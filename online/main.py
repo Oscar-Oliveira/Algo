@@ -337,6 +337,19 @@ async def rota_fluxograma(request: Request, id_estudante: int = Depends(estudant
     return resultado
 
 
+@app.post("/api/linter")
+async def rota_linter(request: Request, id_estudante: int = Depends(estudante_atual)):
+    dados = await request.json()
+    pseudonimo = autenticacao.obter_id_pseudonimo(id_estudante)
+    pasta_estudante = executor.preparar_pasta_estudante(pseudonimo)
+    try:
+        avisos = executor.analisar_linter(
+            dados.get("ficheiros", []), dados.get("principal", ""), pasta_estudante)
+    except executor.ErroCompilacao as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"avisos": avisos}
+
+
 @app.post("/api/rasto")
 async def rota_rasto(request: Request, id_estudante: int = Depends(estudante_atual)):
     dados = await request.json()

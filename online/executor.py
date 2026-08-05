@@ -30,6 +30,7 @@ from algo_lang.compilador.parser import ErroSintatico
 from algo_lang.compilador.codegen import gerar_python, gerar_python_com_mapa
 from algo_lang.tools.flowchart import gerar_dot
 from algo_lang.tools.tracer import gerar_trace
+from algo_lang.tools import linter as linter_modulo
 
 PASTA_EXECUCOES_POR_OMISSAO = os.path.join(tempfile.gettempdir(), "algo_online_execucoes")
 
@@ -342,6 +343,23 @@ def gerar_fluxograma_svg(ficheiros: list[dict], nome_principal: str, pasta_estud
         svg = f.read()
 
     return {"svg": svg, "rotinas": rotinas_disponiveis, "rotina_atual": rotina_atual}
+
+
+# ---------- linter ----------
+
+def analisar_linter(ficheiros: list[dict], nome_principal: str, pasta_estudante: str) -> list[dict]:
+    """Corre o linter (algo_lang.tools.linter) sobre o programa do
+    estudante logo que o parse tenha sucesso -- ao contrário de
+    compilar_codigo, NÃO chama verificar(): o linter só percorre a
+    AST, não precisa dela ser semanticamente válida, e os erros de
+    compilação já são mostrados em separado pelo frontend (ver
+    ErroCompilacao). Devolve uma lista de {"mensagem": str, "linha":
+    int}, uma por aviso, na mesma ordem (por linha) que Linter.
+    analisar() já garante."""
+    programa, _ = _escrever_ficheiros_e_analisar(ficheiros, nome_principal, pasta_estudante)
+    codigo_principal = next(f["conteudo"] for f in ficheiros if f["nome"] == nome_principal)
+    avisos = linter_modulo.analisar(programa, codigo_principal)
+    return [{"mensagem": a.mensagem, "linha": a.linha} for a in avisos]
 
 
 # ---------- rasto (tracer) ----------

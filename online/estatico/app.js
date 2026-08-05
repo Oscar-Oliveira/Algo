@@ -380,15 +380,17 @@ modalAdmin.addEventListener("click", (evento) => {
 const vistaExecucao = document.getElementById("vista-execucao");
 const vistaRasto = document.getElementById("vista-rasto");
 const vistaFluxograma = document.getElementById("vista-fluxograma");
+const vistaLinter = document.getElementById("vista-linter");
 const tituloPainelExecucao = document.getElementById("titulo-painel-execucao");
 const botaoVoltarExecucao = document.getElementById("botao-voltar-execucao");
 
-const TITULOS_VISTA_PAINEL_TERMINAL = { execucao: "Execução", rasto: "Rasto", fluxograma: "Fluxograma" };
+const TITULOS_VISTA_PAINEL_TERMINAL = { execucao: "Execução", rasto: "Rasto", fluxograma: "Fluxograma", linter: "Linter" };
 
 function mostrarVistaPainelTerminal(nome) {
   vistaExecucao.classList.toggle("escondido", nome !== "execucao");
   vistaRasto.classList.toggle("escondido", nome !== "rasto");
   vistaFluxograma.classList.toggle("escondido", nome !== "fluxograma");
+  vistaLinter.classList.toggle("escondido", nome !== "linter");
   tituloPainelExecucao.textContent = TITULOS_VISTA_PAINEL_TERMINAL[nome];
   botaoVoltarExecucao.classList.toggle("escondido", nome === "execucao");
   if (nome === "rasto") {
@@ -447,6 +449,49 @@ document.getElementById("botao-fluxograma").addEventListener("click", () => {
 
 campoRotinaFluxograma.addEventListener("change", () => {
   carregarFluxograma(campoRotinaFluxograma.value);
+});
+
+// ---------- linter ----------
+// Corre mesmo que o programa não compile por erro semântico -- só um
+// erro de sintaxe/inclusão (ErroCompilacao) impede a análise; ver a
+// nota em executor.analisar_linter sobre porquê.
+
+async function carregarLinter() {
+  const conteudo = document.getElementById("conteudo-linter");
+  conteudo.innerHTML = "<p>A analisar…</p>";
+  try {
+    const resposta = await fetch("/api/linter", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(obterTodosOsFicheiros()),
+    });
+    const dados = await resposta.json();
+    if (!resposta.ok) {
+      conteudo.innerHTML = `<p class="mensagem-erro">${dados.detail || "Não foi possível correr o linter."}</p>`;
+      return;
+    }
+    if (dados.avisos.length === 0) {
+      conteudo.innerHTML = "<p>✔ Nenhum aviso — o linter não encontrou nada a assinalar.</p>";
+      return;
+    }
+    const lista = document.createElement("ul");
+    lista.className = "lista-avisos-linter";
+    dados.avisos.forEach((aviso) => {
+      const item = document.createElement("li");
+      item.textContent = `linha ${aviso.linha}: ${aviso.mensagem}`;
+      lista.appendChild(item);
+    });
+    conteudo.innerHTML = "";
+    conteudo.appendChild(lista);
+  } catch (erro) {
+    console.error(erro);
+    conteudo.innerHTML = `<p class="mensagem-erro">Não foi possível contactar o servidor: ${erro && erro.message ? erro.message : erro}</p>`;
+  }
+}
+
+document.getElementById("botao-linter").addEventListener("click", () => {
+  mostrarVistaPainelTerminal("linter");
+  carregarLinter();
 });
 
 // ---------- rasto: gera o JSON, oferece download + link para o visualizador autónomo ----------

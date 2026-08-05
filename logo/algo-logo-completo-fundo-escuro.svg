@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" role="img">
+  <title>Algo</title>
+  <desc>Logótipo do Algo: um triângulo construído a partir de quatro degraus ascendentes ao lado do nome "Algo" em tipo serifado, sobre fundo escuro.</desc>
+  <defs>
+    <linearGradient id="algoDegrausCompleto" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0bd5e"/>
+      <stop offset="100%" stop-color="#c98d24"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="520" height="160" fill="#1a1f2e"/>
+
+  <g transform="translate(28, 22) scale(0.5)">
+    <rect x="96"  y="35"  width="48"  height="35" rx="6" fill="url(#algoDegrausCompleto)"/>
+    <rect x="74"  y="75"  width="92"  height="35" rx="6" fill="url(#algoDegrausCompleto)"/>
+    <rect x="52"  y="115" width="136" height="35" rx="6" fill="url(#algoDegrausCompleto)"/>
+    <rect x="30"  y="155" width="180" height="35" rx="6" fill="url(#algoDegrausCompleto)"/>
+  </g>
+
+  <text x="170" y="105" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-weight="600" fill="#f0ede4">Algo</text>
+</svg>

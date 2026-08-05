@@ -383,3 +383,45 @@ def test_gerar_rasto_com_incluir(tmp_path):
     assert rasto["consolaFinal"] == "10\n"
 
 
+# ---------- linter ----------
+
+def test_analisar_linter_sem_avisos(tmp_path):
+    ficheiros, principal = _um_ficheiro('algoritmo "T"\ninicio\n    escrever("ola")\n')
+    avisos = executor.analisar_linter(ficheiros, principal, str(tmp_path))
+    assert avisos == []
+
+
+def test_analisar_linter_variavel_nao_usada(tmp_path):
+    ficheiros, principal = _um_ficheiro('algoritmo "T"\ninicio\n    a:inteiro = 1\n    escrever("ola")\n')
+    avisos = executor.analisar_linter(ficheiros, principal, str(tmp_path))
+    assert len(avisos) == 1
+    assert "a" in avisos[0]["mensagem"]
+    assert avisos[0]["linha"] == 3
+
+
+def test_analisar_linter_erro_de_sintaxe(tmp_path):
+    ficheiros, principal = _um_ficheiro("algoritmo sem aspas\n")
+    with pytest.raises(executor.ErroCompilacao):
+        executor.analisar_linter(ficheiros, principal, str(tmp_path))
+
+
+def test_analisar_linter_corre_mesmo_com_erro_semantico(tmp_path):
+    """Ao contrário de compilar_codigo, analisar_linter não chama
+    verificar() -- um erro semântico (aqui, somar inteiro com texto)
+    não deve impedir o linter de correr sobre a AST já obtida."""
+    ficheiros, principal = _um_ficheiro(
+        'algoritmo "T"\ninicio\n    a:inteiro = 1\n    escrever(a + "x")\n')
+    avisos = executor.analisar_linter(ficheiros, principal, str(tmp_path))
+    assert avisos == []
+
+
+def test_analisar_linter_com_incluir(tmp_path):
+    principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(5))\n'
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"
+    avisos = executor.analisar_linter(
+        [{"nome": "principal.algo", "conteudo": principal},
+         {"nome": "lib.algo", "conteudo": biblioteca}],
+        "principal.algo", str(tmp_path))
+    assert avisos == []
+
+
