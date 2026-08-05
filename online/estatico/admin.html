@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Algo — admin</title>
+<link rel="stylesheet" href="/estatico/estilo.css">
+</head>
+<body class="pagina-entrada">
+  <main class="cartao-entrada cartao-admin">
+    <div class="marca">
+      <span class="marca-simbolo">Δ</span>
+      <h1>Contas pendentes</h1>
+    </div>
+    <p class="subtitulo">Contas que se registaram e aguardam aprovação para poderem entrar.</p>
+
+    <table class="tabela-admin">
+      <thead>
+        <tr><th>Email</th><th>Registada em</th><th></th></tr>
+      </thead>
+      <tbody id="corpo-tabela-pendentes"></tbody>
+    </table>
+    <p id="mensagem-sem-pendentes" class="ajuda-campo escondido">Não há nenhuma conta à espera de aprovação.</p>
+    <p class="mensagem-erro" id="mensagem-erro-admin"></p>
+
+    <a href="/editor" class="botao-ligacao ligacao-voltar">← voltar ao editor</a>
+  </main>
+  <script src="/estatico/admin.js"></script>
+</body>
+</html>

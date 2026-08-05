@@ -21,9 +21,14 @@ async function submeter(formId, url) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dados),
       });
+      const corpo = await resposta.json();
       if (!resposta.ok) {
-        const corpo = await resposta.json();
         mensagemErro.textContent = corpo.detail || "Algo correu mal.";
+        return;
+      }
+      if (corpo.pendente) {
+        mensagemErro.style.color = "var(--sucesso)";
+        mensagemErro.textContent = "A tua conta foi criada. Aguarda a aprovação de um administrador antes de poderes entrar.";
         return;
       }
       window.location.href = "/editor";

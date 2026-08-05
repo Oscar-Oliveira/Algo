@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS estudante (
     email TEXT NOT NULL UNIQUE,
     password_hash BLOB NOT NULL,
     id_pseudonimo TEXT NOT NULL UNIQUE,
-    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+    criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    aprovado INTEGER NOT NULL DEFAULT 1,
+    admin INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS credencial_llm (
@@ -38,6 +40,22 @@ CREATE TABLE IF NOT EXISTS credencial_llm (
 );
 """
 
+# 'aprovado'/'admin' foram acrescentados depois da primeira versão do
+# esquema -- CREATE TABLE IF NOT EXISTS não os acrescenta a uma base de
+# dados já existente, por isso preparar_bd() confirma-os à parte, coluna
+# a coluna, com ALTER TABLE (idempotente: só corre se a coluna faltar).
+_COLUNAS_NOVAS_ESTUDANTE = {
+    "aprovado": "ALTER TABLE estudante ADD COLUMN aprovado INTEGER NOT NULL DEFAULT 1",
+    "admin": "ALTER TABLE estudante ADD COLUMN admin INTEGER NOT NULL DEFAULT 0",
+}
+
+
+def _migrar_colunas_estudante(ligacao: sqlite3.Connection) -> None:
+    colunas_existentes = {linha["name"] for linha in ligacao.execute("PRAGMA table_info(estudante)")}
+    for coluna, comando in _COLUNAS_NOVAS_ESTUDANTE.items():
+        if coluna not in colunas_existentes:
+            ligacao.execute(comando)
+
 
 def obter_ligacao(caminho_bd: str | None = None) -> sqlite3.Connection:
     if caminho_bd is None:
@@ -49,10 +67,12 @@ def obter_ligacao(caminho_bd: str | None = None) -> sqlite3.Connection:
 
 
 def preparar_bd(caminho_bd: str | None = None) -> None:
-    """Cria as tabelas se ainda não existirem -- chamar uma vez ao
-    arrancar a aplicação (idempotente, seguro chamar sempre)."""
+    """Cria as tabelas se ainda não existirem, e aplica migrações de
+    colunas a bases de dados mais antigas -- chamar uma vez ao arrancar
+    a aplicação (idempotente, seguro chamar sempre)."""
     with obter_ligacao(caminho_bd) as ligacao:
         ligacao.executescript(ESQUEMA)
+        _migrar_colunas_estudante(ligacao)
 
 
 @contextmanager

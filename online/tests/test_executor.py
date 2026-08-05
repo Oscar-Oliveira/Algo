@@ -305,6 +305,19 @@ def test_gerar_rasto_simples(tmp_path):
     assert len(rasto["passos"]) > 0
 
 
+def test_gerar_rasto_inclui_as_chaves_que_o_visualizador_exige(tmp_path):
+    """O visualizador (visualizador/algo-trace-viewer.html) recusa
+    ficheiros sem 'passos'/'codigoFonte' -- confirma que o envelope
+    devolvido aqui tem exatamente as mesmas chaves que
+    algo_lang.cli.cmd_executa_com_trace escreve no '..._trace.json'."""
+    codigo = 'algoritmo "Dobro"\ninicio\n    a:inteiro\n    ler(a)\n    escrever(a*2)\n'
+    ficheiros, principal = _um_ficheiro(codigo)
+    rasto = executor.gerar_rasto(ficheiros, principal, ["5"], str(tmp_path))
+    assert rasto["titulo"] == "Dobro"
+    assert rasto["ficheiro"] == principal
+    assert rasto["codigoFonte"] == codigo.splitlines()
+
+
 def test_gerar_rasto_erro_de_compilacao(tmp_path):
     ficheiros, principal = _um_ficheiro("algoritmo sem aspas\n")
     with pytest.raises(executor.ErroCompilacao):

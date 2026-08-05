@@ -208,9 +208,10 @@ document.getElementById("botao-mostrar-ficheiro").addEventListener("click", () =
 
 ligarAlguem();
 
-// ---------- definições do LLM ----------
+// ---------- definições do LLM (vivem dentro do painel do Alguem) ----------
 
-const modalDefinicoes = document.getElementById("modal-definicoes");
+const vistaConversaAlguem = document.getElementById("vista-conversa-alguem");
+const vistaDefinicoesAlguem = document.getElementById("vista-definicoes-alguem");
 const campoFornecedor = document.getElementById("campo-fornecedor");
 const rotuloApiKey = document.getElementById("rotulo-api-key");
 const rotuloHost = document.getElementById("rotulo-host");
@@ -223,7 +224,8 @@ function atualizarCamposFornecedor() {
 campoFornecedor.addEventListener("change", atualizarCamposFornecedor);
 
 async function abrirDefinicoes() {
-  modalDefinicoes.classList.remove("escondido");
+  vistaConversaAlguem.classList.add("escondido");
+  vistaDefinicoesAlguem.classList.remove("escondido");
   try {
     const resposta = await fetch("/api/credencial");
     const dados = await resposta.json();
@@ -236,10 +238,13 @@ async function abrirDefinicoes() {
   atualizarCamposFornecedor();
 }
 
-document.getElementById("botao-definicoes").addEventListener("click", abrirDefinicoes);
-document.getElementById("botao-fechar-definicoes").addEventListener("click", () => {
-  modalDefinicoes.classList.add("escondido");
-});
+function fecharDefinicoes() {
+  vistaDefinicoesAlguem.classList.add("escondido");
+  vistaConversaAlguem.classList.remove("escondido");
+}
+
+document.getElementById("botao-definicoes-alguem").addEventListener("click", abrirDefinicoes);
+document.getElementById("botao-fechar-definicoes").addEventListener("click", fecharDefinicoes);
 
 document.getElementById("form-definicoes").addEventListener("submit", async (evento) => {
   evento.preventDefault();
@@ -257,7 +262,7 @@ document.getElementById("form-definicoes").addEventListener("submit", async (eve
       mensagemErro.textContent = corpo.detail || "Algo correu mal.";
       return;
     }
-    modalDefinicoes.classList.add("escondido");
+    fecharDefinicoes();
     ligarAlguem();
   } catch (erro) {
     console.error(erro);
@@ -270,9 +275,54 @@ document.getElementById("botao-sair").addEventListener("click", async () => {
   window.location.href = "/";
 });
 
+// só mostra a ligação para o painel de admin a quem realmente é admin
+// -- evita um link morto (403) para todos os outros estudantes
+(async () => {
+  try {
+    const resposta = await fetch("/api/eu");
+    const dados = await resposta.json();
+    if (dados.admin) {
+      const ligacao = document.createElement("a");
+      ligacao.href = "/admin";
+      ligacao.className = "botao-secundario";
+      ligacao.style.textDecoration = "none";
+      ligacao.textContent = "Painel de admin";
+      document.querySelector(".acoes-topo").prepend(ligacao);
+    }
+  } catch (erro) { /* silencioso -- só um botão a mais */ }
+})();
+
+// ---------- painel do meio: execução / rasto / fluxograma ----------
+// As três vistas partilham o mesmo painel (nunca ao mesmo tempo) -- só
+// uma fica visível de cada vez, tal como o rasto já fazia antes de
+// existir um terceiro estado.
+
+const vistaExecucao = document.getElementById("vista-execucao");
+const vistaRasto = document.getElementById("vista-rasto");
+const vistaFluxograma = document.getElementById("vista-fluxograma");
+const tituloPainelExecucao = document.getElementById("titulo-painel-execucao");
+const botaoVoltarExecucao = document.getElementById("botao-voltar-execucao");
+
+const TITULOS_VISTA_PAINEL_TERMINAL = { execucao: "Execução", rasto: "Rasto", fluxograma: "Fluxograma" };
+
+function mostrarVistaPainelTerminal(nome) {
+  vistaExecucao.classList.toggle("escondido", nome !== "execucao");
+  vistaRasto.classList.toggle("escondido", nome !== "rasto");
+  vistaFluxograma.classList.toggle("escondido", nome !== "fluxograma");
+  tituloPainelExecucao.textContent = TITULOS_VISTA_PAINEL_TERMINAL[nome];
+  botaoVoltarExecucao.classList.toggle("escondido", nome === "execucao");
+  if (nome === "rasto") {
+    document.getElementById("conteudo-rasto").classList.add("escondido");
+    document.getElementById("form-entradas-rasto").classList.remove("escondido");
+  }
+  if (nome !== "rasto" && ultimoUrlRasto) { URL.revokeObjectURL(ultimoUrlRasto); ultimoUrlRasto = null; }
+}
+
+document.getElementById("botao-rasto").addEventListener("click", () => mostrarVistaPainelTerminal("rasto"));
+botaoVoltarExecucao.addEventListener("click", () => mostrarVistaPainelTerminal("execucao"));
+
 // ---------- fluxograma ----------
 
-const modalFluxograma = document.getElementById("modal-fluxograma");
 const campoRotinaFluxograma = document.getElementById("campo-rotina-fluxograma");
 
 async function carregarFluxograma(nomeRotina) {
@@ -311,7 +361,7 @@ async function carregarFluxograma(nomeRotina) {
 }
 
 document.getElementById("botao-fluxograma").addEventListener("click", () => {
-  modalFluxograma.classList.remove("escondido");
+  mostrarVistaPainelTerminal("fluxograma");
   carregarFluxograma(null);
 });
 
@@ -319,41 +369,12 @@ campoRotinaFluxograma.addEventListener("change", () => {
   carregarFluxograma(campoRotinaFluxograma.value);
 });
 
-document.getElementById("botao-fechar-fluxograma").addEventListener("click", () => {
-  modalFluxograma.classList.add("escondido");
-});
-
 // ---------- rasto: gera o JSON, oferece download + link para o visualizador autónomo ----------
 // (a mesma ferramenta que já existia para uso com `algo executa --json`, não uma
 // navegação passo-a-passo própria -- decisão explícita: reaproveitar o visualizador
 // já existente e testado, em vez de reconstruir a mesma coisa aqui.)
 
-const vistaExecucao = document.getElementById("vista-execucao");
-const vistaRasto = document.getElementById("vista-rasto");
-const tituloPainelExecucao = document.getElementById("titulo-painel-execucao");
-const botaoVoltarExecucao = document.getElementById("botao-voltar-execucao");
-
 let ultimoUrlRasto = null;
-
-function entrarEmModoRasto() {
-  vistaExecucao.classList.add("escondido");
-  vistaRasto.classList.remove("escondido");
-  tituloPainelExecucao.textContent = "Rasto";
-  botaoVoltarExecucao.classList.remove("escondido");
-  document.getElementById("conteudo-rasto").classList.add("escondido");
-  document.getElementById("form-entradas-rasto").classList.remove("escondido");
-}
-
-function sairDoModoRasto() {
-  vistaRasto.classList.add("escondido");
-  vistaExecucao.classList.remove("escondido");
-  tituloPainelExecucao.textContent = "Execução";
-  botaoVoltarExecucao.classList.add("escondido");
-  if (ultimoUrlRasto) { URL.revokeObjectURL(ultimoUrlRasto); ultimoUrlRasto = null; }
-}
-
-document.getElementById("botao-rasto").addEventListener("click", entrarEmModoRasto);
-botaoVoltarExecucao.addEventListener("click", sairDoModoRasto);
 
 document.getElementById("form-entradas-rasto").addEventListener("submit", async (evento) => {
   evento.preventDefault();
@@ -396,6 +417,34 @@ document.getElementById("form-entradas-rasto").addEventListener("submit", async 
     mensagemErro.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
   }
 });
+
+// ---------- esconder/mostrar o painel do Alguem ----------
+
+const painelAlguem = document.querySelector(".painel-alguem");
+const divisorAlguem = document.querySelector('.divisor[data-divisor="1"]');
+const botaoAlternarAlguem = document.getElementById("botao-alternar-alguem");
+
+let ultimasColunasComAlguem = null;
+
+function alternarPainelAlguem() {
+  const disposicao = document.getElementById("disposicao-editor");
+  const escondido = !painelAlguem.classList.contains("escondido");
+  painelAlguem.classList.toggle("escondido", escondido);
+  divisorAlguem.classList.toggle("escondido", escondido);
+
+  const colunas = getComputedStyle(disposicao).gridTemplateColumns.split(" ").map(parseFloat);
+  if (escondido) {
+    ultimasColunasComAlguem = colunas;
+    disposicao.style.gridTemplateColumns = colunas.slice(0, 3).map((c, i) => i === 1 ? "6px" : `${c}px`).join(" ");
+  } else {
+    const restauradas = ultimasColunasComAlguem || colunas.concat(["6px", colunas[0]]);
+    disposicao.style.gridTemplateColumns = restauradas.map((c, i) => i % 2 === 1 ? "6px" : `${c}px`).join(" ");
+  }
+  botaoAlternarAlguem.textContent = escondido ? "Mostrar Alguem" : "Esconder Alguem";
+  if (editor.refresh) editor.refresh();
+}
+
+botaoAlternarAlguem.addEventListener("click", alternarPainelAlguem);
 
 // ---------- painéis redimensionáveis (arrastar os divisores) ----------
 

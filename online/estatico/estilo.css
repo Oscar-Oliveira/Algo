@@ -96,9 +96,20 @@ button { font: inherit; cursor: pointer; }
 
 .mensagem-erro { color: var(--erro); font-size: 0.85rem; margin: 0; min-height: 1.2em; }
 
+/* ---------- painel de admin (contas pendentes) ---------- */
+
+.cartao-admin { width: min(620px, 92vw); }
+.tabela-admin { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+.tabela-admin th { text-align: left; color: #9a9885; font-weight: 500; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0 0.5rem 0.5rem; }
+.tabela-admin td { padding: 0.5rem; border-top: 1px solid #ece7db; vertical-align: middle; }
+.tabela-admin td:last-child { text-align: right; white-space: nowrap; }
+.botao-perigo { background: var(--erro); color: #fff; border: none; padding: 0.4rem 0.7rem; border-radius: 6px; font-weight: 600; font-size: 0.82rem; }
+.tabela-admin .botao-primario { padding: 0.4rem 0.7rem; font-size: 0.82rem; margin-right: 0.4rem; }
+.ligacao-voltar { display: inline-block; margin-top: 0.5rem; }
+
 /* ---------- página do editor ---------- */
 
-.pagina-editor { background: var(--tinta); color: var(--texto-claro); min-height: 100vh; display: flex; flex-direction: column; }
+.pagina-editor { background: var(--tinta); color: var(--texto-claro); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
 .barra-topo {
   display: flex; align-items: center; justify-content: space-between;
@@ -147,6 +158,8 @@ button { font: inherit; cursor: pointer; }
   padding: 0.5rem 0.7rem; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.86rem;
 }
 
+#vista-conversa-alguem { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
 .conversa { flex: 1; overflow-y: auto; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.7rem; }
 .mensagem { max-width: 92%; padding: 0.55rem 0.8rem; border-radius: 10px; font-size: 0.88rem; line-height: 1.5; }
 .mensagem-estudante { align-self: flex-end; background: var(--ambar-forte); color: #fff; }
@@ -156,6 +169,13 @@ button { font: inherit; cursor: pointer; }
 .form-alguem { display: flex; gap: 0.5rem; padding: 0.7rem 1rem; border-top: 1px solid var(--tinta-borda); }
 .form-alguem input { flex: 1; }
 .form-alguem button { background: var(--ambar-forte); color: #fff; border: none; padding: 0 1rem; border-radius: 6px; font-weight: 600; }
+
+.vista-definicoes-alguem { flex: 1; overflow-y: auto; padding: 0.9rem 1rem; }
+.vista-definicoes-alguem .ajuda-campo { color: var(--texto-esmaecido); margin-bottom: 1rem; }
+.vista-definicoes-alguem .formulario input, .vista-definicoes-alguem .formulario select {
+  background: var(--tinta); border-color: var(--tinta-borda); color: var(--texto-claro);
+}
+.vista-definicoes-alguem .formulario label { color: var(--texto-esmaecido); }
 
 .modal {
   position: fixed; inset: 0; background: rgba(15,17,25,0.6); display: flex; align-items: center; justify-content: center; z-index: 10;
@@ -174,7 +194,7 @@ button { font: inherit; cursor: pointer; }
 .modal-cabecalho { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 .modal-cabecalho h2 { color: var(--texto-claro); }
 
-.conteudo-fluxograma { background: #fff; border-radius: 8px; padding: 1rem; overflow-x: auto; }
+.conteudo-fluxograma { background: #fff; border-radius: 8px; padding: 1rem; overflow: auto; flex: 1; min-height: 0; }
 .conteudo-fluxograma svg { max-width: 100%; height: auto; }
 
 .formulario textarea {
@@ -219,7 +239,10 @@ button { font: inherit; cursor: pointer; }
 
 /* ---------- rasto: gerar, descarregar, abrir no visualizador ---------- */
 
-#vista-execucao, .vista-rasto { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+#vista-execucao, .vista-rasto, .vista-fluxograma { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+.vista-fluxograma { padding: 0.8rem 1rem; gap: 0.5rem; }
+.vista-fluxograma .seletor-rotina { margin-bottom: 0; }
 
 .form-entradas-rasto { padding: 0.8rem 1rem; border-bottom: 1px solid var(--tinta-borda); }
 .form-entradas-rasto label { font-size: 0.82rem; color: var(--texto-esmaecido); display: block; margin-bottom: 0.5rem; }

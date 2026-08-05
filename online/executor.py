@@ -344,7 +344,13 @@ def gerar_rasto(ficheiros: list[dict], nome_principal: str, entradas: list[str],
     -- decisão explícita de âmbito para esta primeira versão: um
     programa a pedir mais entradas do que as fornecidas simplesmente
     para, tal como já acontece na ferramenta local). Devolve o
-    dicionário de rasto, pronto a devolver como JSON."""
+    resultado cru de gerar_trace() ACRESCIDO de titulo/ficheiro/
+    codigoFonte -- os mesmos três campos que algo_lang.cli.
+    cmd_executa_com_trace escreve no ficheiro '..._trace.json', e que
+    o visualizador (visualizador/algo-trace-viewer.html) exige para
+    aceitar o ficheiro. Mantém 'consolaFinal' (que o CLI não grava no
+    .json) porque este dicionário também é devolvido diretamente pelo
+    endpoint /api/rasto, e o frontend já o usa antes do download."""
     programa, _ = _escrever_ficheiros_e_analisar(ficheiros, nome_principal, pasta_estudante)
     try:
         verificar(programa)
@@ -358,10 +364,18 @@ def gerar_rasto(ficheiros: list[dict], nome_principal: str, entradas: list[str],
         f.write(dados["codigo"])
 
     try:
-        return gerar_trace(
+        resultado = gerar_trace(
             dados["codigo"], caminho_py, dados["mapa_linhas"],
             dados["nomes_globais"], dados["nomes_funcoes"], entradas=entradas)
     except Exception as e:
         raise ErroRasto(f"Não foi possível gerar o rasto: {e}") from e
+
+    codigo_principal = next(f["conteudo"] for f in ficheiros if f["nome"] == nome_principal)
+    return {
+        **resultado,
+        "titulo": programa.nome,
+        "ficheiro": nome_principal,
+        "codigoFonte": codigo_principal.splitlines(),
+    }
 
 

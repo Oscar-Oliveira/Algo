@@ -80,6 +80,14 @@ def estudante_atual(request: Request) -> int:
     return id_estudante
 
 
+def admin_atual(id_estudante: int = Depends(estudante_atual)) -> int:
+    """Dependência: como estudante_atual, mas exige também que a conta
+    seja admin (ver autenticacao.eh_admin) -- 403 caso contrário."""
+    if not autenticacao.eh_admin(id_estudante):
+        raise HTTPException(status_code=403, detail="Só administradores podem aceder a isto.")
+    return id_estudante
+
+
 @app.post("/api/registar")
 async def rota_registar(request: Request):
     dados = await request.json()
@@ -87,8 +95,10 @@ async def rota_registar(request: Request):
         id_estudante = autenticacao.registar(dados.get("email", ""), dados.get("password", ""))
     except autenticacao.ErroAutenticacao as e:
         raise HTTPException(status_code=400, detail=str(e))
-    request.session["id_estudante"] = id_estudante
-    return {"ok": True}
+    aprovado = autenticacao.esta_aprovado(id_estudante)
+    if aprovado:
+        request.session["id_estudante"] = id_estudante
+    return {"ok": True, "pendente": not aprovado}
 
 
 @app.post("/api/entrar")
@@ -105,6 +115,32 @@ async def rota_entrar(request: Request):
 @app.post("/api/sair")
 async def rota_sair(request: Request):
     request.session.clear()
+    return {"ok": True}
+
+
+@app.get("/api/eu")
+async def rota_eu(id_estudante: int = Depends(estudante_atual)):
+    """Usado pelo frontend só para decidir se mostra a ligação para o
+    painel de admin -- não devolve mais nada sobre a conta."""
+    return {"admin": autenticacao.eh_admin(id_estudante)}
+
+
+# ---------- administração: aprovar/rejeitar contas pendentes ----------
+
+@app.get("/api/admin/pendentes")
+async def rota_admin_pendentes(id_estudante: int = Depends(admin_atual)):
+    return {"pendentes": autenticacao.listar_pendentes()}
+
+
+@app.post("/api/admin/aprovar/{id_estudante_alvo}")
+async def rota_admin_aprovar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+    autenticacao.aprovar_conta(id_estudante_alvo)
+    return {"ok": True}
+
+
+@app.post("/api/admin/rejeitar/{id_estudante_alvo}")
+async def rota_admin_rejeitar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+    autenticacao.rejeitar_conta(id_estudante_alvo)
     return {"ok": True}
 
 
@@ -150,6 +186,14 @@ async def pagina_editor(request: Request):
     if request.session.get("id_estudante") is None:
         return RedirectResponse("/")
     return FileResponse(os.path.join(PASTA_ESTATICO, "editor.html"))
+
+
+@app.get("/admin")
+async def pagina_admin(request: Request):
+    id_estudante = request.session.get("id_estudante")
+    if id_estudante is None or not autenticacao.eh_admin(id_estudante):
+        return RedirectResponse("/editor")
+    return FileResponse(os.path.join(PASTA_ESTATICO, "admin.html"))
 
 
 @app.get("/modo-algo.js")

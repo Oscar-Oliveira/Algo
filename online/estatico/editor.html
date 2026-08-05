@@ -12,7 +12,7 @@
   <header class="barra-topo">
     <div class="marca marca-pequena"><span class="marca-simbolo">Δ</span> Algo</div>
     <div class="acoes-topo">
-      <button id="botao-definicoes" class="botao-secundario">Definições do LLM</button>
+      <button id="botao-alternar-alguem" class="botao-secundario">Esconder Alguem</button>
       <button id="botao-sair" class="botao-secundario">Sair</button>
     </div>
   </header>
@@ -67,6 +67,13 @@
           <p class="ajuda-campo">No visualizador, carrega o ficheiro que acabaste de descarregar (o visualizador não recebe o ficheiro automaticamente — é a mesma ferramenta autónoma usada com <code>algo executa --json</code>).</p>
         </div>
       </div>
+
+      <div id="vista-fluxograma" class="vista-fluxograma escondido">
+        <label class="seletor-rotina">Ver fluxograma de:
+          <select id="campo-rotina-fluxograma"></select>
+        </label>
+        <div id="conteudo-fluxograma" class="conteudo-fluxograma"></div>
+      </div>
     </section>
 
     <div class="divisor" data-divisor="1"></div>
@@ -74,62 +81,52 @@
     <section class="painel painel-alguem">
       <div class="painel-cabecalho">
         <span>Alguem — o teu tutor</span>
-        <button id="botao-mostrar-ficheiro" class="botao-ligacao">mostrar-lhe o meu código</button>
+        <div class="acoes-codigo">
+          <button id="botao-mostrar-ficheiro" class="botao-ligacao">mostrar-lhe o meu código</button>
+          <button id="botao-definicoes-alguem" class="botao-ligacao" title="Definições do LLM">⚙ definições</button>
+        </div>
       </div>
-      <div id="conversa-alguem" class="conversa"></div>
-      <form id="form-alguem" class="form-alguem">
-        <input type="text" id="entrada-alguem" autocomplete="off" placeholder="Pergunta ao Alguem…">
-        <button type="submit">Enviar</button>
-      </form>
+
+      <div id="vista-conversa-alguem">
+        <div id="conversa-alguem" class="conversa"></div>
+        <form id="form-alguem" class="form-alguem">
+          <input type="text" id="entrada-alguem" autocomplete="off" placeholder="Pergunta ao Alguem…">
+          <button type="submit">Enviar</button>
+        </form>
+      </div>
+
+      <div id="vista-definicoes-alguem" class="vista-definicoes-alguem escondido">
+        <p class="ajuda-campo">A tua chave fica cifrada no servidor. Só é usada para chamar o Alguem em teu nome.</p>
+        <form id="form-definicoes" class="formulario">
+          <label>Fornecedor
+            <select name="fornecedor" id="campo-fornecedor">
+              <option value="openrouter">OpenRouter</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="huggingface">HuggingFace</option>
+              <option value="ollama">Ollama (local, sem chave)</option>
+              <option value="opencode">OpenCode Go</option>
+            </select>
+          </label>
+          <label>Modelo
+            <input type="text" name="modelo" id="campo-modelo" placeholder="ex: openai/gpt-4o-mini" required>
+          </label>
+          <label id="rotulo-api-key">Chave de API
+            <input type="password" name="api_key" id="campo-api-key" autocomplete="off">
+          </label>
+          <label id="rotulo-host" class="escondido">Endereço da Ollama
+            <input type="text" name="host" id="campo-host" placeholder="http://localhost:11434">
+          </label>
+          <div class="acoes-modal">
+            <button type="button" id="botao-fechar-definicoes" class="botao-secundario">Fechar</button>
+            <button type="submit" class="botao-primario">Guardar</button>
+          </div>
+          <p class="mensagem-erro" data-form="definicoes"></p>
+        </form>
+      </div>
     </section>
   </main>
-
-  <div id="modal-fluxograma" class="modal escondido">
-    <div class="modal-caixa modal-caixa-larga">
-      <div class="modal-cabecalho">
-        <h2>Fluxograma</h2>
-        <button type="button" id="botao-fechar-fluxograma" class="botao-secundario">Fechar</button>
-      </div>
-      <label class="seletor-rotina">Ver fluxograma de:
-        <select id="campo-rotina-fluxograma"></select>
-      </label>
-      <div id="conteudo-fluxograma" class="conteudo-fluxograma"></div>
-    </div>
-  </div>
-
-  <div id="modal-definicoes" class="modal escondido">
-    <div class="modal-caixa">
-      <h2>Definições do LLM</h2>
-      <p class="ajuda-campo">A tua chave fica cifrada no servidor. Só é usada para chamar o Alguem em teu nome.</p>
-      <form id="form-definicoes" class="formulario">
-        <label>Fornecedor
-          <select name="fornecedor" id="campo-fornecedor">
-            <option value="openrouter">OpenRouter</option>
-            <option value="gemini">Google Gemini</option>
-            <option value="openai">OpenAI</option>
-            <option value="anthropic">Anthropic (Claude)</option>
-            <option value="huggingface">HuggingFace</option>
-            <option value="ollama">Ollama (local, sem chave)</option>
-            <option value="opencode">OpenCode Go</option>
-          </select>
-        </label>
-        <label>Modelo
-          <input type="text" name="modelo" id="campo-modelo" placeholder="ex: openai/gpt-4o-mini" required>
-        </label>
-        <label id="rotulo-api-key">Chave de API
-          <input type="password" name="api_key" id="campo-api-key" autocomplete="off">
-        </label>
-        <label id="rotulo-host" class="escondido">Endereço da Ollama
-          <input type="text" name="host" id="campo-host" placeholder="http://localhost:11434">
-        </label>
-        <div class="acoes-modal">
-          <button type="button" id="botao-fechar-definicoes" class="botao-secundario">Fechar</button>
-          <button type="submit" class="botao-primario">Guardar</button>
-        </div>
-        <p class="mensagem-erro" data-form="definicoes"></p>
-      </form>
-    </div>
-  </div>
 
   <script src="/estatico/vendor/codemirror/codemirror.js"></script>
   <script src="/estatico/vendor/codemirror/simple.js"></script>

@@ -101,6 +101,82 @@ def test_id_pseudonimo_diferente_do_id_da_conta():
     uuid.UUID(pseudo)
 
 
+# ---------- aprovação de contas (admin) ----------
+# ONLINE_EMAIL_ADMIN por omissão não está definida em nenhum teste
+# acima -- por isso o registo continua sempre aberto (aprovado=1
+# automaticamente) em todos eles, sem precisar de nenhuma alteração.
+# Estes testes é que ligam o "gate", só dentro de si próprios.
+
+def test_sem_admin_configurado_conta_fica_logo_aprovada(monkeypatch):
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    id_est = autenticacao.registar("a@b.com", "password123")
+    assert autenticacao.esta_aprovado(id_est) is True
+    assert autenticacao.autenticar("a@b.com", "password123") == id_est
+
+
+def test_email_admin_fica_logo_aprovado_e_e_admin(monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    id_est = autenticacao.registar("professor@escola.pt", "password123")
+    assert autenticacao.esta_aprovado(id_est) is True
+    assert autenticacao.eh_admin(id_est) is True
+    assert autenticacao.autenticar("professor@escola.pt", "password123") == id_est
+
+
+def test_conta_normal_fica_pendente_quando_ha_admin_configurado(monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    id_est = autenticacao.registar("aluno@escola.pt", "password123")
+    assert autenticacao.esta_aprovado(id_est) is False
+    assert autenticacao.eh_admin(id_est) is False
+    with pytest.raises(autenticacao.ErroAutenticacao, match="pendente"):
+        autenticacao.autenticar("aluno@escola.pt", "password123")
+
+
+def test_aprovar_conta_permite_entrar(monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    id_est = autenticacao.registar("aluno@escola.pt", "password123")
+    autenticacao.aprovar_conta(id_est)
+    assert autenticacao.autenticar("aluno@escola.pt", "password123") == id_est
+
+
+def test_rejeitar_conta_remove_a_conta_pendente(monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    id_est = autenticacao.registar("aluno@escola.pt", "password123")
+    autenticacao.rejeitar_conta(id_est)
+    assert autenticacao.listar_pendentes() == []
+    with pytest.raises(autenticacao.ErroAutenticacao, match="incorretos"):
+        autenticacao.autenticar("aluno@escola.pt", "password123")
+
+
+def test_rejeitar_conta_nao_apaga_conta_ja_aprovada(monkeypatch):
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    id_est = autenticacao.registar("a@b.com", "password123")
+    autenticacao.rejeitar_conta(id_est)  # já aprovada -- rejeitar não faz nada
+    assert autenticacao.autenticar("a@b.com", "password123") == id_est
+
+
+def test_listar_pendentes_so_mostra_contas_por_aprovar(monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    autenticacao.registar("professor@escola.pt", "password123")
+    id_pendente = autenticacao.registar("aluno@escola.pt", "password123")
+    pendentes = autenticacao.listar_pendentes()
+    assert [p["id"] for p in pendentes] == [id_pendente]
+    assert pendentes[0]["email"] == "aluno@escola.pt"
+
+
+def test_admin_configurado_depois_da_conta_ja_existir(monkeypatch):
+    """Bootstrap tardio: a conta do professor foi criada ANTES de
+    ONLINE_EMAIL_ADMIN estar configurada -- autenticar() tem de a
+    promover a admin/aprovada na primeira vez que entra, não deixá-la
+    bloqueada para sempre."""
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    id_est = autenticacao.registar("professor@escola.pt", "password123")
+    assert autenticacao.eh_admin(id_est) is False
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    assert autenticacao.autenticar("professor@escola.pt", "password123") == id_est
+    assert autenticacao.eh_admin(id_est) is True
+
+
 # ---------- credenciais ----------
 
 def test_sem_credencial_configurada():

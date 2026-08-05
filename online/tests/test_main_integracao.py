@@ -75,6 +75,96 @@ def test_sair_remove_o_acesso(cliente):
     assert r.status_code == 307
 
 
+# ---------- aprovação de contas (admin) ----------
+# Nenhum teste acima define ONLINE_EMAIL_ADMIN -- por isso continuam
+# todos a registar+entrar exatamente como antes (gate desligado).
+
+def test_registar_com_admin_configurado_fica_pendente_e_sem_sessao(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    r = cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    assert r.status_code == 200
+    assert r.json()["pendente"] is True
+    assert cliente.get("/editor", follow_redirects=False).status_code == 307
+
+
+def test_entrar_com_conta_pendente_da_403(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    r = cliente.post("/api/entrar", json={"email": "aluno@escola.pt", "password": "password123"})
+    assert r.status_code == 401
+    assert "pendente" in r.json()["detail"]
+
+
+def test_admin_pendentes_exige_admin(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    r = cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    assert r.status_code == 200
+
+    r = cliente.get("/api/admin/pendentes")
+    assert r.status_code == 200
+    emails = [c["email"] for c in r.json()["pendentes"]]
+    assert emails == ["aluno@escola.pt"]
+
+
+def test_admin_pendentes_bloqueado_para_nao_admin(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = cliente.get("/api/admin/pendentes")
+    assert r.status_code == 403
+
+
+def test_admin_aprova_conta_pendente(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+
+    pendentes = cliente.get("/api/admin/pendentes").json()["pendentes"]
+    id_aluno = pendentes[0]["id"]
+    r = cliente.post(f"/api/admin/aprovar/{id_aluno}")
+    assert r.status_code == 200
+
+    cliente.post("/api/sair")
+    r = cliente.post("/api/entrar", json={"email": "aluno@escola.pt", "password": "password123"})
+    assert r.status_code == 200
+
+
+def test_admin_rejeita_conta_pendente(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+
+    pendentes = cliente.get("/api/admin/pendentes").json()["pendentes"]
+    id_aluno = pendentes[0]["id"]
+    r = cliente.post(f"/api/admin/rejeitar/{id_aluno}")
+    assert r.status_code == 200
+    assert cliente.get("/api/admin/pendentes").json()["pendentes"] == []
+
+
+def test_api_eu_reflete_se_a_conta_e_admin(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    assert cliente.get("/api/eu").json() == {"admin": True}
+
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    assert cliente.get("/api/eu").json() == {"admin": False}
+
+
+def test_pagina_admin_redireciona_quem_nao_e_admin(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.get("/admin", follow_redirects=False)
+    assert r.status_code == 307
+    assert r.headers["location"] == "/editor"
+
+
 # ---------- credenciais ----------
 
 def test_credencial_exige_autenticacao(cliente):
@@ -282,6 +372,11 @@ def test_rasto_com_entradas_antecipadas(cliente):
     assert dados["consolaFinal"] == "10\n"
     assert dados["erro"] is None
     assert len(dados["passos"]) > 0
+    # o visualizador (visualizador/algo-trace-viewer.html) exige estas
+    # três chaves no ficheiro descarregado -- ver executor.gerar_rasto
+    assert dados["titulo"] == "T"
+    assert dados["ficheiro"] == "principal.algo"
+    assert dados["codigoFonte"] == ['algoritmo "T"', "inicio", "    a:inteiro", "    ler(a)", "    escrever(a*2)"]
 
 
 def test_rasto_erro_de_compilacao(cliente):
