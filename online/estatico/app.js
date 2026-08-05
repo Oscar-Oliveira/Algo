@@ -565,7 +565,9 @@ function alternarPainelAlguem() {
     const restauradas = ultimasColunasComAlguem || colunas.concat(["6px", colunas[0]]);
     disposicao.style.gridTemplateColumns = restauradas.map((c, i) => i % 2 === 1 ? "6px" : `${c}fr`).join(" ");
   }
-  botaoAlternarAlguem.textContent = escondido ? "👁" : "🙈";
+  const ICONE_OLHO = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const ICONE_OLHO_FECHADO = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 20c-7 0-11-8-11-8a18.6 18.6 0 0 1 4.2-5.2M9.9 5.2A9.7 9.7 0 0 1 12 5c7 0 11 8 11 8a18.4 18.4 0 0 1-2.2 3.1M14.1 14.1a3 3 0 1 1-4.2-4.2"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
+  botaoAlternarAlguem.innerHTML = escondido ? ICONE_OLHO : ICONE_OLHO_FECHADO;
   botaoAlternarAlguem.title = escondido ? "Mostrar Alguem" : "Esconder Alguem";
   if (editor.refresh) editor.refresh();
 }

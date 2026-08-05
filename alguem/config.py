@@ -26,7 +26,7 @@ def carregar_config(caminho: str = CAMINHO_CONFIG_POR_OMISSAO) -> dict:
         raise ErroConfiguracao(
             f"Não encontrei '{caminho}'.\n"
             f"Copia '{exemplo}' para '{caminho}' e preenche o fornecedor, "
-            f"o modelo e a tua chave de API antes de chamares o Alguem."
+            f"o modelo e a tua chave de API antes de chamares Alguem."
         )
     with open(caminho, "r", encoding="utf-8") as f:
         try:

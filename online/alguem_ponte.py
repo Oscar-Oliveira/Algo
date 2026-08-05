@@ -4,6 +4,7 @@ estudante guardou (ver credenciais.py), em vez de um config.json local
 -- é a única adaptação necessária; todo o resto do pacote alguem/
 (política, guardião, escada de ajuda, registador) é reaproveitado tal
 e qual, sem alterações."""
+
 from __future__ import annotations
 
 import sys
@@ -28,10 +29,12 @@ class ErroAlguemIndisponivel(Exception):
     pass
 
 
-def construir_alguem(estudante_id: int,
-                      ficheiros_visiveis: list[tuple[str, str]] | None = None,
-                      caminho_bd: str | None = None,
-                      pasta_logs: str | None = None) -> Alguem:
+def construir_alguem(
+    estudante_id: int,
+    ficheiros_visiveis: list[tuple[str, str]] | None = None,
+    caminho_bd: str | None = None,
+    pasta_logs: str | None = None,
+) -> Alguem:
     """Lê a credencial do estudante e constrói um Alguem pronto a
     conversar. Levanta ErroAlguemIndisponivel (com mensagem amigável)
     se o estudante ainda não configurou nenhum fornecedor. Os logs
@@ -39,6 +42,7 @@ def construir_alguem(estudante_id: int,
     'pasta_logs' existe só para os testes conseguirem isolar os logs
     sem variáveis de ambiente (mesma técnica já usada em alguem/)."""
     from bd import CAMINHO_BD_POR_OMISSAO
+
     if caminho_bd is None:
         caminho_bd = CAMINHO_BD_POR_OMISSAO
 
@@ -46,7 +50,7 @@ def construir_alguem(estudante_id: int,
     if credencial is None:
         raise ErroAlguemIndisponivel(
             "Ainda não configuraste nenhum fornecedor de LLM -- "
-            "define um em Definições antes de chamares o Alguem."
+            "define um em Definições antes de chamares Alguem."
         )
 
     extras = {}
@@ -55,7 +59,8 @@ def construir_alguem(estudante_id: int,
 
     try:
         fornecedor = criar_fornecedor(
-            credencial.fornecedor, credencial.modelo, credencial.api_key, **extras)
+            credencial.fornecedor, credencial.modelo, credencial.api_key, **extras
+        )
     except ErroFornecedorLLM as e:
         raise ErroAlguemIndisponivel(str(e)) from e
 
@@ -63,5 +68,9 @@ def construir_alguem(estudante_id: int,
     if pasta_logs is not None:
         kwargs_registador["pasta_logs"] = pasta_logs
     registador = Registador(**kwargs_registador)
-    return Alguem(fornecedor, POLITICA_POR_OMISSAO,
-                  ficheiros_visiveis=ficheiros_visiveis, registador=registador)
+    return Alguem(
+        fornecedor,
+        POLITICA_POR_OMISSAO,
+        ficheiros_visiveis=ficheiros_visiveis,
+        registador=registador,
+    )
