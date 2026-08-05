@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="pt">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Algo — editor</title>
-<link rel="stylesheet" href="/estatico/estilo.css">
-<link rel="stylesheet" href="/estatico/vendor/codemirror/codemirror.css">
-<link rel="stylesheet" href="/estatico/vendor/codemirror/material-darker.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Algo — editor</title>
+  <link rel="stylesheet" href="/estatico/estilo.css">
+  <link rel="stylesheet" href="/estatico/vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="/estatico/vendor/codemirror/material-darker.css">
 </head>
+
 <body class="pagina-editor">
   <header class="barra-topo">
-    <a href="/editor" class="marca marca-pequena" title="Reiniciar o editor"><span class="marca-simbolo">Δ</span> Algo</a>
+    <a href="/editor" class="marca marca-pequena" title="Reiniciar o editor"><img src="/estatico/algo-logo.svg" alt=""
+        class="marca-simbolo"> Algo</a>
     <div class="acoes-topo">
       <button id="botao-admin" class="botao-icone escondido" title="Painel de admin">🛡</button>
       <button id="botao-alternar-alguem" class="botao-icone" title="Esconder Alguem">🙈</button>
@@ -21,17 +24,18 @@
   <main class="disposicao-editor" id="disposicao-editor">
     <section class="painel painel-codigo">
       <div class="painel-cabecalho">
-        <span>O teu programa</span>
+        <span>Editor</span>
         <div class="acoes-codigo">
           <button id="botao-executar" class="botao-primario">▶ Executar</button>
           <button id="botao-fluxograma" class="botao-secundario">Fluxograma</button>
           <button id="botao-rasto" class="botao-secundario">Rasto</button>
-          <button id="botao-linter" class="botao-secundario">Linter</button>
+          <button id="botao-linter" class="botao-secundario">Verificador</button>
         </div>
       </div>
       <div class="barra-ficheiros">
         <div id="lista-ficheiros" class="lista-ficheiros"></div>
-        <button id="botao-novo-ficheiro" class="botao-ligacao" title="Criar uma biblioteca própria, para usares com 'incluir'">+ novo ficheiro</button>
+        <button id="botao-novo-ficheiro" class="botao-ligacao"
+          title="Criar uma biblioteca própria, para usares com 'incluir'">+ novo ficheiro</button>
       </div>
       <textarea id="area-codigo"></textarea>
     </section>
@@ -63,10 +67,15 @@
         <div id="conteudo-rasto" class="conteudo-rasto escondido">
           <p>Rasto gerado com <span id="rasto-num-passos"></span> passos.</p>
           <div class="acoes-rasto-geradas">
-            <a id="ligacao-descarregar-rasto" class="botao-primario" download="rasto.json">⭳ Descarregar rasto (.json)</a>
-            <a id="ligacao-abrir-visualizador" class="botao-secundario" href="/estatico/visualizador/algo-trace-viewer.html" target="_blank" rel="noopener">Abrir no visualizador ↗</a>
+            <a id="ligacao-descarregar-rasto" class="botao-primario" download="rasto.json">⭳ Descarregar rasto
+              (.json)</a>
+            <a id="ligacao-abrir-visualizador" class="botao-secundario"
+              href="/estatico/visualizador/algo-trace-viewer.html" target="_blank" rel="noopener">Abrir no visualizador
+              ↗</a>
           </div>
-          <p class="ajuda-campo">No visualizador, carrega o ficheiro que acabaste de descarregar (o visualizador não recebe o ficheiro automaticamente — é a mesma ferramenta autónoma usada com <code>algo executa --json</code>).</p>
+          <p class="ajuda-campo">No visualizador, carrega o ficheiro que acabaste de descarregar (o visualizador não
+            recebe o ficheiro automaticamente — é a mesma ferramenta autónoma usada com
+            <code>algo executa --json</code>).</p>
         </div>
       </div>
 
@@ -143,7 +152,11 @@
       <p class="ajuda-campo">Contas que se registaram e aguardam aprovação para poderem entrar.</p>
       <table class="tabela-admin">
         <thead>
-          <tr><th>Email</th><th>Registada em</th><th></th></tr>
+          <tr>
+            <th>Email</th>
+            <th>Registada em</th>
+            <th></th>
+          </tr>
         </thead>
         <tbody id="corpo-tabela-pendentes"></tbody>
       </table>
@@ -157,4 +170,5 @@
   <script src="/modo-algo.js"></script>
   <script src="/estatico/app.js"></script>
 </body>
+
 </html>

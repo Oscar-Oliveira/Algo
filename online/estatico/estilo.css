@@ -46,16 +46,11 @@ h1, h2 { font-family: 'Fraunces', serif; font-weight: 600; margin: 0; }
   box-shadow: 0 20px 60px -30px rgba(26, 31, 46, 0.35);
 }
 
-.marca { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.5rem; }
-.marca-simbolo {
-  font-family: 'Fraunces', serif;
-  font-size: 2.2rem;
-  color: var(--ambar-forte);
-  line-height: 1;
-}
+.marca { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+.marca-simbolo { display: block; width: 2.2rem; height: 2.2rem; }
 .marca h1 { font-size: 1.9rem; }
 .marca-pequena { gap: 0.4rem; }
-.marca-pequena .marca-simbolo { font-size: 1.4rem; }
+.marca-pequena .marca-simbolo { width: 1.4rem; height: 1.4rem; }
 .marca-pequena { font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 600; color: inherit; text-decoration: none; }
 
 .subtitulo { color: #6b6a5e; margin: 0 0 1.6rem; line-height: 1.5; font-size: 0.95rem; }
@@ -144,7 +139,7 @@ button { font: inherit; cursor: pointer; }
 .painel { background: var(--tinta); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .painel-cabecalho {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0.6rem 1rem; font-size: 0.82rem; font-weight: 600; color: var(--texto-esmaecido);
+  height: 3.7rem; flex-shrink: 0; padding: 0.6rem 1rem; font-size: 0.82rem; font-weight: 600; color: var(--texto-esmaecido);
   text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--tinta-borda);
 }
 

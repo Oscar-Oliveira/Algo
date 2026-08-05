@@ -384,7 +384,7 @@ const vistaLinter = document.getElementById("vista-linter");
 const tituloPainelExecucao = document.getElementById("titulo-painel-execucao");
 const botaoVoltarExecucao = document.getElementById("botao-voltar-execucao");
 
-const TITULOS_VISTA_PAINEL_TERMINAL = { execucao: "Execução", rasto: "Rasto", fluxograma: "Fluxograma", linter: "Linter" };
+const TITULOS_VISTA_PAINEL_TERMINAL = { execucao: "Execução", rasto: "Rasto", fluxograma: "Fluxograma", linter: "Verificador" };
 
 function mostrarVistaPainelTerminal(nome) {
   vistaExecucao.classList.toggle("escondido", nome !== "execucao");
@@ -467,11 +467,11 @@ async function carregarLinter() {
     });
     const dados = await resposta.json();
     if (!resposta.ok) {
-      conteudo.innerHTML = `<p class="mensagem-erro">${dados.detail || "Não foi possível correr o linter."}</p>`;
+      conteudo.innerHTML = `<p class="mensagem-erro">${dados.detail || "Não foi possível correr o verificador."}</p>`;
       return;
     }
     if (dados.avisos.length === 0) {
-      conteudo.innerHTML = "<p>✔ Nenhum aviso — o linter não encontrou nada a assinalar.</p>";
+      conteudo.innerHTML = "<p>✔ Nenhum aviso — o verificador não encontrou nada a assinalar.</p>";
       return;
     }
     const lista = document.createElement("ul");
