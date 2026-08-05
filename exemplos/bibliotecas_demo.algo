@@ -1,0 +1,19 @@
+algoritmo "BibliotecasDemo"
+
+importar Math
+importar Cadeia
+incluir "geometria.algo"
+
+inicio
+    x:decimal = math.raiz(16.0)
+    escrever("raiz(16) = ", x)
+
+    p:decimal = math.potencia(2.0, 10.0)
+    escrever("2^10 = ", p)
+
+    nome:cadeia = "algoritmia"
+    escrever("maiusculas: ", cadeia.maiusculas(nome))
+    escrever("comprimento: ", cadeia.comprimento(nome))
+
+    area:decimal = areaCirculo(3.0)
+    escrever("área do círculo (r=3): ", area)

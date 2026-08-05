@@ -1,0 +1,20 @@
+services:
+  algo-online:
+    build:
+      # o contexto tem de ser a pasta-mãe (onde algo_lang/, alguem/ e
+      # online/ são irmãs) -- o Dockerfile precisa de copiar as três,
+      # não só o online/ onde este ficheiro vive
+      context: ..
+      dockerfile: online/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # os dados (contas, credenciais) sobrevivem a um `docker compose
+      # down` -- só desaparecem com `docker compose down -v`
+      - algo_dados:/app/online/dados
+    restart: unless-stopped
+
+volumes:
+  algo_dados:

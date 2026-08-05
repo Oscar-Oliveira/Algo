@@ -1,0 +1,236 @@
+# -*- coding: utf-8 -*-
+"""Lexer para a linguagem algorítmica ALGO (baseada em português)."""
+
+PALAVRAS_CHAVE = {
+    "algoritmo", "inicio", "estrutura",
+    "escrever", "ler",
+    "se", "entao", "senao",
+    "para", "de", "ate", "passo", "fazer",
+    "enquanto",
+    "escolher", "caso", "contrario",
+    "funcao", "procedimento", "devolver", "ref",
+    "importar", "incluir",
+    "verdadeiro", "falso",
+    "e", "ou", "nao",
+    "div", "mod",
+    "constante", "afirmar",
+}
+
+
+class Token:
+    __slots__ = ("tipo", "valor", "linha")
+
+    def __init__(self, tipo, valor, linha):
+        self.tipo = tipo
+        self.valor = valor
+        self.linha = linha
+
+    def __repr__(self):  # pragma: no cover -- só para depuração manual, nunca chamado em produção
+        return f"Token({self.tipo}, {self.valor!r}, linha={self.linha})"
+
+
+class ErroLexico(Exception):
+    def __init__(self, mensagem, linha):
+        super().__init__(f"Erro léxico na linha {linha}: {mensagem}")
+        self.linha = linha
+
+
+SIMBOLOS_MULTI = [
+    ("==", "IGUAL"),
+    ("<>", "DIFERENTE"),
+    ("<=", "LE"),
+    (">=", "GE"),
+]
+SIMBOLOS_SINGLE = {
+    "+": "MAIS", "-": "MENOS", "*": "VEZES", "/": "DIVIDE",
+    "^": "POTENCIA", "=": "ATRIB", "<": "MENOR", ">": "MAIOR",
+    "(": "LPAREN", ")": "RPAREN", "[": "LBRACKET", "]": "RBRACKET",
+    "{": "LBRACE", "}": "RBRACE",
+    ":": "COLON", ",": "COMMA", ".": "DOT",
+}
+
+
+def _remover_comentarios_bloco(codigo: str) -> str:
+    """Remove comentários /* ... */ do texto completo, preservando o número
+    de linhas (substitui o conteúdo removido por quebras de linha) para que
+    os números de linha nas mensagens de erro continuem corretos."""
+    resultado = []
+    i = 0
+    n = len(codigo)
+    dentro_str = False
+    dentro_char = False
+    while i < n:
+        c = codigo[i]
+        if not dentro_str and not dentro_char and c == "/" and i + 1 < n and codigo[i + 1] == "*":
+            j = i + 2
+            while j + 1 < n and not (codigo[j] == "*" and codigo[j + 1] == "/"):
+                j += 1
+            if j + 1 >= n:
+                linha_abertura = codigo[:i].count("\n") + 1
+                raise ErroLexico(
+                    "comentário de bloco '/*' nunca foi fechado com '*/'", linha_abertura)
+            trecho = codigo[i:j + 2]
+            resultado.append("\n" * trecho.count("\n"))
+            i += len(trecho)
+            continue
+        if c == '"' and not dentro_char:
+            dentro_str = not dentro_str
+        elif c == "'" and not dentro_str:
+            dentro_char = not dentro_char
+        resultado.append(c)
+        i += 1
+    return "".join(resultado)
+
+
+def _medir_indentacao(linha_sem_comentario, linha_num):
+    """Devolve o nível de indentação em 'unidades' (1 unidade = 1 tab OU
+    um grupo de 4 espaços). A indentação de uma linha tem de ser feita
+    inteiramente com tabs OU inteiramente com espaços em grupos de 4 --
+    nunca uma mistura dos dois na mesma linha, nem espaços que não sejam
+    múltiplos de 4."""
+    sem_indent = linha_sem_comentario.lstrip(" \t")
+    bruto = linha_sem_comentario[: len(linha_sem_comentario) - len(sem_indent)]
+    if not bruto:
+        return 0
+    tem_tab = "\t" in bruto
+    tem_espaco = " " in bruto
+    if tem_tab and tem_espaco:
+        raise ErroLexico(
+            "a indentação mistura tabs e espaços na mesma linha -- usa só tabs "
+            "ou só grupos de 4 espaços", linha_num)
+    if tem_tab:
+        return len(bruto)
+    if len(bruto) % 4 != 0:
+        raise ErroLexico(
+            f"indentação inválida ({len(bruto)} espaço(s)) -- tem de ser tabs "
+            f"ou um múltiplo de 4 espaços", linha_num)
+    return len(bruto) // 4
+
+
+def tokenizar(codigo: str):
+    codigo = _remover_comentarios_bloco(codigo)
+    linhas = codigo.split("\n")
+    tokens = []
+    pilha_indent = [0]
+    linha_num = 0
+
+    for linha_num, linha_bruta in enumerate(linhas, start=1):
+        linha_sem_comentario = _remover_comentario(linha_bruta)
+        linha_stripped = linha_sem_comentario.strip()
+
+        if linha_stripped == "":
+            continue
+
+        nivel = _medir_indentacao(linha_sem_comentario, linha_num)
+
+        if nivel > pilha_indent[-1]:
+            pilha_indent.append(nivel)
+            tokens.append(Token("INDENT", nivel, linha_num))
+        while nivel < pilha_indent[-1]:
+            pilha_indent.pop()
+            tokens.append(Token("DEDENT", nivel, linha_num))
+        if nivel != pilha_indent[-1]:
+            raise ErroLexico("indentação inconsistente", linha_num)
+
+        tokens.extend(_tokenizar_linha(linha_stripped, linha_num))
+        tokens.append(Token("NEWLINE", None, linha_num))
+
+    while len(pilha_indent) > 1:
+        pilha_indent.pop()
+        tokens.append(Token("DEDENT", 0, linha_num))
+    tokens.append(Token("EOF", None, linha_num))
+    return tokens
+
+
+def _remover_comentario(linha):
+    dentro_str = False
+    dentro_char = False
+    i = 0
+    while i < len(linha):
+        c = linha[i]
+        if c == '"' and not dentro_char:
+            dentro_str = not dentro_str
+        elif c == "'" and not dentro_str:
+            dentro_char = not dentro_char
+        elif c == "/" and not dentro_str and not dentro_char and i + 1 < len(linha) and linha[i + 1] == "/":
+            return linha[:i]
+        i += 1
+    return linha
+
+
+def _tokenizar_linha(linha, linha_num):
+    tokens = []
+    i = 0
+    n = len(linha)
+    while i < n:
+        c = linha[i]
+        if c == " ":
+            i += 1
+            continue
+        if c == '"':
+            j = i + 1
+            buf = []
+            while j < n and linha[j] != '"':
+                buf.append(linha[j])
+                j += 1
+            if j >= n:
+                raise ErroLexico("cadeia de texto não fechada com aspas duplas", linha_num)
+            tokens.append(Token("STRING", "".join(buf), linha_num))
+            i = j + 1
+            continue
+        if c == "'":
+            j = i + 1
+            buf = []
+            while j < n and linha[j] != "'":
+                buf.append(linha[j])
+                j += 1
+            if j >= n:
+                raise ErroLexico("carácter não fechado com aspa simples", linha_num)
+            conteudo = "".join(buf)
+            if len(conteudo) != 1:
+                raise ErroLexico(
+                    f"um caracter tem de ter exatamente 1 símbolo entre aspas simples "
+                    f"(encontrado {conteudo!r}); usa aspas duplas para texto", linha_num)
+            tokens.append(Token("CARACTER", conteudo, linha_num))
+            i = j + 1
+            continue
+        if c.isdigit():
+            j = i
+            is_float = False
+            while j < n and (linha[j].isdigit() or (linha[j] == "." and not is_float)):
+                if linha[j] == ".":
+                    is_float = True
+                j += 1
+            texto = linha[i:j]
+            if is_float:
+                tokens.append(Token("FLOAT", float(texto), linha_num))
+            else:
+                tokens.append(Token("INT", int(texto), linha_num))
+            i = j
+            continue
+        if c.isalpha() or c == "_":
+            j = i
+            while j < n and (linha[j].isalnum() or linha[j] == "_"):
+                j += 1
+            palavra = linha[i:j]
+            if palavra in PALAVRAS_CHAVE:
+                tokens.append(Token(palavra.upper(), palavra, linha_num))
+            else:
+                tokens.append(Token("ID", palavra, linha_num))
+            i = j
+            continue
+        achou = False
+        for simb, tipo in SIMBOLOS_MULTI:
+            if linha[i:i + len(simb)] == simb:
+                tokens.append(Token(tipo, simb, linha_num))
+                i += len(simb)
+                achou = True
+                break
+        if achou:
+            continue
+        if c in SIMBOLOS_SINGLE:
+            tokens.append(Token(SIMBOLOS_SINGLE[c], c, linha_num))
+            i += 1
+            continue
+        raise ErroLexico(f"caractere inesperado {c!r}", linha_num)
+    return tokens

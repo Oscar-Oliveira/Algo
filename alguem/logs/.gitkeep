@@ -1,0 +1,5 @@
+Esta pasta guarda um ficheiro .jsonl por sessão do Alguem (ver
+alguem/nucleo/registador.py e a secção "Métricas e logs" do
+alguem/README.md). Fica vazia até à primeira conversa com o Alguem --
+este ficheiro só existe para a pasta ficar versionada/distribuída
+mesmo antes de haver sessões.

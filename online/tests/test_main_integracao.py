@@ -1,0 +1,422 @@
+# -*- coding: utf-8 -*-
+import json
+from unittest.mock import patch, MagicMock
+
+import pytest
+from fastapi.testclient import TestClient
+
+import main
+
+
+@pytest.fixture
+def cliente():
+    with TestClient(main.app) as c:
+        yield c
+
+
+def _msg(codigo, nome="principal.algo"):
+    """Atalho: a maioria dos testes só precisa de UM ficheiro -- monta
+    a mensagem no formato multi-ficheiro que os endpoints esperam."""
+    return {"ficheiros": [{"nome": nome, "conteudo": codigo}], "principal": nome}
+
+
+def _resposta_llm_falsa(texto):
+    cm = MagicMock()
+    cm.__enter__.return_value.read.return_value = json.dumps(
+        {"choices": [{"message": {"content": texto}}]}).encode()
+    return cm
+
+
+# ---------- páginas e sessão ----------
+
+def test_pagina_inicial_sem_sessao(cliente):
+    r = cliente.get("/", follow_redirects=False)
+    assert r.status_code == 200
+
+
+def test_editor_sem_sessao_redireciona(cliente):
+    r = cliente.get("/editor", follow_redirects=False)
+    assert r.status_code == 307
+    assert r.headers["location"] == "/"
+
+
+def test_registar_da_acesso_ao_editor(cliente):
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    assert r.status_code == 200
+    r = cliente.get("/editor")
+    assert r.status_code == 200
+
+
+def test_registar_email_duplicado_da_400(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "outrapass"})
+    assert r.status_code == 400
+
+
+def test_entrar_com_credenciais_corretas(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    cliente.post("/api/sair")
+    r = cliente.post("/api/entrar", json={"email": "a@b.com", "password": "password123"})
+    assert r.status_code == 200
+    assert cliente.get("/editor").status_code == 200
+
+
+def test_entrar_com_password_errada_da_401(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    cliente.post("/api/sair")
+    r = cliente.post("/api/entrar", json={"email": "a@b.com", "password": "errada"})
+    assert r.status_code == 401
+
+
+def test_sair_remove_o_acesso(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    cliente.post("/api/sair")
+    r = cliente.get("/editor", follow_redirects=False)
+    assert r.status_code == 307
+
+
+# ---------- credenciais ----------
+
+def test_credencial_exige_autenticacao(cliente):
+    r = cliente.get("/api/credencial")
+    assert r.status_code == 401
+
+
+def test_credencial_fluxo_completo(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.get("/api/credencial")
+    assert r.json() == {"configurado": False}
+
+    r = cliente.post("/api/credencial", json={
+        "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+    assert r.status_code == 200
+
+    r = cliente.get("/api/credencial")
+    dados = r.json()
+    assert dados["configurado"] is True
+    assert dados["fornecedor"] == "openai"
+    assert "api_key" not in dados  # nunca devolvida
+
+
+def test_credencial_invalida_da_400(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/credencial", json={"fornecedor": "naoexiste", "modelo": "x", "api_key": "y"})
+    assert r.status_code == 400
+
+
+# ---------- WebSocket: execução ----------
+
+def test_ws_executar_sem_autenticacao(cliente):
+    with cliente.websocket_connect("/ws/executar") as ws:
+        m = ws.receive_json()
+        assert m["tipo"] == "erro"
+
+
+def test_ws_executar_programa_simples(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    with cliente.websocket_connect("/ws/executar") as ws:
+        ws.send_json(_msg('algoritmo "T"\ninicio\n    escrever("ola")\n'))
+        mensagens = []
+        while True:
+            m = ws.receive_json()
+            mensagens.append(m)
+            if m["tipo"] in ("fim", "erro", "erro_compilacao"):
+                break
+    tipos = [m["tipo"] for m in mensagens]
+    assert tipos == ["compilado", "saida", "fim"]
+    assert mensagens[1]["texto"] == "ola"
+    assert mensagens[2]["codigo_saida"] == 0
+
+
+def test_ws_executar_erro_de_compilacao(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    with cliente.websocket_connect("/ws/executar") as ws:
+        ws.send_json(_msg("algoritmo sem aspas\ninicio\n    escrever(1)\n"))
+        m = ws.receive_json()
+        assert m["tipo"] == "erro_compilacao"
+        assert "sintaxe" in m["mensagem"]
+
+
+def test_ws_executar_com_entrada_interativa(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    codigo = (
+        'algoritmo "Soma"\ninicio\n'
+        '    a:inteiro\n    b:inteiro\n    ler(a)\n    ler(b)\n'
+        '    escrever("Soma: ", a + b)\n'
+    )
+    with cliente.websocket_connect("/ws/executar") as ws:
+        ws.send_json(_msg(codigo))
+        assert ws.receive_json()["tipo"] == "compilado"
+        ws.send_json({"tipo": "entrada", "valor": "3"})
+        ws.send_json({"tipo": "entrada", "valor": "4"})
+        mensagens = []
+        while True:
+            m = ws.receive_json()
+            mensagens.append(m)
+            if m["tipo"] == "fim":
+                break
+    saidas = [m["texto"] for m in mensagens if m["tipo"] == "saida"]
+    assert saidas == ["Soma: 7"]
+
+
+def test_ws_executar_isola_estudantes_diferentes(cliente):
+    """Dois estudantes diferentes, dois clientes diferentes -- as
+    pastas de execução não se podem cruzar."""
+    cliente.post("/api/registar", json={"email": "um@b.com", "password": "password123"})
+    with cliente.websocket_connect("/ws/executar") as ws:
+        ws.send_json(_msg('algoritmo "T"\ninicio\n    escrever("estudante um")\n'))
+        mensagens_um = []
+        while True:
+            m = ws.receive_json()
+            mensagens_um.append(m)
+            if m["tipo"] == "fim":
+                break
+
+    with TestClient(main.app) as cliente2:
+        cliente2.post("/api/registar", json={"email": "dois@b.com", "password": "password123"})
+        with cliente2.websocket_connect("/ws/executar") as ws:
+            ws.send_json(_msg('algoritmo "T"\ninicio\n    escrever("estudante dois")\n'))
+            mensagens_dois = []
+            while True:
+                m = ws.receive_json()
+                mensagens_dois.append(m)
+                if m["tipo"] == "fim":
+                    break
+
+    saida_um = [m["texto"] for m in mensagens_um if m["tipo"] == "saida"][0]
+    saida_dois = [m["texto"] for m in mensagens_dois if m["tipo"] == "saida"][0]
+    assert saida_um == "estudante um"
+    assert saida_dois == "estudante dois"
+
+
+# ---------- WebSocket: Alguem ----------
+
+def test_ws_alguem_sem_autenticacao(cliente):
+    with cliente.websocket_connect("/ws/alguem") as ws:
+        m = ws.receive_json()
+        assert m["tipo"] == "erro"
+
+
+def test_ws_alguem_sem_credencial_configurada(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    with cliente.websocket_connect("/ws/alguem") as ws:
+        m = ws.receive_json()
+        assert m["tipo"] == "erro"
+        assert "configuraste" in m["mensagem"]
+
+
+def test_ws_alguem_conversa_completa(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+
+    respostas = iter([
+        json.dumps({"choices": [{"message": {"content": "Boa pergunta! O que sabes já?"}}]}),
+        json.dumps({"choices": [{"message": {"content": "SAFE"}}]}),
+    ])
+
+    def urlopen_falso(pedido, timeout=None):
+        cm = MagicMock()
+        cm.__enter__.return_value.read.return_value = next(respostas).encode()
+        return cm
+
+    with patch("urllib.request.urlopen", side_effect=urlopen_falso):
+        with cliente.websocket_connect("/ws/alguem") as ws:
+            m = ws.receive_json()
+            assert m["tipo"] == "pronto"
+            ws.send_json({"texto": "não sei por onde começar"})
+            m = ws.receive_json()
+            assert m["tipo"] == "resposta"
+            assert m["texto"] == "Boa pergunta! O que sabes já?"
+
+
+def test_ws_alguem_logs_usam_pseudonimo_nao_email(cliente, tmp_path):
+    cliente.post("/api/registar", json={"email": "privacidade@b.com", "password": "password123"})
+    cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+
+    with patch("urllib.request.urlopen", return_value=_resposta_llm_falsa("SAFE")):
+        with cliente.websocket_connect("/ws/alguem") as ws:
+            ws.receive_json()
+
+    from alguem.nucleo.registador import PASTA_LOGS_POR_OMISSAO
+    import glob
+    ficheiros = glob.glob(f"{PASTA_LOGS_POR_OMISSAO}/*.jsonl")
+    assert len(ficheiros) == 1
+    with open(ficheiros[0], encoding="utf-8") as f:
+        conteudo = f.read()
+    assert "privacidade@b.com" not in conteudo
+
+
+# ---------- fluxograma ----------
+
+def test_fluxograma_exige_autenticacao(cliente):
+    r = cliente.post("/api/fluxograma", json=_msg('algoritmo "T"\ninicio\n    escrever(1)\n'))
+    assert r.status_code == 401
+
+
+def test_fluxograma_gera_svg(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/fluxograma", json=_msg('algoritmo "T"\ninicio\n    escrever("ola")\n'))
+    assert r.status_code == 200
+    assert "<svg" in r.json()["svg"]
+
+
+def test_fluxograma_erro_de_compilacao(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/fluxograma", json=_msg("algoritmo sem aspas\n"))
+    assert r.status_code == 400
+    assert "sintaxe" in r.json()["detail"]
+
+
+# ---------- rasto ----------
+
+def test_rasto_exige_autenticacao(cliente):
+    r = cliente.post("/api/rasto", json={**_msg('algoritmo "T"\ninicio\n    escrever(1)\n'), "entradas": []})
+    assert r.status_code == 401
+
+
+def test_rasto_com_entradas_antecipadas(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/rasto", json={**_msg('algoritmo "T"\ninicio\n    a:inteiro\n    ler(a)\n    escrever(a*2)\n'), "entradas": ["5"]})
+    assert r.status_code == 200
+    dados = r.json()
+    assert dados["consolaFinal"] == "10\n"
+    assert dados["erro"] is None
+    assert len(dados["passos"]) > 0
+
+
+def test_rasto_erro_de_compilacao(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/rasto", json={**_msg("algoritmo sem aspas\n"), "entradas": []})
+    assert r.status_code == 400
+
+
+def test_rasto_sem_entradas_suficientes_nao_bloqueia(cliente):
+    """Confirma que o pedido HTTP termina (não fica pendurado à espera
+    de entrada que nunca vai chegar) -- o rasto devolve um erro
+    'EOF...' em vez de ficar bloqueado."""
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/rasto", json={**_msg('algoritmo "T"\ninicio\n    a:inteiro\n    ler(a)\n    escrever(a)\n'), "entradas": []})
+    assert r.status_code == 200
+    assert r.json()["erro"] is not None
+
+
+# ---------- incluir (bibliotecas próprias), de ponta a ponta ----------
+
+def test_ws_executar_com_incluir(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(21))\n'
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"
+    with cliente.websocket_connect("/ws/executar") as ws:
+        ws.send_json({
+            "ficheiros": [
+                {"nome": "principal.algo", "conteudo": principal},
+                {"nome": "lib.algo", "conteudo": biblioteca},
+            ],
+            "principal": "principal.algo",
+        })
+        mensagens = []
+        while True:
+            m = ws.receive_json()
+            mensagens.append(m)
+            if m["tipo"] in ("fim", "erro", "erro_compilacao"):
+                break
+    saidas = [m["texto"] for m in mensagens if m["tipo"] == "saida"]
+    assert saidas == ["42"]
+
+
+def test_ws_executar_incluir_ficheiro_em_falta(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    principal = 'algoritmo "T"\nincluir "nao_existe.algo"\ninicio\n    escrever(1)\n'
+    with cliente.websocket_connect("/ws/executar") as ws:
+        ws.send_json({"ficheiros": [{"nome": "principal.algo", "conteudo": principal}],
+                       "principal": "principal.algo"})
+        m = ws.receive_json()
+        assert m["tipo"] == "erro_compilacao"
+        assert "não encontrado" in m["mensagem"]
+
+
+def test_ws_alguem_recebe_varios_ficheiros(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+
+    capturado = {}
+
+    def urlopen_falso(pedido, timeout=None):
+        import json as json_mod
+        corpo = json_mod.loads(pedido.data.decode())
+        eh_classificacao = any(
+            "Categoria (uma palavra só, maiúsculas):" in m.get("content", "")
+            for m in corpo["messages"])
+        if eh_classificacao:
+            return _resposta_llm_falsa("SAFE")
+        capturado["corpo"] = corpo
+        return _resposta_llm_falsa("ok")
+
+    with patch("urllib.request.urlopen", side_effect=urlopen_falso):
+        with cliente.websocket_connect("/ws/alguem") as ws:
+            ws.receive_json()  # "pronto"
+            ws.send_json({"tipo": "ficheiro", "ficheiros": [
+                {"nome": "principal.algo", "conteudo": "conteudo do principal"},
+                {"nome": "lib.algo", "conteudo": "conteudo da biblioteca"},
+            ]})
+            ws.send_json({"texto": "o que faz este código?"})
+            ws.receive_json()
+
+    textos = [m["content"] for m in capturado["corpo"]["messages"]]
+    assert any("principal.algo" in t and "conteudo do principal" in t for t in textos)
+    assert any("lib.algo" in t and "conteudo da biblioteca" in t for t in textos)
+
+
+def test_fluxograma_com_incluir(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/fluxograma", json={
+        "ficheiros": [
+            {"nome": "principal.algo", "conteudo": 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'},
+            {"nome": "lib.algo", "conteudo": "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"},
+        ],
+        "principal": "principal.algo",
+    })
+    assert r.status_code == 200
+    assert "<svg" in r.json()["svg"]
+
+
+def test_fluxograma_lista_rotinas_e_permite_escolher_uma_de_biblioteca(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    corpo_pedido = {
+        "ficheiros": [
+            {"nome": "principal.algo", "conteudo": 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'},
+            {"nome": "lib.algo", "conteudo": "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"},
+        ],
+        "principal": "principal.algo",
+    }
+    r = cliente.post("/api/fluxograma", json=corpo_pedido)
+    dados = r.json()
+    assert dados["rotinas"] == ["Principal", "dobro"]
+    assert dados["rotina_atual"] == "Principal"
+
+    r2 = cliente.post("/api/fluxograma", json={**corpo_pedido, "rotina": "dobro"})
+    dados2 = r2.json()
+    assert dados2["rotina_atual"] == "dobro"
+    assert "<svg" in dados2["svg"]
+
+
+# ---------- rede de segurança: erro inesperado nunca devolve texto simples ----------
+
+def test_erro_inesperado_devolve_sempre_json():
+    """Reproduz o sintoma real reportado: 'Unexpected token... is not
+    valid JSON' -- acontecia quando um erro não tratado devolvia uma
+    página de erro em texto simples, que o frontend tenta sempre
+    fazer resposta.json(). Precisa de um TestClient próprio, com
+    raise_server_exceptions=False -- por omissão, o TestClient torna a
+    levantar a exceção no teste, mesmo já havendo um tratador
+    registado (só o servidor uvicorn real usa sempre o tratador; isto
+    é só uma particularidade do TestClient em modo de depuração)."""
+    with TestClient(main.app, raise_server_exceptions=False) as cliente:
+        cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+        with patch("credenciais.guardar_credencial", side_effect=RuntimeError("algo inesperado")):
+            r = cliente.post("/api/credencial", json={
+                "fornecedor": "openai", "modelo": "x", "api_key": "sk-teste"})
+    assert r.status_code == 500
+    corpo = r.json()  # nunca deve levantar exceção -- tem de ser sempre JSON válido
+    assert "algo inesperado" in corpo["detail"]
+

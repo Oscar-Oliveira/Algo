@@ -1,0 +1,23 @@
+algoritmo "NovasFuncionalidades"
+
+/* Este exemplo mostra as funcionalidades mais recentes da linguagem:
+   - constante
+   - comentários de bloco (como este)
+   - literais de array {..}
+   - afirmar, para os alunos validarem os próprios exercícios */
+
+constante IVA:decimal = 1.23
+
+funcao precoComIva(preco:decimal):decimal
+    devolver preco * IVA
+
+inicio
+    precos:decimal[3] = {10.0, 25.5, 100.0}   // sem IVA
+
+    para i de 0 ate 2 fazer
+        escrever("Preço ", i + 1, " com IVA: ", precoComIva(precos[i]))
+
+    // afirmar ajuda a confirmar que uma função fazer o que deve
+    afirmar precoComIva(10.0) == 12.3, "o cálculo do IVA está errado"
+
+    escrever("Todas as afirmações passaram.")

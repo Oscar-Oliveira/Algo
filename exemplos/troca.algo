@@ -1,0 +1,26 @@
+algoritmo "TrocaValores"
+
+procedimento trocar(ref a:inteiro, ref b:inteiro)
+    temp:inteiro = a
+    a = b
+    b = temp
+
+funcao dobro(x:inteiro):inteiro
+    devolver x * 2
+
+funcao incrementar(ref x:inteiro):inteiro
+    x = x + 1
+    devolver x
+
+inicio
+    p:inteiro = 3
+    q:inteiro = 9
+    escrever("Antes: p=", p, " q=", q)
+    trocar(p, q)
+    escrever("Depois: p=", p, " q=", q)
+
+    resultado:inteiro = dobro(p)
+    escrever("Dobro de p: ", resultado)
+
+    novo:inteiro = incrementar(p)
+    escrever("incrementar(p) devolveu ", novo, "; p passou a ", p)

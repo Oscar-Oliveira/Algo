@@ -1,0 +1,466 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight,
+  Upload, AlertTriangle, Terminal, Layers, FileCode2, Gauge, Info,
+} from "lucide-react";
+
+/* ============================================================
+   Tipografia e paleta -- carregadas uma vez, aplicadas via style
+   inline (as classes Tailwind predefinidas não conhecem estes
+   nomes de fonte / cores específicas do projeto).
+   ============================================================ */
+const FONT_DISPLAY = "'Space Grotesk', ui-sans-serif, sans-serif";
+const FONT_MONO = "'JetBrains Mono', ui-monospace, 'Courier New', monospace";
+
+const FRAME_PALETTE = [
+  { linha: "#6FA8A0", texto: "#9FCAC3", fundo: "#1B2422" }, // Principal -- verde-azulado
+  { linha: "#C97B5C", texto: "#E3A98D", fundo: "#241C18" }, // terracota
+  { linha: "#8C85C9", texto: "#B6B0E6", fundo: "#1F1E29" }, // violeta
+  { linha: "#6E96C4", texto: "#A3C1E3", fundo: "#1A2028" }, // azul-ardósia
+  { linha: "#A3AA5E", texto: "#C7CC8F", fundo: "#212317" }, // oliva
+  { linha: "#C77FA0", texto: "#E3AFC6", fundo: "#251B21" }, // rosa-velho
+];
+
+const PALAVRAS_CHAVE = new Set([
+  "algoritmo", "inicio", "estrutura", "escrever", "ler", "se", "entao", "senao",
+  "para", "de", "ate", "passo", "fazer", "enquanto", "escolher", "caso", "contrario",
+  "funcao", "procedimento", "devolver", "ref", "importar", "incluir", "verdadeiro",
+  "falso", "e", "ou", "nao", "div", "mod", "constante", "afirmar",
+]);
+const TIPOS_PRIMITIVOS = new Set(["inteiro", "decimal", "booleano", "cadeia", "caracter"]);
+
+/* ============================================================
+   Realce de sintaxe (só para apresentação do código carregado)
+   ============================================================ */
+const TOKEN_RE = /(\/\/.*$)|("(?:[^"\\]|\\.)*"?)|('(?:[^'\\]|\\.)*'?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)|(\s+)|([^\sA-Za-z0-9_])/g;
+
+function LinhaRealcada({ texto }) {
+  if (!texto) return <span>&nbsp;</span>;
+  const partes = [];
+  let m;
+  let idx = 0;
+  TOKEN_RE.lastIndex = 0;
+  while ((m = TOKEN_RE.exec(texto)) !== null) {
+    const [full, comentario, str, char, num, palavra, espaco] = m;
+    if (comentario) { partes.push(<span key={idx++} style={{ color: "#6B7280", fontStyle: "italic" }}>{full}</span>); break; }
+    if (espaco) { partes.push(<span key={idx++}>{full}</span>); continue; }
+    let cor = "#D7D9E0";
+    if (str || char) cor = "#8FCFA8";
+    else if (num) cor = "#7FB3D9";
+    else if (palavra) {
+      if (PALAVRAS_CHAVE.has(palavra)) cor = "#E3B341";
+      else if (TIPOS_PRIMITIVOS.has(palavra)) cor = "#B6A6E6";
+      else cor = "#D7D9E0";
+    }
+    partes.push(<span key={idx++} style={{ color: cor, fontWeight: palavra && PALAVRAS_CHAVE.has(palavra) ? 600 : 400 }}>{full}</span>);
+  }
+  return <>{partes}</>;
+}
+
+/* ============================================================
+   Formatação de valores (estilo ALGO: verdadeiro/falso, arrays, structs)
+   ============================================================ */
+function formatarValor(v) {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "verdadeiro" : "falso";
+  if (typeof v === "string") return `"${v}"`;
+  if (Array.isArray(v)) return "[" + v.map(formatarValor).join(", ") + "]";
+  if (typeof v === "object") {
+    return "{" + Object.entries(v).map(([k, val]) => `${k}: ${formatarValor(val)}`).join(", ") + "}";
+  }
+  return String(v);
+}
+
+/* ============================================================
+   Ecrã inicial (antes de carregar um ficheiro)
+   ============================================================ */
+function EcraInicial({ onFicheiro, erro }) {
+  const inputRef = useRef(null);
+  const [aArrastar, setArrastar] = useState(false);
+
+  const processar = useCallback((ficheiro) => {
+    if (!ficheiro) return;
+    const leitor = new FileReader();
+    leitor.onload = (e) => onFicheiro(e.target.result, ficheiro.name);
+    leitor.readAsText(ficheiro);
+  }, [onFicheiro]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: "#16181D" }}>
+      <div
+        onDragOver={(e) => { e.preventDefault(); setArrastar(true); }}
+        onDragLeave={() => setArrastar(false)}
+        onDrop={(e) => { e.preventDefault(); setArrastar(false); processar(e.dataTransfer.files[0]); }}
+        className="w-full max-w-xl rounded-2xl p-10 text-center transition-colors"
+        style={{
+          background: "#1E2128",
+          border: `2px dashed ${aArrastar ? "#E3B341" : "#33363F"}`,
+        }}
+      >
+        <div className="mx-auto mb-5 w-14 h-14 rounded-xl flex items-center justify-center"
+             style={{ background: "#24272F", border: "1px solid #33363F" }}>
+          <Layers size={26} color="#E3B341" />
+        </div>
+        <h1 className="text-2xl mb-2" style={{ fontFamily: FONT_DISPLAY, color: "#EDEEF1", fontWeight: 600 }}>
+          Visualizador de Execução ALGO
+        </h1>
+        <p className="text-sm mb-7 leading-relaxed" style={{ color: "#8B8F99" }}>
+          Carrega um ficheiro <code style={{ fontFamily: FONT_MONO, color: "#B6A6E6" }}>_trace.json</code> para
+          navegar, passo a passo, pela pilha de chamadas e pelas variáveis de um programa ALGO em execução.
+        </p>
+
+        <button
+          onClick={() => inputRef.current?.click()}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-transform hover:scale-[1.02]"
+          style={{ background: "#E3B341", color: "#16181D" }}
+        >
+          <Upload size={16} /> Carregar ficheiro .json
+        </button>
+        <input ref={inputRef} type="file" accept=".json,application/json" className="hidden"
+               onChange={(e) => processar(e.target.files[0])} />
+
+        <p className="text-xs mt-4" style={{ color: "#5B5F69" }}>ou arrasta o ficheiro para aqui</p>
+
+        {erro && (
+          <div className="mt-6 flex items-start gap-2 text-left text-sm rounded-lg px-3 py-2.5"
+               style={{ background: "#2A1A18", color: "#E3A98D", border: "1px solid #4A2A24" }}>
+            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+            <span>{erro}</span>
+          </div>
+        )}
+
+        <div className="mt-8 pt-6 text-left text-xs leading-relaxed" style={{ borderTop: "1px solid #2A2D35", color: "#6B7280" }}>
+          <p className="mb-2 font-medium" style={{ color: "#9CA0AA" }}>Como gerar um ficheiro de trace:</p>
+          <pre className="rounded-lg px-3 py-2 overflow-x-auto" style={{ background: "#101216", fontFamily: FONT_MONO, color: "#9FCAC3" }}>
+algo executa o-teu-programa.algo --debug --json
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Painel de código
+   ============================================================ */
+function PainelCodigo({ linhas, linhaAtual, tituloFicheiro, erroLinha }) {
+  const refLinhaAtual = useRef(null);
+
+  useEffect(() => {
+    refLinhaAtual.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [linhaAtual]);
+
+  return (
+    <div className="flex flex-col rounded-xl overflow-hidden h-full" style={{ background: "#1E2128", border: "1px solid #2A2D35" }}>
+      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid #2A2D35" }}>
+        <FileCode2 size={15} color="#8B8F99" />
+        <span className="text-sm truncate" style={{ color: "#C7C9D1", fontFamily: FONT_MONO }}>{tituloFicheiro}</span>
+      </div>
+      <div className="flex-1 overflow-auto py-2" style={{ fontFamily: FONT_MONO, fontSize: 13.5, lineHeight: "1.7rem" }}>
+        {linhas.map((linha, i) => {
+          const numLinha = i + 1;
+          const ativa = numLinha === linhaAtual;
+          const comErro = ativa && numLinha === erroLinha;
+          return (
+            <div
+              key={i}
+              ref={ativa ? refLinhaAtual : null}
+              className="flex px-3"
+              style={
+                comErro
+                  ? { background: "#2A1A18", boxShadow: "inset 3px 0 0 #D9694F" }
+                  : ativa
+                  ? { background: "#332B14", boxShadow: "inset 3px 0 0 #E3B341" }
+                  : undefined
+              }
+            >
+              <span className="w-5 shrink-0 text-center select-none" style={{ color: comErro ? "#D9694F" : ativa ? "#E3B341" : "transparent" }}>
+                {ativa ? (comErro ? "✕" : "▶") : "·"}
+              </span>
+              <span className="w-9 shrink-0 text-right pr-3 select-none" style={{ color: "#4A4E58" }}>{numLinha}</span>
+              <span className="whitespace-pre" style={{ color: "#D7D9E0" }}>
+                <LinhaRealcada texto={linha} />
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Painel da pilha de memória ("o computador")
+   ============================================================ */
+function PainelPilha({ pilha, pilhaAnterior }) {
+  function valorMudou(indiceFrame, nome) {
+    if (!pilhaAnterior || !pilhaAnterior[indiceFrame]) return false;
+    const antes = pilhaAnterior[indiceFrame].variaveis;
+    if (!(nome in antes)) return true;
+    return JSON.stringify(antes[nome]) !== JSON.stringify(pilha[indiceFrame].variaveis[nome]);
+  }
+
+  return (
+    <div className="flex flex-col rounded-xl overflow-hidden h-full" style={{ background: "#1E2128", border: "1px solid #2A2D35" }}>
+      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid #2A2D35" }}>
+        <Layers size={15} color="#8B8F99" />
+        <span className="text-sm" style={{ color: "#C7C9D1", fontFamily: FONT_DISPLAY, fontWeight: 500 }}>Pilha de memória</span>
+        <span className="ml-auto text-xs" style={{ color: "#5B5F69", fontFamily: FONT_MONO }}>
+          {pilha.length} nível{pilha.length !== 1 ? "eis" : ""}
+        </span>
+      </div>
+      <div className="flex-1 overflow-auto p-3 space-y-2.5">
+        {pilha.map((frame, i) => {
+          const cor = FRAME_PALETTE[i % FRAME_PALETTE.length];
+          const entradas = Object.entries(frame.variaveis || {});
+          return (
+            <div
+              key={i}
+              className="rounded-lg px-3.5 py-3 transition-all"
+              style={{
+                background: cor.fundo,
+                borderLeft: `3px solid ${cor.linha}`,
+                marginLeft: `${i * 10}px`,
+              }}
+            >
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: cor.linha }} />
+                <span className="text-xs font-semibold tracking-wide" style={{ color: cor.texto, fontFamily: FONT_DISPLAY }}>
+                  {frame.nome}
+                </span>
+              </div>
+              {entradas.length === 0 ? (
+                <p className="text-xs italic" style={{ color: "#5B5F69" }}>sem variáveis ainda</p>
+              ) : (
+                <div className="grid gap-1">
+                  {entradas.map(([nome, valor]) => (
+                    <div
+                      key={nome}
+                      className="flex items-baseline gap-2 rounded px-1.5 py-0.5 text-xs transition-colors duration-300"
+                      style={{
+                        fontFamily: FONT_MONO,
+                        background: valorMudou(i, nome) ? "rgba(227,179,65,0.16)" : "transparent",
+                      }}
+                    >
+                      <span style={{ color: "#8B8F99" }}>{nome}</span>
+                      <span style={{ color: "#5B5F69" }}>=</span>
+                      <span className="truncate" style={{ color: valorMudou(i, nome) ? "#E3B341" : "#D7D9E0" }}>
+                        {formatarValor(valor)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Consola
+   ============================================================ */
+function PainelConsola({ texto, erro, aMostrarErro }) {
+  const fimRef = useRef(null);
+  useEffect(() => { fimRef.current?.scrollIntoView({ behavior: "smooth" }); }, [texto]);
+
+  return (
+    <div className="rounded-xl overflow-hidden shrink-0" style={{ background: "#101216", border: "1px solid #2A2D35", height: 168 }}>
+      <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid #22252C" }}>
+        <Terminal size={14} color="#6B7280" />
+        <span className="text-xs" style={{ color: "#8B8F99", fontFamily: FONT_DISPLAY }}>Consola</span>
+      </div>
+      <div className="overflow-auto px-4 py-3" style={{ height: 118, fontFamily: FONT_MONO, fontSize: 13 }}>
+        <pre className="whitespace-pre-wrap break-words" style={{ color: "#9FCAC3", margin: 0 }}>{texto}</pre>
+        {aMostrarErro && erro && (
+          <div className="flex items-start gap-1.5 mt-1" style={{ color: "#E3A98D" }}>
+            <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+            <span>{erro.mensagem}</span>
+          </div>
+        )}
+        <div ref={fimRef} />
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Componente principal
+   ============================================================ */
+export default function VisualizadorTraceAlgo() {
+  const [trace, setTrace] = useState(null);
+  const [nomeFicheiro, setNomeFicheiro] = useState("");
+  const [erroCarregamento, setErroCarregamento] = useState(null);
+  const [passo, setPasso] = useState(0);
+  const [aReproduzir, setAReproduzir] = useState(false);
+  const [velocidade, setVelocidade] = useState(450);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (document.getElementById("algo-trace-fontes")) return;
+    const link = document.createElement("link");
+    link.id = "algo-trace-fontes";
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap";
+    document.head.appendChild(link);
+  }, []);
+
+  const carregarFicheiro = useCallback((texto, nome) => {
+    try {
+      const dados = JSON.parse(texto);
+      if (!dados.passos || !dados.codigoFonte) {
+        setErroCarregamento("Este ficheiro não parece ser um trace ALGO válido (faltam 'passos' ou 'codigoFonte').");
+        return;
+      }
+      setTrace(dados);
+      setNomeFicheiro(nome);
+      setPasso(0);
+      setErroCarregamento(null);
+    } catch (e) {
+      setErroCarregamento("Não consegui interpretar o ficheiro como JSON: " + e.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!aReproduzir || !trace) return;
+    if (passo >= trace.passos.length - 1) { setAReproduzir(false); return; }
+    timerRef.current = setTimeout(() => setPasso((p) => Math.min(p + 1, trace.passos.length - 1)), velocidade);
+    return () => clearTimeout(timerRef.current);
+  }, [aReproduzir, passo, trace, velocidade]);
+
+  const irPara = useCallback((novoPasso) => {
+    setAReproduzir(false);
+    setPasso((p) => {
+      const total = trace?.passos.length || 1;
+      const alvo = typeof novoPasso === "function" ? novoPasso(p) : novoPasso;
+      return Math.max(0, Math.min(alvo, total - 1));
+    });
+  }, [trace]);
+
+  useEffect(() => {
+    function aoTeclar(e) {
+      if (!trace) return;
+      if (e.key === "ArrowRight") irPara((p) => p + 1);
+      if (e.key === "ArrowLeft") irPara((p) => p - 1);
+      if (e.key === " ") { e.preventDefault(); setAReproduzir((r) => !r); }
+    }
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [trace, irPara]);
+
+  if (!trace) {
+    return <EcraInicial onFicheiro={carregarFicheiro} erro={erroCarregamento} />;
+  }
+
+  const estadoAtual = trace.passos[passo];
+  const estadoAnterior = passo > 0 ? trace.passos[passo - 1] : null;
+  const noFim = passo === trace.passos.length - 1;
+  const mostrarErroAgora = noFim && !!trace.erro;
+
+  return (
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#16181D" }}>
+      {/* Cabeçalho */}
+      <header className="shrink-0 flex flex-wrap items-center gap-4 px-6 py-4" style={{ borderBottom: "1px solid #2A2D35" }}>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#E3B341" }}>
+            <Layers size={16} color="#16181D" />
+          </div>
+          <div>
+            <h1 className="text-base leading-tight" style={{ fontFamily: FONT_DISPLAY, color: "#EDEEF1", fontWeight: 600 }}>
+              {trace.titulo || "Programa ALGO"}
+            </h1>
+            <p className="text-xs leading-tight" style={{ color: "#5B5F69" }}>{nomeFicheiro}</p>
+          </div>
+        </div>
+        <div className="flex-1" />
+        {trace.limiteExcedido && (
+          <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
+                style={{ background: "#2A2213", color: "#E3B341" }}>
+            <Info size={12} /> trace truncado (limite de passos)
+          </span>
+        )}
+        <label className="flex items-center gap-2 text-xs cursor-pointer px-3 py-1.5 rounded-lg transition-colors"
+               style={{ color: "#8B8F99", border: "1px solid #33363F" }}>
+          <Upload size={13} /> Trocar ficheiro
+          <input type="file" accept=".json" className="hidden" onChange={(e) => {
+            const f = e.target.files[0];
+            if (!f) return;
+            const leitor = new FileReader();
+            leitor.onload = (ev) => carregarFicheiro(ev.target.result, f.name);
+            leitor.readAsText(f);
+          }} />
+        </label>
+      </header>
+
+      {/* Corpo */}
+      <main className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-5 gap-4 p-4">
+        <div className="lg:col-span-3 h-full min-h-0">
+          <PainelCodigo
+            linhas={trace.codigoFonte}
+            linhaAtual={estadoAtual.linha}
+            tituloFicheiro={trace.ficheiro || "programa.algo"}
+            erroLinha={mostrarErroAgora ? trace.erro.linha : null}
+          />
+        </div>
+        <div className="lg:col-span-2 flex flex-col gap-4 h-full min-h-0">
+          <div className="flex-1 min-h-0">
+            <PainelPilha pilha={estadoAtual.pilha} pilhaAnterior={estadoAnterior?.pilha} />
+          </div>
+          <PainelConsola texto={estadoAtual.consola} erro={trace.erro} aMostrarErro={mostrarErroAgora} />
+        </div>
+      </main>
+
+      {/* Controlos */}
+      <footer className="shrink-0 px-6 py-3.5 flex items-center gap-3" style={{ borderTop: "1px solid #2A2D35" }}>
+        <button onClick={() => irPara(0)} className="p-2 rounded-lg transition-colors hover:opacity-80" style={{ color: "#8B8F99" }} title="Início">
+          <SkipBack size={16} />
+        </button>
+        <button onClick={() => irPara(passo - 1)} disabled={passo === 0} className="p-2 rounded-lg transition-colors hover:opacity-80 disabled:opacity-30" style={{ color: "#C7C9D1" }} title="Passo anterior (←)">
+          <ChevronLeft size={18} />
+        </button>
+        <button
+          onClick={() => setAReproduzir((r) => !r)}
+          disabled={noFim && !aReproduzir}
+          className="w-9 h-9 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-30"
+          style={{ background: "#E3B341", color: "#16181D" }}
+          title="Reproduzir/Pausar (espaço)"
+        >
+          {aReproduzir ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+        </button>
+        <button onClick={() => irPara(passo + 1)} disabled={noFim} className="p-2 rounded-lg transition-colors hover:opacity-80 disabled:opacity-30" style={{ color: "#C7C9D1" }} title="Passo seguinte (→)">
+          <ChevronRight size={18} />
+        </button>
+        <button onClick={() => irPara(trace.passos.length - 1)} className="p-2 rounded-lg transition-colors hover:opacity-80" style={{ color: "#8B8F99" }} title="Fim">
+          <SkipForward size={16} />
+        </button>
+
+        <input
+          type="range" min={0} max={trace.passos.length - 1} value={passo}
+          onChange={(e) => irPara(Number(e.target.value))}
+          className="flex-1 mx-2"
+          style={{ accentColor: "#E3B341" }}
+        />
+
+        <span className="text-xs shrink-0 tabular-nums" style={{ color: "#8B8F99", fontFamily: FONT_MONO }}>
+          {passo + 1} / {trace.passos.length}
+        </span>
+
+        <div className="flex items-center gap-1.5 pl-3 ml-1" style={{ borderLeft: "1px solid #2A2D35" }}>
+          <Gauge size={13} color="#5B5F69" />
+          <select
+            value={velocidade}
+            onChange={(e) => setVelocidade(Number(e.target.value))}
+            className="text-xs rounded px-1.5 py-1"
+            style={{ background: "#1E2128", color: "#8B8F99", border: "1px solid #33363F" }}
+          >
+            <option value={900}>lento</option>
+            <option value={450}>normal</option>
+            <option value={180}>rápido</option>
+          </select>
+        </div>
+      </footer>
+    </div>
+  );
+}

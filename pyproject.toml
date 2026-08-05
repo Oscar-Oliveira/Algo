@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "algo-lang"
+version = "0.1.0"
+description = "Compilador de uma linguagem algorítmica (em português) para Python, para ensino de programação"
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+algo = "algo_lang.cli:main"
+
+[tool.setuptools]
+packages = ["algo_lang", "algo_lang.compilador", "algo_lang.tools", "algo_lang.bibliotecas"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: testes que criam um venv a sério (algo.sh) -- mais lentos, mas corretos",
+]

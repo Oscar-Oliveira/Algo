@@ -1,0 +1,36 @@
+{
+  "fornecedor": "openrouter",
+  "modelo": "openai/gpt-4o-mini",
+  "credenciais": {
+    "openrouter": {
+      "api_key": "PREENCHE_AQUI_A_TUA_CHAVE_OPENROUTER"
+    },
+    "gemini": {
+      "api_key": "PREENCHE_AQUI_A_TUA_CHAVE_GEMINI"
+    },
+    "openai": {
+      "api_key": "PREENCHE_AQUI_A_TUA_CHAVE_OPENAI"
+    },
+    "anthropic": {
+      "api_key": "PREENCHE_AQUI_A_TUA_CHAVE_ANTHROPIC"
+    },
+    "huggingface": {
+      "api_key": "PREENCHE_AQUI_O_TEU_TOKEN_HUGGINGFACE"
+    },
+    "ollama": {
+      "host": "http://localhost:11434"
+    },
+    "opencode": {
+      "api_key": "PREENCHE_AQUI_A_TUA_CHAVE_OPENCODE"
+    }
+  },
+  "politica_pedagogica": {
+    "modo": "socratic",
+    "nivel_maximo_ajuda": 5,
+    "permite_gerar_codigo": false,
+    "permite_solucoes_completas": false,
+    "prefere_perguntas": true,
+    "pistas_progressivas": true,
+    "usar_guardiao": true
+  }
+}

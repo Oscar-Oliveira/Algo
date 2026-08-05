@@ -1,0 +1,15 @@
+# Credenciais reais -- só o config.exemplo.json deve ser partilhado/versionado
+config.json
+
+# Identificador de estudante desta instalação -- é local, não faz
+# sentido partilhar nem versionar
+.estudante_id
+
+# Logs das sessões -- podem conter texto integral de conversas e
+# código de estudantes; nunca devem ir para um repositório partilhado
+# (a pasta em si e o .gitkeep ficam -- só os .jsonl reais é que não)
+logs/*.jsonl
+
+__pycache__/
+*.pyc
+.pytest_cache/

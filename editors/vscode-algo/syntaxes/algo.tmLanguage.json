@@ -1,0 +1,132 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ALGO",
+  "scopeName": "source.algo",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#chars" },
+    { "include": "#numbers" },
+    { "include": "#program-header" },
+    { "include": "#import-include" },
+    { "include": "#function-defs" },
+    { "include": "#struct-defs" },
+    { "include": "#library-calls" },
+    { "include": "#declarations" },
+    { "include": "#keywords-control" },
+    { "include": "#keywords-other" },
+    { "include": "#io-keywords" },
+    { "include": "#logical-operators" },
+    { "include": "#types" },
+    { "include": "#constants" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.algo",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.algo",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.algo",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.algo", "match": "\\\\." }
+      ]
+    },
+    "chars": {
+      "name": "string.quoted.single.algo",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        { "name": "constant.character.escape.algo", "match": "\\\\." }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.algo",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    },
+    "program-header": {
+      "match": "\\b(algoritmo)\\b\\s*(\"[^\"]*\")?",
+      "captures": {
+        "1": { "name": "keyword.other.algo" },
+        "2": { "name": "string.quoted.double.algo" }
+      }
+    },
+    "import-include": {
+      "match": "\\b(importar|incluir)\\b\\s*([A-Za-z_][A-Za-z0-9_]*|\"[^\"]*\")?",
+      "captures": {
+        "1": { "name": "keyword.control.import.algo" },
+        "2": { "name": "entity.name.namespace.algo" }
+      }
+    },
+    "function-defs": {
+      "match": "\\b(funcao|procedimento)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.type.function.algo" },
+        "2": { "name": "entity.name.function.algo" }
+      }
+    },
+    "struct-defs": {
+      "match": "\\b(estrutura)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.other.algo" },
+        "2": { "name": "entity.name.type.algo" }
+      }
+    },
+    "library-calls": {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)([A-Za-z_][A-Za-z0-9_]*)\\b",
+      "captures": {
+        "1": { "name": "support.class.algo" },
+        "2": { "name": "punctuation.accessor.algo" },
+        "3": { "name": "support.function.algo" }
+      }
+    },
+    "declarations": {
+      "comment": "nome:tipo -- realça o nome da variável/parâmetro/campo antes dos dois pontos",
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*([A-Za-z_][A-Za-z0-9_]*)\\b",
+      "captures": {
+        "1": { "name": "variable.other.algo" },
+        "2": { "name": "punctuation.separator.algo" },
+        "3": { "name": "storage.type.algo" }
+      }
+    },
+    "keywords-control": {
+      "name": "keyword.control.algo",
+      "match": "\\b(se|entao|senao|para|de|ate|passo|fazer|enquanto|escolher|caso|contrario|devolver)\\b"
+    },
+    "keywords-other": {
+      "name": "keyword.other.algo",
+      "match": "\\b(inicio|ref|constante|afirmar)\\b"
+    },
+    "io-keywords": {
+      "name": "support.function.builtin.algo",
+      "match": "\\b(escrever|ler)\\b"
+    },
+    "logical-operators": {
+      "name": "keyword.operator.word.algo",
+      "match": "\\b(e|ou|nao|div|mod)\\b"
+    },
+    "types": {
+      "name": "storage.type.algo",
+      "match": "\\b(inteiro|decimal|booleano|cadeia|caracter)\\b"
+    },
+    "constants": {
+      "name": "constant.language.algo",
+      "match": "\\b(verdadeiro|falso)\\b"
+    },
+    "operators": {
+      "name": "keyword.operator.algo",
+      "match": "(==|<>|<=|>=|=|\\+|-|\\*|\\^|<|>)|(?<![a-zA-Z_])/(?![/*])"
+    }
+  }
+}

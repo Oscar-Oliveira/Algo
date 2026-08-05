@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Algo — editor</title>
+<link rel="stylesheet" href="/estatico/estilo.css">
+<link rel="stylesheet" href="/estatico/vendor/codemirror/codemirror.css">
+<link rel="stylesheet" href="/estatico/vendor/codemirror/material-darker.css">
+</head>
+<body class="pagina-editor">
+  <header class="barra-topo">
+    <div class="marca marca-pequena"><span class="marca-simbolo">Δ</span> Algo</div>
+    <div class="acoes-topo">
+      <button id="botao-definicoes" class="botao-secundario">Definições do LLM</button>
+      <button id="botao-sair" class="botao-secundario">Sair</button>
+    </div>
+  </header>
+
+  <main class="disposicao-editor" id="disposicao-editor">
+    <section class="painel painel-codigo">
+      <div class="painel-cabecalho">
+        <span>O teu programa</span>
+        <div class="acoes-codigo">
+          <button id="botao-executar" class="botao-primario">▶ Executar</button>
+          <button id="botao-fluxograma" class="botao-secundario">Fluxograma</button>
+          <button id="botao-rasto" class="botao-secundario">Rasto</button>
+        </div>
+      </div>
+      <div class="barra-ficheiros">
+        <div id="lista-ficheiros" class="lista-ficheiros"></div>
+        <button id="botao-novo-ficheiro" class="botao-ligacao" title="Criar uma biblioteca própria, para usares com 'incluir'">+ novo ficheiro</button>
+      </div>
+      <textarea id="area-codigo"></textarea>
+    </section>
+
+    <div class="divisor" data-divisor="0"></div>
+
+    <section class="painel painel-terminal">
+      <div class="painel-cabecalho">
+        <span id="titulo-painel-execucao">Execução</span>
+        <button id="botao-voltar-execucao" class="botao-ligacao escondido">← voltar à execução normal</button>
+      </div>
+
+      <div id="vista-execucao">
+        <div id="terminal" class="terminal" aria-live="polite"></div>
+        <form id="form-entrada-terminal" class="form-entrada-terminal escondido">
+          <input type="text" id="entrada-terminal" autocomplete="off" placeholder="Escreve o valor e prime Enter…">
+        </form>
+      </div>
+
+      <div id="vista-rasto" class="vista-rasto escondido">
+        <form id="form-entradas-rasto" class="form-entradas-rasto">
+          <label>Entradas para cada <code>ler()</code>, por ordem, separadas por vírgula:</label>
+          <div class="linha-entradas-rasto">
+            <input type="text" id="campo-entradas-rasto" placeholder="ex: 5, 7">
+            <button type="submit" class="botao-primario">Gerar rasto</button>
+          </div>
+          <p class="mensagem-erro" data-form="rasto"></p>
+        </form>
+        <div id="conteudo-rasto" class="conteudo-rasto escondido">
+          <p>Rasto gerado com <span id="rasto-num-passos"></span> passos.</p>
+          <div class="acoes-rasto-geradas">
+            <a id="ligacao-descarregar-rasto" class="botao-primario" download="rasto.json">⭳ Descarregar rasto (.json)</a>
+            <a id="ligacao-abrir-visualizador" class="botao-secundario" href="/estatico/visualizador/algo-trace-viewer.html" target="_blank" rel="noopener">Abrir no visualizador ↗</a>
+          </div>
+          <p class="ajuda-campo">No visualizador, carrega o ficheiro que acabaste de descarregar (o visualizador não recebe o ficheiro automaticamente — é a mesma ferramenta autónoma usada com <code>algo executa --json</code>).</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="divisor" data-divisor="1"></div>
+
+    <section class="painel painel-alguem">
+      <div class="painel-cabecalho">
+        <span>Alguem — o teu tutor</span>
+        <button id="botao-mostrar-ficheiro" class="botao-ligacao">mostrar-lhe o meu código</button>
+      </div>
+      <div id="conversa-alguem" class="conversa"></div>
+      <form id="form-alguem" class="form-alguem">
+        <input type="text" id="entrada-alguem" autocomplete="off" placeholder="Pergunta ao Alguem…">
+        <button type="submit">Enviar</button>
+      </form>
+    </section>
+  </main>
+
+  <div id="modal-fluxograma" class="modal escondido">
+    <div class="modal-caixa modal-caixa-larga">
+      <div class="modal-cabecalho">
+        <h2>Fluxograma</h2>
+        <button type="button" id="botao-fechar-fluxograma" class="botao-secundario">Fechar</button>
+      </div>
+      <label class="seletor-rotina">Ver fluxograma de:
+        <select id="campo-rotina-fluxograma"></select>
+      </label>
+      <div id="conteudo-fluxograma" class="conteudo-fluxograma"></div>
+    </div>
+  </div>
+
+  <div id="modal-definicoes" class="modal escondido">
+    <div class="modal-caixa">
+      <h2>Definições do LLM</h2>
+      <p class="ajuda-campo">A tua chave fica cifrada no servidor. Só é usada para chamar o Alguem em teu nome.</p>
+      <form id="form-definicoes" class="formulario">
+        <label>Fornecedor
+          <select name="fornecedor" id="campo-fornecedor">
+            <option value="openrouter">OpenRouter</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="huggingface">HuggingFace</option>
+            <option value="ollama">Ollama (local, sem chave)</option>
+            <option value="opencode">OpenCode Go</option>
+          </select>
+        </label>
+        <label>Modelo
+          <input type="text" name="modelo" id="campo-modelo" placeholder="ex: openai/gpt-4o-mini" required>
+        </label>
+        <label id="rotulo-api-key">Chave de API
+          <input type="password" name="api_key" id="campo-api-key" autocomplete="off">
+        </label>
+        <label id="rotulo-host" class="escondido">Endereço da Ollama
+          <input type="text" name="host" id="campo-host" placeholder="http://localhost:11434">
+        </label>
+        <div class="acoes-modal">
+          <button type="button" id="botao-fechar-definicoes" class="botao-secundario">Fechar</button>
+          <button type="submit" class="botao-primario">Guardar</button>
+        </div>
+        <p class="mensagem-erro" data-form="definicoes"></p>
+      </form>
+    </div>
+  </div>
+
+  <script src="/estatico/vendor/codemirror/codemirror.js"></script>
+  <script src="/estatico/vendor/codemirror/simple.js"></script>
+  <script src="/modo-algo.js"></script>
+  <script src="/estatico/app.js"></script>
+</body>
+</html>

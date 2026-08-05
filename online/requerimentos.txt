@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+bcrypt
+cryptography
+python-multipart
+itsdangerous
+websockets

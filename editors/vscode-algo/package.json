@@ -1,0 +1,28 @@
+{
+  "name": "algo-language",
+  "displayName": "ALGO Language",
+  "description": "Realce de sintaxe para a linguagem algorítmica ALGO (ensino de programação em português)",
+  "version": "0.1.0",
+  "publisher": "algo-lang",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "algo",
+        "aliases": ["ALGO", "algo"],
+        "extensions": [".algo"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "algo",
+        "scopeName": "source.algo",
+        "path": "./syntaxes/algo.tmLanguage.json"
+      }
+    ]
+  }
+}

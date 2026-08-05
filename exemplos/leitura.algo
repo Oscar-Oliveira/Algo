@@ -1,0 +1,14 @@
+algoritmo "TesteLeitura"
+
+inicio
+    nome:cadeia
+    idade:inteiro
+    inicial:caracter = 'A'
+
+    escrever("Nome: ")
+    ler(nome)
+    escrever("Idade: ")
+    ler(idade)
+
+    saudacao:cadeia = "Olá, " + nome + "!"
+    escrever(saudacao, " Tens ", idade, " anos. Inicial de teste: ", inicial)
