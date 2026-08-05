@@ -56,7 +56,7 @@ h1, h2 { font-family: 'Fraunces', serif; font-weight: 600; margin: 0; }
 .marca h1 { font-size: 1.9rem; }
 .marca-pequena { gap: 0.4rem; }
 .marca-pequena .marca-simbolo { font-size: 1.4rem; }
-.marca-pequena { font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 600; }
+.marca-pequena { font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 600; color: inherit; text-decoration: none; }
 
 .subtitulo { color: #6b6a5e; margin: 0 0 1.6rem; line-height: 1.5; font-size: 0.95rem; }
 
@@ -93,6 +93,13 @@ button { font: inherit; cursor: pointer; }
 }
 .botao-secundario:hover { background: var(--tinta-clara); }
 .botao-ligacao { background: none; border: none; color: var(--ambar); font-size: 0.8rem; text-decoration: underline; padding: 0; }
+
+.botao-icone {
+  background: transparent; border: 1px solid var(--tinta-borda); color: var(--texto-claro);
+  width: 2.1rem; height: 2.1rem; border-radius: 8px; font-size: 1.05rem;
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+}
+.botao-icone:hover { background: var(--tinta-clara); }
 
 .mensagem-erro { color: var(--erro); font-size: 0.85rem; margin: 0; min-height: 1.2em; }
 
@@ -187,6 +194,8 @@ button { font: inherit; cursor: pointer; }
 }
 .modal-caixa .formulario label { color: var(--texto-esmaecido); }
 .acoes-modal { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.4rem; }
+.modal-caixa .tabela-admin th { color: var(--texto-esmaecido); }
+.modal-caixa .tabela-admin td { border-top-color: var(--tinta-borda); }
 
 /* ---------- fluxograma e rasto ---------- */
 

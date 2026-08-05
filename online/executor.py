@@ -35,6 +35,7 @@ PASTA_EXECUCOES_POR_OMISSAO = os.path.join(tempfile.gettempdir(), "algo_online_e
 
 LIMITE_TEMPO_SEGUNDOS = 10
 LIMITE_MEMORIA_BYTES = 256 * 1024 * 1024  # 256 MB
+LIMITE_INATIVIDADE_SEGUNDOS = 60  # janela por ler(), reiniciada a cada entrada enviada
 
 
 class ErroCompilacao(Exception):
@@ -199,6 +200,7 @@ class ExecucaoInterativa:
         self.processo: asyncio.subprocess.Process | None = None
         self.terminou = False
         self.codigo_saida: int | None = None
+        self.tempo_limite: asyncio.Timeout | None = None
 
     async def iniciar(self) -> None:
         kwargs = {}
@@ -230,6 +232,9 @@ class ExecucaoInterativa:
         assert self.processo is not None and self.processo.stdin is not None
         self.processo.stdin.write((texto + "\n").encode("utf-8"))
         await self.processo.stdin.drain()
+        if self.tempo_limite is not None:
+            self.tempo_limite.reschedule(
+                asyncio.get_running_loop().time() + LIMITE_INATIVIDADE_SEGUNDOS)
 
     async def terminar_a_forcar(self) -> None:
         if self.processo is not None and self.processo.returncode is None:
@@ -241,11 +246,17 @@ class ExecucaoInterativa:
 async def correr_com_limite_de_tempo(execucao: ExecucaoInterativa, callback_linha,
                                       limite_segundos: float = LIMITE_TEMPO_SEGUNDOS + 2) -> None:
     """Lê linhas da execução e chama callback_linha(linha) para cada
-    uma, até o programa terminar -- com um limite de tempo total de
-    parede (um pouco acima do limite de CPU do próprio processo, para
-    dar folga a E/S bloqueante que não conta como tempo de CPU)."""
+    uma, até o programa terminar. 'limite_segundos' cobre só o
+    arranque (compilar → primeira saída, um pouco acima do limite de
+    CPU do próprio processo, para dar folga a E/S bloqueante que não
+    conta como tempo de CPU) -- a partir daí, cada entrada enviada por
+    ExecucaoInterativa.enviar_entrada() reagenda o prazo para uma nova
+    janela de LIMITE_INATIVIDADE_SEGUNDOS, para um programa com vários
+    ler() não ficar com um orçamento único partilhado por todas as
+    respostas do estudante."""
     try:
-        async with asyncio.timeout(limite_segundos):
+        async with asyncio.timeout(limite_segundos) as tempo_limite:
+            execucao.tempo_limite = tempo_limite
             while True:
                 linha = await execucao.ler_proxima_linha()
                 if linha is None:
@@ -254,6 +265,8 @@ async def correr_com_limite_de_tempo(execucao: ExecucaoInterativa, callback_linh
     except TimeoutError:
         await execucao.terminar_a_forcar()
         raise
+    finally:
+        execucao.tempo_limite = None
 
 
 # ---------- fluxograma ----------

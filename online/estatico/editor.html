@@ -10,9 +10,10 @@
 </head>
 <body class="pagina-editor">
   <header class="barra-topo">
-    <div class="marca marca-pequena"><span class="marca-simbolo">Δ</span> Algo</div>
+    <a href="/editor" class="marca marca-pequena" title="Reiniciar o editor"><span class="marca-simbolo">Δ</span> Algo</a>
     <div class="acoes-topo">
-      <button id="botao-alternar-alguem" class="botao-secundario">Esconder Alguem</button>
+      <button id="botao-admin" class="botao-icone escondido" title="Painel de admin">🛡</button>
+      <button id="botao-alternar-alguem" class="botao-icone" title="Esconder Alguem">🙈</button>
       <button id="botao-sair" class="botao-secundario">Sair</button>
     </div>
   </header>
@@ -82,8 +83,8 @@
       <div class="painel-cabecalho">
         <span>Alguem — o teu tutor</span>
         <div class="acoes-codigo">
-          <button id="botao-mostrar-ficheiro" class="botao-ligacao">mostrar-lhe o meu código</button>
-          <button id="botao-definicoes-alguem" class="botao-ligacao" title="Definições do LLM">⚙ definições</button>
+          <button id="botao-mostrar-ficheiro" class="botao-icone" title="Mostrar-lhe o meu código">📄</button>
+          <button id="botao-definicoes-alguem" class="botao-icone" title="Definições do LLM">⚙</button>
         </div>
       </div>
 
@@ -127,6 +128,24 @@
       </div>
     </section>
   </main>
+
+  <div id="modal-admin" class="modal escondido">
+    <div class="modal-caixa modal-caixa-larga">
+      <div class="modal-cabecalho">
+        <h2>Contas pendentes</h2>
+        <button id="botao-fechar-admin" class="botao-ligacao" title="Fechar">✕</button>
+      </div>
+      <p class="ajuda-campo">Contas que se registaram e aguardam aprovação para poderem entrar.</p>
+      <table class="tabela-admin">
+        <thead>
+          <tr><th>Email</th><th>Registada em</th><th></th></tr>
+        </thead>
+        <tbody id="corpo-tabela-pendentes"></tbody>
+      </table>
+      <p id="mensagem-sem-pendentes" class="ajuda-campo escondido">Não há nenhuma conta à espera de aprovação.</p>
+      <p class="mensagem-erro" data-form="admin"></p>
+    </div>
+  </div>
 
   <script src="/estatico/vendor/codemirror/codemirror.js"></script>
   <script src="/estatico/vendor/codemirror/simple.js"></script>

@@ -256,7 +256,7 @@ async def ws_executar(websocket: WebSocket):
         except TimeoutError:
             await websocket.send_json({
                 "tipo": "erro",
-                "mensagem": f"Execução interrompida: excedeu o limite de {executor.LIMITE_TEMPO_SEGUNDOS}s.",
+                "mensagem": "Execução interrompida: excedeu o tempo limite.",
             })
 
     tarefa_leitura = None

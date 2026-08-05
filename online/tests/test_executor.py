@@ -204,6 +204,41 @@ def test_limite_de_tempo_mata_ciclo_infinito(tmp_path):
     _correr(cenario())
 
 
+def test_inatividade_reinicia_a_cada_entrada_enviada(tmp_path, monkeypatch):
+    """Um programa com vários ler() não deve ficar preso a um único
+    orçamento de tempo partilhado por todas as respostas -- cada
+    enviar_entrada() tem de reabrir uma nova janela de inatividade."""
+    monkeypatch.setattr(executor, "LIMITE_INATIVIDADE_SEGUNDOS", 1.5)
+
+    async def cenario():
+        ficheiros, principal = _um_ficheiro(
+            'algoritmo "Soma"\ninicio\n'
+            '    a:inteiro\n    b:inteiro\n'
+            '    escrever("dá-me a")\n    ler(a)\n'
+            '    escrever("dá-me b")\n    ler(b)\n'
+            '    escrever("Soma: ", a + b)\n'
+        )
+        caminho_py = executor.compilar_codigo(ficheiros, principal, str(tmp_path))
+        execucao = executor.ExecucaoInterativa(caminho_py, str(tmp_path))
+        await execucao.iniciar()
+
+        linhas = []
+        respostas = iter(["3", "4"])
+
+        async def responder(linha):
+            linhas.append(linha)
+            resposta = next(respostas, None)
+            if resposta is not None:
+                # atraso maior do que o orçamento de arranque original
+                # (2s), mas dentro da janela de inatividade de cada turno
+                await asyncio.sleep(1.0)
+                await execucao.enviar_entrada(resposta)
+
+        await executor.correr_com_limite_de_tempo(execucao, responder, limite_segundos=2)
+        assert linhas == ["dá-me a", "dá-me b", "Soma: 7"]
+    _correr(cenario())
+
+
 def test_limite_de_memoria_trava_alocacao_excessiva(tmp_path):
     async def cenario():
         caminho_py = str(tmp_path / "memoria.py")
