@@ -118,6 +118,7 @@ button { font: inherit; cursor: pointer; }
   padding: 0.7rem 1.2rem; border-bottom: 1px solid var(--tinta-borda); background: var(--tinta-clara);
 }
 .acoes-topo { display: flex; gap: 0.6rem; }
+.acoes-codigo { display: flex; gap: 0.5rem; }
 
 .disposicao-editor {
   flex: 1; display: grid; grid-template-columns: 1.3fr 6px 1fr 6px 1fr;
