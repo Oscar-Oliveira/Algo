@@ -362,6 +362,41 @@ def test_inclusoes_diferentes_nao_dao_aviso():
     assert not any("já tinha sido incluído" in a.mensagem for a in avisos)
 
 
+def test_importar_duplicado_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        importar math
+        importar math
+        inicio
+            escrever("ok")
+    """)
+    relevantes = [a for a in avisos if "já tinha sido importada" in a.mensagem]
+    assert len(relevantes) == 1
+    assert "math" in relevantes[0].mensagem
+
+
+def test_importar_duplicado_ignora_maiusculas_minusculas():
+    avisos = _avisos("""
+        algoritmo "T"
+        importar math
+        importar Math
+        inicio
+            escrever("ok")
+    """)
+    assert any("já tinha sido importada" in a.mensagem for a in avisos)
+
+
+def test_importares_diferentes_nao_dao_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        importar math
+        importar cadeia
+        inicio
+            escrever("ok")
+    """)
+    assert not any("já tinha sido importada" in a.mensagem for a in avisos)
+
+
 def test_caso_repetido_em_escolha_da_aviso():
     avisos = _avisos("""
         algoritmo "T"

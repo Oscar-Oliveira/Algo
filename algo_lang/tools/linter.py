@@ -33,6 +33,7 @@ class Linter:
         self._verificar_rotinas_nunca_chamadas()
         self._verificar_indentacao_consistente()
         self._verificar_inclusoes_duplicadas()
+        self._verificar_importares_duplicados()
         self._verificar_casos_duplicados_em_escolha()
         self._verificar_resultado_de_funcao_descartado()
         self._verificar_campos_em_falta_em_literal_de_estrutura()
@@ -374,6 +375,22 @@ class Linter:
                     inc.linha))
             else:
                 primeira_ocorrencia[caminho] = inc.linha
+
+    def _verificar_importares_duplicados(self):
+        """Mesma situação que _verificar_inclusoes_duplicadas, mas para
+        'importar' -- semantics.py também ignora silenciosamente uma
+        biblioteca já importada (comparando nomes sem distinguir
+        maiúsculas/minúsculas, tal como faz para resolver a chamada)."""
+        primeira_ocorrencia = {}
+        for imp in self.programa.importares:
+            chave = imp.nome.lower()
+            if chave in primeira_ocorrencia:
+                self.avisos.append(Aviso(
+                    f"a biblioteca '{imp.nome}' já tinha sido importada na linha "
+                    f"{primeira_ocorrencia[chave]} -- esta importação repetida é ignorada",
+                    imp.linha))
+            else:
+                primeira_ocorrencia[chave] = imp.linha
 
     def _verificar_casos_duplicados_em_escolha(self):
         for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
