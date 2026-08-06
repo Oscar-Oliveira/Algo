@@ -253,27 +253,30 @@ button { font: inherit; cursor: pointer; }
 /* ---------- separadores de ficheiros ---------- */
 
 .barra-ficheiros {
-  display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 1rem;
+  display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.4rem 1rem;
   border-bottom: 1px solid var(--tinta-borda);
 }
 .lista-ficheiros {
-  display: flex; flex-wrap: nowrap; gap: 0.3rem; flex: 1; min-width: 0;
-  overflow-x: auto; scrollbar-width: thin;
+  display: flex; flex-wrap: wrap; gap: 0.3rem; flex: 1; min-width: 0;
+  max-height: 4rem; overflow: hidden;
 }
-.lista-ficheiros::-webkit-scrollbar { height: 6px; }
-.lista-ficheiros::-webkit-scrollbar-thumb { background: var(--tinta-borda); border-radius: 3px; }
+.lista-ficheiros.expandida { max-height: none; }
 .ficheiro-separador {
   display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.6rem;
   border-radius: 6px; background: var(--tinta-clara); color: var(--texto-esmaecido);
   font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; cursor: pointer;
-  border: 1px solid transparent; white-space: nowrap; flex-shrink: 0;
+  border: 1px solid transparent; flex-shrink: 1; min-width: 3.5rem; max-width: 11rem;
 }
+.ficheiro-separador span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .ficheiro-separador.ativo { background: var(--tinta); color: var(--texto-claro); border-color: var(--ambar-forte); }
 .ficheiro-separador .fechar-ficheiro {
   background: none; border: none; color: inherit; opacity: 0.6; cursor: pointer; padding: 0; font-size: 0.9rem; line-height: 1;
 }
 .ficheiro-separador .fechar-ficheiro:hover { opacity: 1; color: var(--erro); }
-#botao-novo-ficheiro { flex-shrink: 0; white-space: nowrap; }
+.botao-icone-pequeno { width: 1.7rem; height: 1.7rem; border-radius: 6px; flex-shrink: 0; }
+.botao-icone-pequeno .icone-botao { width: 14px; height: 14px; }
+#botao-alternar-ficheiros .icone-botao { transition: transform 0.15s; }
+#botao-alternar-ficheiros.expandida .icone-botao { transform: rotate(180deg); }
 
 .seletor-rotina {
   display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;

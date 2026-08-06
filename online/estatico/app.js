@@ -78,7 +78,34 @@ function renderizarSeparadoresDeFicheiros() {
     }
     lista.appendChild(separador);
   });
+  atualizarBotaoAlternarFicheiros();
 }
+
+function atualizarBotaoAlternarFicheiros() {
+  const lista = document.getElementById("lista-ficheiros");
+  const botao = document.getElementById("botao-alternar-ficheiros");
+  const estavaExpandida = lista.classList.contains("expandida");
+  lista.classList.remove("expandida");
+  const temFicheirosEscondidos = lista.scrollHeight > lista.clientHeight + 1;
+  botao.classList.toggle("escondido", !temFicheirosEscondidos);
+  if (estavaExpandida && temFicheirosEscondidos) {
+    lista.classList.add("expandida");
+  } else {
+    botao.classList.remove("expandida");
+    botao.title = "Mostrar todos os ficheiros";
+  }
+}
+
+document.getElementById("botao-alternar-ficheiros").addEventListener("click", () => {
+  const lista = document.getElementById("lista-ficheiros");
+  const botao = document.getElementById("botao-alternar-ficheiros");
+  const expandir = !lista.classList.contains("expandida");
+  lista.classList.toggle("expandida", expandir);
+  botao.classList.toggle("expandida", expandir);
+  botao.title = expandir ? "Mostrar menos ficheiros" : "Mostrar todos os ficheiros";
+});
+
+new ResizeObserver(atualizarBotaoAlternarFicheiros).observe(document.getElementById("lista-ficheiros"));
 
 document.getElementById("botao-novo-ficheiro").addEventListener("click", () => {
   let nome = prompt("Nome do ficheiro (ex: biblioteca.algo):", "biblioteca.algo");
