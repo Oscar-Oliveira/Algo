@@ -157,3 +157,25 @@ def rejeitar_conta(estudante_id: int, caminho_bd: str | None = None) -> None:
     usado por engano para apagar uma conta ativa."""
     with sessao_bd(caminho_bd) as bd:
         bd.execute("DELETE FROM estudante WHERE id = ? AND aprovado = 0", (estudante_id,))
+
+
+def listar_todos(caminho_bd: str | None = None) -> list[dict]:
+    """Todas as contas (pendentes, aprovadas e admin), mais antigas
+    primeiro -- para a tabela de utilizadores do painel de admin."""
+    with sessao_bd(caminho_bd) as bd:
+        linhas = bd.execute(
+            "SELECT id, email, criado_em, aprovado, admin FROM estudante ORDER BY criado_em"
+        ).fetchall()
+    return [dict(linha) for linha in linhas]
+
+
+def revogar_conta(estudante_id: int, caminho_bd: str | None = None) -> None:
+    """Bloqueia o login de uma conta já aprovada (põe aprovado=0),
+    revertendo aprovar_conta -- nunca uma conta admin (o WHERE admin = 0
+    é a salvaguarda, simétrica à de rejeitar_conta), para não ser
+    possível bloquear um admin por engano a partir desta ação."""
+    with sessao_bd(caminho_bd) as bd:
+        bd.execute(
+            "UPDATE estudante SET aprovado = 0 WHERE id = ? AND aprovado = 1 AND admin = 0",
+            (estudante_id,),
+        )

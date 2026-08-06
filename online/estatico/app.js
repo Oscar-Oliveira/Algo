@@ -275,102 +275,19 @@ document.getElementById("botao-sair").addEventListener("click", async () => {
   window.location.href = "/";
 });
 
-// ---------- painel de admin (modal, dentro do próprio editor) ----------
+// ---------- ligação para o painel de admin ----------
 
-// só mostra o botão do painel de admin a quem realmente é admin
-// -- evita uma ação morta (403) para todos os outros estudantes
+// só mostra a ligação do painel de admin a quem realmente é admin --
+// evita uma ação morta (403) para todos os outros estudantes
 const botaoAdmin = document.getElementById("botao-admin");
-const modalAdmin = document.getElementById("modal-admin");
-const corpoTabelaPendentes = document.getElementById("corpo-tabela-pendentes");
-const mensagemSemPendentes = document.getElementById("mensagem-sem-pendentes");
-const mensagemErroAdmin = document.querySelector('.mensagem-erro[data-form="admin"]');
 
 (async () => {
   try {
     const resposta = await fetch("/api/eu");
     const dados = await resposta.json();
     if (dados.admin) botaoAdmin.classList.remove("escondido");
-  } catch (erro) { /* silencioso -- só um botão a mais */ }
+  } catch (erro) { /* silencioso -- só uma ligação a mais */ }
 })();
-
-function formatarDataConta(iso) {
-  return iso.replace("T", " ").slice(0, 16);
-}
-
-async function carregarPendentes() {
-  mensagemErroAdmin.textContent = "";
-  try {
-    const resposta = await fetch("/api/admin/pendentes");
-    if (!resposta.ok) {
-      const corpo = await resposta.json();
-      mensagemErroAdmin.textContent = corpo.detail || "Não foi possível carregar as contas pendentes.";
-      return;
-    }
-    const { pendentes } = await resposta.json();
-    corpoTabelaPendentes.innerHTML = "";
-    mensagemSemPendentes.classList.toggle("escondido", pendentes.length > 0);
-    pendentes.forEach((conta) => {
-      const linha = document.createElement("tr");
-
-      const celulaEmail = document.createElement("td");
-      celulaEmail.textContent = conta.email;
-
-      const celulaData = document.createElement("td");
-      celulaData.textContent = formatarDataConta(conta.criado_em);
-
-      const celulaAcoes = document.createElement("td");
-      const botaoAprovar = document.createElement("button");
-      botaoAprovar.className = "botao-primario";
-      botaoAprovar.textContent = "Aprovar";
-      botaoAprovar.addEventListener("click", () => agirSobreConta(conta.id, "aprovar"));
-
-      const botaoRejeitar = document.createElement("button");
-      botaoRejeitar.className = "botao-perigo";
-      botaoRejeitar.textContent = "Rejeitar";
-      botaoRejeitar.addEventListener("click", () => agirSobreConta(conta.id, "rejeitar"));
-
-      celulaAcoes.appendChild(botaoAprovar);
-      celulaAcoes.appendChild(botaoRejeitar);
-
-      linha.appendChild(celulaEmail);
-      linha.appendChild(celulaData);
-      linha.appendChild(celulaAcoes);
-      corpoTabelaPendentes.appendChild(linha);
-    });
-  } catch (erro) {
-    console.error(erro);
-    mensagemErroAdmin.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
-  }
-}
-
-async function agirSobreConta(idConta, acao) {
-  mensagemErroAdmin.textContent = "";
-  try {
-    const resposta = await fetch(`/api/admin/${acao}/${idConta}`, { method: "POST" });
-    if (!resposta.ok) {
-      const corpo = await resposta.json();
-      mensagemErroAdmin.textContent = corpo.detail || "Não foi possível concluir a ação.";
-      return;
-    }
-    carregarPendentes();
-  } catch (erro) {
-    console.error(erro);
-    mensagemErroAdmin.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
-  }
-}
-
-function abrirModalAdmin() {
-  modalAdmin.classList.remove("escondido");
-  carregarPendentes();
-}
-function fecharModalAdmin() {
-  modalAdmin.classList.add("escondido");
-}
-botaoAdmin.addEventListener("click", abrirModalAdmin);
-document.getElementById("botao-fechar-admin").addEventListener("click", fecharModalAdmin);
-modalAdmin.addEventListener("click", (evento) => {
-  if (evento.target === modalAdmin) fecharModalAdmin();
-});
 
 // ---------- painel do meio: execução / rasto / fluxograma ----------
 // As três vistas partilham o mesmo painel (nunca ao mesmo tempo) -- só

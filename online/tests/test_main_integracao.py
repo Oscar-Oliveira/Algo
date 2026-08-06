@@ -165,6 +165,82 @@ def test_pagina_admin_redireciona_quem_nao_e_admin(cliente):
     assert r.headers["location"] == "/editor"
 
 
+def test_admin_utilizadores_exige_admin(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = cliente.get("/api/admin/utilizadores")
+    assert r.status_code == 403
+
+
+def test_admin_utilizadores_lista_todas_as_contas(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+
+    r = cliente.get("/api/admin/utilizadores")
+    assert r.status_code == 200
+    utilizadores = {u["email"]: u for u in r.json()["utilizadores"]}
+    assert utilizadores["aluno@escola.pt"]["aprovado"] == 0
+    assert utilizadores["professor@escola.pt"]["admin"] == 1
+
+
+def test_admin_revoga_conta_aprovada(cliente, monkeypatch):
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+
+    id_aluno = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "aluno@escola.pt"
+    )
+    r = cliente.post(f"/api/admin/revogar/{id_aluno}")
+    assert r.status_code == 200
+
+    cliente.post("/api/sair")
+    r = cliente.post("/api/entrar", json={"email": "aluno@escola.pt", "password": "password123"})
+    assert r.status_code == 401
+    assert "pendente" in r.json()["detail"]
+
+
+def test_admin_nao_pode_revogar_a_propria_conta(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_proprio = cliente.get("/api/admin/utilizadores").json()["utilizadores"][0]["id"]
+
+    r = cliente.post(f"/api/admin/revogar/{id_proprio}")
+    assert r.status_code == 400
+
+
+def test_admin_atividade_exige_admin(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = cliente.get("/api/admin/atividade")
+    assert r.status_code == 403
+
+
+def test_admin_atividade_sem_logs_devolve_relatorio_vazio(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "a@b.com")
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+
+    r = cliente.get("/api/admin/atividade")
+    assert r.status_code == 200
+    corpo = r.json()
+    assert corpo["por_sessao"] == []
+    assert corpo["globais"]["num_sessoes"] == 0
+
+
 # ---------- credenciais ----------
 
 def test_credencial_exige_autenticacao(cliente):

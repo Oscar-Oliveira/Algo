@@ -6,24 +6,72 @@
 <title>Algo — admin</title>
 <link rel="stylesheet" href="/estatico/estilo.css">
 </head>
-<body class="pagina-entrada">
-  <main class="cartao-entrada cartao-admin">
-    <div class="marca">
-      <img src="/estatico/algo-logo.svg" alt="" class="marca-simbolo">
-      <h1>Contas pendentes</h1>
+<body class="pagina-admin">
+  <header class="barra-topo">
+    <span class="marca marca-pequena"><img src="/estatico/algo-logo.svg" alt="" class="marca-simbolo"> Algo — admin</span>
+    <div class="acoes-topo">
+      <a href="/editor" class="botao-icone" title="Voltar ao editor"><svg class="icone-botao" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg></a>
     </div>
-    <p class="subtitulo">Contas que se registaram e aguardam aprovação para poderem entrar.</p>
+  </header>
 
-    <table class="tabela-admin">
-      <thead>
-        <tr><th>Email</th><th>Registada em</th><th></th></tr>
-      </thead>
-      <tbody id="corpo-tabela-pendentes"></tbody>
-    </table>
-    <p id="mensagem-sem-pendentes" class="ajuda-campo escondido">Não há nenhuma conta à espera de aprovação.</p>
-    <p class="mensagem-erro" id="mensagem-erro-admin"></p>
+  <main class="conteudo-admin">
+    <nav class="abas-admin">
+      <button type="button" class="aba-admin ativa" data-aba="utilizadores">Utilizadores</button>
+      <button type="button" class="aba-admin" data-aba="atividade">Atividade</button>
+    </nav>
 
-    <a href="/editor" class="botao-ligacao ligacao-voltar">← voltar ao editor</a>
+    <section id="aba-conteudo-utilizadores" class="conteudo-aba-admin">
+      <p class="subtitulo">Contas registadas: aprova ou rejeita quem está pendente, ou revoga o acesso de quem já tinha sido aprovado.</p>
+      <table class="tabela-admin">
+        <thead>
+          <tr><th>Email</th><th>Estado</th><th>Registada em</th><th></th></tr>
+        </thead>
+        <tbody id="corpo-tabela-utilizadores"></tbody>
+      </table>
+      <p id="mensagem-sem-utilizadores" class="ajuda-campo escondido">Ainda não há nenhuma conta registada.</p>
+      <p class="mensagem-erro" id="mensagem-erro-utilizadores"></p>
+    </section>
+
+    <section id="aba-conteudo-atividade" class="conteudo-aba-admin escondido">
+      <p class="subtitulo">Métricas calculadas a partir dos logs de conversa com o Alguem (identificação por ID pseudónimo, nunca por email).</p>
+      <div class="cartoes-metricas">
+        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-sessoes">-</span><span class="cartao-metrica-titulo">Sessões</span></div>
+        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-estudantes">-</span><span class="cartao-metrica-titulo">Estudantes distintos</span></div>
+        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-leakage-global">-</span><span class="cartao-metrica-titulo">Solution Leakage Rate</span></div>
+        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-hint-dependency">-</span><span class="cartao-metrica-titulo">Hint Dependency (turnos/sessão)</span></div>
+      </div>
+      <div class="filtros-admin">
+        <input type="search" id="atividade-pesquisa" placeholder="Pesquisar por sessão ou estudante...">
+        <select id="atividade-filtro-fornecedor">
+          <option value="">Todos os fornecedores</option>
+        </select>
+      </div>
+      <table class="tabela-admin">
+        <thead>
+          <tr>
+            <th>Sessão</th>
+            <th>Estudante</th>
+            <th class="ordenavel" data-ordenar="num_turnos">Turnos</th>
+            <th class="ordenavel" data-ordenar="solution_leakage_rate">Leakage</th>
+            <th class="ordenavel" data-ordenar="hint_escalation_maxima">Nível máx.</th>
+            <th>Modelo</th>
+            <th class="ordenavel" data-ordenar="num_recusas_seguras">Recusas seguras</th>
+          </tr>
+        </thead>
+        <tbody id="corpo-tabela-atividade"></tbody>
+      </table>
+      <p id="mensagem-sem-atividade" class="ajuda-campo escondido">Nenhuma sessão corresponde aos filtros atuais.</p>
+      <div class="paginacao-admin">
+        <button type="button" id="atividade-pagina-anterior" class="botao-secundario">← Anterior</button>
+        <span id="atividade-texto-pagina" class="ajuda-campo"></span>
+        <button type="button" id="atividade-pagina-seguinte" class="botao-secundario">Seguinte →</button>
+      </div>
+      <p class="mensagem-erro" id="mensagem-erro-atividade"></p>
+    </section>
   </main>
   <script src="/estatico/admin.js"></script>
 </body>

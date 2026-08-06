@@ -163,6 +163,36 @@ def test_listar_pendentes_so_mostra_contas_por_aprovar(monkeypatch):
     assert pendentes[0]["email"] == "aluno@escola.pt"
 
 
+def test_revogar_conta_bloqueia_entrada_de_conta_aprovada(monkeypatch):
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    id_est = autenticacao.registar("a@b.com", "password123")
+    autenticacao.revogar_conta(id_est)
+    assert autenticacao.esta_aprovado(id_est) is False
+    with pytest.raises(autenticacao.ErroAutenticacao, match="pendente"):
+        autenticacao.autenticar("a@b.com", "password123")
+
+
+def test_revogar_conta_nao_afeta_conta_admin(monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    id_est = autenticacao.registar("professor@escola.pt", "password123")
+    autenticacao.revogar_conta(id_est)  # é admin -- revogar não faz nada
+    assert autenticacao.autenticar("professor@escola.pt", "password123") == id_est
+
+
+def test_listar_todos_inclui_pendentes_aprovados_e_admin(monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    id_admin = autenticacao.registar("professor@escola.pt", "password123")
+    id_pendente = autenticacao.registar("aluno@escola.pt", "password123")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    id_aprovado = autenticacao.registar("outro@escola.pt", "password123")
+
+    todos = {c["id"]: c for c in autenticacao.listar_todos()}
+    assert set(todos) == {id_admin, id_pendente, id_aprovado}
+    assert todos[id_admin]["admin"] == 1 and todos[id_admin]["aprovado"] == 1
+    assert todos[id_pendente]["aprovado"] == 0
+    assert todos[id_aprovado]["aprovado"] == 1 and todos[id_aprovado]["admin"] == 0
+
+
 def test_admin_configurado_depois_da_conta_ja_existir(monkeypatch):
     """Bootstrap tardio: a conta do professor foi criada ANTES de
     ONLINE_EMAIL_ADMIN estar configurada -- autenticar() tem de a

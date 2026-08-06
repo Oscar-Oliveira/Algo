@@ -23,6 +23,8 @@ import credenciais
 import executor
 import alguem_ponte
 from alguem.fornecedores.base import ErroFornecedorLLM
+from alguem.scripts import metricas
+from alguem.nucleo import registador as registador_alguem
 
 PASTA_ESTATICO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estatico")
 
@@ -142,6 +144,32 @@ async def rota_admin_aprovar(id_estudante_alvo: int, id_estudante: int = Depends
 async def rota_admin_rejeitar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
     autenticacao.rejeitar_conta(id_estudante_alvo)
     return {"ok": True}
+
+
+# ---------- administração: todos os utilizadores e revogação ----------
+
+@app.get("/api/admin/utilizadores")
+async def rota_admin_utilizadores(id_estudante: int = Depends(admin_atual)):
+    return {"utilizadores": autenticacao.listar_todos()}
+
+
+@app.post("/api/admin/revogar/{id_estudante_alvo}")
+async def rota_admin_revogar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+    if id_estudante_alvo == id_estudante:
+        raise HTTPException(status_code=400, detail="Não podes revogar a tua própria conta.")
+    autenticacao.revogar_conta(id_estudante_alvo)
+    return {"ok": True}
+
+
+# ---------- administração: atividade/métricas dos logs do Alguem ----------
+
+@app.get("/api/admin/atividade")
+async def rota_admin_atividade(id_estudante: int = Depends(admin_atual)):
+    # Lê a pasta de logs do módulo registador, não a constante (idêntica
+    # em produção) do próprio metricas -- é aquele módulo que o
+    # alguem_ponte usa de facto para escrever os logs, e os testes já
+    # isolam esse caminho com monkeypatch (ver tests/conftest.py).
+    return metricas.gerar_relatorio(registador_alguem.PASTA_LOGS_POR_OMISSAO)
 
 
 # ---------- credenciais de LLM ----------

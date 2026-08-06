@@ -15,11 +15,11 @@
     <a href="/editor" class="marca marca-pequena" title="Reiniciar o editor"><img src="/estatico/algo-logo.svg" alt=""
         class="marca-simbolo"> Algo</a>
     <div class="acoes-topo">
-      <button id="botao-admin" class="botao-icone escondido" title="Painel de admin"><svg class="icone-botao"
+      <a id="botao-admin" href="/admin" class="botao-icone escondido" title="Painel de admin"><svg class="icone-botao"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
           stroke-linejoin="round">
           <path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6z" />
-        </svg></button>
+        </svg></a>
       <button id="botao-alternar-alguem" class="botao-icone" title="Esconder Alguem"><svg class="icone-botao"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
           stroke-linejoin="round">
@@ -189,32 +189,6 @@
       </div>
     </section>
   </main>
-
-  <div id="modal-admin" class="modal escondido">
-    <div class="modal-caixa modal-caixa-larga">
-      <div class="modal-cabecalho">
-        <h2>Contas pendentes</h2>
-        <button id="botao-fechar-admin" class="botao-icone" title="Fechar"><svg class="icone-botao" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg></button>
-      </div>
-      <p class="ajuda-campo">Contas que se registaram e aguardam aprovação para poderem entrar.</p>
-      <table class="tabela-admin">
-        <thead>
-          <tr>
-            <th>Email</th>
-            <th>Registada em</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="corpo-tabela-pendentes"></tbody>
-      </table>
-      <p id="mensagem-sem-pendentes" class="ajuda-campo escondido">Não há nenhuma conta à espera de aprovação.</p>
-      <p class="mensagem-erro" data-form="admin"></p>
-    </div>
-  </div>
 
   <script src="/estatico/vendor/codemirror/codemirror.js"></script>
   <script src="/estatico/vendor/codemirror/simple.js"></script>
