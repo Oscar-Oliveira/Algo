@@ -98,6 +98,9 @@ button { font: inherit; cursor: pointer; }
 .botao-icone:hover { background: var(--tinta-clara); }
 .icone-botao { width: 18px; height: 18px; }
 
+#botao-executar { background: var(--ambar-forte); border-color: var(--ambar-forte); color: #fff; }
+#botao-executar:hover { background: #b17d1f; border-color: #b17d1f; }
+
 .mensagem-erro { color: var(--erro); font-size: 0.85rem; margin: 0; min-height: 1.2em; }
 
 /* ---------- painel de admin (página própria, não um modal) ---------- */

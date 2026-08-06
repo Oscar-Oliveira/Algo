@@ -490,6 +490,7 @@ function alternarPainelAlguem() {
 }
 
 botaoAlternarAlguem.addEventListener("click", alternarPainelAlguem);
+alternarPainelAlguem(); // painel do Alguem começa escondido
 
 // ---------- painéis redimensionáveis (arrastar os divisores) ----------
 
