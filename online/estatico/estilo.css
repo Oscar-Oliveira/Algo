@@ -88,7 +88,12 @@ button { font: inherit; cursor: pointer; }
   padding: 0.5rem 0.9rem; border-radius: 8px; font-weight: 500;
 }
 .botao-secundario:hover { background: var(--tinta-clara); }
-.botao-ligacao { background: none; border: none; color: var(--ambar); font-size: 0.8rem; text-decoration: underline; padding: 0; }
+.botao-ligacao {
+  background: none; border: none; color: var(--ambar); font-size: 0.8rem; padding: 0;
+  display: inline-flex; align-items: center; gap: 0.3rem;
+}
+.botao-ligacao .icone-botao { width: 14px; height: 14px; }
+.botao-ligacao span { text-decoration: underline; }
 
 .botao-icone {
   background: transparent; border: 1px solid var(--tinta-borda); color: var(--texto-claro);
