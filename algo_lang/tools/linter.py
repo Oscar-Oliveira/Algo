@@ -8,6 +8,8 @@ variáveis/parâmetros nunca usados, funções nunca chamadas, divisões por
 zero óbvias, comparações sempre verdadeiras, e variáveis locais que
 sombreiam uma variável global.
 """
+import os
+
 from ..compilador import ast_nodes as A
 
 
@@ -30,6 +32,10 @@ class Linter:
         self.avisos = []
         self._verificar_rotinas_nunca_chamadas()
         self._verificar_indentacao_consistente()
+        self._verificar_inclusoes_duplicadas()
+        self._verificar_casos_duplicados_em_escolha()
+        self._verificar_resultado_de_funcao_descartado()
+        self._verificar_campos_em_falta_em_literal_de_estrutura()
 
         nomes_globais = {d.nome for d in self.programa.declaracoes}
         nomes_globais |= self._nomes_declarados(self.programa.corpo)
@@ -38,8 +44,13 @@ class Linter:
         nomes_constantes |= self._nomes_constantes_declaradas(self.programa.corpo)
         nomes_globais_mutaveis = nomes_globais - nomes_constantes
 
+        arrays_globais = self._arrays_com_tamanho_literal(self.programa.declaracoes)
+
         self._verificar_variaveis_nao_usadas(self.programa.corpo, contexto="no programa principal")
         self._verificar_divisoes_e_comparacoes(self.programa.corpo)
+        self._verificar_codigo_depois_de_devolver(self.programa.corpo)
+        self._verificar_ciclo_verdadeiro_sem_saida(self.programa.corpo)
+        self._verificar_indices_fora_dos_limites(self.programa.corpo, arrays_globais)
 
         for f in self.programa.funcoes:
             self._verificar_parametros_nao_usados(f)
@@ -50,6 +61,10 @@ class Linter:
             self._verificar_sombra_de_global(f, nomes_globais)
             self._verificar_uso_de_globais(f, nomes_globais_mutaveis)
             self._verificar_divisoes_e_comparacoes(f.corpo)
+            self._verificar_atribuicao_a_parametro_por_valor(f)
+            self._verificar_codigo_depois_de_devolver(f.corpo)
+            self._verificar_ciclo_verdadeiro_sem_saida(f.corpo)
+            self._verificar_indices_fora_dos_limites(f.corpo, arrays_globais)
 
         self.avisos.sort(key=lambda a: a.linha)
         return self.avisos
@@ -344,6 +359,167 @@ class Linter:
                 f"o ficheiro mistura indentação por tabs (ex: linha {primeira_linha_tab}) "
                 f"e por espaços (ex: linha {primeira_linha_espaco}) -- escolhe só um dos "
                 f"dois estilos e usa-o em todo o ficheiro", primeira_linha_espaco))
+
+    def _verificar_inclusoes_duplicadas(self):
+        """_resolver_inclusoes (cli.py e online/executor.py) ignora
+        silenciosamente uma 'incluir' repetida -- não é erro de compilação,
+        mas é quase sempre um lapso do programador, por isso avisa aqui."""
+        primeira_ocorrencia = {}
+        for inc in self.programa.inclusoes:
+            caminho = os.path.normpath(inc.caminho)
+            if caminho in primeira_ocorrencia:
+                self.avisos.append(Aviso(
+                    f"o ficheiro '{inc.caminho}' já tinha sido incluído na linha "
+                    f"{primeira_ocorrencia[caminho]} -- esta inclusão repetida é ignorada",
+                    inc.linha))
+            else:
+                primeira_ocorrencia[caminho] = inc.linha
+
+    def _verificar_casos_duplicados_em_escolha(self):
+        for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
+            for s in self._todas_as_stmts(stmts):
+                if not isinstance(s, A.Escolha):
+                    continue
+                vistos = []   # lista de (expr, linha) já vistos neste 'escolher'
+                for valores, _corpo in s.casos:
+                    for v in valores:
+                        repetido = next(
+                            (linha for v_vista, linha in vistos
+                             if self._mesma_expressao_simples(v_vista, v)), None)
+                        if repetido is not None:
+                            self.avisos.append(Aviso(
+                                f"este valor de 'caso' já apareceu na linha {repetido} "
+                                f"deste 'escolher' -- este ramo nunca é alcançado", v.linha))
+                        else:
+                            vistos.append((v, v.linha))
+
+    def _verificar_codigo_depois_de_devolver(self, stmts):
+        """Instruções a seguir a um 'devolver', no mesmo bloco, são código
+        morto -- normalmente sobras de uma refatoração incompleta."""
+        for i, s in enumerate(stmts):
+            if isinstance(s, A.Devolver) and i < len(stmts) - 1:
+                self.avisos.append(Aviso(
+                    "instruções a seguir a este 'devolver' nunca são executadas",
+                    stmts[i + 1].linha))
+            for bloco in A.subblocos(s):
+                self._verificar_codigo_depois_de_devolver(bloco)
+
+    def _verificar_atribuicao_a_parametro_por_valor(self, f: A.FuncaoDef):
+        """Atribuir diretamente a um parâmetro que não é 'por referência'
+        só muda a cópia local -- confusão clássica entre passagem por
+        valor e por referência."""
+        nomes_por_valor = {p.nome for p in f.parametros if not p.por_referencia}
+        for s in self._todas_as_stmts(f.corpo):
+            if isinstance(s, A.Atribuicao) and not s.alvo.acessos and s.alvo.nome in nomes_por_valor:
+                self.avisos.append(Aviso(
+                    f"o parâmetro '{s.alvo.nome}' de '{f.nome}' não é 'por referência' -- "
+                    f"atribuir-lhe aqui um novo valor não é visto por quem chamou a função",
+                    s.linha))
+
+    def _verificar_resultado_de_funcao_descartado(self):
+        funcoes_por_nome = {f.nome: f for f in self.programa.funcoes}
+        for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
+            for s in self._todas_as_stmts(stmts):
+                if not isinstance(s, A.ChamadaStmt):
+                    continue
+                f_def = funcoes_por_nome.get(s.chamada.nome)
+                if f_def is not None and not f_def.eh_procedimento:
+                    self.avisos.append(Aviso(
+                        f"o valor devolvido por '{s.chamada.nome}' é descartado aqui -- "
+                        f"se só interessa o efeito, considera torná-la um procedimento; "
+                        f"caso contrário falta usar o valor devolvido", s.linha))
+
+    def _verificar_ciclo_verdadeiro_sem_saida(self, corpo):
+        """O ALGO não tem instrução para sair de um ciclo a meio -- um
+        'enquanto verdadeiro'/'faz...enquanto verdadeiro' só pode terminar
+        através de um 'devolver' algures no corpo."""
+        for s in self._todas_as_stmts(corpo):
+            if isinstance(s, (A.Enquanto, A.FazEnquanto)) and self._eh_literal_verdadeiro(s.condicao):
+                if not any(isinstance(sub, A.Devolver) for sub in self._todas_as_stmts(s.corpo)):
+                    self.avisos.append(Aviso(
+                        "ciclo com condição sempre verdadeira e sem nenhum 'devolver' no "
+                        "corpo -- como o ALGO não tem instrução para sair de um ciclo, "
+                        "isto nunca termina", s.linha))
+
+    def _eh_literal_verdadeiro(self, expr):
+        return isinstance(expr, A.Literal) and expr.tipo == "booleano" and expr.valor is True
+
+    def _arrays_com_tamanho_literal(self, declaracoes):
+        """nome -> tamanho, só para arrays de 1 dimensão declarados com um
+        tamanho literal (ex: 'v:inteiro[5]') -- os únicos casos em que dá
+        para verificar limites estaticamente."""
+        tamanhos = {}
+        for d in declaracoes:
+            if d.dims and len(d.dims) == 1 and isinstance(d.dims[0], A.Literal) \
+                    and d.dims[0].tipo == "inteiro":
+                tamanhos[d.nome] = d.dims[0].valor
+        return tamanhos
+
+    def _verificar_indices_fora_dos_limites(self, corpo, arrays_globais):
+        arrays = dict(arrays_globais)
+        locais = [s for s in self._todas_as_stmts(corpo) if isinstance(s, A.Declaracao)]
+        arrays.update(self._arrays_com_tamanho_literal(locais))
+        for s in self._todas_as_stmts(corpo):
+            for e in self._expressoes_lidas(s):
+                self._verificar_indices_expr(e, arrays)
+            if isinstance(s, A.Atribuicao):
+                self._verificar_indices_expr(s.alvo, arrays)
+
+    def _verificar_indices_expr(self, expr, arrays):
+        if expr is None:  # pragma: no cover -- mesmo raciocínio de _extrair_lvalues_e_chamadas
+            return
+        if isinstance(expr, A.LValue):
+            tamanho = arrays.get(expr.nome)
+            for tag, valor in expr.acessos:
+                if tag != "indice":
+                    continue
+                indice = self._valor_literal_inteiro(valor)
+                if tamanho is not None and indice is not None and not (0 <= indice < tamanho):
+                    self.avisos.append(Aviso(
+                        f"índice {indice} está fora dos limites de '{expr.nome}' (tamanho "
+                        f"{tamanho}, índices válidos: 0 a {tamanho - 1})", expr.linha))
+                self._verificar_indices_expr(valor, arrays)
+        elif isinstance(expr, A.BinOp):
+            self._verificar_indices_expr(expr.esq, arrays)
+            self._verificar_indices_expr(expr.dire, arrays)
+        elif isinstance(expr, A.UnOp):
+            self._verificar_indices_expr(expr.operando, arrays)
+        elif isinstance(expr, A.Chamada):
+            for a in expr.args:
+                self._verificar_indices_expr(a, arrays)
+        elif isinstance(expr, A.ArrayLiteral):
+            for e in expr.elementos:
+                self._verificar_indices_expr(e, arrays)
+        elif isinstance(expr, A.EstruturaLiteral):
+            for _nome, valor in expr.campos:
+                self._verificar_indices_expr(valor, arrays)
+
+    def _valor_literal_inteiro(self, expr):
+        if isinstance(expr, A.Literal) and expr.tipo == "inteiro":
+            return expr.valor
+        if isinstance(expr, A.UnOp) and expr.op == "-" and isinstance(expr.operando, A.Literal) \
+                and expr.operando.tipo == "inteiro":
+            return -expr.operando.valor
+        return None
+
+    def _verificar_campos_em_falta_em_literal_de_estrutura(self):
+        campos_por_estrutura = {e.nome: {c.nome for c in e.campos} for e in self.programa.estruturas}
+        declaracoes = list(self.programa.declaracoes)
+        for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
+            declaracoes.extend(s for s in self._todas_as_stmts(stmts) if isinstance(s, A.Declaracao))
+        for d in declaracoes:
+            if not isinstance(d.inicial, A.EstruturaLiteral):
+                continue
+            campos_da_estrutura = campos_por_estrutura.get(d.tipo)
+            if campos_da_estrutura is None:
+                continue
+            campos_dados = {nome for nome, _expr in d.inicial.campos}
+            em_falta = sorted(campos_da_estrutura - campos_dados)
+            if em_falta:
+                lista = ", ".join(f"'{c}'" for c in em_falta)
+                self.avisos.append(Aviso(
+                    f"o literal de '{d.tipo}' não define o(s) campo(s) {lista} -- ficam "
+                    f"com o valor por omissão", d.linha))
 
 
 def analisar(programa: A.Programa, codigo_fonte: str = None):

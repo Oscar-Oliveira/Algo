@@ -325,6 +325,248 @@ def test_comparacao_entre_indices_diferentes_nao_e_assinalada():
     assert not any("sempre" in a.mensagem for a in avisos)
 
 
+def test_inclusao_duplicada_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        incluir "biblioteca.algo"
+        incluir "biblioteca.algo"
+        inicio
+            escrever("ok")
+    """)
+    relevantes = [a for a in avisos if "já tinha sido incluído" in a.mensagem]
+    assert len(relevantes) == 1
+    assert "biblioteca.algo" in relevantes[0].mensagem
+
+
+def test_inclusao_duplicada_com_caminhos_equivalentes_da_aviso():
+    """'./biblioteca.algo' e 'biblioteca.algo' resolvem para o mesmo
+    ficheiro -- deve ser detetado apesar do texto literal ser diferente."""
+    avisos = _avisos("""
+        algoritmo "T"
+        incluir "biblioteca.algo"
+        incluir "./biblioteca.algo"
+        inicio
+            escrever("ok")
+    """)
+    assert any("já tinha sido incluído" in a.mensagem for a in avisos)
+
+
+def test_inclusoes_diferentes_nao_dao_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        incluir "a.algo"
+        incluir "b.algo"
+        inicio
+            escrever("ok")
+    """)
+    assert not any("já tinha sido incluído" in a.mensagem for a in avisos)
+
+
+def test_caso_repetido_em_escolha_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            x:inteiro = 1
+            escolher x
+                caso 1
+                    escrever("um")
+                caso 1
+                    escrever("também um")
+    """)
+    relevantes = [a for a in avisos if "já apareceu na linha" in a.mensagem]
+    assert len(relevantes) == 1
+
+
+def test_casos_diferentes_em_escolha_nao_dao_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            x:inteiro = 1
+            escolher x
+                caso 1
+                    escrever("um")
+                caso 2
+                    escrever("dois")
+    """)
+    assert not any("já apareceu na linha" in a.mensagem for a in avisos)
+
+
+def test_codigo_depois_de_devolver_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        funcao f(x:inteiro):inteiro
+            devolver x
+            escrever("nunca corre")
+        inicio
+            escrever(f(1))
+    """)
+    assert any("nunca são executadas" in a.mensagem for a in avisos)
+
+
+def test_devolver_no_fim_do_bloco_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        funcao f(x:inteiro):inteiro
+            devolver x
+        inicio
+            escrever(f(1))
+    """)
+    assert not any("nunca são executadas" in a.mensagem for a in avisos)
+
+
+def test_atribuicao_a_parametro_por_valor_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        procedimento incrementa(x:inteiro)
+            x = x + 1
+        inicio
+            n:inteiro = 5
+            incrementa(n)
+            escrever(n)
+    """)
+    assert any("não é 'por referência'" in a.mensagem for a in avisos)
+
+
+def test_atribuicao_a_parametro_por_referencia_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        procedimento incrementa(ref x:inteiro)
+            x = x + 1
+        inicio
+            n:inteiro = 5
+            incrementa(n)
+            escrever(n)
+    """)
+    assert not any("não é 'por referência'" in a.mensagem for a in avisos)
+
+
+def test_resultado_de_funcao_descartado_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        funcao dobro(x:inteiro):inteiro
+            devolver x * 2
+        inicio
+            dobro(5)
+    """)
+    assert any("é descartado aqui" in a.mensagem for a in avisos)
+
+
+def test_resultado_de_funcao_usado_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        funcao dobro(x:inteiro):inteiro
+            devolver x * 2
+        inicio
+            escrever(dobro(5))
+    """)
+    assert not any("é descartado aqui" in a.mensagem for a in avisos)
+
+
+def test_chamada_a_procedimento_nao_da_aviso_de_resultado_descartado():
+    avisos = _avisos("""
+        algoritmo "T"
+        procedimento mostra(x:inteiro)
+            escrever(x)
+        inicio
+            mostra(5)
+    """)
+    assert not any("é descartado aqui" in a.mensagem for a in avisos)
+
+
+def test_ciclo_enquanto_verdadeiro_sem_devolver_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            enquanto verdadeiro fazer
+                escrever("para sempre")
+    """)
+    assert any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_ciclo_enquanto_verdadeiro_com_devolver_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        funcao f():inteiro
+            enquanto verdadeiro fazer
+                devolver 1
+        inicio
+            escrever(f())
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_ciclo_enquanto_com_condicao_normal_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            i:inteiro = 0
+            enquanto i < 5 fazer
+                i = i + 1
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_indice_literal_fora_dos_limites_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            v:inteiro[3] = {1, 2, 3}
+            escrever(v[5])
+    """)
+    assert any("fora dos limites" in a.mensagem for a in avisos)
+
+
+def test_indice_literal_dentro_dos_limites_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            v:inteiro[3] = {1, 2, 3}
+            escrever(v[2])
+    """)
+    assert not any("fora dos limites" in a.mensagem for a in avisos)
+
+
+def test_indice_variavel_nao_da_aviso():
+    """Só deteta o caso óbvio (índice literal); não tenta analisar valores
+    de variáveis em tempo de execução."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            v:inteiro[3] = {1, 2, 3}
+            i:inteiro = 5
+            escrever(v[i])
+    """)
+    assert not any("fora dos limites" in a.mensagem for a in avisos)
+
+
+def test_campo_em_falta_em_literal_de_estrutura_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        inicio
+            p:Ponto = {x: 1}
+            escrever(p.x, p.y)
+    """)
+    relevantes = [a for a in avisos if "não define o(s) campo(s)" in a.mensagem]
+    assert len(relevantes) == 1
+    assert "'y'" in relevantes[0].mensagem
+
+
+def test_literal_de_estrutura_com_todos_os_campos_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        inicio
+            p:Ponto = {x: 1, y: 2}
+            escrever(p.x, p.y)
+    """)
+    assert not any("não define o(s) campo(s)" in a.mensagem for a in avisos)
+
+
 def test_comparacao_com_literal_nao_e_assinalada():
     """x == 5 -- um dos lados não é sequer uma variável simples (é um
     literal), por isso nunca pode ser tratado como 'a mesma variável'."""
