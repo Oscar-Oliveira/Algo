@@ -75,6 +75,22 @@ def preparar_bd(caminho_bd: str | None = None) -> None:
         _migrar_colunas_estudante(ligacao)
 
 
+def copiar_para_backup(destino: str, caminho_bd: str | None = None) -> None:
+    """Escreve uma cópia consistente da base de dados em 'destino',
+    usando a API de backup do sqlite3 em vez de copiar o ficheiro
+    diretamente -- assim não há risco de apanhar o ficheiro a meio de
+    uma escrita concorrente."""
+    origem = obter_ligacao(caminho_bd)
+    try:
+        copia = sqlite3.connect(destino)
+        try:
+            origem.backup(copia)
+        finally:
+            copia.close()
+    finally:
+        origem.close()
+
+
 @contextmanager
 def sessao_bd(caminho_bd: str | None = None):
     """Gestor de contexto: abre, faz commit se não houver exceção, fecha

@@ -7,8 +7,11 @@ sessões na base de dados)."""
 from __future__ import annotations
 
 import os
+import tempfile
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from datetime import datetime, timezone
+
+from fastapi import BackgroundTasks, FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -170,6 +173,27 @@ async def rota_admin_atividade(id_estudante: int = Depends(admin_atual)):
     # alguem_ponte usa de facto para escrever os logs, e os testes já
     # isolam esse caminho com monkeypatch (ver tests/conftest.py).
     return metricas.gerar_relatorio(registador_alguem.PASTA_LOGS_POR_OMISSAO)
+
+
+# ---------- administração: descarregar a base de dados para backup ----------
+
+@app.get("/api/admin/bd")
+async def rota_admin_descarregar_bd(tarefas: BackgroundTasks, id_estudante: int = Depends(admin_atual)):
+    """Devolve uma cópia .db da base de dados inteira, para o admin
+    guardar como backup ou analisar offline. A cópia é feita pela API
+    de backup do sqlite3 (bd.copiar_para_backup), não por uma leitura
+    direta do ficheiro, para nunca apanhar uma escrita a meio."""
+    descritor, caminho_copia = tempfile.mkstemp(suffix=".db")
+    os.close(descritor)
+    bd.copiar_para_backup(caminho_copia)
+    tarefas.add_task(os.remove, caminho_copia)
+    nome_ficheiro = f"algo-online-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.db"
+    return FileResponse(
+        caminho_copia,
+        media_type="application/vnd.sqlite3",
+        filename=nome_ficheiro,
+        background=tarefas,
+    )
 
 
 # ---------- credenciais de LLM ----------

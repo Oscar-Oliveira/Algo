@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+import bd
 import main
 
 
@@ -252,6 +253,35 @@ def test_admin_atividade_sem_logs_devolve_relatorio_vazio(cliente, monkeypatch):
     corpo = r.json()
     assert corpo["por_sessao"] == []
     assert corpo["globais"]["num_sessoes"] == 0
+
+
+def test_admin_bd_exige_admin(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = cliente.get("/api/admin/bd")
+    assert r.status_code == 403
+
+
+def test_admin_bd_devolve_copia_sqlite_valida(cliente, monkeypatch, tmp_path):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "a@b.com")
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+
+    r = cliente.get("/api/admin/bd")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/vnd.sqlite3"
+
+    caminho_copia = tmp_path / "copia.db"
+    caminho_copia.write_bytes(r.content)
+    ligacao = bd.obter_ligacao(str(caminho_copia))
+    try:
+        emails = [linha["email"] for linha in ligacao.execute("SELECT email FROM estudante")]
+    finally:
+        ligacao.close()
+    assert emails == ["a@b.com"]
 
 
 # ---------- credenciais ----------
