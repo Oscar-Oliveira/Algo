@@ -143,6 +143,8 @@ function escreverNoTerminal(texto, classe) {
 let wsExecucao = null;
 
 document.getElementById("botao-executar").addEventListener("click", () => {
+  mostrarVistaPainelTerminal("execucao");
+  document.querySelector(".painel-terminal").scrollIntoView({ behavior: "smooth", block: "start" });
   terminal.innerHTML = "";
   formEntradaTerminal.classList.add("escondido");
   if (wsExecucao) wsExecucao.close();

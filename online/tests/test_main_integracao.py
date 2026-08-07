@@ -47,6 +47,19 @@ def test_registar_da_acesso_ao_editor(cliente):
     assert r.status_code == 200
 
 
+def test_ajuda_sem_sessao_redireciona(cliente):
+    r = cliente.get("/ajuda", follow_redirects=False)
+    assert r.status_code == 307
+    assert r.headers["location"] == "/"
+
+
+def test_registar_da_acesso_a_ajuda(cliente):
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    assert r.status_code == 200
+    r = cliente.get("/ajuda")
+    assert r.status_code == 200
+
+
 def test_registar_email_duplicado_da_400(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "outrapass"})

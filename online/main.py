@@ -216,6 +216,13 @@ async def pagina_editor(request: Request):
     return FileResponse(os.path.join(PASTA_ESTATICO, "editor.html"))
 
 
+@app.get("/ajuda")
+async def pagina_ajuda(request: Request):
+    if request.session.get("id_estudante") is None:
+        return RedirectResponse("/")
+    return FileResponse(os.path.join(PASTA_ESTATICO, "ajuda.html"))
+
+
 @app.get("/admin")
 async def pagina_admin(request: Request):
     id_estudante = request.session.get("id_estudante")

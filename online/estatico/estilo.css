@@ -148,6 +148,44 @@ button { font: inherit; cursor: pointer; }
 .paginacao-admin { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 0.8rem 0; }
 .paginacao-admin button:disabled { opacity: 0.4; cursor: default; }
 
+/* ---------- página de ajuda ---------- */
+
+.pagina-ajuda { background: var(--tinta); color: var(--texto-claro); min-height: 100vh; display: flex; flex-direction: column; }
+.conteudo-ajuda { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; padding: 2rem clamp(1rem, 4vw, 2.5rem) 4rem; }
+
+.aba-ajuda {
+  background: transparent; border: none; color: var(--texto-esmaecido); font-weight: 500; font-size: 0.95rem;
+  padding: 0.6rem 0.2rem; margin-bottom: -1px; border-bottom: 2px solid transparent;
+}
+.aba-ajuda.ativa { color: var(--texto-claro); border-bottom-color: var(--ambar); }
+.conteudo-aba-ajuda.escondido { display: none; }
+
+.corpo-manual { display: flex; gap: 2.5rem; align-items: flex-start; }
+.indice-manual {
+  flex: 0 0 220px; position: sticky; top: 2rem; display: flex; flex-direction: column; gap: 0.3rem;
+  font-size: 0.85rem; max-height: calc(100vh - 4rem); overflow-y: auto;
+}
+.indice-manual a { color: var(--texto-esmaecido); padding: 0.15rem 0; }
+.indice-manual a:hover { color: var(--texto-claro); }
+.texto-manual { flex: 1; min-width: 0; }
+
+.texto-manual h2 { font-size: 1.4rem; margin: 2.2rem 0 0.8rem; scroll-margin-top: 1.5rem; }
+.texto-manual h2:first-child { margin-top: 0; }
+.texto-manual h3 { font-size: 1.05rem; margin: 1.4rem 0 0.6rem; color: var(--texto-claro); scroll-margin-top: 1.5rem; }
+.texto-manual p { line-height: 1.6; color: var(--texto-claro); }
+.texto-manual .nota { color: var(--texto-esmaecido); font-size: 0.88rem; }
+
+.texto-manual pre {
+  background: var(--tinta-clara); border: 1px solid var(--tinta-borda); border-radius: 8px;
+  padding: 0.8rem 1rem; overflow-x: auto; margin: 0.8rem 0;
+}
+.texto-manual code { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+.texto-manual p code { background: var(--tinta-clara); border-radius: 4px; padding: 0.1rem 0.35rem; }
+
+.texto-manual table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.88rem; }
+.texto-manual th { text-align: left; color: var(--texto-esmaecido); font-weight: 500; padding: 0 0.6rem 0.4rem 0; }
+.texto-manual td { padding: 0.4rem 0.6rem 0.4rem 0; border-top: 1px solid var(--tinta-borda); }
+
 /* ---------- página do editor ---------- */
 
 .pagina-editor { background: var(--tinta); color: var(--texto-claro); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
@@ -164,8 +202,9 @@ button { font: inherit; cursor: pointer; }
   min-height: 0;
 }
 @media (max-width: 900px) {
-  .disposicao-editor { grid-template-columns: 1fr !important; }
+  .disposicao-editor { grid-template-columns: 1fr !important; overflow-y: auto; }
   .divisor { display: none; }
+  .painel-codigo, .painel-terminal, .painel-alguem { min-height: 70vh; flex-shrink: 0; }
 }
 
 .divisor {
