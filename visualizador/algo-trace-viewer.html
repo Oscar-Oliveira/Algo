@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Visualizador de Execução ALGO</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjIwIiByb2xlPSJpbWciPgogIDx0aXRsZT5BbGdvIOKAlCBzw61tYm9sbzwvdGl0bGU+CiAgPGRlc2M+VW0gdHJpw6JuZ3VsbyBjb25zdHJ1w61kbyBhIHBhcnRpciBkZSBxdWF0cm8gZGVncmF1cyBhc2NlbmRlbnRlcywgcmVwcmVzZW50YW5kbyB1bSBhbGdvcml0bW8gY29tbyBzZXF1w6puY2lhIG9yZGVuYWRhIGRlIHBhc3NvcywgbmEgZm9ybWEgZGEgbGV0cmEgZ3JlZ2EgZGVsdGEuPC9kZXNjPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJhbGdvRGVncmF1cyIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZjBiZDVlIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2M5OGQyNCIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHJlY3QgeD0iOTYiICB5PSIzNSIgIHdpZHRoPSI0OCIgIGhlaWdodD0iMzUiIHJ4PSI1IiBmaWxsPSJ1cmwoI2FsZ29EZWdyYXVzKSIvPgogIDxyZWN0IHg9Ijc0IiAgeT0iNzUiICB3aWR0aD0iOTIiICBoZWlnaHQ9IjM1IiByeD0iNSIgZmlsbD0idXJsKCNhbGdvRGVncmF1cykiLz4KICA8cmVjdCB4PSI1MiIgIHk9IjExNSIgd2lkdGg9IjEzNiIgaGVpZ2h0PSIzNSIgcng9IjUiIGZpbGw9InVybCgjYWxnb0RlZ3JhdXMpIi8+CiAgPHJlY3QgeD0iMzAiICB5PSIxNTUiIHdpZHRoPSIxODAiIGhlaWdodD0iMzUiIHJ4PSI1IiBmaWxsPSJ1cmwoI2FsZ29EZWdyYXVzKSIvPgo8L3N2Zz4K">
 <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin></script>
@@ -42,7 +43,22 @@ const FileCode2 = (p) => <Icone {...p}><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a
 const Gauge = (p) => <Icone {...p}><path d="m12 14 4-4" /><path d="M3.34 19a10 10 0 1 1 17.32 0" /></Icone>;
 const Info = (p) => <Icone {...p}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></Icone>;
 
-
+function AlgoLogo({ size = 24 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 240 220" role="img" aria-label="Algo">
+      <defs>
+        <linearGradient id="algoDegraus" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f0bd5e" />
+          <stop offset="100%" stopColor="#c98d24" />
+        </linearGradient>
+      </defs>
+      <rect x="96" y="35" width="48" height="35" rx="5" fill="url(#algoDegraus)" />
+      <rect x="74" y="75" width="92" height="35" rx="5" fill="url(#algoDegraus)" />
+      <rect x="52" y="115" width="136" height="35" rx="5" fill="url(#algoDegraus)" />
+      <rect x="30" y="155" width="180" height="35" rx="5" fill="url(#algoDegraus)" />
+    </svg>
+  );
+}
 
 /* ============================================================
    Tipografia e paleta -- carregadas uma vez, aplicadas via style
@@ -139,7 +155,7 @@ function EcraInicial({ onFicheiro, erro }) {
       >
         <div className="mx-auto mb-5 w-14 h-14 rounded-xl flex items-center justify-center"
              style={{ background: "#24272F", border: "1px solid #33363F" }}>
-          <Layers size={26} color="#E3B341" />
+          <AlgoLogo size={26} />
         </div>
         <h1 className="text-2xl mb-2" style={{ fontFamily: FONT_DISPLAY, color: "#EDEEF1", fontWeight: 600 }}>
           Visualizador de Execução ALGO
@@ -405,7 +421,7 @@ function VisualizadorTraceAlgo() {
       <header className="shrink-0 flex flex-wrap items-center gap-4 px-6 py-4" style={{ borderBottom: "1px solid #2A2D35" }}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#E3B341" }}>
-            <Layers size={16} color="#16181D" />
+            <AlgoLogo size={16} />
           </div>
           <div>
             <h1 className="text-base leading-tight" style={{ fontFamily: FONT_DISPLAY, color: "#EDEEF1", fontWeight: 600 }}>

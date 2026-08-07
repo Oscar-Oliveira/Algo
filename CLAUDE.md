@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## General instructions
+
+Be concise with all of your responses.
+
 ## Behavioral guidelines
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.

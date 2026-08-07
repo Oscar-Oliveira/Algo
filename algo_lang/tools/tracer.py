@@ -131,6 +131,23 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         return pilha
 
     def tracer(frame, evento, arg):
+        if evento == "return":
+            # a função principal terminou -- o 'line' da sua última instrução
+            # só regista o estado ANTES dela correr, por isso o efeito dessa
+            # última linha (consola/variáveis) nunca aparecia em nenhum
+            # passo. Aqui, no retorno, já correu -- atualiza o último passo
+            # em vez de acrescentar um novo, para não violar "um passo por
+            # linha executada".
+            if (passos and frame.f_code.co_filename == caminho_py
+                    and frame.f_code.co_name == NOME_FUNCAO_PRINCIPAL):
+                pilha_final = construir_pilha(frame)
+                if pilha_final:
+                    passos[-1] = {
+                        "linha": passos[-1]["linha"],
+                        "consola": buffer_saida.getvalue(),
+                        "pilha": pilha_final,
+                    }
+            return tracer
         if evento != "line":
             return tracer
         if frame.f_code.co_filename != caminho_py:
