@@ -124,6 +124,25 @@ def _resolver_inclusoes(programa, pasta_base) -> None:
             nomes_decl_existentes.add(d.nome)
 
 
+def _validar_nome_ficheiro(nome: str, pasta_estudante: str) -> str:
+    """ON-01: 'nome' vem do editor (controlado pelo estudante) e é usado
+    para construir um caminho de escrita -- sem esta validação, um nome
+    como '../../outra_pasta/ficheiro.py' ou um caminho absoluto escreve
+    fora da pasta do estudante. Exige um nome simples (sem separadores
+    de caminho nem '..') e confirma, com os.path.realpath, que o
+    caminho final resolvido continua dentro de pasta_estudante -- dupla
+    verificação, para não confiar só na whitelist de caracteres.
+    Devolve o caminho absoluto já validado."""
+    if not nome or nome in (".", "..") or "/" in nome or "\\" in nome:
+        raise ErroCompilacao(f"Nome de ficheiro inválido: '{nome}'.")
+    caminho = os.path.join(pasta_estudante, nome)
+    pasta_real = os.path.realpath(pasta_estudante)
+    caminho_real = os.path.realpath(caminho)
+    if os.path.commonpath([caminho_real, pasta_real]) != pasta_real:
+        raise ErroCompilacao(f"Nome de ficheiro inválido: '{nome}'.")
+    return caminho
+
+
 def _escrever_ficheiros_e_analisar(ficheiros: list[dict], nome_principal: str,
                                     pasta_estudante: str):
     """Escreve todos os ficheiros do estudante na pasta, analisa o
@@ -139,7 +158,7 @@ def _escrever_ficheiros_e_analisar(ficheiros: list[dict], nome_principal: str,
         if nome in nomes_vistos:
             raise ErroCompilacao(f"Tens dois ficheiros com o mesmo nome: '{nome}'.")
         nomes_vistos.add(nome)
-        caminho = os.path.join(pasta_estudante, nome)
+        caminho = _validar_nome_ficheiro(nome, pasta_estudante)
         with open(caminho, "w", encoding="utf-8") as f:
             f.write(ficheiro["conteudo"])
         if nome == nome_principal:

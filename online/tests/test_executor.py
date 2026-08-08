@@ -55,6 +55,32 @@ def test_dois_ficheiros_com_o_mesmo_nome_da_erro_claro(tmp_path):
             "a.algo", str(tmp_path))
 
 
+# ---------- ON-01: nome de ficheiro não pode escrever fora da pasta ----------
+
+def test_nome_de_ficheiro_com_travessia_de_caminho_e_rejeitado(tmp_path):
+    import os
+    marcador = tmp_path.parent / "pwned.txt"
+    with pytest.raises(executor.ErroCompilacao, match="inválido"):
+        executor.compilar_codigo(
+            [{"nome": "../pwned.txt", "conteudo": "x"}], "../pwned.txt", str(tmp_path))
+    assert not marcador.exists()
+
+
+def test_nome_de_ficheiro_absoluto_e_rejeitado(tmp_path):
+    import os
+    alvo = str(tmp_path.parent / "pwned.txt")
+    with pytest.raises(executor.ErroCompilacao, match="inválido"):
+        executor.compilar_codigo(
+            [{"nome": alvo, "conteudo": "x"}], alvo, str(tmp_path))
+    assert not os.path.exists(alvo)
+
+
+def test_nome_de_ficheiro_com_separador_e_rejeitado(tmp_path):
+    with pytest.raises(executor.ErroCompilacao, match="inválido"):
+        executor.compilar_codigo(
+            [{"nome": "sub/ficheiro.algo", "conteudo": "x"}], "sub/ficheiro.algo", str(tmp_path))
+
+
 # ---------- incluir (bibliotecas próprias) ----------
 
 def test_incluir_resolve_funcao_de_outro_ficheiro(tmp_path):
