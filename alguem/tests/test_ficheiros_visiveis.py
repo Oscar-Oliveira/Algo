@@ -93,6 +93,40 @@ def test_ficheiro_principal_que_nao_existe_devolve_lista_vazia(tmp_path):
     assert resultado == []
 
 
+def test_incluir_caminho_absoluto_fora_da_pasta_e_ignorado(tmp_path):
+    """AG-27: um 'incluir' com caminho absoluto para fora da pasta do
+    exercício não pode dar ao Alguem (e por extensão à resposta ao
+    estudante) visibilidade sobre ficheiros arbitrários do servidor."""
+    pasta_exercicio = tmp_path / "exercicio"
+    pasta_exercicio.mkdir()
+    segredo = tmp_path / "segredo.algo"
+    segredo.write_text("CONTEUDO_SECRETO", encoding="utf-8")
+    principal = pasta_exercicio / "principal.algo"
+    principal.write_text(
+        f'algoritmo "T"\nincluir "{segredo.as_posix()}"\ninicio\n    escrever(1)\n',
+        encoding="utf-8")
+    resultado = resolver_ficheiros_visiveis(str(principal))
+    nomes = [n for n, _ in resultado]
+    assert nomes == ["principal.algo"]
+    assert not any("CONTEUDO_SECRETO" in c for _, c in resultado)
+
+
+def test_incluir_travessia_de_caminho_fora_da_pasta_e_ignorado(tmp_path):
+    """AG-27: '../' não pode escapar da pasta do exercício."""
+    pasta_exercicio = tmp_path / "exercicio"
+    pasta_exercicio.mkdir()
+    segredo = tmp_path / "segredo.algo"
+    segredo.write_text("CONTEUDO_SECRETO", encoding="utf-8")
+    principal = pasta_exercicio / "principal.algo"
+    principal.write_text(
+        'algoritmo "T"\nincluir "../segredo.algo"\ninicio\n    escrever(1)\n',
+        encoding="utf-8")
+    resultado = resolver_ficheiros_visiveis(str(principal))
+    nomes = [n for n, _ in resultado]
+    assert nomes == ["principal.algo"]
+    assert not any("CONTEUDO_SECRETO" in c for _, c in resultado)
+
+
 def test_conteudo_de_cada_ficheiro_esta_correto(tmp_path):
     (tmp_path / "biblioteca.algo").write_text("CONTEUDO_DA_BIBLIOTECA", encoding="utf-8")
     principal = tmp_path / "principal.algo"

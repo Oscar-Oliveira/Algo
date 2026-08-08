@@ -20,17 +20,32 @@ def resolver_ficheiros_visiveis(caminho_principal: str) -> list[tuple[str, str]]
     """Devolve [(nome_do_ficheiro, conteudo), ...] -- o ficheiro
     principal primeiro, depois cada ficheiro incluído (na ordem em que
     aparece no código), sem repetir o mesmo ficheiro duas vezes mesmo
-    que seja incluído por mais do que um caminho."""
+    que seja incluído por mais do que um caminho.
+
+    AG-27: um 'incluir "..."' no próprio código do estudante (absoluto
+    ou com '../') não pode fazer o Alguem ler ficheiros fora da pasta
+    do exercício (a pasta de caminho_principal) -- isso exporia
+    conteúdo arbitrário do servidor ao LLM, e por extensão à resposta
+    mostrada ao estudante. Confinado via os.path.realpath +
+    verificação de prefixo, tal como em online/executor.py:
+    _resolver_inclusoes (ON-02)."""
     resultado: list[tuple[str, str]] = []
     vistos: set[str] = set()
+    pasta_permitida = os.path.realpath(os.path.dirname(os.path.abspath(caminho_principal)))
 
     def _processar(caminho: str) -> None:
-        caminho_abs = os.path.normpath(os.path.abspath(caminho))
+        caminho_abs = os.path.realpath(caminho)
         if caminho_abs in vistos:
             return
         vistos.add(caminho_abs)
         try:
-            with open(caminho, "r", encoding="utf-8") as f:
+            dentro_da_pasta = os.path.commonpath([caminho_abs, pasta_permitida]) == pasta_permitida
+        except ValueError:  # caminhos em unidades/discos diferentes (Windows)
+            dentro_da_pasta = False
+        if not dentro_da_pasta:
+            return
+        try:
+            with open(caminho_abs, "r", encoding="utf-8") as f:
                 conteudo = f.read()
         except OSError:
             return
