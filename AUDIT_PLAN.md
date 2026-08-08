@@ -80,7 +80,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 ### 3.3 `online/` — Bugs e Segurança (31 findings)
 
-- **ON-02** [SEGURANÇA · CRÍTICA · Baixo] `executor.py:77-91`. Leitura arbitrária de ficheiros do servidor via `incluir` no código do estudante — caminho absoluto usado tal-e-qual. Recomendação: mesma correção de confinamento de caminho que AG-27, aplicada aqui e reutilizada (hoje há duas implementações independentes — considerar extrair uma função partilhada, ver ARCH-04).
 - **ON-03** [SEGURANÇA/DESEMPENHO · ALTA · Médio] `executor.py` + `main.py` (`/ws/executar`). Sem limite global de execuções concorrentes — N estudantes a executar em simultâneo podem esgotar CPU/memória do servidor para todos. Recomendação: `asyncio.Semaphore` global com limite configurável, e fila/mensagem de espera quando saturado.
 - **ON-04** [SEGURANÇA · ALTA · Baixo] `executor.py:45-52`. Só CPU e memória são limitados; sem `RLIMIT_NPROC`/`RLIMIT_NOFILE` — um programa de estudante pode fazer fork-bomb ou esgotar descritores de ficheiro. Recomendação: adicionar os dois limites em `_limitar_recursos`.
 - **ON-05** [SEGURANÇA · CRÍTICA · Baixo] `executor.py:209-220`. O subprocesso herda todas as variáveis de ambiente do servidor, incluindo `ONLINE_CHAVE_CIFRAGEM`/`ONLINE_CHAVE_SESSAO`. Recomendação: passar `env=` explícito com apenas o mínimo necessário (`PATH`, etc.).
@@ -182,7 +181,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 0 — Contenção crítica de segurança
 - **Objetivo**: eliminar os vetores de execução remota de código e leitura/escrita arbitrária de ficheiros antes de qualquer outra alteração.
-- **Resolve**: ~~AL-01~~, ~~AL-32~~, ~~ON-01~~ (ver AUDIT_DONE.md), ON-02, AG-27, ON-14, ON-05, ON-27.
+- **Resolve**: ~~AL-01~~, ~~AL-32~~, ~~ON-01~~, ~~ON-02~~ (ver AUDIT_DONE.md), AG-27, ON-14, ON-05, ON-27.
 - **Componentes**: `algo_lang/compilador/codegen.py`, `algo_lang/tools/flowchart.py`, `online/executor.py`, `alguem/nucleo/ficheiros_visiveis.py`, `online/credenciais.py`, `online/main.py`, `online/Dockerfile`.
 - **Alterações principais**: reescrever a geração da mensagem de `afirmar` para nunca reinterpretar a condição do utilizador como f-string nova; aplicar o mesmo tratamento a `texto_expr`; confinar `incluir` a um diretório-base com `os.path.realpath` + verificação de prefixo (em `executor.py` e `ficheiros_visiveis.py`); restringir nomes de ficheiro de escrita a uma whitelist sem separadores de caminho; allowlist/bloqueio de IPs privados para o host Ollama; `env=` explícito no subprocesso do executor; `USER` não-root no Dockerfile.
 - **Dependências**: nenhuma — primeira fase.

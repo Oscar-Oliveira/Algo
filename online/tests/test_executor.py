@@ -102,6 +102,30 @@ def test_incluir_ficheiro_em_falta_da_erro_claro(tmp_path):
             [{"nome": "principal.algo", "conteudo": principal}], "principal.algo", str(tmp_path))
 
 
+def test_incluir_caminho_absoluto_fora_da_pasta_e_rejeitado(tmp_path):
+    """ON-02: um 'incluir' com caminho absoluto não pode ler ficheiros
+    fora da pasta do estudante -- aqui, um ficheiro real que existe no
+    sistema mas fora de tmp_path, para confirmar que não é a simples
+    inexistência do ficheiro que está a ser apanhada."""
+    alvo = tmp_path.parent / "segredo.algo"
+    alvo.write_text("funcao f():inteiro\n    devolver 1\n", encoding="utf-8")
+    principal = f'algoritmo "T"\nincluir "{alvo.as_posix()}"\ninicio\n    escrever(f())\n'
+    with pytest.raises(executor.ErroCompilacao, match="não encontrado"):
+        executor.compilar_codigo(
+            [{"nome": "principal.algo", "conteudo": principal}], "principal.algo", str(tmp_path))
+
+
+def test_incluir_travessia_de_caminho_fora_da_pasta_e_rejeitado(tmp_path):
+    """ON-02: '../' não pode escapar da pasta do estudante para ler um
+    ficheiro irmão de outra pasta."""
+    alvo = tmp_path.parent / "outra_pasta_segredo.algo"
+    alvo.write_text("funcao f():inteiro\n    devolver 1\n", encoding="utf-8")
+    principal = f'algoritmo "T"\nincluir "../{alvo.name}"\ninicio\n    escrever(f())\n'
+    with pytest.raises(executor.ErroCompilacao, match="não encontrado"):
+        executor.compilar_codigo(
+            [{"nome": "principal.algo", "conteudo": principal}], "principal.algo", str(tmp_path))
+
+
 def test_incluir_colisao_de_funcao_da_erro_claro(tmp_path):
     principal = (
         'algoritmo "T"\nincluir "b.algo"\n'
