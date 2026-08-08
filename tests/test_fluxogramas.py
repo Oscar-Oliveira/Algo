@@ -73,6 +73,7 @@ def test_ciclo_para_tem_aresta_de_retorno():
         algoritmo "T"
         inicio
             total:inteiro = 0
+            i:inteiro = 0
             para i de 1 ate 10 fazer
                 total = total + i
     """)
@@ -120,6 +121,8 @@ def test_dot_gerado_nao_tem_ids_de_no_duplicados():
     dot = _dot_para("""
         algoritmo "T"
         inicio
+            i:inteiro = 0
+            j:inteiro = 0
             para i de 1 ate 3 fazer
                 para j de 1 ate 3 fazer
                     escrever(i, j)
@@ -142,6 +145,7 @@ def test_graphviz_consegue_renderizar_o_dot_gerado():
             senao
                 devolver "Reprovado"
         inicio
+            i:inteiro = 0
             para i de 1 ate 3 fazer
                 escrever(i)
             enquanto falso fazer

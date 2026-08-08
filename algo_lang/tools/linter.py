@@ -206,6 +206,11 @@ class Linter:
         for s in self._todas_as_stmts(corpo):
             for e in self._expressoes_lidas(s):
                 self._extrair_lvalues(e, usadas)
+            if isinstance(s, A.Para):
+                # a variável de controlo tem de estar pré-declarada (ver
+                # semantics.py) -- o próprio ciclo já conta como uso dela,
+                # mesmo que o corpo nunca a leia (idioma comum: repetir N vezes)
+                usadas.add(s.var)
 
         for nome, linha in declaradas.items():
             if nome not in usadas:

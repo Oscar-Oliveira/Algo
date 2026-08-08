@@ -279,6 +279,7 @@ def test_fluxograma_com_condicoes_e_ciclos(tmp_path):
 inicio
     n:inteiro
     ler(n)
+    i:inteiro
     para i de 1 ate n fazer
         se i mod 2 == 0 entao
             escrever(i)

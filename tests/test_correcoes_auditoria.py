@@ -125,6 +125,7 @@ def test_passo_zero_literal_da_erro_de_compilacao():
         compilar("""
             algoritmo "T"
             inicio
+                i:inteiro = 0
                 para i de 1 ate 10 passo 0 fazer
                     escrever(i)
         """)
@@ -531,6 +532,7 @@ def test_sem_limite_do_para_tem_de_ser_inteiro():
         compilar("""
             algoritmo "T"
             inicio
+                i:inteiro = 0
                 para i de "a" ate 10 fazer
                     escrever(i)
         """)
@@ -541,6 +543,7 @@ def test_sem_passo_do_para_tem_de_ser_inteiro():
         compilar("""
             algoritmo "T"
             inicio
+                i:inteiro = 0
                 para i de 1 ate 10 passo "x" fazer
                     escrever(i)
         """)
@@ -1241,6 +1244,7 @@ def test_linter_sem_falsos_positivos_com_para_passo_enquanto_escolha():
             devolver n * 2
         inicio
             total:inteiro = 0
+            i:inteiro = 0
             para i de 1 ate 3 passo 1 fazer
                 total = total + i
             enquanto total > 100 fazer

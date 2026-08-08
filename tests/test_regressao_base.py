@@ -30,6 +30,7 @@ def test_ciclos_para_enquanto_faz_enquanto():
     saida = executar("""
         algoritmo "T"
         inicio
+            i:inteiro = 0
             para i de 1 ate 3 fazer
                 escrever(i)
             c:inteiro = 0

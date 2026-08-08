@@ -138,6 +138,7 @@ sete
 ```
 algoritmo "Ciclos"
 inicio
+    i:inteiro
     para i de 1 ate 3 fazer
         escrever("para: ", i)
 
@@ -415,6 +416,7 @@ inicio
 ```
 algoritmo "PassoZero"
 inicio
+    i:inteiro
     para i de 1 ate 10 passo 0 fazer
         escrever(i)
 ```

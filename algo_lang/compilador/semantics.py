@@ -34,21 +34,30 @@ def verificar_nomes_python(programa):
 
 
 class Escopo:
-    """Escopo de uma função/procedimento: nomes locais próprios, com
-    fallback para as variáveis globais do programa (visíveis para leitura
-    e escrita, mas não redeclaráveis localmente)."""
+    """Escopo aninhado (bloco, função, ou nível de topo): nomes locais
+    próprios, com fallback de LEITURA para o escopo pai (Escopo ou dict).
 
-    def __init__(self, globais):
-        self.globais = globais
+    'raiz_funcao' marca a fronteira de uma função/procedimento (ou do
+    corpo principal): é seguro sombrear para lá dela porque corresponde
+    a um 'def' Python à parte, com o seu próprio namespace. Um Escopo
+    de bloco comum (corpo de 'se'/'para'/'enquanto'/...) não é fronteira,
+    porque em Python if/for/while NÃO criam namespace novo -- por isso
+    '_registar_decl' não deixa redeclarar um nome já ativo num bloco
+    aninhado dentro da mesma função, só reaproveitar o nome depois de o
+    bloco onde foi declarado ter terminado."""
+
+    def __init__(self, pai, raiz_funcao=False):
+        self.pai = pai
+        self.raiz_funcao = raiz_funcao
         self.locais = {}
 
     def __contains__(self, nome):
-        return nome in self.locais or nome in self.globais
+        return nome in self.locais or nome in self.pai
 
     def __getitem__(self, nome):
         if nome in self.locais:
             return self.locais[nome]
-        return self.globais[nome]
+        return self.pai[nome]
 
     def __setitem__(self, nome, valor):
         self.locais[nome] = valor
@@ -138,7 +147,7 @@ class VerificadorTipos:
 
     # ---------- funções ----------
     def _verificar_funcao(self, f: A.FuncaoDef):
-        escopo = Escopo(self.globais)
+        escopo = Escopo(self.globais, raiz_funcao=True)
         for p in f.parametros:
             if p.nome in escopo.locais:
                 raise ErroSemantico(f"parâmetro '{p.nome}' duplicado", f.linha)
@@ -164,9 +173,24 @@ class VerificadorTipos:
         return False
 
     # ---------- declarações ----------
+    def _nome_ativo(self, escopo, nome):
+        """Verifica se 'nome' já está em uso dentro do mesmo namespace
+        Python (a função/procedimento atual, ou o corpo principal),
+        incluindo qualquer bloco 'se'/'para'/'enquanto'/... ainda aberto
+        à volta do ponto de declaração -- sem subir além dessa fronteira,
+        para continuar a permitir que uma função sombreie uma global."""
+        nivel = escopo
+        while True:
+            locais = nivel.locais if isinstance(nivel, Escopo) else nivel
+            if nome in locais:
+                return True
+            if isinstance(nivel, Escopo) and not nivel.raiz_funcao:
+                nivel = nivel.pai
+                continue
+            return False
+
     def _registar_decl(self, escopo, d: A.Declaracao):
-        ja_declarado = (d.nome in escopo.locais) if isinstance(escopo, Escopo) else (d.nome in escopo)
-        if ja_declarado:
+        if self._nome_ativo(escopo, d.nome):
             raise ErroSemantico(f"a variável '{d.nome}' já foi declarada", d.linha)
         self._validar_tipo(d.tipo, d.linha)
         if d.eh_constante:
@@ -327,47 +351,52 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"a condição de 'se' tem de ser booleana (é '{tipo}')",
                         getattr(cond, "linha", s.linha))
-                self._verificar_bloco(corpo, escopo, ctx_funcao)
+                self._verificar_bloco(corpo, Escopo(escopo), ctx_funcao)
             if s.senao is not None:
-                self._verificar_bloco(s.senao, escopo, ctx_funcao)
+                self._verificar_bloco(s.senao, Escopo(escopo), ctx_funcao)
 
         elif isinstance(s, A.Para):
-            if s.var in escopo and escopo[s.var][:2] != ("inteiro", 0):
+            escopo_corpo = Escopo(escopo)
+            if s.var not in escopo:
+                raise ErroSemantico(
+                    f"a variável de controlo '{s.var}' do ciclo 'para' não foi "
+                    f"declarada -- declara-a antes do ciclo, ex.: '{s.var}:inteiro'",
+                    s.linha)
+            if escopo[s.var][:2] != ("inteiro", 0):
                 raise ErroSemantico(
                     f"a variável de controlo '{s.var}' do ciclo 'para' tem de ser "
                     f"inteiro", s.linha)
-            if s.var in escopo and escopo[s.var][2]:
+            if escopo[s.var][2]:
                 raise ErroSemantico(
                     f"'{s.var}' é uma constante; não pode ser usada como variável "
                     f"de controlo de um ciclo 'para'", s.linha)
-            if s.var not in escopo:
-                escopo[s.var] = ("inteiro", 0, False)
             for expr, rotulo in ((s.ini, "inicial"), (s.fim, "final")):
-                tipo, _ = self._tipo_expr(expr, escopo)
+                tipo, _ = self._tipo_expr(expr, escopo_corpo)
                 if tipo != "inteiro":
                     raise ErroSemantico(
                         f"o valor {rotulo} do ciclo 'para' tem de ser inteiro (é "
                         f"'{tipo}')", s.linha)
             if s.passo is not None:
-                tipo, _ = self._tipo_expr(s.passo, escopo)
+                tipo, _ = self._tipo_expr(s.passo, escopo_corpo)
                 if tipo != "inteiro":
                     raise ErroSemantico("o 'passo' do ciclo 'para' tem de ser inteiro", s.linha)
                 if isinstance(s.passo, A.Literal) and s.passo.valor == 0:
                     raise ErroSemantico(
                         "o 'passo' de um ciclo 'para' não pode ser 0 (o ciclo nunca "
                         "avançaria)", s.passo.linha)
-            self._verificar_bloco(s.corpo, escopo, ctx_funcao)
+            self._verificar_bloco(s.corpo, escopo_corpo, ctx_funcao)
 
         elif isinstance(s, A.Enquanto):
             tipo, _ = self._tipo_expr(s.condicao, escopo)
             if tipo != "booleano":
                 raise ErroSemantico(
                     f"a condição de 'enquanto' tem de ser booleana (é '{tipo}')", s.linha)
-            self._verificar_bloco(s.corpo, escopo, ctx_funcao)
+            self._verificar_bloco(s.corpo, Escopo(escopo), ctx_funcao)
 
         elif isinstance(s, A.FazEnquanto):
-            self._verificar_bloco(s.corpo, escopo, ctx_funcao)
-            tipo, _ = self._tipo_expr(s.condicao, escopo)
+            escopo_corpo = Escopo(escopo)
+            self._verificar_bloco(s.corpo, escopo_corpo, ctx_funcao)
+            tipo, _ = self._tipo_expr(s.condicao, escopo_corpo)
             if tipo != "booleano":
                 raise ErroSemantico(
                     f"a condição de 'fazer...enquanto' tem de ser booleana (é "
@@ -382,9 +411,9 @@ class VerificadorTipos:
                         raise ErroSemantico(
                             f"o valor de 'caso' é do tipo '{tipo_v}', incompatível com "
                             f"'{tipo_base}' de 'escolher'", getattr(v, "linha", s.linha))
-                self._verificar_bloco(corpo, escopo, ctx_funcao)
+                self._verificar_bloco(corpo, Escopo(escopo), ctx_funcao)
             if s.contrario is not None:
-                self._verificar_bloco(s.contrario, escopo, ctx_funcao)
+                self._verificar_bloco(s.contrario, Escopo(escopo), ctx_funcao)
 
         elif isinstance(s, A.Devolver):
             if ctx_funcao is None or ctx_funcao.eh_procedimento:

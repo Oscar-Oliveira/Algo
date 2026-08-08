@@ -23,17 +23,11 @@
     <nav class="abas-admin">
       <button type="button" class="aba-admin ativa" data-aba="utilizadores">Utilizadores</button>
       <button type="button" class="aba-admin" data-aba="atividade">Atividade</button>
+      <button type="button" class="aba-admin" data-aba="backup">Backup</button>
     </nav>
 
     <section id="aba-conteudo-utilizadores" class="conteudo-aba-admin">
       <p class="subtitulo">Contas registadas: aprova ou rejeita quem está pendente, ou revoga o acesso de quem já tinha sido aprovado.</p>
-      <a href="/api/admin/bd" download class="botao-secundario botao-com-icone"><svg class="icone-botao"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-          stroke-linejoin="round">
-          <path d="M12 3v12" />
-          <polyline points="7 10 12 15 17 10" />
-          <path d="M4 19h16" />
-        </svg><span>Descarregar base de dados (backup)</span></a>
       <table class="tabela-admin">
         <thead>
           <tr><th>Email</th><th>Estado</th><th>Registada em</th><th></th></tr>
@@ -89,6 +83,17 @@
           </svg></button>
       </div>
       <p class="mensagem-erro" id="mensagem-erro-atividade"></p>
+    </section>
+
+    <section id="aba-conteudo-backup" class="conteudo-aba-admin escondido">
+      <p class="subtitulo">Descarrega uma cópia completa da base de dados (contas e credenciais cifradas) para guardar como backup ou analisar offline.</p>
+      <a href="/api/admin/bd" download class="botao-primario botao-com-icone"><svg class="icone-botao"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M12 3v12" />
+          <polyline points="7 10 12 15 17 10" />
+          <path d="M4 19h16" />
+        </svg><span>Descarregar base de dados</span></a>
     </section>
   </main>
   <script src="/estatico/admin.js"></script>

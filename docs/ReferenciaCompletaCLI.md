@@ -338,7 +338,14 @@ senao
 
 ## Ciclos
 
+Tal como qualquer outra variável, a variável de controlo de um `para`
+tem de estar declarada **antes** do ciclo -- não é declarada
+implicitamente pelo próprio `para`. E só existe dentro do corpo do
+ciclo (ou do bloco `se`/`enquanto`/`escolher` onde for declarada): usá-la
+depois do ciclo/bloco terminar é um erro de compilação.
+
 ```
+i:inteiro
 para i de 1 ate 10 fazer
     escrever(i)
 

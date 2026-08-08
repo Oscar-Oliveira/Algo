@@ -255,6 +255,7 @@ def test_debug_nao_mostra_variavel_antes_de_atribuida(tmp_path):
         algoritmo "T"
         inicio
             soma:inteiro = 0
+            i:inteiro = 0
             para i de 0 ate 2 fazer
                 soma = soma + i
             media:decimal = soma / 3
@@ -275,6 +276,7 @@ def test_debug_mostra_globais_e_locais_dentro_de_funcao(tmp_path):
         total:inteiro = 0
         funcao soma(a:inteiro, b:inteiro):inteiro
             resultado:inteiro = 0
+            k:inteiro = 0
             para k de a ate b fazer
                 resultado = resultado + k
             devolver resultado

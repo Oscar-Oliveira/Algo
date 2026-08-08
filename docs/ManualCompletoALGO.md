@@ -337,6 +337,7 @@ Cria um programa com um bocadinho mais de conteúdo, por exemplo
 algoritmo "Soma"
 inicio
     total:inteiro = 0
+    i:inteiro
     para i de 1 ate 3 fazer
         total = total + i
     escrever("Total = ", total)

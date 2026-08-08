@@ -22,6 +22,7 @@ inicio
 
     notas:inteiro[3] = {14, 17, 9}
     total:inteiro = 0
+    i:inteiro
     para i de 0 ate 2 fazer
         total = total + notas[i]
     escrever("total das notas: ", total)

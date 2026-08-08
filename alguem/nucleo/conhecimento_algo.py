@@ -58,7 +58,8 @@ sem dois pontos no fim da linha.
 - Decisão múltipla: `escolher expr` / `caso valor1, valor2` / \
 `contrario`.
 - Ciclo contado: `para i de inicio ate fim fazer` (opcionalmente \
-`passo N`).
+`passo N`) -- `i` tem de estar declarada ANTES do ciclo (ex: `i:inteiro`), \
+como qualquer outra variável.
 - Ciclo condicional: `enquanto condicao fazer`.
 - Ciclo com teste no fim: `fazer` ... `enquanto condicao` (executa \
 sempre pelo menos uma vez).

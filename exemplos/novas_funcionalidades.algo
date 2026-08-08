@@ -13,6 +13,7 @@ funcao precoComIva(preco:decimal):decimal
 
 inicio
     precos:decimal[3] = {10.0, 25.5, 100.0}   // sem IVA
+    i:inteiro
 
     para i de 0 ate 2 fazer
         escrever("Preço ", i + 1, " com IVA: ", precoComIva(precos[i]))

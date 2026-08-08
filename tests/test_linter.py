@@ -31,6 +31,7 @@ def test_variavel_de_ciclo_para_nunca_e_assinalada():
     avisos = _avisos("""
         algoritmo "T"
         inicio
+            i:inteiro = 0
             para i de 1 ate 5 fazer
                 escrever("oi")
     """)
