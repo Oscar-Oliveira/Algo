@@ -5,7 +5,10 @@ uma credencial por conta -- escolher um fornecedor novo substitui o
 anterior, não acumula."""
 from __future__ import annotations
 
+import ipaddress
+import socket
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from bd import sessao_bd
 from cifragem import cifrar, decifrar
@@ -15,6 +18,31 @@ FORNECEDORES_VALIDOS = {"openrouter", "gemini", "openai", "anthropic", "huggingf
 
 class ErroCredencial(Exception):
     pass
+
+
+def _validar_host_ollama(host: str) -> None:
+    """ON-14: 'host' é escolhido pelo próprio estudante e torna-se o URL
+    base de um pedido HTTP feito pelo SERVIDOR (não pelo browser do
+    estudante) sempre que o tutor é usado -- sem validação, um host como
+    'http://169.254.169.254' (metadata de cloud) ou 'http://127.0.0.1:
+    <porta interna>' é um SSRF clássico contra a própria máquina do
+    servidor ou a rede interna. Bloqueia esquemas que não sejam http/
+    https e qualquer endereço (resolvido por DNS) privado, loopback,
+    link-local, reservado ou multicast."""
+    partes = urlparse(host)
+    if partes.scheme not in ("http", "https") or not partes.hostname:
+        raise ErroCredencial(f"Host inválido: '{host}'.")
+    try:
+        enderecos = {info[4][0] for info in socket.getaddrinfo(partes.hostname, None)}
+    except socket.gaierror:
+        raise ErroCredencial(f"Não foi possível resolver o host '{partes.hostname}'.")
+    for ip_texto in enderecos:
+        ip = ipaddress.ip_address(ip_texto)
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            raise ErroCredencial(
+                f"Host '{host}' aponta para um endereço interno/privado -- não permitido."
+            )
 
 
 @dataclass
@@ -35,6 +63,8 @@ def guardar_credencial(estudante_id: int, fornecedor: str, modelo: str,
         raise ErroCredencial("Indica o modelo a usar.")
     if fornecedor != "ollama" and not api_key:
         raise ErroCredencial(f"O fornecedor '{fornecedor}' precisa de uma chave de API.")
+    if host:
+        _validar_host_ollama(host)
 
     api_key_cifrada = cifrar(api_key) if api_key else b""
     with sessao_bd(caminho_bd) as bd:

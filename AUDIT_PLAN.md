@@ -90,7 +90,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 - **ON-11** [SEGURANÇA · ALTA · Médio] `autenticacao.py:66-81`. Sem limite de tentativas nem rate limiting no login. Recomendação: limite por conta (não só por IP, para não penalizar redes escolares partilhadas) com backoff progressivo.
 - **ON-12** [SEGURANÇA · MÉDIA · Baixo] `autenticacao.py:42-50`. Registo revela explicitamente se um email já tem conta, ao contrário do login (mensagem genérica). Recomendação: uniformizar para mensagem genérica também no registo, ou aceitar o trade-off de UX e documentar a decisão.
 - **ON-13** [SEGURANÇA · MÉDIA · Baixo] `autenticacao.py:29-31`. Password mínima só valida comprimento (8 caracteres). Recomendação: verificação contra uma lista curta de passwords comuns (ex. `rockyou`-top-1000 reduzida).
-- **ON-14** [SEGURANÇA · CRÍTICA · Médio] `credenciais.py:28-51` + `main.py:123-136`. SSRF: campo `host` da credencial Ollama aceite sem validação nem allowlist — pode apontar a endereços internos (`169.254.169.254`, `127.0.0.1`, rede interna). Recomendação: bloquear IPs privados/loopback/link-local e, idealmente, restringir a um allowlist configurado pelo administrador.
 - **ON-15** [BUG · BAIXA · Baixo] `credenciais.py` + `alguem_ponte.py`. Campo `host` é incluído sempre que presente, mesmo para fornecedores que não o suportam (gera erro amigável a jusante, mas evitável). Recomendação: só incluir `host` para o fornecedor Ollama.
 - **ON-16** [DESEMPENHO · ALTA · Médio] `bd.py:42-67`. Nova ligação SQLite síncrona por pedido, chamada dentro de rotas `async` sem `run_in_threadpool`. Recomendação: mover chamadas de BD para threadpool, ou avaliar uma ligação persistente com lock.
 - **ON-17** [DESEMPENHO · CRÍTICA · Médio] `autenticacao.py:40,79` + `main.py:83-102`. `bcrypt` (deliberadamente lento) chamado de forma síncrona dentro de rotas `async` — bloqueia o servidor inteiro por ~100-300ms a cada login/registo. Recomendação: `run_in_threadpool` à volta de `bcrypt.hashpw`/`checkpw`.
@@ -180,7 +179,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 0 — Contenção crítica de segurança
 - **Objetivo**: eliminar os vetores de execução remota de código e leitura/escrita arbitrária de ficheiros antes de qualquer outra alteração.
-- **Resolve**: ~~AL-01~~, ~~AL-32~~, ~~ON-01~~, ~~ON-02~~, ~~AG-27~~ (ver AUDIT_DONE.md), ON-14, ON-05, ON-27.
+- **Resolve**: ~~AL-01~~, ~~AL-32~~, ~~ON-01~~, ~~ON-02~~, ~~AG-27~~, ~~ON-14~~ (ver AUDIT_DONE.md), ON-05, ON-27.
 - **Componentes**: `algo_lang/compilador/codegen.py`, `algo_lang/tools/flowchart.py`, `online/executor.py`, `alguem/nucleo/ficheiros_visiveis.py`, `online/credenciais.py`, `online/main.py`, `online/Dockerfile`.
 - **Alterações principais**: reescrever a geração da mensagem de `afirmar` para nunca reinterpretar a condição do utilizador como f-string nova; aplicar o mesmo tratamento a `texto_expr`; confinar `incluir` a um diretório-base com `os.path.realpath` + verificação de prefixo (em `executor.py` e `ficheiros_visiveis.py`); restringir nomes de ficheiro de escrita a uma whitelist sem separadores de caminho; allowlist/bloqueio de IPs privados para o host Ollama; `env=` explícito no subprocesso do executor; `USER` não-root no Dockerfile.
 - **Dependências**: nenhuma — primeira fase.

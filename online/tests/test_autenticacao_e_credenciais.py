@@ -226,10 +226,13 @@ def test_guardar_e_ler_credencial():
 def test_guardar_credencial_substitui_a_anterior():
     id_est = autenticacao.registar("a@b.com", "password123")
     credenciais.guardar_credencial(id_est, "openai", "gpt-4o-mini", "sk-1")
-    credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host="http://localhost:11434")
+    # 8.8.8.8 é um IP público real (Google DNS) só para não depender de
+    # resolução de DNS num ambiente de teste sem rede -- não é loopback
+    # nem privado, por isso passa a validação de ON-14.
+    credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
     c = credenciais.obter_credencial(id_est)
     assert c.fornecedor == "ollama"
-    assert c.host == "http://localhost:11434"
+    assert c.host == "http://8.8.8.8:11434"
 
 
 def test_credencial_fornecedor_desconhecido():
@@ -249,6 +252,34 @@ def test_credencial_ollama_nao_precisa_de_chave():
     credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "")
     c = credenciais.obter_credencial(id_est)
     assert c.fornecedor == "ollama"
+
+
+# ---------- ON-14: SSRF via host da credencial Ollama ----------
+
+@pytest.mark.parametrize("host", [
+    "http://127.0.0.1:11434",       # loopback
+    "http://localhost:11434",       # loopback (por nome)
+    "http://169.254.169.254/",      # link-local -- metadata de cloud (AWS/GCP/Azure)
+    "http://10.0.0.5:11434",        # rede privada
+    "http://192.168.1.10:11434",    # rede privada
+])
+def test_credencial_ollama_com_host_interno_e_rejeitada(host):
+    id_est = autenticacao.registar("a@b.com", "password123")
+    with pytest.raises(credenciais.ErroCredencial, match="interno|privado"):
+        credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host=host)
+
+
+def test_credencial_ollama_com_esquema_invalido_e_rejeitada():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    with pytest.raises(credenciais.ErroCredencial, match="inválido"):
+        credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host="file:///etc/passwd")
+
+
+def test_credencial_ollama_com_host_publico_e_aceite():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
+    c = credenciais.obter_credencial(id_est)
+    assert c.host == "http://8.8.8.8:11434"
 
 
 def test_credencial_fica_cifrada_em_disco(caminho_bd):
