@@ -99,7 +99,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 - **ON-23** [SEGURANÇA · MÉDIA · Médio] `main.py` (geral). Sem token CSRF nem verificação de origem nas rotas de mutação de estado. Recomendação: verificação de `Origin`/`Referer` nas rotas sensíveis, no mínimo; token CSRF explícito se se quiser defesa robusta.
 - **ON-25** [SEGURANÇA · BAIXA · Baixo] `main.py:46`. Sessão sem tempo de expiração explícito (usa o default implícito do Starlette). Recomendação: `max_age` explícito e documentado.
 - **ON-26** [SEGURANÇA · MÉDIA · Médio] `main.py:364-368` (a citação original de `alguem_ponte.py:261-265` estava desatualizada) + `alguem/nucleo/tutor.py:71-91`. Nenhuma validação de tamanho/formato do conteúdo de ficheiros antes de entrar no pacote `alguem` via `ws_alguem`. Recomendação: aplicar o mesmo limite de AG-28 no ponto de entrada do `online`.
-- **ON-27** [SEGURANÇA · CRÍTICA · Baixo] `Dockerfile:1-29`. Contentor corre como root — não há instrução `USER`. Recomendação: criar utilizador não-privilegiado e trocar para ele antes do `CMD`.
 - **ON-30** [SEGURANÇA/OPERAÇÕES · MÉDIA · Baixo] `requerimentos.txt`. Nenhuma dependência com versão fixada. Recomendação: fixar versões (ou pelo menos limites superiores) e configurar `pip-audit`/`dependabot`.
 - **ON-33** [SEGURANÇA · ALTA · Baixo] `estatico/app.js:367` (linha deslocada desde a citação original 289). `innerHTML` com a mensagem de erro do fluxograma, que pode conter texto derivado da entrada do estudante. Recomendação: `textContent` em vez de `innerHTML`, ou sanitização explícita.
 - **ON-34** [SEGURANÇA · ALTA · Baixo] `estatico/app.js:370` (linha deslocada desde 292). SVG devolvido pelo servidor inserido diretamente via `innerHTML`, sem sanitização do lado do cliente. Recomendação: sanitizar no servidor antes de devolver (o SVG vem do `graphviz`, gerado a partir do código do estudante) ou usar uma biblioteca de sanitização de SVG no cliente.
@@ -178,7 +177,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 0 — Contenção crítica de segurança
 - **Objetivo**: eliminar os vetores de execução remota de código e leitura/escrita arbitrária de ficheiros antes de qualquer outra alteração.
-- **Resolve**: ~~AL-01~~, ~~AL-32~~, ~~ON-01~~, ~~ON-02~~, ~~AG-27~~, ~~ON-14~~, ~~ON-05~~ (ver AUDIT_DONE.md), ON-27.
+- **Resolve**: ~~AL-01~~, ~~AL-32~~, ~~ON-01~~, ~~ON-02~~, ~~AG-27~~, ~~ON-14~~, ~~ON-05~~, ~~ON-27~~ (ver AUDIT_DONE.md).
 - **Componentes**: `algo_lang/compilador/codegen.py`, `algo_lang/tools/flowchart.py`, `online/executor.py`, `alguem/nucleo/ficheiros_visiveis.py`, `online/credenciais.py`, `online/main.py`, `online/Dockerfile`.
 - **Alterações principais**: reescrever a geração da mensagem de `afirmar` para nunca reinterpretar a condição do utilizador como f-string nova; aplicar o mesmo tratamento a `texto_expr`; confinar `incluir` a um diretório-base com `os.path.realpath` + verificação de prefixo (em `executor.py` e `ficheiros_visiveis.py`); restringir nomes de ficheiro de escrita a uma whitelist sem separadores de caminho; allowlist/bloqueio de IPs privados para o host Ollama; `env=` explícito no subprocesso do executor; `USER` não-root no Dockerfile.
 - **Dependências**: nenhuma — primeira fase.
