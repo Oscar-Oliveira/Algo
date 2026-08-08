@@ -1449,3 +1449,48 @@ def test_incluir_o_mesmo_ficheiro_duas_vezes_nao_da_erro(tmp_path):
         capture_output=True, text=True)
     assert resultado.returncode == 0, resultado.stderr
     assert "1" in resultado.stdout
+
+
+# ---------- AUDIT_PLAN Fase 0: AL-01 / AL-32 -- RCE via 'afirmar' ----------
+
+def test_afirmar_com_chavetas_na_condicao_nao_executa_codigo(tmp_path):
+    """AL-01: a condição de 'afirmar' é reproduzida na mensagem de erro.
+    Antes da correção, era interpolada diretamente numa f-string do Python
+    gerado sem escapar chavetas -- uma condição contendo
+    '{__import__(...)...}' executava código Python arbitrário ao falhar."""
+    import os
+    marcador = tmp_path / "pwned.txt"
+    payload = "{__import__('builtins').open('" + marcador.as_posix() + "','w').write('x')}"
+    codigo_py = compilar(f"""
+        algoritmo "T"
+        inicio
+            s:cadeia = "abc"
+            afirmar s == "{payload}"
+    """)
+    # PYTHONIOENCODING força UTF-8 no stdout do subprocesso -- sem isto, o
+    # emoji da mensagem de erro pode falhar a codificar em consolas Windows
+    # sem code page UTF-8 (falha de ambiente pré-existente, ver AL-35;
+    # não é isso que este teste está a verificar).
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert resultado.returncode == 1
+    assert not marcador.exists()
+    assert "__import__" in resultado.stdout
+
+
+def test_flowchart_texto_expr_com_chavetas_produz_dot_seguro():
+    """AL-32: mesma classe de defeito em tools/flowchart.py -- confirma que
+    chavetas/aspas vindas de um literal do estudante aparecem tal-e-qual no
+    rótulo DOT (nunca reavaliadas como código, DOT não é executável)."""
+    from algo_lang.tools.flowchart import gerar_dot
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        inicio
+            s:cadeia = "abc"
+            afirmar s == "{codigo malicioso}"
+    """))
+    verificar(programa)
+    dot = gerar_dot(programa.corpo, programa.nome)
+    assert "{codigo malicioso}" in dot

@@ -11,7 +11,14 @@ def _escapar(texto: str) -> str:
 
 def texto_expr(expr):
     """Representação textual legível de uma expressão (usada nos rótulos
-    do fluxograma e nas mensagens de 'afirmar')."""
+    do fluxograma e nas mensagens de 'afirmar').
+
+    Devolve texto NÃO escapado — pode conter aspas/chavetas/backslash vindos
+    de literais do próprio código do estudante. Nunca embutir o resultado
+    diretamente numa f-string ou noutro código a reavaliar (usar repr() para
+    isso, como em codegen.py:_gerar_afirmar); os chamadores neste ficheiro
+    passam sempre o resultado por _escapar() antes de o inserir num rótulo
+    DOT."""
     if isinstance(expr, A.Literal):
         if expr.tipo == "cadeia":
             return f'"{expr.valor}"'

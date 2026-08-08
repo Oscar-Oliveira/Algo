@@ -340,16 +340,17 @@ class GeradorCodigo:
 
     def _gerar_afirmar(self, stmt: A.Afirmar, nivel, tipos):
         cond_py = self._expr(stmt.condicao, tipos)
-        cond_texto = texto_expr(stmt.condicao).replace("\\", "\\\\").replace('"', '\\"')
+        # texto_expr() devolve texto não escapado (pode conter aspas/chavetas/backslash
+        # vindos de literais do próprio código do estudante). repr() gera um literal
+        # Python seguro para esse texto — nunca é reavaliado como f-string/código no
+        # programa gerado, ao contrário de o interpolar diretamente numa f-string.
+        prefixo_literal = repr(f"❌ Afirmação falhou (linha {stmt.linha}): {texto_expr(stmt.condicao)}")
         self.emit(f"if not ({cond_py}):", nivel)
         if stmt.mensagem is not None:
             msg_py = self._expr(stmt.mensagem, tipos)
-            self.emit(
-                f'print(f"❌ Afirmação falhou (linha {stmt.linha}): {cond_texto} — " + '
-                f'str({msg_py}))', nivel + 1)
+            self.emit(f'print({prefixo_literal} + " — " + str({msg_py}))', nivel + 1)
         else:
-            self.emit(
-                f'print(f"❌ Afirmação falhou (linha {stmt.linha}): {cond_texto}")', nivel + 1)
+            self.emit(f'print({prefixo_literal})', nivel + 1)
         self.emit("sys.exit(1)", nivel + 1)
 
     def _gerar_corpo(self, corpo, nivel, tipos):
