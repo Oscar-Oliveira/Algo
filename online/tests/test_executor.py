@@ -205,6 +205,22 @@ def test_execucao_simples_sem_entrada(tmp_path):
     _correr(cenario())
 
 
+def test_subprocesso_nao_herda_variaveis_de_ambiente_do_servidor(tmp_path, monkeypatch):
+    """ON-05: o subprocesso do estudante não pode ver segredos do
+    servidor (ex.: ONLINE_CHAVE_CIFRAGEM/ONLINE_CHAVE_SESSAO)."""
+    async def cenario():
+        monkeypatch.setenv("SEGREDO_TESTE_ON05", "nao_deveria_aparecer")
+        caminho_py = str(tmp_path / "prog.py")
+        with open(caminho_py, "w") as f:
+            f.write("import os\nprint(os.environ.get('SEGREDO_TESTE_ON05', 'AUSENTE'))\n")
+        execucao = executor.ExecucaoInterativa(caminho_py, str(tmp_path))
+        await execucao.iniciar()
+        linha = await execucao.ler_proxima_linha()
+        assert linha == "AUSENTE"
+        await execucao.terminar_a_forcar()
+    _correr(cenario())
+
+
 def test_execucao_com_ler_interativo(tmp_path):
     async def cenario():
         codigo = (

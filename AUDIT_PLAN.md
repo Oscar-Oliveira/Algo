@@ -81,7 +81,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 - **ON-03** [SEGURANÇA/DESEMPENHO · ALTA · Médio] `executor.py` + `main.py` (`/ws/executar`). Sem limite global de execuções concorrentes — N estudantes a executar em simultâneo podem esgotar CPU/memória do servidor para todos. Recomendação: `asyncio.Semaphore` global com limite configurável, e fila/mensagem de espera quando saturado.
 - **ON-04** [SEGURANÇA · ALTA · Baixo] `executor.py:45-52`. Só CPU e memória são limitados; sem `RLIMIT_NPROC`/`RLIMIT_NOFILE` — um programa de estudante pode fazer fork-bomb ou esgotar descritores de ficheiro. Recomendação: adicionar os dois limites em `_limitar_recursos`.
-- **ON-05** [SEGURANÇA · CRÍTICA · Baixo] `executor.py:209-220`. O subprocesso herda todas as variáveis de ambiente do servidor, incluindo `ONLINE_CHAVE_CIFRAGEM`/`ONLINE_CHAVE_SESSAO`. Recomendação: passar `env=` explícito com apenas o mínimo necessário (`PATH`, etc.).
 - **ON-06** [BUG/SEGURANÇA · MÉDIA · Médio] `executor.py:211-212`. `preexec_fn` com `asyncio.create_subprocess_exec` é uma combinação documentada como insegura na presença de threads (pode causar deadlock no fork). Recomendação: mover para `subprocess.Popen` num thread executor, ou usar mecanismos de limite fora do `preexec_fn` (ex. `systemd-run`/cgroups).
 - **ON-07** [BUG/ARQUITETURA · MÉDIA · Médio, ligado a ARCH-11] `executor.py:55-64`. Pasta de trabalho partilhada por estudante (não por execução), apagada/recriada a cada pedido — corrida entre pedidos concorrentes do mesmo estudante. Recomendação: pasta por execução (UUID), com limpeza assíncrona das antigas.
 - **ON-08** [DESEMPENHO · CRÍTICA · Médio] `executor.py:327-330` + `main.py` (`rota_fluxograma`). `graphviz` corre de forma síncrona e bloqueante dentro de uma rota `async` — trava o event loop, e por extensão o servidor inteiro, para todos os estudantes durante a chamada. Recomendação: `run_in_threadpool` (Starlette) à volta da chamada a `dot`.
@@ -179,7 +178,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 0 — Contenção crítica de segurança
 - **Objetivo**: eliminar os vetores de execução remota de código e leitura/escrita arbitrária de ficheiros antes de qualquer outra alteração.
-- **Resolve**: ~~AL-01~~, ~~AL-32~~, ~~ON-01~~, ~~ON-02~~, ~~AG-27~~, ~~ON-14~~ (ver AUDIT_DONE.md), ON-05, ON-27.
+- **Resolve**: ~~AL-01~~, ~~AL-32~~, ~~ON-01~~, ~~ON-02~~, ~~AG-27~~, ~~ON-14~~, ~~ON-05~~ (ver AUDIT_DONE.md), ON-27.
 - **Componentes**: `algo_lang/compilador/codegen.py`, `algo_lang/tools/flowchart.py`, `online/executor.py`, `alguem/nucleo/ficheiros_visiveis.py`, `online/credenciais.py`, `online/main.py`, `online/Dockerfile`.
 - **Alterações principais**: reescrever a geração da mensagem de `afirmar` para nunca reinterpretar a condição do utilizador como f-string nova; aplicar o mesmo tratamento a `texto_expr`; confinar `incluir` a um diretório-base com `os.path.realpath` + verificação de prefixo (em `executor.py` e `ficheiros_visiveis.py`); restringir nomes de ficheiro de escrita a uma whitelist sem separadores de caminho; allowlist/bloqueio de IPs privados para o host Ollama; `env=` explícito no subprocesso do executor; `USER` não-root no Dockerfile.
 - **Dependências**: nenhuma — primeira fase.

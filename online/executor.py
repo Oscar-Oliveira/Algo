@@ -44,6 +44,20 @@ class ErroCompilacao(Exception):
     pass
 
 
+def _env_minimo() -> dict:
+    """ON-05: o subprocesso que corre o programa do estudante não deve
+    herdar as variáveis de ambiente do servidor -- em particular
+    ONLINE_CHAVE_CIFRAGEM/ONLINE_CHAVE_SESSAO (ver main.py), que nunca
+    deviam estar acessíveis a código escrito pelo estudante. Só o
+    mínimo necessário para o Python arrancar corretamente."""
+    minimo = {"PATH": os.environ.get("PATH", "")}
+    if os.name == "nt":  # pragma: no cover -- produção corre sempre em Linux (ver Dockerfile)
+        for chave in ("SYSTEMROOT", "SYSTEMDRIVE", "TEMP", "TMP"):
+            if chave in os.environ:
+                minimo[chave] = os.environ[chave]
+    return minimo
+
+
 def _limitar_recursos():  # pragma: no cover -- só corre DENTRO do processo filho, após o fork
     """Chamada via preexec_fn, já dentro do processo filho, antes de
     executar o Python do programa do estudante -- limita CPU e memória
@@ -243,6 +257,7 @@ class ExecucaoInterativa:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd=self.pasta_estudante,
+            env=_env_minimo(),
             **kwargs,
         )
 
