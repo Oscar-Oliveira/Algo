@@ -6,6 +6,7 @@ SessionMiddleware do próprio Starlette (cookie assinado, sem tabela de
 sessões na base de dados)."""
 from __future__ import annotations
 
+import asyncio
 import os
 import tempfile
 
@@ -290,6 +291,31 @@ def _id_estudante_do_websocket(websocket: WebSocket) -> int | None:
     return websocket.session.get("id_estudante")
 
 
+# ON-03: sem isto, N estudantes a executar código em simultâneo podiam
+# esgotar CPU/memória do servidor para todos -- limite configurável
+# (variável de ambiente, para não obrigar a mexer no código consoante
+# o tamanho da máquina onde o servidor corre).
+LIMITE_EXECUCOES_CONCORRENTES = int(os.environ.get("ONLINE_LIMITE_EXECUCOES_CONCORRENTES", "10"))
+_semaforo_execucoes = asyncio.Semaphore(LIMITE_EXECUCOES_CONCORRENTES)
+
+
+async def _adquirir_vaga_de_execucao(websocket: WebSocket) -> None:
+    """Espera por uma vaga no semáforo de execuções concorrentes. Se
+    não há vaga livre logo (servidor saturado), avisa o estudante antes
+    de ficar à espera -- sem isto, um pedido bloqueado no semáforo
+    pareceria simplesmente "pendurado", sem nenhuma explicação."""
+    try:
+        await asyncio.wait_for(_semaforo_execucoes.acquire(), timeout=0.05)
+        return
+    except TimeoutError:
+        pass
+    await websocket.send_json({
+        "tipo": "info",
+        "mensagem": "O servidor está ocupado -- a tua execução vai começar assim que houver um lugar livre.",
+    })
+    await _semaforo_execucoes.acquire()
+
+
 @app.websocket("/ws/executar")
 async def ws_executar(websocket: WebSocket):
     await websocket.accept()
@@ -316,44 +342,45 @@ async def ws_executar(websocket: WebSocket):
         await websocket.close()
         return
 
-    await websocket.send_json({"tipo": "compilado"})
-
-    execucao = executor.ExecucaoInterativa(caminho_py, pasta_estudante)
-    await execucao.iniciar()
-
-    async def enviar_linha(linha: str):
-        await websocket.send_json({"tipo": "saida", "texto": linha})
-
-    async def ler_e_reencaminhar():
-        try:
-            await executor.correr_com_limite_de_tempo(execucao, enviar_linha)
-            await websocket.send_json({"tipo": "fim", "codigo_saida": execucao.codigo_saida})
-        except TimeoutError:
-            await websocket.send_json({
-                "tipo": "erro",
-                "mensagem": "Execução interrompida: excedeu o tempo limite.",
-            })
-        except executor.SaidaExcessiva:
-            await websocket.send_json({
-                "tipo": "erro",
-                "mensagem": "Execução interrompida: produziu uma linha de saída demasiado longa.",
-            })
-
-    tarefa_leitura = None
-    import asyncio
-    tarefa_leitura = asyncio.create_task(ler_e_reencaminhar())
-
+    await _adquirir_vaga_de_execucao(websocket)
     try:
-        while not execucao.terminou:
-            mensagem = await websocket.receive_json()
-            if mensagem.get("tipo") == "entrada":
-                await execucao.enviar_entrada(mensagem.get("valor", ""))
-    except WebSocketDisconnect:
-        await execucao.terminar_a_forcar()
+        await websocket.send_json({"tipo": "compilado"})
+        execucao = executor.ExecucaoInterativa(caminho_py, pasta_estudante)
+        await execucao.iniciar()
+
+        async def enviar_linha(linha: str):
+            await websocket.send_json({"tipo": "saida", "texto": linha})
+
+        async def ler_e_reencaminhar():
+            try:
+                await executor.correr_com_limite_de_tempo(execucao, enviar_linha)
+                await websocket.send_json({"tipo": "fim", "codigo_saida": execucao.codigo_saida})
+            except TimeoutError:
+                await websocket.send_json({
+                    "tipo": "erro",
+                    "mensagem": "Execução interrompida: excedeu o tempo limite.",
+                })
+            except executor.SaidaExcessiva:
+                await websocket.send_json({
+                    "tipo": "erro",
+                    "mensagem": "Execução interrompida: produziu uma linha de saída demasiado longa.",
+                })
+
+        tarefa_leitura = asyncio.create_task(ler_e_reencaminhar())
+
+        try:
+            while not execucao.terminou:
+                mensagem = await websocket.receive_json()
+                if mensagem.get("tipo") == "entrada":
+                    await execucao.enviar_entrada(mensagem.get("valor", ""))
+        except WebSocketDisconnect:
+            await execucao.terminar_a_forcar()
+        finally:
+            if not tarefa_leitura.done():
+                tarefa_leitura.cancel()
+            await execucao.terminar_a_forcar()
     finally:
-        if tarefa_leitura is not None and not tarefa_leitura.done():
-            tarefa_leitura.cancel()
-        await execucao.terminar_a_forcar()
+        _semaforo_execucoes.release()
 
 
 # ---------- WebSocket: conversa com o Alguem ----------

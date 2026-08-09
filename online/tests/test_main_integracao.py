@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import asyncio
 import json
 from unittest.mock import patch, MagicMock
 
@@ -367,6 +368,41 @@ def test_ws_executar_com_entrada_interativa(cliente):
                 break
     saidas = [m["texto"] for m in mensagens if m["tipo"] == "saida"]
     assert saidas == ["Soma: 7"]
+
+
+def test_adquirir_vaga_de_execucao_espera_e_avisa_quando_saturado(monkeypatch):
+    """ON-03: testa _adquirir_vaga_de_execucao diretamente (não através
+    de duas ligações WebSocket concorrentes no mesmo TestClient -- esse
+    cliente de testes não suporta bem duas ligações WebSocket
+    genuinamente simultâneas). Com o limite reduzido a 1: a segunda
+    chamada tem de bloquear e avisar antes de conseguir a vaga; só
+    depois de a primeira libertar é que a segunda avança."""
+    monkeypatch.setattr(main, "_semaforo_execucoes", asyncio.Semaphore(1))
+
+    class WebSocketFalso:
+        def __init__(self):
+            self.mensagens = []
+
+        async def send_json(self, dados):
+            self.mensagens.append(dados)
+
+    async def cenario():
+        ws1, ws2 = WebSocketFalso(), WebSocketFalso()
+
+        await main._adquirir_vaga_de_execucao(ws1)
+        assert ws1.mensagens == []  # vaga livre -- sem aviso de espera
+
+        tarefa2 = asyncio.create_task(main._adquirir_vaga_de_execucao(ws2))
+        await asyncio.sleep(0.2)
+        assert not tarefa2.done()
+        assert ws2.mensagens and ws2.mensagens[0]["tipo"] == "info"
+        assert "ocupado" in ws2.mensagens[0]["mensagem"]
+
+        main._semaforo_execucoes.release()  # ws1 "termina" a sua execução
+        await asyncio.wait_for(tarefa2, timeout=1)
+
+        main._semaforo_execucoes.release()  # limpeza
+    asyncio.run(cenario())
 
 
 def test_ws_executar_isola_estudantes_diferentes(cliente):
