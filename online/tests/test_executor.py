@@ -363,6 +363,29 @@ def test_limite_de_memoria_trava_alocacao_excessiva(tmp_path):
     _correr(cenario())
 
 
+def test_linha_de_saida_excessiva_da_erro_amigavel_em_vez_de_rebentar(tmp_path):
+    """ON-09: uma única linha maior do que o buffer do StreamReader
+    (64KB por omissão) fazia readline() levantar ValueError/
+    LimitOverrunError não apanhado -- agora vira SaidaExcessiva, e o
+    processo é terminado em vez de ficar pendurado."""
+    async def cenario():
+        caminho_py = str(tmp_path / "linhagigante.py")
+        with open(caminho_py, "w") as f:
+            f.write(
+                "import sys\n"
+                "sys.stdout.write('x' * (2 * 1024 * 1024))\n"
+                "sys.stdout.flush()\n"
+                "import time\n"
+                "time.sleep(5)\n"
+            )
+        execucao = executor.ExecucaoInterativa(caminho_py, str(tmp_path))
+        await execucao.iniciar()
+        with pytest.raises(executor.SaidaExcessiva):
+            await execucao.ler_proxima_linha()
+        assert execucao.terminou
+    _correr(cenario())
+
+
 @pytest.mark.skipif(os.name != "posix", reason="RLIMIT_NOFILE só é aplicado em POSIX")
 def test_limite_de_descritores_de_ficheiro_e_aplicado(tmp_path):
     """ON-04: sem RLIMIT_NOFILE, nada impedia um programa de esgotar os

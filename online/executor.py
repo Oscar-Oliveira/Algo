@@ -287,6 +287,15 @@ def compilar_codigo(ficheiros: list[dict], nome_principal: str, pasta_estudante:
     return caminho_py
 
 
+class SaidaExcessiva(Exception):
+    """ON-09: uma única linha de saída maior do que o buffer do
+    StreamReader (64KB por omissão no asyncio) faz readline() levantar
+    ValueError/LimitOverrunError em vez de devolver a linha -- sem
+    isto, um programa "preso" a imprimir uma linha gigante sem quebra
+    de linha derrubava a leitura inteira com uma exceção não tratada."""
+    pass
+
+
 class ExecucaoInterativa:
     """Envolve um processo de execução em curso -- criar, ler o que
     ele já escreveu, escrever-lhe entradas, terminar. Pensada para ser
@@ -335,7 +344,13 @@ class ExecucaoInterativa:
         newline (confirmado no codegen), por isso ler linha a linha
         não perde nenhum aviso/pedido de entrada."""
         assert self.processo is not None and self.processo.stdout is not None
-        linha = await self.processo.stdout.readline()
+        try:
+            linha = await self.processo.stdout.readline()
+        except (ValueError, asyncio.LimitOverrunError) as e:
+            await self.terminar_a_forcar()
+            raise SaidaExcessiva(
+                "A saída do programa excedeu o limite de tamanho por linha."
+            ) from e
         if not linha:
             self.codigo_saida = await self.processo.wait()
             self.terminou = True

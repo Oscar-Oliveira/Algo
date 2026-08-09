@@ -333,6 +333,11 @@ async def ws_executar(websocket: WebSocket):
                 "tipo": "erro",
                 "mensagem": "Execução interrompida: excedeu o tempo limite.",
             })
+        except executor.SaidaExcessiva:
+            await websocket.send_json({
+                "tipo": "erro",
+                "mensagem": "Execução interrompida: produziu uma linha de saída demasiado longa.",
+            })
 
     tarefa_leitura = None
     import asyncio
