@@ -17,6 +17,17 @@ class PoliticaPedagogica:
     pistas_progressivas: bool = True
     usar_guardiao: bool = True
 
+    def __post_init__(self):
+        # AG-15: sem isto, um nivel_maximo_ajuda negativo ou acima do
+        # topo da escada (7) passava sem erro -- e, no caso negativo,
+        # excluía até o nível 0 (Autonomia) do prompt (AG-16), que se
+        # resolve sozinho ao validar aqui.
+        if not (0 <= self.nivel_maximo_ajuda <= 7):
+            raise ValueError(
+                f"nivel_maximo_ajuda tem de estar entre 0 e 7 (os níveis "
+                f"da escada de ajuda), recebido: {self.nivel_maximo_ajuda}"
+            )
+
     @classmethod
     def a_partir_de_dict(cls, dados: dict) -> "PoliticaPedagogica":
         """Constrói a política a partir do dicionário 'politica_pedagogica'

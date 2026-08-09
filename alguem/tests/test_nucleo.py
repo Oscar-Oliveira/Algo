@@ -33,6 +33,33 @@ def test_politica_campo_desconhecido_da_erro_claro():
         PoliticaPedagogica.a_partir_de_dict({"nivel_maximo_ajuda_com_erro_de_escrita": 3})
 
 
+# ---------- AG-15: validação de nivel_maximo_ajuda ----------
+
+@pytest.mark.parametrize("nivel_invalido", [-1, 8, -5, 100])
+def test_politica_com_nivel_maximo_fora_do_intervalo_da_erro(nivel_invalido):
+    with pytest.raises(ValueError, match="nivel_maximo_ajuda"):
+        PoliticaPedagogica(nivel_maximo_ajuda=nivel_invalido)
+
+
+@pytest.mark.parametrize("nivel_valido", [0, 1, 5, 7])
+def test_politica_com_nivel_maximo_no_intervalo_e_aceite(nivel_valido):
+    assert PoliticaPedagogica(nivel_maximo_ajuda=nivel_valido).nivel_maximo_ajuda == nivel_valido
+
+
+def test_politica_a_partir_de_dict_tambem_valida_nivel_maximo():
+    with pytest.raises(ValueError, match="nivel_maximo_ajuda"):
+        PoliticaPedagogica.a_partir_de_dict({"nivel_maximo_ajuda": -1})
+
+
+# ---------- AG-16: nível 0 nunca é excluído com um nível máximo válido
+# (o próprio finding descreve como resolvido automaticamente pelo
+# AG-15, já que um nivel_maximo negativo deixa de ser possível) ----------
+
+def test_formatar_escada_inclui_sempre_o_nivel_0_com_nivel_maximo_valido():
+    texto = formatar_escada_para_prompt(nivel_maximo=0)
+    assert "Nível 0" in texto
+
+
 # ---------- Escada de ajuda ----------
 
 def test_escada_tem_8_niveis_0_a_7():
