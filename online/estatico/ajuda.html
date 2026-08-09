@@ -410,7 +410,11 @@ senao
 
           <h2 id="9-ciclos">9. Ciclos</h2>
           <h3>9.1 para — número de repetições conhecido</h3>
-          <pre><code>para i de 0 ate 9 fazer
+          <p>A variável de controlo tem de estar declarada <strong>antes</strong> do ciclo, tal como
+            qualquer outra variável — o <code>para</code> não a declara por si. E só existe dentro do
+            corpo do ciclo: usá-la depois de o ciclo terminar é um erro de compilação.</p>
+          <pre><code>i:inteiro
+para i de 0 ate 9 fazer
     escrever(i)
 
 para i de 10 ate 1 passo -1 fazer
@@ -435,6 +439,7 @@ enquanto opcao &lt;&gt; 0</code></pre>
 tabuleiro:inteiro[8][8]          // matriz
 cubo:inteiro[3][3][3]            // 3 dimensões -- ou mais, se precisares
 
+i:inteiro
 para i de 0 ate 29 fazer
     soma = soma + notas[i]</code></pre>
           <p>Um array pode ser inicializado com uma lista de valores entre <code>{ }</code>:</p>
