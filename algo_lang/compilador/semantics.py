@@ -656,6 +656,7 @@ class VerificadorTipos:
             raise ErroSemantico(
                 f"'{chamada.nome}' espera {len(f_def.parametros)} argumento(s), "
                 f"recebeu {len(chamada.args)}", chamada.linha)
+        nomes_ref_simples_usados = set()
         for arg, p in zip(chamada.args, f_def.parametros):
             if p.por_referencia:
                 if not isinstance(arg, A.LValue):
@@ -670,6 +671,18 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"'{arg.nome}' é uma constante; não pode ser passada por "
                         f"referência ao parâmetro '{p.nome}'", chamada.linha)
+                # AL-04: só apanha o caso inequívoco -- a mesma variável
+                # simples (sem índice nem campo) passada por referência a
+                # dois parâmetros diferentes na mesma chamada. 'v[i]' e
+                # 'v[j]' partilham o nome base 'v' mas podem apontar a
+                # posições diferentes, por isso não são comparados aqui.
+                if not arg.acessos:
+                    if arg.nome in nomes_ref_simples_usados:
+                        raise ErroSemantico(
+                            f"a variável '{arg.nome}' é passada por referência mais do "
+                            f"que uma vez na mesma chamada a '{chamada.nome}'",
+                            chamada.linha)
+                    nomes_ref_simples_usados.add(arg.nome)
             tipo, _ = self._tipo_expr(arg, escopo)
             if not self._compativel(p.tipo, tipo):
                 raise ErroSemantico(

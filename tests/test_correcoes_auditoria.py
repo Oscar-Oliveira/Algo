@@ -713,6 +713,55 @@ def test_sem_div_exige_inteiros():
         compilar('algoritmo "T"\ninicio\n    escrever(5.0 div 2)\n')
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-04 -- mesma variável passada 2x por referência ----------
+
+def test_mesma_variavel_simples_passada_duas_vezes_por_referencia_da_erro():
+    with pytest.raises(ErroSemantico, match="mais do que uma vez"):
+        compilar("""
+            algoritmo "T"
+            procedimento trocar(ref a:inteiro, ref b:inteiro)
+                temp:inteiro = a
+                a = b
+                b = temp
+            inicio
+                x:inteiro = 1
+                trocar(x, x)
+        """)
+
+
+def test_variaveis_diferentes_por_referencia_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        procedimento trocar(ref a:inteiro, ref b:inteiro)
+            temp:inteiro = a
+            a = b
+            b = temp
+        inicio
+            x:inteiro = 1
+            y:inteiro = 2
+            trocar(x, y)
+            escrever(x, " ", y)
+    """)
+    assert saida.strip() == "2 1"
+
+
+def test_elementos_diferentes_do_mesmo_array_por_referencia_nao_da_falso_positivo():
+    """v[0] e v[1] partilham o nome base 'v' mas são posições diferentes
+    -- não deve ser assinalado como a mesma variável repetida."""
+    saida = executar("""
+        algoritmo "T"
+        procedimento trocar(ref a:inteiro, ref b:inteiro)
+            temp:inteiro = a
+            a = b
+            b = temp
+        inicio
+            v:inteiro[2] = {1, 2}
+            trocar(v[0], v[1])
+            escrever(v[0], " ", v[1])
+    """)
+    assert saida.strip() == "2 1"
+
+
 # ---------- AUDIT_PLAN Fase 2: AL-02 -- ^ com expoente negativo ----------
 
 def test_potencia_com_expoente_literal_nao_negativo_continua_inteiro():
