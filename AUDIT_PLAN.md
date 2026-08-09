@@ -30,7 +30,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 ### 3.1 `algo_lang/` — Bugs e Segurança (25 findings)
 
-- **AL-02** [BUG · MÉDIA · Baixo] `compilador/semantics.py:~536-541`. `^` entre dois `inteiro` é sempre tipado `inteiro`, mas um expoente negativo devolve `float` em Python. Recomendação: tipar como `real` quando o expoente não for estaticamente não-negativo (ou proibir expoente negativo em `^` de inteiros com erro semântico claro).
 - **AL-04** [BUG · MÉDIA · Baixo] `compilador/semantics.py:598-658`. Nada impede passar a mesma variável duas vezes como parâmetro `ref` na mesma chamada. Recomendação: detetar nomes repetidos entre argumentos `ref` na mesma chamada e emitir erro semântico.
 - **AL-05** [FUNCIONALIDADE/PEDAGOGIA · MÉDIA · Médio] `semantics.py` + `codegen.py`. `div`/`mod` mapeiam para divisão inteira/módulo *floor* do Python, não a divisão truncada que muitos alunos esperam de pseudocódigo estilo "div/mod" (ex.: `-7 div 2` = -4 em Algo/Python, vs. -3 truncado). Recomendação: decisão de produto explícita (documentar a semântica escolhida no manual) e, se se decidir truncar, implementar via `math.trunc`/ajuste de sinal em vez do operador nativo.
 - **AL-06** [BUG · MÉDIA · Baixo] `semantics.py:202-212` + `codegen.py:257-264`. Tamanho de array calculado em runtime que dê negativo gera silenciosamente um array vazio, sem erro. Recomendação: adicionar guarda de runtime (`if tam < 0: raise ...`) na construção de arrays, com mensagem amigável em português.
@@ -185,7 +184,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 2 — Robustez do compilador
 - **Objetivo**: corrigir os defeitos funcionais do compilador identificados na secção 3.1 que ainda não foram tratados na Fase 0.
-- **Resolve**: AL-02, AL-04, AL-05, AL-06, AL-09, AL-12, AL-13, AL-15, AL-16, AL-18, AL-19, AL-21, AL-28, AL-29, AL-31, AL-33, AL-34, AL-35, AL-36.
+- **Resolve**: ~~AL-02~~ (ver AUDIT_DONE.md), AL-04, AL-05, AL-06, AL-09, AL-12, AL-13, AL-15, AL-16, AL-18, AL-19, AL-21, AL-28, AL-29, AL-31, AL-33, AL-34, AL-35, AL-36.
 - **Componentes**: `algo_lang/compilador/*`, `algo_lang/bibliotecas/*`, `algo_lang/tools/linter.py`, `algo_lang/cli.py`.
 - **Dependências**: Fase 0 (`codegen.py` já alterado, evitar conflitos).
 - **Riscos**: AL-05 (semântica de `div`/`mod`) exige uma decisão de produto documentada antes de implementar — pode alterar o comportamento de programas existentes; não implementar sem essa decisão explícita.

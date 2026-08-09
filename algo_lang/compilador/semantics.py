@@ -519,6 +519,18 @@ class VerificadorTipos:
         raise ErroSemantico(  # pragma: no cover -- todos os tipos de expressão da AST são tratados acima
             f"expressão não reconhecida: {type(expr).__name__}", getattr(expr, "linha", 0))
 
+    def _expoente_estaticamente_nao_negativo(self, expr) -> bool:
+        """AL-02: só reconhece os casos simples -- um literal numérico
+        não-negativo é seguro; o unário '-' aplicado a algo é tratado
+        como (potencialmente) negativo; qualquer outra expressão
+        (variável, chamada, etc.) tem sinal desconhecido em tempo de
+        compilação, por isso não é considerada não-negativa."""
+        if isinstance(expr, A.UnOp) and expr.op == "-":
+            return False
+        if isinstance(expr, A.Literal) and expr.tipo in NUMERICOS:
+            return expr.valor >= 0
+        return False
+
     def _tipo_binop(self, expr: A.BinOp, escopo):
         t_e, _ = self._tipo_expr(expr.esq, escopo)
         t_d, _ = self._tipo_expr(expr.dire, escopo)
@@ -538,7 +550,15 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"o operador '{op}' só pode ser usado entre números (tens "
                     f"'{t_e}' e '{t_d}')", expr.linha)
-            return ("decimal" if "decimal" in (t_e, t_d) else "inteiro"), 0
+            if "decimal" in (t_e, t_d):
+                return "decimal", 0
+            if op == "^" and not self._expoente_estaticamente_nao_negativo(expr.dire):
+                # AL-02: '**' do Python devolve float quando a base é int e o
+                # expoente é negativo -- se não conseguimos provar em
+                # compilação que o expoente nunca é negativo, o resultado
+                # tem de ser tipado 'decimal', não 'inteiro'.
+                return "decimal", 0
+            return "inteiro", 0
 
         if op == "/":
             if t_e not in NUMERICOS or t_d not in NUMERICOS:

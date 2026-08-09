@@ -713,6 +713,36 @@ def test_sem_div_exige_inteiros():
         compilar('algoritmo "T"\ninicio\n    escrever(5.0 div 2)\n')
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-02 -- ^ com expoente negativo ----------
+
+def test_potencia_com_expoente_literal_nao_negativo_continua_inteiro():
+    saida = executar('algoritmo "T"\ninicio\n    x:inteiro = 2 ^ 3\n    escrever(x)\n')
+    assert saida.strip() == "8"
+
+
+def test_potencia_com_expoente_literal_negativo_nao_pode_ser_inteiro():
+    with pytest.raises(ErroSemantico, match="não é possível inicializar"):
+        compilar('algoritmo "T"\ninicio\n    x:inteiro = 2 ^ -1\n')
+
+
+def test_potencia_com_expoente_literal_negativo_e_decimal():
+    saida = executar('algoritmo "T"\ninicio\n    x:decimal = 2 ^ -1\n    escrever(x)\n')
+    assert saida.strip() == "0.5"
+
+
+def test_potencia_com_expoente_variavel_e_tratada_como_decimal():
+    """Sinal do expoente é desconhecido em compilação -- tem de ser
+    tipado 'decimal' mesmo que o valor em runtime venha a ser
+    não-negativo, para nunca esconder um float dentro de um 'inteiro'."""
+    with pytest.raises(ErroSemantico, match="não é possível inicializar"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                n:inteiro = 3
+                x:inteiro = 2 ^ n
+        """)
+
+
 def test_sem_comparacao_incomparavel():
     with pytest.raises(ErroSemantico, match="não é possível comparar"):
         compilar("""
