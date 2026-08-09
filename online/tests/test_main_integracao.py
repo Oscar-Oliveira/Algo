@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 import bd
 import main
+import autenticacao
 
 
 @pytest.fixture
@@ -633,4 +634,46 @@ def test_erro_inesperado_devolve_sempre_json():
     assert r.status_code == 500
     corpo = r.json()  # nunca deve levantar exceção -- tem de ser sempre JSON válido
     assert "algo inesperado" in corpo["detail"]
+
+
+# ---------- ON-17: bcrypt lento não pode bloquear o servidor inteiro ----------
+
+def test_login_lento_nao_bloqueia_pedido_concorrente_nao_relacionado(cliente, monkeypatch):
+    """bcrypt.checkpw é deliberadamente lento -- antes de
+    run_in_threadpool, isso bloqueava o event loop inteiro, travando
+    até um pedido completamente não relacionado (a página inicial)
+    enquanto um login estava a decorrer."""
+    import asyncio
+    import time
+
+    import httpx
+
+    cliente.post("/api/registar", json={"email": "lento@b.com", "password": "password123"})
+
+    checkpw_original = autenticacao.bcrypt.checkpw
+
+    def checkpw_lento(*args, **kwargs):
+        time.sleep(1.0)
+        return checkpw_original(*args, **kwargs)
+
+    monkeypatch.setattr(autenticacao.bcrypt, "checkpw", checkpw_lento)
+
+    async def cenario():
+        transporte = httpx.ASGITransport(app=main.app)
+        async with httpx.AsyncClient(transport=transporte, base_url="http://test") as ac:
+            tarefa_login = asyncio.create_task(
+                ac.post("/api/entrar", json={"email": "lento@b.com", "password": "password123"}))
+            await asyncio.sleep(0.1)  # dá tempo ao login para começar a bloquear a thread
+            inicio = time.monotonic()
+            resposta_rapida = await ac.get("/")
+            duracao_pedido_rapido = time.monotonic() - inicio
+            resposta_login = await tarefa_login
+            return duracao_pedido_rapido, resposta_rapida.status_code, resposta_login.status_code
+
+    duracao, estado_rapido, estado_login = asyncio.run(cenario())
+    assert estado_rapido == 200
+    assert estado_login == 200
+    # a página inicial não devia esperar pelo bcrypt lento (1s) do login
+    # concorrente -- generoso para não ficar frágil em CI lento
+    assert duracao < 0.5
 

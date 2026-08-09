@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from fastapi import BackgroundTasks, FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.sessions import SessionMiddleware
 
 from contextlib import asynccontextmanager
@@ -85,15 +86,15 @@ def estudante_atual(request: Request) -> int:
     return id_estudante
 
 
-def admin_atual(id_estudante: int = Depends(estudante_atual)) -> int:
+async def admin_atual(id_estudante: int = Depends(estudante_atual)) -> int:
     """Dependência: como estudante_atual, mas exige também que a conta
     seja admin (ver autenticacao.eh_admin) -- 403 caso contrário."""
-    if not autenticacao.eh_admin(id_estudante):
+    if not await run_in_threadpool(autenticacao.eh_admin, id_estudante):
         raise HTTPException(status_code=403, detail="Só administradores podem aceder a isto.")
     return id_estudante
 
 
-def pasta_execucao_atual(id_estudante: int = Depends(estudante_atual)) -> str:
+async def pasta_execucao_atual(id_estudante: int = Depends(estudante_atual)) -> str:
     """Dependência partilhada (ARCH-12): "resolver pseudónimo → preparar
     pasta de execução" estava repetido de forma idêntica nas rotas
     HTTP que tocam código do estudante. O WebSocket /ws/executar não
@@ -101,7 +102,7 @@ def pasta_execucao_atual(id_estudante: int = Depends(estudante_atual)) -> str:
     responder com um erro JSON próprio antes de fechar quando não há
     sessão -- replica a mesma lógica manualmente, com o mesmo
     resultado."""
-    pseudonimo = autenticacao.obter_id_pseudonimo(id_estudante)
+    pseudonimo = await run_in_threadpool(autenticacao.obter_id_pseudonimo, id_estudante)
     return executor.preparar_pasta_execucao(pseudonimo)
 
 
@@ -109,10 +110,11 @@ def pasta_execucao_atual(id_estudante: int = Depends(estudante_atual)) -> str:
 async def rota_registar(request: Request):
     dados = await request.json()
     try:
-        id_estudante = autenticacao.registar(dados.get("email", ""), dados.get("password", ""))
+        id_estudante = await run_in_threadpool(
+            autenticacao.registar, dados.get("email", ""), dados.get("password", ""))
     except autenticacao.ErroAutenticacao as e:
         raise HTTPException(status_code=400, detail=str(e))
-    aprovado = autenticacao.esta_aprovado(id_estudante)
+    aprovado = await run_in_threadpool(autenticacao.esta_aprovado, id_estudante)
     if aprovado:
         request.session["id_estudante"] = id_estudante
     return {"ok": True, "pendente": not aprovado}
@@ -122,7 +124,8 @@ async def rota_registar(request: Request):
 async def rota_entrar(request: Request):
     dados = await request.json()
     try:
-        id_estudante = autenticacao.autenticar(dados.get("email", ""), dados.get("password", ""))
+        id_estudante = await run_in_threadpool(
+            autenticacao.autenticar, dados.get("email", ""), dados.get("password", ""))
     except autenticacao.ErroAutenticacao as e:
         raise HTTPException(status_code=401, detail=str(e))
     request.session["id_estudante"] = id_estudante
@@ -139,25 +142,25 @@ async def rota_sair(request: Request):
 async def rota_eu(id_estudante: int = Depends(estudante_atual)):
     """Usado pelo frontend só para decidir se mostra a ligação para o
     painel de admin -- não devolve mais nada sobre a conta."""
-    return {"admin": autenticacao.eh_admin(id_estudante)}
+    return {"admin": await run_in_threadpool(autenticacao.eh_admin, id_estudante)}
 
 
 # ---------- administração: aprovar/rejeitar contas pendentes ----------
 
 @app.get("/api/admin/pendentes")
 async def rota_admin_pendentes(id_estudante: int = Depends(admin_atual)):
-    return {"pendentes": autenticacao.listar_pendentes()}
+    return {"pendentes": await run_in_threadpool(autenticacao.listar_pendentes)}
 
 
 @app.post("/api/admin/aprovar/{id_estudante_alvo}")
 async def rota_admin_aprovar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
-    autenticacao.aprovar_conta(id_estudante_alvo)
+    await run_in_threadpool(autenticacao.aprovar_conta, id_estudante_alvo)
     return {"ok": True}
 
 
 @app.post("/api/admin/rejeitar/{id_estudante_alvo}")
 async def rota_admin_rejeitar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
-    autenticacao.rejeitar_conta(id_estudante_alvo)
+    await run_in_threadpool(autenticacao.rejeitar_conta, id_estudante_alvo)
     return {"ok": True}
 
 
@@ -165,14 +168,14 @@ async def rota_admin_rejeitar(id_estudante_alvo: int, id_estudante: int = Depend
 
 @app.get("/api/admin/utilizadores")
 async def rota_admin_utilizadores(id_estudante: int = Depends(admin_atual)):
-    return {"utilizadores": autenticacao.listar_todos()}
+    return {"utilizadores": await run_in_threadpool(autenticacao.listar_todos)}
 
 
 @app.post("/api/admin/revogar/{id_estudante_alvo}")
 async def rota_admin_revogar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
     if id_estudante_alvo == id_estudante:
         raise HTTPException(status_code=400, detail="Não podes revogar a tua própria conta.")
-    autenticacao.revogar_conta(id_estudante_alvo)
+    await run_in_threadpool(autenticacao.revogar_conta, id_estudante_alvo)
     return {"ok": True}
 
 
@@ -197,7 +200,7 @@ async def rota_admin_descarregar_bd(tarefas: BackgroundTasks, id_estudante: int 
     direta do ficheiro, para nunca apanhar uma escrita a meio."""
     descritor, caminho_copia = tempfile.mkstemp(suffix=".db")
     os.close(descritor)
-    bd.copiar_para_backup(caminho_copia)
+    await run_in_threadpool(bd.copiar_para_backup, caminho_copia)
     tarefas.add_task(os.remove, caminho_copia)
     nome_ficheiro = f"algo-online-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.db"
     return FileResponse(
@@ -214,7 +217,7 @@ async def rota_admin_descarregar_bd(tarefas: BackgroundTasks, id_estudante: int 
 async def rota_obter_credencial(id_estudante: int = Depends(estudante_atual)):
     """Nunca devolve a chave de API -- só o que é seguro mostrar de
     volta ao estudante para confirmar o que já tem configurado."""
-    c = credenciais.obter_credencial(id_estudante)
+    c = await run_in_threadpool(credenciais.obter_credencial, id_estudante)
     if c is None:
         return {"configurado": False}
     return {"configurado": True, "fornecedor": c.fornecedor, "modelo": c.modelo, "host": c.host}
@@ -224,7 +227,8 @@ async def rota_obter_credencial(id_estudante: int = Depends(estudante_atual)):
 async def rota_guardar_credencial(request: Request, id_estudante: int = Depends(estudante_atual)):
     dados = await request.json()
     try:
-        credenciais.guardar_credencial(
+        await run_in_threadpool(
+            credenciais.guardar_credencial,
             id_estudante,
             dados.get("fornecedor", ""),
             dados.get("modelo", ""),
@@ -262,7 +266,7 @@ async def pagina_ajuda(request: Request):
 @app.get("/admin")
 async def pagina_admin(request: Request):
     id_estudante = request.session.get("id_estudante")
-    if id_estudante is None or not autenticacao.eh_admin(id_estudante):
+    if id_estudante is None or not await run_in_threadpool(autenticacao.eh_admin, id_estudante):
         return RedirectResponse("/editor")
     return FileResponse(os.path.join(PASTA_ESTATICO, "admin.html"))
 
@@ -295,7 +299,7 @@ async def ws_executar(websocket: WebSocket):
         await websocket.close()
         return
 
-    pseudonimo = autenticacao.obter_id_pseudonimo(id_estudante)
+    pseudonimo = await run_in_threadpool(autenticacao.obter_id_pseudonimo, id_estudante)
     pasta_estudante = executor.preparar_pasta_execucao(pseudonimo)
 
     try:
@@ -359,7 +363,7 @@ async def ws_alguem(websocket: WebSocket):
         return
 
     try:
-        tutor = alguem_ponte.construir_alguem(id_estudante)
+        tutor = await run_in_threadpool(alguem_ponte.construir_alguem, id_estudante)
     except alguem_ponte.ErroAlguemIndisponivel as e:
         await websocket.send_json({"tipo": "erro", "mensagem": str(e)})
         await websocket.close()
@@ -396,7 +400,11 @@ async def ws_alguem(websocket: WebSocket):
 async def rota_fluxograma(request: Request, pasta_estudante: str = Depends(pasta_execucao_atual)):
     dados = await request.json()
     try:
-        resultado = executor.gerar_fluxograma_svg(
+        # ON-08: gerar_fluxograma_svg chama o binário 'dot' (graphviz) de
+        # forma síncrona e bloqueante -- sem isto, travava o event loop
+        # (e por extensão o servidor inteiro) durante a chamada.
+        resultado = await run_in_threadpool(
+            executor.gerar_fluxograma_svg,
             dados.get("ficheiros", []), dados.get("principal", ""), pasta_estudante,
             nome_rotina=dados.get("rotina"))
     except executor.ErroCompilacao as e:
