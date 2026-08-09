@@ -48,6 +48,7 @@ class Linter:
         arrays_globais = self._arrays_com_tamanho_literal(self.programa.declaracoes)
 
         self._verificar_variaveis_nao_usadas(self.programa.corpo, contexto="no programa principal")
+        self._verificar_globais_nao_usadas()
         self._verificar_divisoes_e_comparacoes(self.programa.corpo)
         self._verificar_codigo_depois_de_devolver(self.programa.corpo)
         self._verificar_ciclo_verdadeiro_sem_saida(self.programa.corpo)
@@ -217,6 +218,26 @@ class Linter:
                 self.avisos.append(Aviso(
                     f"a variável '{nome}' é declarada mas nunca é usada {contexto}",
                     linha))
+
+    def _verificar_globais_nao_usadas(self):
+        """AL-28: _verificar_variaveis_nao_usadas só olha para o bloco
+        'inicio' e para cada função isoladamente -- nunca para as
+        declarações globais de topo (fora de 'inicio'), que podem ser
+        usadas em QUALQUER função ou no próprio 'inicio'. Por isso o
+        uso tem de ser recolhido combinando todos os corpos, não um de
+        cada vez."""
+        usadas = set()
+        for corpo in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
+            for s in self._todas_as_stmts(corpo):
+                for e in self._expressoes_lidas(s):
+                    self._extrair_lvalues(e, usadas)
+                if isinstance(s, A.Para):
+                    usadas.add(s.var)
+        for d in self.programa.declaracoes:
+            if d.nome not in usadas:
+                self.avisos.append(Aviso(
+                    f"a variável global '{d.nome}' é declarada mas nunca é usada",
+                    d.linha))
 
     def _verificar_parametros_nao_usados(self, f: A.FuncaoDef):
         usadas = set()

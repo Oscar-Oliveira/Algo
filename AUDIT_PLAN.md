@@ -35,7 +35,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 - **AL-16** [FUNCIONALIDADE · MÉDIA · Médio] `parser.py:141-177,597-639`. Literais `{...}` de array/estrutura só podem ser usados como valor inicial de uma declaração, não como argumento de função ou expressão geral. Recomendação: adicionar suporte a literais em `_parse_primario` quando o tipo alvo for conhecido pelo contexto (chamadas de função com parâmetro tipado).
 - **AL-23** [BUG · MÉDIA · Baixo] `tools/tracer.py:190-201`. Deteção de erro no trace cobre 3 dos 4 handlers de `codegen.py`; falta o padrão do `ValueError` (ligado a AL-08). Recomendação: adicionar o padrão em falta a `eh_erro_runtime`.
 - **AL-24** [BUG · BAIXA · Baixo] `tools/tracer.py:190-201`. A mesma deteção por `endswith` de frases fixas pode dar falso positivo se um `escrever` legítimo terminar com uma dessas frases. Recomendação: marcar a linha de erro com um prefixo/sentinel interno em vez de inferir por texto.
-- **AL-28** [BUG · MÉDIA · Baixo] `tools/linter.py:41`. Verificação de variáveis nunca usadas só analisa o bloco `inicio`, nunca declarações globais de topo. Recomendação: estender a verificação às declarações globais.
 - **AL-29** [BUG · BAIXA · Baixo] `tools/linter.py:154-172`. Uma função puramente auto-recursiva, nunca chamada de fora, não é detetada como código morto (a autochamada conta como "uso"). Recomendação: excluir autochamadas da contagem de "chamada externa" no cálculo de rotinas nunca chamadas.
 - **AL-31** [BUG · BAIXA · Baixo] `tools/linter.py:338-367`. Aviso de indentação inconsistente só reporta a primeira ocorrência de tabs e de espaços em todo o ficheiro. Recomendação: reportar todas as linhas afetadas, ou pelo menos contagem total.
 - **AL-33** [BUG · BAIXA · Baixo] `cli.py:19-28`. `os.makedirs(pasta, exist_ok=True)` não trata o caso de já existir um *ficheiro* (não pasta) com esse nome — falha com exceção não tratada. Recomendação: verificar `os.path.isfile` antes e dar erro amigável.
@@ -174,7 +173,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 2 — Robustez do compilador
 - **Objetivo**: corrigir os defeitos funcionais do compilador identificados na secção 3.1 que ainda não foram tratados na Fase 0.
-- **Resolve**: ~~AL-02~~, ~~AL-04~~, ~~AL-05~~, ~~AL-06~~, ~~AL-09~~, ~~AL-12~~, ~~AL-13~~, ~~AL-15~~, ~~AL-18~~, ~~AL-19~~, ~~AL-21~~ (ver AUDIT_DONE.md), AL-16, AL-28, AL-29, AL-31, AL-33, AL-34, AL-35, AL-36.
+- **Resolve**: ~~AL-02~~, ~~AL-04~~, ~~AL-05~~, ~~AL-06~~, ~~AL-09~~, ~~AL-12~~, ~~AL-13~~, ~~AL-15~~, ~~AL-18~~, ~~AL-19~~, ~~AL-21~~, ~~AL-28~~ (ver AUDIT_DONE.md), AL-16, AL-29, AL-31, AL-33, AL-34, AL-35, AL-36.
 - **Componentes**: `algo_lang/compilador/*`, `algo_lang/bibliotecas/*`, `algo_lang/tools/linter.py`, `algo_lang/cli.py`.
 - **Dependências**: Fase 0 (`codegen.py` já alterado, evitar conflitos).
 - **Riscos**: AL-05 (semântica de `div`/`mod`) exige uma decisão de produto documentada antes de implementar — pode alterar o comportamento de programas existentes; não implementar sem essa decisão explícita.

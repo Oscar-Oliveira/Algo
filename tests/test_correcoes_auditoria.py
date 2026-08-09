@@ -1687,6 +1687,40 @@ def test_linter_constante_declarada_em_bloco_aninhado_nao_e_falso_positivo():
     assert avisos == []
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-28 -- linter verifica globais nunca usadas ----------
+
+def test_linter_assinala_global_de_topo_nunca_usada():
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        total:inteiro = 0
+        inicio
+            escrever("ola")
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert any("'total'" in a.mensagem and "nunca é usada" in a.mensagem for a in avisos)
+
+
+def test_linter_global_usada_so_dentro_de_uma_funcao_nao_e_falso_positivo():
+    """'total' nunca é lida/escrita em 'inicio' -- só dentro do
+    procedimento. Antes do AL-28, o linter não via usos vindos de
+    funções ao verificar globais (nem sequer as verificava), por isso
+    isto teria de ser corretamente reconhecido como "usada"."""
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        total:inteiro = 0
+        procedimento mostrar()
+            escrever(total)
+        inicio
+            mostrar()
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert not any("'total'" in a.mensagem and "nunca é usada" in a.mensagem for a in avisos)
+
+
 def test_indentacao_mista_entre_linhas_diferentes_da_erro_de_compilacao():
     """AL-15: promovido de aviso do linter a erro de compilação -- uma
     linha com tabs e outra com espaços no mesmo ficheiro já não chega
