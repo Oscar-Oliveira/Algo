@@ -920,6 +920,30 @@ inicio
     assert resultado.stdout.strip() == 'ele disse "ola"'
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-18 -- limite de profundidade no parser ----------
+
+def test_expressao_fortemente_aninhada_da_erro_sintatico_amigavel():
+    from algo_lang.compilador.parser import ErroSintatico
+    profundidade = 200
+    codigo = 'algoritmo "T"\ninicio\n    x:inteiro = ' + "(" * profundidade + "1" + ")" * profundidade + "\n"
+    with pytest.raises(ErroSintatico, match="demasiado aninhada"):
+        parse(codigo)
+
+
+def test_expressao_moderadamente_aninhada_continua_a_funcionar():
+    saida = executar('algoritmo "T"\ninicio\n    escrever(((((1 + 2))) * (3 - 1)))\n')
+    assert saida.strip() == "6"
+
+
+def test_cadeia_longa_de_operadores_sem_parenteses_nao_e_afetada():
+    """Uma cadeia longa do MESMO operador (a+b+c+...) é tratada de
+    forma iterativa (while), não recursiva -- não deve disparar o
+    limite de profundidade, ao contrário de parênteses aninhados."""
+    termos = " + ".join(["1"] * 200)
+    saida = executar(f'algoritmo "T"\ninicio\n    escrever({termos})\n')
+    assert saida.strip() == "200"
+
+
 # ---------- AUDIT_PLAN Fase 2: AL-02 -- ^ com expoente negativo ----------
 
 def test_potencia_com_expoente_literal_nao_negativo_continua_inteiro():

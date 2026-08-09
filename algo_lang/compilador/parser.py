@@ -28,10 +28,14 @@ class ErroSintatico(Exception):
         self.linha = linha
 
 
+LIMITE_PROFUNDIDADE_EXPR = 50
+
+
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
         self.pos = 0
+        self._profundidade_expr = 0
 
     # ---------- utilidades ----------
     def atual(self):
@@ -528,7 +532,20 @@ class Parser:
 
     # ---------- expressões (precedência) ----------
     def _parse_expr(self):
-        return self._parse_ou()
+        # AL-18: sem isto, uma expressão fortemente aninhada (ex: muitos
+        # parênteses seguidos) estourava a pilha de recursão do próprio
+        # Python (RecursionError não tratado, sem número de linha nem
+        # explicação) em vez de um erro de sintaxe amigável.
+        self._profundidade_expr += 1
+        if self._profundidade_expr > LIMITE_PROFUNDIDADE_EXPR:
+            raise ErroSintatico(
+                "expressão demasiado aninhada (parênteses ou operadores a mais) -- "
+                "tenta simplificar, ex. dividindo em variáveis intermédias",
+                self.atual().linha)
+        try:
+            return self._parse_ou()
+        finally:
+            self._profundidade_expr -= 1
 
     def _parse_ou(self):
         esq = self._parse_e()
