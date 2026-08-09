@@ -36,6 +36,53 @@ def test_linhas_vazias_no_jsonl_sao_ignoradas(tmp_path):
     assert len(resultado["a"]) == 2
 
 
+# ---------- AG-31: tolerância a eventos de log malformados ----------
+
+def test_linha_json_corrompida_no_jsonl_e_ignorada_sem_rebentar(tmp_path, capsys):
+    """Uma linha de log truncada/corrompida (ex: processo interrompido
+    a meio da escrita) não pode fazer o script inteiro falhar -- é
+    ignorada, e o operador é avisado de quantas foram."""
+    import json
+    from alguem.scripts.metricas import carregar_eventos_por_sessao
+    caminho = tmp_path / "sessao.jsonl"
+    caminho.write_text(
+        json.dumps({"id_sessao": "a", "tipo": "x"}) + "\n"
+        '{"id_sessao": "a", "tipo": "linha truncada a meio' + "\n"
+        + json.dumps({"id_sessao": "a", "tipo": "y"}) + "\n",
+        encoding="utf-8")
+    resultado = carregar_eventos_por_sessao(str(tmp_path))
+    assert len(resultado["a"]) == 2
+    aviso = capsys.readouterr().err
+    assert "1" in aviso and "ignorado" in aviso
+
+
+def test_evento_sem_id_sessao_e_ignorado_sem_rebentar(tmp_path):
+    import json
+    from alguem.scripts.metricas import carregar_eventos_por_sessao
+    caminho = tmp_path / "sessao.jsonl"
+    caminho.write_text(
+        json.dumps({"tipo": "sem_id_sessao"}) + "\n"
+        + json.dumps({"id_sessao": "a", "tipo": "y"}) + "\n",
+        encoding="utf-8")
+    resultado = carregar_eventos_por_sessao(str(tmp_path))
+    assert list(resultado.keys()) == ["a"]
+    assert len(resultado["a"]) == 1
+
+
+def test_calcular_metricas_tolera_eventos_com_chaves_em_falta():
+    """Um evento tentativa_guardiao sem 'aceitavel'/'nivel_aproximado'
+    (ex: escrito por uma versão mais antiga do Registador) não pode
+    fazer calcular_metricas_da_sessao rebentar."""
+    eventos = [
+        {"id_sessao": "a", "id_estudante": "e1", "tipo": "inicio_sessao"},
+        {"tipo": "tentativa_guardiao"},
+        {"tipo": "resposta_final"},
+    ]
+    resultado = calcular_metricas_da_sessao(eventos)
+    assert resultado["num_tentativas_totais"] == 1
+    assert resultado["num_turnos"] == 1
+
+
 def test_solution_leakage_rate_de_uma_sessao(tmp_path):
     def eventos(r):
         r.inicio_sessao("openrouter", "x", {}, [])

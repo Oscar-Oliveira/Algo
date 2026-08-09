@@ -25,39 +25,59 @@ PASTA_LOGS_POR_OMISSAO = os.path.join(os.path.dirname(os.path.dirname(__file__))
 
 def carregar_eventos_por_sessao(pasta_logs: str) -> dict[str, list[dict]]:
     eventos_por_sessao: dict[str, list[dict]] = defaultdict(list)
+    num_ignorados = 0
     for caminho in sorted(glob.glob(os.path.join(pasta_logs, "*.jsonl"))):
         with open(caminho, "r", encoding="utf-8") as f:
             for linha in f:
                 linha = linha.strip()
                 if not linha:
                     continue
-                evento = json.loads(linha)
-                eventos_por_sessao[evento["id_sessao"]].append(evento)
+                # AG-31: uma linha truncada/corrompida (ex: processo
+                # interrompido a meio da escrita) não pode fazer o
+                # script inteiro falhar -- é ignorada, e o operador é
+                # avisado de quantas foram.
+                try:
+                    evento = json.loads(linha)
+                    id_sessao = evento["id_sessao"]
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    num_ignorados += 1
+                    continue
+                eventos_por_sessao[id_sessao].append(evento)
+    if num_ignorados:
+        print(f"⚠ {num_ignorados} evento(s) de log malformado(s) foram ignorados.",
+              file=sys.stderr)
     return eventos_por_sessao
 
 
 def calcular_metricas_da_sessao(eventos: list[dict]) -> dict:
-    tentativas = [e for e in eventos if e["tipo"] == "tentativa_guardiao"]
-    respostas_finais = [e for e in eventos if e["tipo"] == "resposta_final"]
-    inicio = next((e for e in eventos if e["tipo"] == "inicio_sessao"), None)
+    # AG-31: usa .get() em vez de indexação direta -- um evento de uma
+    # versão mais antiga do Registador (ou corrompido de outra forma
+    # que não a deteção de JSON inválido acima) não pode fazer o
+    # cálculo de métricas rebentar. Uma tentativa sem 'aceitavel'
+    # conta-se como rejeitada (lado seguro); uma resposta sem
+    # 'veio_de_recusa_segura' conta-se como NÃO recusa segura (não
+    # inflaciona essa contagem por omissão).
+    tentativas = [e for e in eventos if e.get("tipo") == "tentativa_guardiao"]
+    respostas_finais = [e for e in eventos if e.get("tipo") == "resposta_final"]
+    inicio = next((e for e in eventos if e.get("tipo") == "inicio_sessao"), None)
 
     n_tentativas = len(tentativas)
-    n_rejeitadas = sum(1 for t in tentativas if not t["aceitavel"])
+    n_rejeitadas = sum(1 for t in tentativas if not t.get("aceitavel"))
 
     return {
-        "id_sessao": eventos[0]["id_sessao"] if eventos else None,
-        "id_estudante": eventos[0]["id_estudante"] if eventos else None,
-        "fornecedor": inicio["fornecedor"] if inicio else None,
-        "modelo": inicio["modelo"] if inicio else None,
+        "id_sessao": eventos[0].get("id_sessao") if eventos else None,
+        "id_estudante": eventos[0].get("id_estudante") if eventos else None,
+        "fornecedor": inicio.get("fornecedor") if inicio else None,
+        "modelo": inicio.get("modelo") if inicio else None,
         "num_turnos": len(respostas_finais),
         "num_tentativas_totais": n_tentativas,
         "num_tentativas_rejeitadas": n_rejeitadas,
         "solution_leakage_rate": (n_rejeitadas / n_tentativas) if n_tentativas else None,
         "hint_escalation_maxima": (
-            max((t["nivel_aproximado"] for t in tentativas), default=None)
+            max((t.get("nivel_aproximado", 0) for t in tentativas), default=None)
         ),
         "num_recusas_seguras": sum(
-            1 for r in respostas_finais if r["veio_de_recusa_segura"]),
+            1 for r in respostas_finais if r.get("veio_de_recusa_segura")),
     }
 
 
