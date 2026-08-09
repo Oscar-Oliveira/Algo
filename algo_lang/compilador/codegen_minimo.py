@@ -418,6 +418,16 @@ class GeradorCodigo:
         if isinstance(expr, A.LValue):
             return self._lvalue(expr, tipos)
         if isinstance(expr, A.BinOp):
+            if expr.op in ("div", "mod"):
+                # AL-05: divisão truncada (arredonda em direção a zero),
+                # não a floor division nativa do Python -- inline em vez
+                # de função de apoio, para se manter fiel ao espírito
+                # deste modo (Python o mais direto possível).
+                e = self._expr(expr.esq, tipos)
+                d = self._expr(expr.dire, tipos)
+                if expr.op == "div":
+                    return f"int({e} / {d})"
+                return f"({e} - int({e} / {d}) * {d})"
             op = OPS_BIN[expr.op]
             return f"({self._expr(expr.esq, tipos)} {op} {self._expr(expr.dire, tipos)})"
         if isinstance(expr, A.UnOp):

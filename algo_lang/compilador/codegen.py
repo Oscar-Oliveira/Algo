@@ -65,11 +65,28 @@ def _algo_ler_caracter(prompt=""):
             return resp
         print("Valor invalido. Introduza exatamente 1 caracter.")
 
+
+def _algo_div(a, b):
+    """div: divisao INTEIRA TRUNCADA (arredonda em direcao a zero, como
+    a maioria das linguagens ensinadas em programacao introdutoria) --
+    ao contrario do // nativo do Python, que arredonda para -infinito
+    (ex: -7 // 2 = -4, mas -7 div 2 = -3)."""
+    q, r = divmod(a, b)
+    if r != 0 and (a < 0) != (b < 0):
+        q += 1
+    return q
+
+
+def _algo_mod(a, b):
+    """mod: resto da divisao truncada (_algo_div) -- sinal igual ao do
+    primeiro operando, ao contrario do % nativo do Python."""
+    return a - _algo_div(a, b) * b
+
 '''
 
 OPS_BIN = {
     "+": "+", "-": "-", "*": "*", "/": "/",
-    "div": "//", "mod": "%", "^": "**",
+    "^": "**",
     "==": "==", "<>": "!=", "<": "<", ">": ">", "<=": "<=", ">=": ">=",
     "e": "and", "ou": "or",
 }
@@ -488,6 +505,11 @@ class GeradorCodigo:
         if isinstance(expr, A.LValue):
             return self._lvalue(expr, tipos)
         if isinstance(expr, A.BinOp):
+            if expr.op in ("div", "mod"):
+                # AL-05: divisão truncada, não a floor division nativa do
+                # Python -- ver _algo_div/_algo_mod no cabeçalho.
+                funcao = "_algo_div" if expr.op == "div" else "_algo_mod"
+                return f"{funcao}({self._expr(expr.esq, tipos)}, {self._expr(expr.dire, tipos)})"
             op = OPS_BIN[expr.op]
             return f"({self._expr(expr.esq, tipos)} {op} {self._expr(expr.dire, tipos)})"
         if isinstance(expr, A.UnOp):

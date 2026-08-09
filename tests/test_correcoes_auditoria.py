@@ -762,6 +762,43 @@ def test_elementos_diferentes_do_mesmo_array_por_referencia_nao_da_falso_positiv
     assert saida.strip() == "2 1"
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-05 -- div/mod truncados, não floor ----------
+
+def test_div_mod_com_operandos_positivos_inalterado():
+    saida = executar('algoritmo "T"\ninicio\n    escrever(7 div 2, " ", 7 mod 2)\n')
+    assert saida.strip() == "3 1"
+
+
+def test_div_mod_com_dividendo_negativo_e_truncado_nao_floor():
+    """-7 div 2: floor (Python //) dava -4; truncado (em direção a
+    zero, o que a maioria dos alunos espera de pseudocódigo) é -3."""
+    saida = executar('algoritmo "T"\ninicio\n    escrever(-7 div 2, " ", -7 mod 2)\n')
+    assert saida.strip() == "-3 -1"
+
+
+def test_div_mod_com_divisor_negativo_e_truncado_nao_floor():
+    saida = executar('algoritmo "T"\ninicio\n    escrever(7 div -2, " ", 7 mod -2)\n')
+    assert saida.strip() == "-3 1"
+
+
+def test_div_mod_com_ambos_negativos():
+    saida = executar('algoritmo "T"\ninicio\n    escrever(-7 div -2, " ", -7 mod -2)\n')
+    assert saida.strip() == "3 -1"
+
+
+def test_minimo_div_mod_tambem_e_truncado_e_sem_funcoes_de_apoio():
+    """O modo --minimo tem de refletir a MESMA semântica da linguagem
+    (não pode divergir do modo normal), mas continua sem funções de
+    apoio -- ver test_minimo_nao_tem_funcoes_de_apoio."""
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse('algoritmo "T"\ninicio\n    escrever(-7 div 2, -7 mod 2)\n')
+    codigo_py = gerar_python_minimo(programa)
+    assert "_algo_" not in codigo_py
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.stdout.strip() == "-3-1"
+
+
 # ---------- AUDIT_PLAN Fase 2: AL-02 -- ^ com expoente negativo ----------
 
 def test_potencia_com_expoente_literal_nao_negativo_continua_inteiro():
