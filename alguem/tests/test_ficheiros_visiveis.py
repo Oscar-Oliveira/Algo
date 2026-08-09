@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Testes de alguem.nucleo.ficheiros_visiveis."""
+from alguem.nucleo import ficheiros_visiveis as modulo_ficheiros_visiveis
 from alguem.nucleo.ficheiros_visiveis import resolver_ficheiros_visiveis
 
 
@@ -125,6 +126,44 @@ def test_incluir_travessia_de_caminho_fora_da_pasta_e_ignorado(tmp_path):
     nomes = [n for n, _ in resultado]
     assert nomes == ["principal.algo"]
     assert not any("CONTEUDO_SECRETO" in c for _, c in resultado)
+
+
+# ---------- AG-28: limites de nº de ficheiros e bytes totais ----------
+
+def test_cadeia_de_inclusoes_maior_que_o_limite_de_ficheiros_e_cortada(tmp_path, monkeypatch):
+    monkeypatch.setattr(modulo_ficheiros_visiveis, "LIMITE_FICHEIROS", 3)
+    anterior = None
+    for i in range(6):
+        caminho = tmp_path / f"f{i}.algo"
+        linha_incluir = f'incluir "f{i - 1}.algo"\n' if anterior else ""
+        caminho.write_text(f"{linha_incluir}CONTEUDO_{i}", encoding="utf-8")
+        anterior = caminho
+    resultado = resolver_ficheiros_visiveis(str(tmp_path / "f5.algo"))
+    assert len(resultado) == 3
+
+
+def test_ficheiro_maior_que_o_limite_de_bytes_e_truncado(tmp_path, monkeypatch):
+    monkeypatch.setattr(modulo_ficheiros_visiveis, "LIMITE_BYTES_TOTAL", 100)
+    caminho = tmp_path / "grande.algo"
+    caminho.write_text("x" * 1000, encoding="utf-8")
+    resultado = resolver_ficheiros_visiveis(str(caminho))
+    assert len(resultado) == 1
+    nome, conteudo = resultado[0]
+    assert len(conteudo.encode("utf-8")) <= 100 + len(
+        "\n\n[... ficheiro truncado, excede o limite de tamanho total permitido ...]")
+    assert "truncado" in conteudo
+
+
+def test_soma_de_varios_ficheiros_acima_do_limite_de_bytes_para_de_incluir(tmp_path, monkeypatch):
+    monkeypatch.setattr(modulo_ficheiros_visiveis, "LIMITE_BYTES_TOTAL", 50)
+    (tmp_path / "b.algo").write_text("y" * 40, encoding="utf-8")
+    principal = tmp_path / "principal.algo"
+    principal.write_text('incluir "b.algo"\n' + "x" * 40, encoding="utf-8")
+    resultado = resolver_ficheiros_visiveis(str(principal))
+    nomes = [n for n, _ in resultado]
+    # o principal (40 bytes + a linha de incluir) já quase esgota o
+    # limite de 50 -- o segundo ficheiro não deve entrar de todo
+    assert nomes == ["principal.algo"]
 
 
 def test_conteudo_de_cada_ficheiro_esta_correto(tmp_path):

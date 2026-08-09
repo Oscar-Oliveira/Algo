@@ -15,6 +15,12 @@ import re
 
 PADRAO_INCLUIR = re.compile(r'^\s*incluir\s+"([^"]+)"', re.MULTILINE)
 
+# AG-28: sem limite, uma cadeia de 'incluir' grande (ou um único
+# ficheiro enorme) podia inflar sem controlo o prompt enviado ao LLM --
+# custo e risco de exceder o limite de contexto do fornecedor.
+LIMITE_FICHEIROS = 20
+LIMITE_BYTES_TOTAL = 200_000
+
 
 def resolver_ficheiros_visiveis(caminho_principal: str) -> list[tuple[str, str]]:
     """Devolve [(nome_do_ficheiro, conteudo), ...] -- o ficheiro
@@ -31,9 +37,13 @@ def resolver_ficheiros_visiveis(caminho_principal: str) -> list[tuple[str, str]]
     _resolver_inclusoes (ON-02)."""
     resultado: list[tuple[str, str]] = []
     vistos: set[str] = set()
+    bytes_acumulados = 0
     pasta_permitida = os.path.realpath(os.path.dirname(os.path.abspath(caminho_principal)))
 
     def _processar(caminho: str) -> None:
+        nonlocal bytes_acumulados
+        if len(resultado) >= LIMITE_FICHEIROS or bytes_acumulados >= LIMITE_BYTES_TOTAL:
+            return
         caminho_abs = os.path.realpath(caminho)
         if caminho_abs in vistos:
             return
@@ -49,6 +59,13 @@ def resolver_ficheiros_visiveis(caminho_principal: str) -> list[tuple[str, str]]
                 conteudo = f.read()
         except OSError:
             return
+
+        espaco_restante = LIMITE_BYTES_TOTAL - bytes_acumulados
+        conteudo_bytes = conteudo.encode("utf-8")
+        if len(conteudo_bytes) > espaco_restante:
+            conteudo = conteudo_bytes[:espaco_restante].decode("utf-8", errors="ignore")
+            conteudo += "\n\n[... ficheiro truncado, excede o limite de tamanho total permitido ...]"
+        bytes_acumulados += len(conteudo.encode("utf-8"))
         resultado.append((os.path.basename(caminho), conteudo))
 
         pasta_base = os.path.dirname(caminho_abs)
