@@ -83,15 +83,16 @@ def _remover_comentarios_bloco(codigo: str) -> str:
 
 
 def _medir_indentacao(linha_sem_comentario, linha_num):
-    """Devolve o nível de indentação em 'unidades' (1 unidade = 1 tab OU
-    um grupo de 4 espaços). A indentação de uma linha tem de ser feita
+    """Devolve (nível, estilo) -- nível em 'unidades' (1 unidade = 1 tab
+    OU um grupo de 4 espaços), estilo 'tab'/'espaco'/None (linha sem
+    indentação, nível 0). A indentação de uma linha tem de ser feita
     inteiramente com tabs OU inteiramente com espaços em grupos de 4 --
     nunca uma mistura dos dois na mesma linha, nem espaços que não sejam
     múltiplos de 4."""
     sem_indent = linha_sem_comentario.lstrip(" \t")
     bruto = linha_sem_comentario[: len(linha_sem_comentario) - len(sem_indent)]
     if not bruto:
-        return 0
+        return 0, None
     tem_tab = "\t" in bruto
     tem_espaco = " " in bruto
     if tem_tab and tem_espaco:
@@ -99,12 +100,12 @@ def _medir_indentacao(linha_sem_comentario, linha_num):
             "a indentação mistura tabs e espaços na mesma linha -- usa só tabs "
             "ou só grupos de 4 espaços", linha_num)
     if tem_tab:
-        return len(bruto)
+        return len(bruto), "tab"
     if len(bruto) % 4 != 0:
         raise ErroLexico(
             f"indentação inválida ({len(bruto)} espaço(s)) -- tem de ser tabs "
             f"ou um múltiplo de 4 espaços", linha_num)
-    return len(bruto) // 4
+    return len(bruto) // 4, "espaco"
 
 
 def tokenizar(codigo: str):
@@ -113,6 +114,13 @@ def tokenizar(codigo: str):
     tokens = []
     pilha_indent = [0]
     linha_num = 0
+    # AL-15: mistura de tabs/espaços entre LINHAS DIFERENTES do mesmo
+    # ficheiro -- cada linha isolada pode ser válida (só tabs, ou só
+    # grupos de 4 espaços), mas misturar os dois estilos ao longo do
+    # ficheiro já era um erro de compilação dentro da mesma linha;
+    # agora é consistentemente um erro também entre linhas.
+    estilo_indentacao = None
+    linha_primeiro_estilo = None
 
     for linha_num, linha_bruta in enumerate(linhas, start=1):
         linha_sem_comentario = _remover_comentario(linha_bruta)
@@ -121,7 +129,18 @@ def tokenizar(codigo: str):
         if linha_stripped == "":
             continue
 
-        nivel = _medir_indentacao(linha_sem_comentario, linha_num)
+        nivel, estilo = _medir_indentacao(linha_sem_comentario, linha_num)
+        if estilo is not None:
+            if estilo_indentacao is None:
+                estilo_indentacao = estilo
+                linha_primeiro_estilo = linha_num
+            elif estilo != estilo_indentacao:
+                nomes = {"tab": "tabs", "espaco": "espaços"}
+                raise ErroLexico(
+                    f"o ficheiro mistura indentação por {nomes[estilo]} nesta linha "
+                    f"com {nomes[estilo_indentacao]} usados anteriormente (desde a "
+                    f"linha {linha_primeiro_estilo}) -- escolhe só um dos dois estilos "
+                    f"e usa-o em todo o ficheiro", linha_num)
 
         if nivel > pilha_indent[-1]:
             pilha_indent.append(nivel)

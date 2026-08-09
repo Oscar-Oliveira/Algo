@@ -1594,11 +1594,13 @@ def test_linter_constante_declarada_em_bloco_aninhado_nao_e_falso_positivo():
     assert avisos == []
 
 
-def test_linter_indentacao_mista_entre_linhas_diferentes(tmp_path):
-    algo_path = tmp_path / "prog.algo"
-    algo_path.write_bytes(b'algoritmo "T"\ninicio\n\tx:inteiro = 5\n    escrever(x)\n')
-    resultado = subprocess.run(["algo", "lint", str(algo_path)], capture_output=True, text=True)
-    assert "mistura indentação" in resultado.stdout
+def test_indentacao_mista_entre_linhas_diferentes_da_erro_de_compilacao():
+    """AL-15: promovido de aviso do linter a erro de compilação -- uma
+    linha com tabs e outra com espaços no mesmo ficheiro já não chega
+    sequer a compilar (antes, cada linha isolada era válida e só o
+    linter assinalava a mistura como aviso de estilo)."""
+    with pytest.raises(ErroLexico, match="mistura indentação"):
+        compilar('algoritmo "T"\ninicio\n\tx:inteiro = 5\n    escrever(x)\n')
 
 
 # ---------- lacunas de cobertura: flowchart.py ----------

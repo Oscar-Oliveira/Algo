@@ -32,7 +32,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 - **AL-07** [QUALIDADE DE CÓDIGO · ALTA · Alto] `compilador/codegen.py` + `codegen_minimo.py`. ~13 funções quase byte-a-byte duplicadas entre os dois geradores (ver ARCH-01 para o impacto estrutural). Recomendação: extrair uma camada de dispatch/funções partilhadas; tratar como refactor dedicado, não uma correção pontual.
 - **AL-08** [UX/BUG · BAIXA · Baixo] `codegen.py:180-183`. `except ValueError` genérico mostra sempre "valor inválido", já melhorado para incluir a mensagem Python real entre parênteses, mas continua sem localizar/traduzir essa mensagem (ver UX-01). Recomendação: mapear as causas conhecidas (`math domain error`, `invalid literal for int()`, etc.) para frases em português; manter o genérico como fallback.
-- **AL-15** [BUG · BAIXA · Baixo] `lexer.py:85-107`. Mistura de tabs/espaços entre linhas diferentes do mesmo ficheiro só é avisada pelo linter (não é erro de compilação), ao contrário da mistura dentro da mesma linha. Recomendação: decisão de produto — manter como aviso, ou promover a erro de compilação para consistência.
 - **AL-16** [FUNCIONALIDADE · MÉDIA · Médio] `parser.py:141-177,597-639`. Literais `{...}` de array/estrutura só podem ser usados como valor inicial de uma declaração, não como argumento de função ou expressão geral. Recomendação: adicionar suporte a literais em `_parse_primario` quando o tipo alvo for conhecido pelo contexto (chamadas de função com parâmetro tipado).
 - **AL-18** [SEGURANÇA/BUG · MÉDIA · Baixo] `parser.py` (geral). Sem limite de profundidade de recursão no parser — uma expressão fortemente aninhada pode estourar a pilha do Python com um `RecursionError` não tratado, em vez de um erro de sintaxe amigável. Recomendação: contador de profundidade com erro sintático claro ao exceder um limite razoável.
 - **AL-19** [BUG · BAIXA · Baixo] `bibliotecas/math.py:18-21`. `math.absoluto` devolve sempre `decimal`, mesmo para argumento `inteiro`. Recomendação: tipo de retorno condicional ao tipo do argumento (como outras funções da biblioteca já fazem).
@@ -178,7 +177,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 2 — Robustez do compilador
 - **Objetivo**: corrigir os defeitos funcionais do compilador identificados na secção 3.1 que ainda não foram tratados na Fase 0.
-- **Resolve**: ~~AL-02~~, ~~AL-04~~, ~~AL-05~~, ~~AL-06~~, ~~AL-09~~, ~~AL-12~~, ~~AL-13~~ (ver AUDIT_DONE.md), AL-15, AL-16, AL-18, AL-19, AL-21, AL-28, AL-29, AL-31, AL-33, AL-34, AL-35, AL-36.
+- **Resolve**: ~~AL-02~~, ~~AL-04~~, ~~AL-05~~, ~~AL-06~~, ~~AL-09~~, ~~AL-12~~, ~~AL-13~~, ~~AL-15~~ (ver AUDIT_DONE.md), AL-16, AL-18, AL-19, AL-21, AL-28, AL-29, AL-31, AL-33, AL-34, AL-35, AL-36.
 - **Componentes**: `algo_lang/compilador/*`, `algo_lang/bibliotecas/*`, `algo_lang/tools/linter.py`, `algo_lang/cli.py`.
 - **Dependências**: Fase 0 (`codegen.py` já alterado, evitar conflitos).
 - **Riscos**: AL-05 (semântica de `div`/`mod`) exige uma decisão de produto documentada antes de implementar — pode alterar o comportamento de programas existentes; não implementar sem essa decisão explícita.
