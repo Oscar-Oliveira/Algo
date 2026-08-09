@@ -26,9 +26,16 @@ MAX_TENTATIVAS = 2
 NIVEL_INICIAL_ESCALADA = 1
 INCREMENTO_ESCALADA_POR_TURNO = 2
 
-RESPOSTA_SEGURA_POR_OMISSAO = (
+# UX-08: várias variantes, escolhida uma ao acaso a cada recusa -- uma
+# frase fixa única, se UX-07 disparar repetidamente na mesma sessão,
+# faz a experiência parecer um bot avariado a repetir-se.
+RESPOSTAS_SEGURAS_POR_OMISSAO = (
     "Não vou escrever a solução por si. Posso ajudá-lo a descobrir o "
-    "próximo passo -- o que já tentou até agora?"
+    "próximo passo -- o que já tentou até agora?",
+    "Isso é algo que quero que descubra por si. Vamos por partes: o "
+    "que já sabe sobre o problema até agora?",
+    "Prefiro não lhe dar a solução diretamente -- que tal começarmos "
+    "pelo que já percebeu do enunciado?",
 )
 
 PEDIDO_DE_REGENERACAO = (
@@ -38,7 +45,7 @@ PEDIDO_DE_REGENERACAO = (
     "nunca código nem a solução passo a passo."
 )
 
-# AG-21: distinta de RESPOSTA_SEGURA_POR_OMISSAO -- esta não é uma
+# AG-21: distinta de RESPOSTAS_SEGURAS_POR_OMISSAO -- esta não é uma
 # recusa pedagógica (o Alguem decidiu não ajudar mais), é um erro de
 # comunicação com o fornecedor de IA.
 RESPOSTA_ERRO_FORNECEDOR = (
@@ -190,11 +197,12 @@ class Alguem:
         # CONVERSA (não queremos que o modelo "veja" o que revelou
         # antes, para não reforçar esse comportamento nas trocas
         # seguintes) -- mas já ficou registada acima, para investigação
-        self.historico.append({"role": "assistant", "content": RESPOSTA_SEGURA_POR_OMISSAO})
+        resposta_segura = secrets.choice(RESPOSTAS_SEGURAS_POR_OMISSAO)
+        self.historico.append({"role": "assistant", "content": resposta_segura})
         self.registador.resposta_final(
-            turno, RESPOSTA_SEGURA_POR_OMISSAO,
+            turno, resposta_segura,
             num_tentativas=MAX_TENTATIVAS, veio_de_recusa_segura=True)
-        return RESPOSTA_SEGURA_POR_OMISSAO
+        return resposta_segura
 
     def fechar_sessao(self) -> None:
         """Fecha o ficheiro de log desta sessão -- chamar quando a

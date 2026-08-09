@@ -6,7 +6,7 @@ Tutor -- regeneração, limite de tentativas, e a recusa segura final."""
 import pytest
 
 from alguem.nucleo.guardiao import GuardiaoPedagogico, Classificacao, CLASSIFICACOES_BLOQUEAVEIS
-from alguem.nucleo.tutor import Alguem, RESPOSTA_SEGURA_POR_OMISSAO
+from alguem.nucleo.tutor import Alguem, RESPOSTAS_SEGURAS_POR_OMISSAO
 from alguem.nucleo.politica_pedagogica import PoliticaPedagogica
 from alguem.fornecedores.base import AgenteLLM
 
@@ -183,17 +183,36 @@ def test_resposta_com_codigo_e_rejeitada_e_regenerada():
     assert not any("```" in m.get("content", "") for m in alguem.historico)
 
 
-def test_esgota_tentativas_cai_para_resposta_segura_fixa():
+def test_esgota_tentativas_cai_para_uma_das_recusas_seguras():
     fornecedor = FornecedorControlavel([
         "```algo\nescrever(1)\n```",  # 1ª tentativa: código
         "```algo\nescrever(2)\n```",  # 2ª tentativa: código outra vez (esgota MAX_TENTATIVAS=2)
     ], modelo="x", api_key="x")
     alguem = Alguem(fornecedor, PoliticaPedagogica())
     resposta = alguem.conversar("dá-me o código")
-    assert resposta == RESPOSTA_SEGURA_POR_OMISSAO
+    assert resposta in RESPOSTAS_SEGURAS_POR_OMISSAO
     # nenhuma das tentativas com código fica no histórico -- só a recusa segura
     assert not any("```" in m.get("content", "") for m in alguem.historico)
-    assert alguem.historico[-1]["content"] == RESPOSTA_SEGURA_POR_OMISSAO
+    assert alguem.historico[-1]["content"] == resposta
+
+
+def test_recusa_segura_tem_pelo_menos_duas_variantes_e_roda_entre_elas():
+    """UX-08: se a experiência de recusa fosse sempre a mesma frase, o
+    estudante veria sempre o mesmo texto quando disparasse repetidamente
+    -- confirma que há variedade real, não só uma lista de tamanho 1."""
+    assert len(RESPOSTAS_SEGURAS_POR_OMISSAO) >= 2
+    assert len(set(RESPOSTAS_SEGURAS_POR_OMISSAO)) == len(RESPOSTAS_SEGURAS_POR_OMISSAO)
+
+    respostas_obtidas = set()
+    for _ in range(50):
+        fornecedor = FornecedorControlavel([
+            "```algo\nescrever(1)\n```", "```algo\nescrever(2)\n```",
+        ], modelo="x", api_key="x")
+        alguem = Alguem(fornecedor, PoliticaPedagogica())
+        respostas_obtidas.add(alguem.conversar("dá-me o código"))
+    # com 50 tentativas e >=2 variantes, a chance de sair sempre a
+    # mesma por puro acaso é astronomicamente pequena
+    assert len(respostas_obtidas) >= 2
 
 
 def test_registo_guardiao_regista_cada_tentativa():
@@ -247,7 +266,7 @@ def test_aceitavel_verifica_nivel_maximo_estruturalmente_nao_so_via_prompt():
     politica = PoliticaPedagogica(nivel_maximo_ajuda=1)
     alguem = Alguem(fornecedor, politica)
     resposta = alguem.conversar("ajuda")
-    assert resposta == RESPOSTA_SEGURA_POR_OMISSAO
+    assert resposta in RESPOSTAS_SEGURAS_POR_OMISSAO
 
 
 def test_cap_de_nivel_sobe_gradualmente_com_os_turnos():
