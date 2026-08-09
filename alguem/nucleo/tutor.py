@@ -76,15 +76,25 @@ class Alguem:
         # disco, entre sessões, para a investigação.
         self.registo_guardiao: list[dict] = []
 
+        # AG-26: se algo a seguir falhar, um Registador que NÓS criámos
+        # (não um passado explicitamente -- esse continua a ser
+        # responsabilidade de quem o criou) tem o ficheiro de log já
+        # aberto e precisa de ser fechado, para não vazar o descritor.
+        registador_criado_aqui = registador is None
         self.registador = registador if registador is not None else Registador(
             id_estudante=obter_id_estudante())
-        nomes_iniciais = [nome for nome, _ in (ficheiros_visiveis or [])]
-        self.registador.inicio_sessao(
-            fornecedor=fornecedor.nome, modelo=fornecedor.modelo,
-            politica=vars(politica), nomes_ficheiros_iniciais=nomes_iniciais)
+        try:
+            nomes_iniciais = [nome for nome, _ in (ficheiros_visiveis or [])]
+            self.registador.inicio_sessao(
+                fornecedor=fornecedor.nome, modelo=fornecedor.modelo,
+                politica=vars(politica), nomes_ficheiros_iniciais=nomes_iniciais)
 
-        if ficheiros_visiveis:
-            self.considerar_ficheiros(ficheiros_visiveis)
+            if ficheiros_visiveis:
+                self.considerar_ficheiros(ficheiros_visiveis)
+        except Exception:
+            if registador_criado_aqui:
+                self.registador.fechar()
+            raise
 
     def considerar_ficheiros(self, ficheiros_visiveis: list[tuple[str, str]]) -> None:
         """Dá (ou substitui) ao Alguem a visão de um conjunto de

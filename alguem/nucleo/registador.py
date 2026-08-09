@@ -109,6 +109,13 @@ class Registador:
         self._escrever({"tipo": "fim_sessao", "num_turnos": self.turno_atual})
         self._ficheiro.close()
 
+    def fechar(self) -> None:
+        """AG-26: fecha o ficheiro sem escrever o evento fim_sessao --
+        para quando a sessão nunca chegou a começar corretamente (ex:
+        o construtor do Alguem falhou depois de já ter criado este
+        Registador)."""
+        self._ficheiro.close()
+
     def novo_turno(self) -> int:
         self.turno_atual += 1
         return self.turno_atual

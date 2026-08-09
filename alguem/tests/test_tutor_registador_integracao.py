@@ -5,6 +5,8 @@ durante uma conversa real, incluindo as tentativas rejeitadas pelo
 guardião."""
 import json
 
+import pytest
+
 from alguem.nucleo.tutor import Alguem
 from alguem.nucleo.politica_pedagogica import PoliticaPedagogica
 from alguem.nucleo.registador import Registador
@@ -186,6 +188,55 @@ def test_falha_do_fornecedor_sem_guardiao_tambem_regista_e_nao_deixa_pendurado(t
     assert len(alguem.historico) == 1
     eventos = _ler_eventos(registador.caminho)
     assert any(e["tipo"] == "falha_turno" for e in eventos)
+
+
+# ---------- AG-26: fechar o Registador se o construtor falhar depois de o criar ----------
+
+def test_construtor_fecha_o_registador_criado_internamente_se_falhar_depois(monkeypatch):
+    """Se o construtor falhar DEPOIS de já ter criado o Registador (ex:
+    inicio_sessao levanta), o ficheiro de log já aberto tem de ser
+    fechado -- não pode ficar pendurado."""
+    import alguem.nucleo.tutor as tutor_mod
+
+    fechado = []
+
+    class RegistadorFalsoQueFalha:
+        def __init__(self, id_estudante):
+            self.id_estudante = id_estudante
+
+        def inicio_sessao(self, **kwargs):
+            raise RuntimeError("falha simulada a meio do construtor")
+
+        def fechar(self):
+            fechado.append(True)
+
+    monkeypatch.setattr(tutor_mod, "Registador", RegistadorFalsoQueFalha)
+
+    fornecedor = FornecedorControlavel([], modelo="x", api_key="x")
+    with pytest.raises(RuntimeError, match="falha simulada"):
+        Alguem(fornecedor, PoliticaPedagogica())
+    assert fechado == [True]
+
+
+def test_registador_explicito_nao_e_fechado_pelo_construtor_se_falhar(tmp_path):
+    """Um Registador passado explicitamente é do CALLER -- se o
+    construtor falhar depois, não deve fechá-lo, já que o caller pode
+    continuar a precisar dele."""
+    from alguem.fornecedores.base import AgenteLLM as _AgenteLLM
+
+    class FornecedorComNomeQuebrado(_AgenteLLM):
+        @property
+        def nome(self):
+            raise RuntimeError("nome indisponível")
+
+        def responder(self, mensagens):
+            return "x"
+
+    registador = Registador(id_estudante="est-1", pasta_logs=str(tmp_path))
+    fornecedor = FornecedorComNomeQuebrado(modelo="x", api_key="x")
+    with pytest.raises(RuntimeError, match="nome indisponível"):
+        Alguem(fornecedor, PoliticaPedagogica(), registador=registador)
+    registador.fim_sessao()  # não levanta -- o ficheiro continua aberto
 
 
 def test_sem_registador_explicito_usa_um_por_omissao_isolado_pelo_conftest(tmp_path):
