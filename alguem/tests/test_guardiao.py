@@ -211,6 +211,45 @@ def test_registo_guardiao_regista_cada_tentativa():
     assert alguem.registo_guardiao[1]["aceitavel"] is True
 
 
+# ---------- AG-13 + UX-09: cap estrutural (e dinâmico por turno) do
+# nível de ajuda -- não basta o system prompt pedir, o guardião impõe ----------
+
+def test_aceitavel_verifica_nivel_maximo_estruturalmente_nao_so_via_prompt():
+    """AG-13: PARTIAL_SOLUTION não está em CLASSIFICACOES_BLOQUEAVEIS,
+    mas com um nivel_maximo_ajuda muito baixo (1) tem de ser rejeitada
+    na mesma -- a imposição não pode depender só da obediência do
+    modelo gerador ao texto do system prompt."""
+    fornecedor = FornecedorControlavel([
+        "Uma pista bastante detalhada, quase uma estrutura completa.",
+        "PARTIAL_SOLUTION",
+        "Outra pista igualmente detalhada.",
+        "PARTIAL_SOLUTION",
+    ], modelo="x", api_key="x")
+    politica = PoliticaPedagogica(nivel_maximo_ajuda=1)
+    alguem = Alguem(fornecedor, politica)
+    resposta = alguem.conversar("ajuda")
+    assert resposta == RESPOSTA_SEGURA_POR_OMISSAO
+
+
+def test_cap_de_nivel_sobe_gradualmente_com_os_turnos():
+    """UX-09: o nível permitido não é logo o máximo configurado no 1º
+    turno -- HINT (nível aproximado 3) é rejeitado no turno 1, mas
+    aceite no turno 2 depois de o cap subir."""
+    fornecedor = FornecedorControlavel([
+        "Uma pergunta específica que aponta para a próxima parte.",  # turno 1: HINT, rejeitado
+        "HINT",
+        "Uma resposta mais simples para o turno 1.",  # turno 1: SAFE, aceite
+        "SAFE",
+        "Uma pergunta específica outra vez, agora no turno 2.",  # turno 2: HINT, aceite
+        "HINT",
+    ], modelo="x", api_key="x")
+    alguem = Alguem(fornecedor, PoliticaPedagogica())
+    resposta_turno_1 = alguem.conversar("primeira pergunta")
+    assert resposta_turno_1 == "Uma resposta mais simples para o turno 1."
+    resposta_turno_2 = alguem.conversar("segunda pergunta")
+    assert resposta_turno_2 == "Uma pergunta específica outra vez, agora no turno 2."
+
+
 # ---------- política ----------
 
 def test_permite_gerar_codigo_deixa_passar_classificacao_code():

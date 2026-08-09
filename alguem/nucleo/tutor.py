@@ -17,6 +17,13 @@ from .identidade import obter_id_estudante
 
 MAX_TENTATIVAS = 2
 
+# UX-09: o nível de ajuda estruturalmente permitido não começa logo no
+# máximo configurado em nivel_maximo_ajuda -- sobe gradualmente com os
+# turnos da conversa, para nada saltar diretamente para o nível mais
+# alto já no primeiro turno.
+NIVEL_INICIAL_ESCALADA = 1
+INCREMENTO_ESCALADA_POR_TURNO = 2
+
 RESPOSTA_SEGURA_POR_OMISSAO = (
     "Não vou escrever a solução por si. Posso ajudá-lo a descobrir o "
     "próximo passo -- o que já tentou até agora?"
@@ -113,8 +120,8 @@ class Alguem:
         for tentativa in range(1, MAX_TENTATIVAS + 1):
             resposta = self.fornecedor.responder(mensagens_tentativa)
             classificacao = self.guardiao.classificar(resposta)
-            aceitavel = self._aceitavel(classificacao)
             nivel_aproximado = NIVEL_APROXIMADO_POR_CLASSIFICACAO[classificacao]
+            aceitavel = self._aceitavel(classificacao, nivel_aproximado, turno)
 
             self.registo_guardiao.append({
                 "mensagem_do_estudante": mensagem_do_estudante,
@@ -154,11 +161,23 @@ class Alguem:
         conversa com o estudante terminar (ex: escreveu 'sair')."""
         self.registador.fim_sessao()
 
-    def _aceitavel(self, classificacao: Classificacao) -> bool:
+    def _aceitavel(self, classificacao: Classificacao, nivel_aproximado: int, turno: int) -> bool:
         if classificacao not in CLASSIFICACOES_BLOQUEAVEIS:
-            return True
+            # AG-13: nivel_maximo_ajuda tem de ser imposto aqui, por
+            # regra explícita -- não basta pedir no system prompt e
+            # confiar que o modelo obedece. UX-09: o nível
+            # estruturalmente permitido também não é o máximo logo no
+            # 1º turno, sobe gradualmente (ver _nivel_maximo_efetivo).
+            return nivel_aproximado <= self._nivel_maximo_efetivo(turno)
         if classificacao is Classificacao.CODE:
             return self.politica.permite_gerar_codigo
         if classificacao is Classificacao.FULL_SOLUTION:
             return self.politica.permite_solucoes_completas
         return False  # pragma: no cover -- CLASSIFICACOES_BLOQUEAVEIS só tem estas duas
+
+    def _nivel_maximo_efetivo(self, turno: int) -> int:
+        """UX-09: o nível máximo estruturalmente permitido cresce com
+        os turnos (1, 3, 5, ...), sem nunca ultrapassar o teto
+        configurado em nivel_maximo_ajuda."""
+        escalada = NIVEL_INICIAL_ESCALADA + INCREMENTO_ESCALADA_POR_TURNO * (turno - 1)
+        return min(self.politica.nivel_maximo_ajuda, escalada)
