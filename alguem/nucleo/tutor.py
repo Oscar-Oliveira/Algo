@@ -215,6 +215,13 @@ class Alguem:
         return RESPOSTA_ERRO_FORNECEDOR
 
     def _aceitavel(self, classificacao: Classificacao, nivel_aproximado: int, turno: int) -> bool:
+        # ARCH-08: CONTRATO com guardiao.py -- esta função interpreta
+        # Classificacao, CLASSIFICACOES_BLOQUEAVEIS e
+        # NIVEL_APROXIMADO_POR_CLASSIFICACAO (importados no topo deste
+        # ficheiro), que vivem em guardiao.py. Se uma categoria nova
+        # for adicionada lá, este método também tem de decidir
+        # explicitamente o que fazer com ela -- ver o comentário junto
+        # à definição de Classificacao em guardiao.py.
         if classificacao not in CLASSIFICACOES_BLOQUEAVEIS:
             # AG-13: nivel_maximo_ajuda tem de ser imposto aqui, por
             # regra explícita -- não basta pedir no system prompt e

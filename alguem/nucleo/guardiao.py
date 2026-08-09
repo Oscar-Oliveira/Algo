@@ -61,6 +61,17 @@ _PADRAO_LINHA_CODIGO_PYTHON = re.compile(
 
 
 class Classificacao(Enum):
+    # ARCH-08: CONTRATO com tutor.py -- estas 5 categorias, mais as
+    # duas estruturas logo abaixo (CLASSIFICACOES_BLOQUEAVEIS,
+    # NIVEL_APROXIMADO_POR_CLASSIFICACAO), são a única fonte de
+    # verdade que tutor.py:Alguem._aceitavel interpreta. Adicionar uma
+    # categoria nova aqui SEM também a adicionar a
+    # NIVEL_APROXIMADO_POR_CLASSIFICACAO faz _aceitavel rebentar com
+    # KeyError na primeira resposta classificada com essa categoria;
+    # esquecer de decidir se entra em CLASSIFICACOES_BLOQUEAVEIS faz
+    # _aceitavel tratá-la como sempre aceitável (só olha ao nível, não
+    # está bloqueável por omissão) -- rever sempre os dois ficheiros
+    # juntos ao mexer aqui.
     SAFE = "SAFE"
     HINT = "HINT"
     PARTIAL_SOLUTION = "PARTIAL_SOLUTION"
