@@ -16,7 +16,10 @@ FUNCOES = {
         "def math_potencia(base, exp):\n    return base ** exp\n",
     ),
     "absoluto": (
-        ["numeric"], "decimal",
+        # AL-19: "numeric" como tipo de retorno é um marcador especial --
+        # devolve o mesmo tipo do argumento (ver semantics.py:
+        # _verificar_chamada), não sempre 'decimal'.
+        ["numeric"], "numeric",
         "def math_absoluto(x):\n    return abs(x)\n",
     ),
     "piso": (

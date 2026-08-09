@@ -944,6 +944,30 @@ def test_cadeia_longa_de_operadores_sem_parenteses_nao_e_afetada():
     assert saida.strip() == "200"
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-19 -- math.absoluto preserva o tipo do argumento ----------
+
+def test_math_absoluto_de_inteiro_pode_ser_atribuido_a_inteiro():
+    saida = executar("""
+        algoritmo "T"
+        importar Math
+        inicio
+            x:inteiro = math.absoluto(-5)
+            escrever(x)
+    """)
+    assert saida.strip() == "5"
+
+
+def test_math_absoluto_de_decimal_continua_decimal():
+    saida = executar("""
+        algoritmo "T"
+        importar Math
+        inicio
+            x:decimal = math.absoluto(-5.5)
+            escrever(x)
+    """)
+    assert saida.strip() == "5.5"
+
+
 # ---------- AUDIT_PLAN Fase 2: AL-02 -- ^ com expoente negativo ----------
 
 def test_potencia_com_expoente_literal_nao_negativo_continua_inteiro():

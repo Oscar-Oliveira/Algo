@@ -634,8 +634,10 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"'{chamada.nome}' espera {len(categorias)} argumento(s), "
                     f"recebeu {len(chamada.args)}", chamada.linha)
+            tipos_args = []
             for arg, categoria in zip(chamada.args, categorias):
                 tipo, _ = self._tipo_expr(arg, escopo)
+                tipos_args.append(tipo)
                 if categoria == "numeric" and tipo not in NUMERICOS:
                     raise ErroSemantico(
                         f"'{chamada.nome}' espera um argumento numérico (é '{tipo}')",
@@ -646,6 +648,11 @@ class VerificadorTipos:
                 if categoria == "inteiro" and tipo != "inteiro":
                     raise ErroSemantico(
                         f"'{chamada.nome}' espera um inteiro (é '{tipo}')", chamada.linha)
+            if tipo_retorno == "numeric":
+                # AL-19: tipo de retorno "espelha" o do primeiro argumento
+                # numérico (ex.: math.absoluto(inteiro) devolve inteiro,
+                # não sempre decimal).
+                tipo_retorno = tipos_args[0]
             return tipo_retorno
 
         f_def = self.funcoes.get(chamada.nome)
