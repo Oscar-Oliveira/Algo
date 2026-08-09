@@ -94,21 +94,31 @@ docker run -d -p 8000:8000 \
   -e ONLINE_CHAVE_CIFRAGEM="<a tua chave gerada>" \
   -e ONLINE_CHAVE_SESSAO="<a tua outra chave gerada>" \
   -v algo_dados:/app/online/dados \
+  --pids-limit=512 \
   algo-online
 ```
+
+`--pids-limit` (ou `pids_limit:` no `docker-compose.yml`) limita o
+número de processos dentro do contentor via cgroups -- isolado por
+contentor, e por isso o mecanismo correto para conter um fork-bomb
+vindo de um programa de estudante (ON-04). `online/executor.py` já
+limita CPU/memória/descritores de ficheiro por execução via
+`RLIMIT_CPU`/`RLIMIT_AS`/`RLIMIT_NOFILE`, mas deliberadamente não usa
+`RLIMIT_NPROC` para processos -- esse é um contador por UID do próprio
+kernel, partilhado com processos fora do contentor, e confirmado pouco
+fiável em testes (tanto afetado por processos não relacionados como,
+nalguns motores de contentores, nem sequer aplicado).
 
 A imagem já traz o `graphviz` incluído — é o que resolve o fluxograma
 sem precisar de nada instalado à parte na máquina que corre o
 contentor. O volume `algo_dados` mantém a base de dados (contas,
 credenciais) entre reinícios do contentor.
 
-> **Nota de honestidade**: este ambiente de desenvolvimento não tem
-> acesso ao Docker (sem *daemon* disponível), por isso **nunca
-> consegui construir nem correr a imagem, nem o `docker compose`, a
-> sério** — revi tudo linha a linha manualmente (caminhos, ordem de
-> cópia, onde cada coisa fica montada, e validei a sintaxe YAML do
-> `docker-compose.yml`), mas a primeira confirmação real de que builda
-> e arranca tem de ser feita por ti.
+> **Nota de honestidade**: `docker build`, `docker run` e um smoke
+> test real (arranque do servidor, resposta HTTP 200, confirmação de
+> que corre como utilizador não-root) foram validados nesta sessão de
+> trabalho (ver `AUDIT_DONE.md`, ON-27). `docker compose up` em si
+> ainda não foi corrido a sério -- a sintaxe YAML foi revista à mão.
 
 ## Como arrancar (sem Docker)
 

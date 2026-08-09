@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import asyncio
+import os
 
 import pytest
 
@@ -359,6 +360,34 @@ def test_limite_de_memoria_trava_alocacao_excessiva(tmp_path):
             pass
         assert "antes" in linhas
         assert "depois" not in linhas
+    _correr(cenario())
+
+
+@pytest.mark.skipif(os.name != "posix", reason="RLIMIT_NOFILE só é aplicado em POSIX")
+def test_limite_de_descritores_de_ficheiro_e_aplicado(tmp_path):
+    """ON-04: sem RLIMIT_NOFILE, nada impedia um programa de esgotar os
+    descritores de ficheiro disponíveis no servidor."""
+    async def cenario():
+        caminho_py = str(tmp_path / "muitosficheiros.py")
+        with open(caminho_py, "w") as f:
+            f.write(
+                "abertos = 0\n"
+                "try:\n"
+                "    fds = []\n"
+                "    while True:\n"
+                "        fds.append(open('/dev/null'))\n"
+                "        abertos += 1\n"
+                "except OSError:\n"
+                "    pass\n"
+                "print(f'abertos={abertos}')\n"
+            )
+        execucao = executor.ExecucaoInterativa(caminho_py, str(tmp_path))
+        await execucao.iniciar()
+        linha = await execucao.ler_proxima_linha()
+        await execucao.terminar_a_forcar()
+        assert linha is not None
+        abertos = int(linha.split("=")[1])
+        assert 0 < abertos < executor.LIMITE_DESCRITORES_FICHEIRO
     _correr(cenario())
 
 

@@ -80,8 +80,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 ### 3.3 `online/` — Bugs e Segurança (31 findings)
 
 - **ON-03** [SEGURANÇA/DESEMPENHO · ALTA · Médio] `executor.py` + `main.py` (`/ws/executar`). Sem limite global de execuções concorrentes — N estudantes a executar em simultâneo podem esgotar CPU/memória do servidor para todos. Recomendação: `asyncio.Semaphore` global com limite configurável, e fila/mensagem de espera quando saturado.
-- **ON-04** [SEGURANÇA · ALTA · Baixo] `executor.py:45-52`. Só CPU e memória são limitados; sem `RLIMIT_NPROC`/`RLIMIT_NOFILE` — um programa de estudante pode fazer fork-bomb ou esgotar descritores de ficheiro. Recomendação: adicionar os dois limites em `_limitar_recursos`.
-- **ON-06** [BUG/SEGURANÇA · MÉDIA · Médio] `executor.py:211-212`. `preexec_fn` com `asyncio.create_subprocess_exec` é uma combinação documentada como insegura na presença de threads (pode causar deadlock no fork). Recomendação: mover para `subprocess.Popen` num thread executor, ou usar mecanismos de limite fora do `preexec_fn` (ex. `systemd-run`/cgroups).
 - **ON-09** [BUG · BAIXA · Baixo] `executor.py:222-233`. Leitura de linha sem tratamento do limite de tamanho do buffer do `StreamReader` — pode levantar exceção não apanhada. Recomendação: `try/except (ValueError, asyncio.LimitOverrunError)` com mensagem amigável de "saída demasiado longa".
 - **ON-10** [SEGURANÇA · BAIXA · Baixo] `cifragem.py:32-42`. Nenhuma validação de entropia da chave de cifragem, só do formato Fernet. Recomendação: documentar claramente no README como gerar a chave (já existe comando sugerido) e, opcionalmente, avisar se a chave parecer previsível.
 - **ON-11** [SEGURANÇA · ALTA · Médio] `autenticacao.py:66-81`. Sem limite de tentativas nem rate limiting no login. Recomendação: limite por conta (não só por IP, para não penalizar redes escolares partilhadas) com backoff progressivo.
@@ -180,7 +178,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 1 — Estabilização do executor online
 - **Objetivo**: eliminar os bloqueios síncronos e a falta de limites de concorrência que podem travar o servidor inteiro.
-- **Resolve**: ON-03, ON-04, ON-06, ~~ON-07~~, ~~ON-08~~, ON-09, ~~ON-16~~, ~~ON-17~~, ~~ARCH-11~~, ~~ARCH-12~~ (ver AUDIT_DONE.md).
+- **Resolve**: ON-03, ~~ON-04~~, ~~ON-06~~, ~~ON-07~~, ~~ON-08~~, ON-09, ~~ON-16~~, ~~ON-17~~, ~~ARCH-11~~, ~~ARCH-12~~ (ver AUDIT_DONE.md).
 - **Componentes**: `online/executor.py`, `online/main.py`, `online/bd.py`, `online/autenticacao.py`.
 - **Alterações principais**: semáforo global de execuções concorrentes; `RLIMIT_NPROC`/`RLIMIT_NOFILE`; mover `graphviz` e `bcrypt` para threadpool; pasta de trabalho por execução com lock (não por estudante); acesso à BD via threadpool; dependência FastAPI partilhada para "resolver pseudónimo → preparar pasta".
 - **Dependências**: Fase 0 (mesmo ficheiro `executor.py` já alterado).

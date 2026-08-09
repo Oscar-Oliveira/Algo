@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import resource
 import shutil
 import sys
 import tempfile
@@ -38,6 +37,29 @@ PASTA_EXECUCOES_POR_OMISSAO = os.path.join(tempfile.gettempdir(), "algo_online_e
 LIMITE_TEMPO_SEGUNDOS = 10
 LIMITE_MEMORIA_BYTES = 256 * 1024 * 1024  # 256 MB
 LIMITE_INATIVIDADE_SEGUNDOS = 60  # janela por ler(), reiniciada a cada entrada enviada
+
+# ON-04: a linguagem ALGO não tem forma de abrir ficheiros arbitrários
+# -- este limite é generoso face ao que um programa legítimo precisa,
+# só para conter uma exaustão de descritores de ficheiro caso o
+# gerador de código alguma vez permita abrir ficheiros.
+#
+# Limite de número de PROCESSOS fica de fora daqui de propósito:
+# RLIMIT_NPROC é, no Linux, um contador por UID do próprio kernel --
+# partilhado por TODOS os processos desse utilizador, incluindo fora
+# do contentor -- e confirmado nada fiável em testes (tanto afetado
+# por processos não relacionados como, nalguns motores de contentores,
+# nem sequer aplicado). O limite de processos é aplicado antes por
+# `--pids-limit`/`pids_limit:` do Docker (cgroups, isolado por
+# contentor) -- ver Dockerfile/docker-compose.yml e README.md.
+LIMITE_DESCRITORES_FICHEIRO = 256
+
+_BOOTSTRAP_LIMITES_RECURSOS = f"""\
+import resource, os, sys
+resource.setrlimit(resource.RLIMIT_CPU, ({LIMITE_TEMPO_SEGUNDOS}, {LIMITE_TEMPO_SEGUNDOS}))
+resource.setrlimit(resource.RLIMIT_AS, ({LIMITE_MEMORIA_BYTES}, {LIMITE_MEMORIA_BYTES}))
+resource.setrlimit(resource.RLIMIT_NOFILE, ({LIMITE_DESCRITORES_FICHEIRO}, {LIMITE_DESCRITORES_FICHEIRO}))
+os.execv(sys.executable, [sys.executable, sys.argv[1]])
+"""
 
 # pastas de execução mais antigas do que isto são candidatas a limpeza em
 # segundo plano -- generosamente acima do tempo de vida máximo de
@@ -64,16 +86,6 @@ def _env_minimo() -> dict:
             if chave in os.environ:
                 minimo[chave] = os.environ[chave]
     return minimo
-
-
-def _limitar_recursos():  # pragma: no cover -- só corre DENTRO do processo filho, após o fork
-    """Chamada via preexec_fn, já dentro do processo filho, antes de
-    executar o Python do programa do estudante -- limita CPU e memória
-    ao nível do sistema operativo (Linux). Um programa preso num ciclo
-    infinito ou a alocar memória sem controlo é travado pelo próprio
-    SO, não por um temporizador do lado do servidor sozinho."""
-    resource.setrlimit(resource.RLIMIT_CPU, (LIMITE_TEMPO_SEGUNDOS, LIMITE_TEMPO_SEGUNDOS))
-    resource.setrlimit(resource.RLIMIT_AS, (LIMITE_MEMORIA_BYTES, LIMITE_MEMORIA_BYTES))
 
 
 def _limpar_pastas_antigas_em_fundo(pasta_pseudonimo: str) -> None:
@@ -291,17 +303,30 @@ class ExecucaoInterativa:
         self.tempo_limite: asyncio.Timeout | None = None
 
     async def iniciar(self) -> None:
-        kwargs = {}
+        # ON-04/ON-06: os limites de CPU/memória/descritores de ficheiro
+        # têm de ser aplicados DENTRO do processo filho, mas NUNCA via
+        # preexec_fn -- a documentação do Python avisa
+        # explicitamente que preexec_fn não é seguro na presença de
+        # threads no processo pai (corre no intervalo entre fork() e
+        # exec(), e pode bloquear o filho indefinidamente). Em vez
+        # disso, o filho arranca já como um interpretador Python novo,
+        # totalmente independente do processo pai (via -c), aplica os
+        # limites com resource.setrlimit -- seguro aqui, porque este
+        # código só corre DEPOIS de um exec(), num processo já
+        # single-threaded, não no meio de um fork() -- e só depois
+        # arranca o programa do estudante com um segundo exec()
+        # (os.execv), tornando-se indistinguível de o ter corrido
+        # diretamente.
+        comando = [sys.executable, self.caminho_py]
         if os.name == "posix":  # pragma: no cover -- ambiente de desenvolvimento é sempre POSIX aqui, mas mantém o código correto para Windows
-            kwargs["preexec_fn"] = _limitar_recursos
+            comando = [sys.executable, "-c", _BOOTSTRAP_LIMITES_RECURSOS, self.caminho_py]
         self.processo = await asyncio.create_subprocess_exec(
-            sys.executable, self.caminho_py,
+            *comando,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd=self.pasta_estudante,
             env=_env_minimo(),
-            **kwargs,
         )
 
     async def ler_proxima_linha(self) -> str | None:

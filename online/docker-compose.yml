@@ -10,6 +10,11 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    # ON-04: limite de processos por cgroups (não RLIMIT_NPROC -- esse
+    # é um contador por UID do kernel, partilhado com processos fora do
+    # contentor, e por isso não fiável para conter um fork-bomb aqui;
+    # pids_limit é isolado por contentor, o mecanismo correto).
+    pids_limit: 512
     volumes:
       # os dados (contas, credenciais) sobrevivem a um `docker compose
       # down` -- só desaparecem com `docker compose down -v`
