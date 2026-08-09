@@ -93,6 +93,24 @@ def test_considerar_ficheiros_acrescenta_nova_mensagem_sem_apagar_a_conversa():
     assert any(m["content"] == "uma pergunta qualquer" for m in alguem.historico)
 
 
+def test_ficheiros_visiveis_usa_delimitador_aleatorio_por_chamada():
+    """AG-23: o conteúdo dos ficheiros do estudante é delimitado com
+    um token aleatório (mesma técnica de AG-14), diferente a cada
+    chamada -- não um delimitador fixo que o próprio código do
+    estudante pudesse imitar para tentar injetar instruções."""
+    import re
+    fornecedor = FornecedorFalso(modelo="x", api_key="x")
+    alguem = Alguem(fornecedor, PoliticaPedagogica(),
+                     ficheiros_visiveis=[("a.algo", "conteudo a")])
+    alguem.considerar_ficheiros([("b.algo", "conteudo b")])
+    conteudo_1 = alguem.historico[1]["content"]
+    conteudo_2 = alguem.historico[2]["content"]
+    delimitador_1 = re.search(r"====[0-9a-f]{16}====", conteudo_1).group()
+    delimitador_2 = re.search(r"====[0-9a-f]{16}====", conteudo_2).group()
+    assert delimitador_1 != delimitador_2
+    assert conteudo_1.count(delimitador_1) >= 2  # abre e fecha o conteúdo do ficheiro
+
+
 def test_alguem_sem_contexto_nao_acrescenta_mensagem_extra():
     fornecedor = FornecedorFalso(modelo="x", api_key="x")
     alguem = Alguem(fornecedor, PoliticaPedagogica())

@@ -211,6 +211,25 @@ def test_registo_guardiao_regista_cada_tentativa():
     assert alguem.registo_guardiao[1]["aceitavel"] is True
 
 
+# ---------- AG-14: delimitador aleatório por pedido de classificação ----------
+
+def test_prompt_de_classificacao_usa_delimitador_aleatorio_por_pedido():
+    """Um delimitador fixo (ex. '---') podia ser imitado dentro da
+    própria resposta a avaliar -- cada pedido de classificação usa um
+    delimitador diferente, gerado aleatoriamente."""
+    import re
+    fornecedor = FornecedorControlavel(["SAFE", "SAFE"], modelo="x", api_key="x")
+    guardiao = GuardiaoPedagogico(fornecedor)
+    guardiao.classificar("primeira resposta sem código")
+    guardiao.classificar("segunda resposta sem código")
+    prompt_1 = fornecedor.pedidos_recebidos[0][0]["content"]
+    prompt_2 = fornecedor.pedidos_recebidos[1][0]["content"]
+    delimitador_1 = re.search(r"====[0-9a-f]{16}====", prompt_1).group()
+    delimitador_2 = re.search(r"====[0-9a-f]{16}====", prompt_2).group()
+    assert delimitador_1 != delimitador_2
+    assert prompt_1.count(delimitador_1) >= 2  # abre e fecha a resposta a avaliar
+
+
 # ---------- AG-13 + UX-09: cap estrutural (e dinâmico por turno) do
 # nível de ajuda -- não basta o system prompt pedir, o guardião impõe ----------
 
