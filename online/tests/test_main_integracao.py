@@ -475,6 +475,42 @@ def test_ws_alguem_conversa_completa(cliente):
             assert m["texto"] == "Boa pergunta! O que sabes já?"
 
 
+class _TutorFalsoQueRebenta:
+    """AG-21-style: simula um erro inesperado (não WebSocketDisconnect)
+    a meio da conversa -- ARCH-09 exige que fechar_sessao() corra na
+    mesma."""
+    def __init__(self):
+        self.fechado = False
+
+    def considerar_ficheiros(self, ficheiros_visiveis):
+        pass
+
+    def conversar(self, mensagem):
+        raise RuntimeError("falha inesperada simulada")
+
+    def fechar_sessao(self):
+        self.fechado = True
+
+
+def test_ws_alguem_fecha_sessao_mesmo_com_excecao_inesperada(cliente, monkeypatch):
+    """ARCH-09: antes, fechar_sessao() só corria dentro do 'except
+    WebSocketDisconnect' -- qualquer outra exceção no loop deixava o
+    ficheiro de log aberto e nunca escrevia o evento fim_sessao."""
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+
+    tutor_falso = _TutorFalsoQueRebenta()
+    monkeypatch.setattr(main.alguem_ponte, "construir_alguem", lambda id_estudante: tutor_falso)
+
+    with pytest.raises(Exception):
+        with cliente.websocket_connect("/ws/alguem") as ws:
+            ws.receive_json()  # "pronto"
+            ws.send_json({"texto": "algo"})
+            ws.receive_json()
+
+    assert tutor_falso.fechado is True
+
+
 def test_ws_alguem_logs_usam_pseudonimo_nao_email(cliente, tmp_path):
     cliente.post("/api/registar", json={"email": "privacidade@b.com", "password": "password123"})
     cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})

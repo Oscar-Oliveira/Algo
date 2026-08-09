@@ -406,6 +406,11 @@ async def ws_alguem(websocket: WebSocket):
         "mensagem": "Olá! Sou o Alguem, o teu tutor de algoritmia. Em que posso ajudar-te?",
     })
 
+    # ARCH-09: fechar_sessao() tem de correr para QUALQUER saída deste
+    # bloco, não só WebSocketDisconnect -- caso contrário uma exceção
+    # inesperada (ex: JSON malformado em receive_json) deixa o ficheiro
+    # de log aberto e nunca escreve o evento fim_sessao, ao contrário
+    # do que algo_lang/cli.py já faz com try/finally.
     try:
         while True:
             dados = await websocket.receive_json()
@@ -423,6 +428,8 @@ async def ws_alguem(websocket: WebSocket):
             except ErroFornecedorLLM as e:
                 await websocket.send_json({"tipo": "erro", "mensagem": str(e)})
     except WebSocketDisconnect:
+        pass
+    finally:
         tutor.fechar_sessao()
 
 
