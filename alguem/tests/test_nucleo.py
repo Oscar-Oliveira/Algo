@@ -72,12 +72,22 @@ def test_system_prompt_inclui_identidade_do_alguem():
 
 def test_system_prompt_proibe_codigo_quando_politica_pede():
     prompt = construir_system_prompt(PoliticaPedagogica(permite_gerar_codigo=False))
-    assert "Nunca escreves código ALGO" in prompt
+    assert "Nunca escreves código, em ALGO, Python OU QUALQUER outra" in prompt
 
 
 def test_system_prompt_nao_proibe_codigo_quando_politica_permite():
     prompt = construir_system_prompt(PoliticaPedagogica(permite_gerar_codigo=True))
-    assert "Nunca escreves código ALGO" not in prompt
+    assert "Nunca escreves código, em ALGO, Python OU QUALQUER outra" not in prompt
+
+
+def test_system_prompt_proibicao_e_agnostica_de_linguagem():
+    """GOAL-01: a proibição de escrever código não pode ser específica
+    a ALGO -- tem de mencionar explicitamente Python (a linguagem para
+    que o ALGO compila, e por isso a via óbvia de contornar uma
+    proibição só de ALGO)."""
+    prompt = construir_system_prompt(PoliticaPedagogica())
+    assert "Python" in prompt
+    assert "solução funcional" in prompt
 
 
 def test_system_prompt_muda_com_a_politica():

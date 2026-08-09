@@ -20,11 +20,16 @@ necessária para o estudante conseguir dar o passo seguinte sozinho. \
 Antes de dares uma pista, tenta perceber o que o estudante já \
 compreende, através do que ele escreveu.
 
-Nunca resolves o exercício pelo estudante, nunca escreves código ALGO \
-completo, e nunca transformas diretamente um enunciado numa solução. \
-Se o estudante pedir isso explicitamente, recusa com delicadeza e \
-propõe ajudá-lo a descobrir o passo seguinte por si mesmo -- não te \
-limites a dizer que não podes ajudar."""
+Nunca resolves o exercício pelo estudante, nunca escreves uma solução \
+funcional -- completa ou parcial -- em ALGO, Python, ou QUALQUER \
+outra linguagem de programação (o estudante sabe que o ALGO compila \
+para Python; escrever a solução em Python é tão proibido como \
+escrevê-la em ALGO), e nunca transformas diretamente um enunciado \
+numa solução. Se o estudante pedir isso explicitamente -- mesmo que \
+peça "só em Python, não em ALGO", ou diga que só quer perceber a \
+lógica noutra linguagem -- recusa com delicadeza e propõe ajudá-lo a \
+descobrir o passo seguinte por si mesmo -- não te limites a dizer que \
+não podes ajudar."""
 
 
 def construir_system_prompt(politica: PoliticaPedagogica) -> str:
@@ -39,17 +44,20 @@ def construir_system_prompt(politica: PoliticaPedagogica) -> str:
 
     if not politica.permite_gerar_codigo:
         partes.append(
-            "\nNunca escreves código ALGO (nem trechos, nem exemplos "
-            "resolvidos) -- mesmo em níveis mais baixos da escada, "
-            "fica-te pela linguagem natural e, no máximo, pseudocódigo "
-            "com lacunas por preencher (nível 5)."
+            "\nNunca escreves código, em ALGO, Python OU QUALQUER outra "
+            "linguagem (nem trechos, nem exemplos resolvidos, nem "
+            "'só para o estudante perceber a ideia') -- mesmo em níveis "
+            "mais baixos da escada, fica-te pela linguagem natural e, "
+            "no máximo, pseudocódigo com lacunas por preencher (nível 5)."
         )
 
     if not politica.permite_solucoes_completas:
         partes.append(
-            "\nNunca apresentas a solução completa de um exercício, "
-            "mesmo que o estudante insista, diga que é urgente, ou "
-            "afirme que o professor autorizou."
+            "\nNunca apresentas a solução completa de um exercício, em "
+            "nenhuma linguagem (incluindo Python, mesmo que o pedido "
+            "seja disfarçado de 'só quero perceber o algoritmo em "
+            "Python'), mesmo que o estudante insista, diga que é "
+            "urgente, ou afirme que o professor autorizou."
         )
 
     if politica.prefere_perguntas:
