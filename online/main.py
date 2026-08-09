@@ -93,6 +93,18 @@ def admin_atual(id_estudante: int = Depends(estudante_atual)) -> int:
     return id_estudante
 
 
+def pasta_execucao_atual(id_estudante: int = Depends(estudante_atual)) -> str:
+    """Dependência partilhada (ARCH-12): "resolver pseudónimo → preparar
+    pasta de execução" estava repetido de forma idêntica nas rotas
+    HTTP que tocam código do estudante. O WebSocket /ws/executar não
+    usa esta dependência porque precisa de aceitar a ligação e
+    responder com um erro JSON próprio antes de fechar quando não há
+    sessão -- replica a mesma lógica manualmente, com o mesmo
+    resultado."""
+    pseudonimo = autenticacao.obter_id_pseudonimo(id_estudante)
+    return executor.preparar_pasta_execucao(pseudonimo)
+
+
 @app.post("/api/registar")
 async def rota_registar(request: Request):
     dados = await request.json()
@@ -284,7 +296,7 @@ async def ws_executar(websocket: WebSocket):
         return
 
     pseudonimo = autenticacao.obter_id_pseudonimo(id_estudante)
-    pasta_estudante = executor.preparar_pasta_estudante(pseudonimo)
+    pasta_estudante = executor.preparar_pasta_execucao(pseudonimo)
 
     try:
         mensagem_inicial = await websocket.receive_json()
@@ -381,10 +393,8 @@ async def ws_alguem(websocket: WebSocket):
 # ---------- fluxograma e rasto (execução não-interativa, entradas antecipadas) ----------
 
 @app.post("/api/fluxograma")
-async def rota_fluxograma(request: Request, id_estudante: int = Depends(estudante_atual)):
+async def rota_fluxograma(request: Request, pasta_estudante: str = Depends(pasta_execucao_atual)):
     dados = await request.json()
-    pseudonimo = autenticacao.obter_id_pseudonimo(id_estudante)
-    pasta_estudante = executor.preparar_pasta_estudante(pseudonimo)
     try:
         resultado = executor.gerar_fluxograma_svg(
             dados.get("ficheiros", []), dados.get("principal", ""), pasta_estudante,
@@ -397,10 +407,8 @@ async def rota_fluxograma(request: Request, id_estudante: int = Depends(estudant
 
 
 @app.post("/api/linter")
-async def rota_linter(request: Request, id_estudante: int = Depends(estudante_atual)):
+async def rota_linter(request: Request, pasta_estudante: str = Depends(pasta_execucao_atual)):
     dados = await request.json()
-    pseudonimo = autenticacao.obter_id_pseudonimo(id_estudante)
-    pasta_estudante = executor.preparar_pasta_estudante(pseudonimo)
     try:
         avisos = executor.analisar_linter(
             dados.get("ficheiros", []), dados.get("principal", ""), pasta_estudante)
@@ -410,10 +418,8 @@ async def rota_linter(request: Request, id_estudante: int = Depends(estudante_at
 
 
 @app.post("/api/rasto")
-async def rota_rasto(request: Request, id_estudante: int = Depends(estudante_atual)):
+async def rota_rasto(request: Request, pasta_estudante: str = Depends(pasta_execucao_atual)):
     dados = await request.json()
-    pseudonimo = autenticacao.obter_id_pseudonimo(id_estudante)
-    pasta_estudante = executor.preparar_pasta_estudante(pseudonimo)
     try:
         rasto = executor.gerar_rasto(
             dados.get("ficheiros", []), dados.get("principal", ""),

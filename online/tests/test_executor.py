@@ -170,22 +170,60 @@ def test_execucao_completa_com_incluir(tmp_path):
     _correr(cenario())
 
 
-# ---------- pasta por estudante ----------
+# ---------- pasta por execução (ON-07/ARCH-11) ----------
 
-def test_preparar_pasta_estudante_limpa_conteudo_anterior(tmp_path):
-    pasta = executor.preparar_pasta_estudante("pseudo-1", str(tmp_path))
-    with open(f"{pasta}/lixo.txt", "w") as f:
-        f.write("resto de uma execucao anterior")
-    pasta2 = executor.preparar_pasta_estudante("pseudo-1", str(tmp_path))
-    assert pasta == pasta2
+def test_preparar_pasta_execucao_devolve_pasta_nova_a_cada_chamada(tmp_path):
+    """Ao contrário do comportamento antigo (mesma pasta por
+    estudante, apagada e recriada a cada pedido), cada chamada agora
+    devolve uma pasta distinta e sempre vazia -- não há "conteúdo
+    anterior" a limpar porque nunca é a mesma pasta."""
     import os
-    assert not os.path.exists(f"{pasta2}/lixo.txt")
+    pasta1 = executor.preparar_pasta_execucao("pseudo-1", str(tmp_path))
+    with open(os.path.join(pasta1, "trabalho.txt"), "w") as f:
+        f.write("conteudo desta execucao")
+    pasta2 = executor.preparar_pasta_execucao("pseudo-1", str(tmp_path))
+    assert pasta1 != pasta2
+    assert os.listdir(pasta2) == []
 
 
 def test_pastas_de_estudantes_diferentes_sao_diferentes(tmp_path):
-    pasta_a = executor.preparar_pasta_estudante("pseudo-a", str(tmp_path))
-    pasta_b = executor.preparar_pasta_estudante("pseudo-b", str(tmp_path))
+    pasta_a = executor.preparar_pasta_execucao("pseudo-a", str(tmp_path))
+    pasta_b = executor.preparar_pasta_execucao("pseudo-b", str(tmp_path))
     assert pasta_a != pasta_b
+
+
+def test_execucoes_concorrentes_do_mesmo_estudante_nao_se_apagam(tmp_path):
+    """ON-07/ARCH-11: duas execuções concorrentes do mesmo estudante
+    (ex: duas abas do browser, ou o fluxograma pedido enquanto uma
+    execução ainda decorre) nunca podem apagar os ficheiros uma da
+    outra -- a limpeza em segundo plano só apaga pastas antigas
+    (ver test_pastas_antigas_sao_limpas...), nunca a mais recente."""
+    import os
+    pasta_a = executor.preparar_pasta_execucao("pseudo-concorrente", str(tmp_path))
+    with open(os.path.join(pasta_a, "a.txt"), "w") as f:
+        f.write("a")
+    pasta_b = executor.preparar_pasta_execucao("pseudo-concorrente", str(tmp_path))
+    with open(os.path.join(pasta_b, "b.txt"), "w") as f:
+        f.write("b")
+    assert pasta_a != pasta_b
+    assert os.path.exists(os.path.join(pasta_a, "a.txt"))
+    assert os.path.exists(os.path.join(pasta_b, "b.txt"))
+
+
+def test_pastas_antigas_sao_limpas_pastas_recentes_sao_preservadas(tmp_path):
+    import os
+    import time
+    pasta_pseudonimo = os.path.join(str(tmp_path), "pseudo-limpeza")
+    os.makedirs(pasta_pseudonimo)
+    pasta_antiga = os.path.join(pasta_pseudonimo, "antiga")
+    os.makedirs(pasta_antiga)
+    instante_antigo = time.time() - executor.IDADE_MINIMA_PARA_LIMPEZA_SEGUNDOS - 60
+    os.utime(pasta_antiga, (instante_antigo, instante_antigo))
+
+    pasta_nova = executor.preparar_pasta_execucao("pseudo-limpeza", str(tmp_path))
+
+    assert not os.path.exists(pasta_antiga)
+    assert os.path.isdir(pasta_nova)
 
 
 # ---------- execução interativa ----------

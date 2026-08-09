@@ -17,6 +17,7 @@ import resource
 import shutil
 import sys
 import tempfile
+import time
 import uuid
 
 _RAIZ_PROJETO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,6 +38,13 @@ PASTA_EXECUCOES_POR_OMISSAO = os.path.join(tempfile.gettempdir(), "algo_online_e
 LIMITE_TEMPO_SEGUNDOS = 10
 LIMITE_MEMORIA_BYTES = 256 * 1024 * 1024  # 256 MB
 LIMITE_INATIVIDADE_SEGUNDOS = 60  # janela por ler(), reiniciada a cada entrada enviada
+
+# pastas de execução mais antigas do que isto são candidatas a limpeza em
+# segundo plano -- generosamente acima do tempo de vida máximo de
+# qualquer execução em curso (LIMITE_INATIVIDADE_SEGUNDOS renova-se a
+# cada entrada enviada, mas nunca por mais de uma hora de sessão real),
+# para nunca apagar a pasta de uma execução concorrente ainda em curso
+IDADE_MINIMA_PARA_LIMPEZA_SEGUNDOS = 3600
 
 
 class ErroCompilacao(Exception):
@@ -68,15 +76,50 @@ def _limitar_recursos():  # pragma: no cover -- só corre DENTRO do processo fil
     resource.setrlimit(resource.RLIMIT_AS, (LIMITE_MEMORIA_BYTES, LIMITE_MEMORIA_BYTES))
 
 
-def preparar_pasta_estudante(id_pseudonimo: str,
-                              pasta_base: str = PASTA_EXECUCOES_POR_OMISSAO) -> str:
-    """Uma pasta própria por estudante (pelo pseudónimo, nunca pelo
-    email), limpa a cada nova execução -- nunca guarda código entre
-    visitas, por decisão explícita (sem persistência de programas)."""
-    pasta = os.path.join(pasta_base, id_pseudonimo)
-    if os.path.isdir(pasta):
-        shutil.rmtree(pasta)
+def _limpar_pastas_antigas_em_fundo(pasta_pseudonimo: str) -> None:
+    """Apaga pastas de execuções ANTIGAS (mais velhas que
+    IDADE_MINIMA_PARA_LIMPEZA_SEGUNDOS) do mesmo estudante --
+    best-effort, nunca bloqueia nem falha o pedido atual. Crucial: o
+    critério é a IDADE de cada pasta, nunca "todas exceto a mais
+    recente" -- uma execução concorrente ainda em curso (ex: duas abas
+    do browser, ou o fluxograma pedido enquanto uma execução decorre)
+    tem sempre uma pasta recente, por isso nunca é apagada por engano
+    a meio. Corre fora do event loop quando há um a correr (não
+    bloqueia o pedido que acabou de pedir uma pasta nova); corre já,
+    de forma síncrona, quando chamada fora de um contexto assíncrono
+    (ex: testes)."""
+    def _limpar():
+        agora = time.time()
+        for nome in os.listdir(pasta_pseudonimo):
+            caminho = os.path.join(pasta_pseudonimo, nome)
+            try:
+                idade = agora - os.path.getmtime(caminho)
+            except OSError:
+                continue
+            if idade > IDADE_MINIMA_PARA_LIMPEZA_SEGUNDOS:
+                shutil.rmtree(caminho, ignore_errors=True)
+    try:
+        asyncio.get_running_loop().run_in_executor(None, _limpar)
+    except RuntimeError:
+        _limpar()
+
+
+def preparar_pasta_execucao(id_pseudonimo: str,
+                             pasta_base: str = PASTA_EXECUCOES_POR_OMISSAO) -> str:
+    """Uma pasta nova por EXECUÇÃO (não por estudante) -- nome único
+    (UUID), para que pedidos concorrentes do mesmo estudante (duas
+    abas do browser, ou o fluxograma pedido enquanto uma execução
+    ainda está em curso) nunca colidam nem apaguem ficheiros uns dos
+    outros a meio (ON-07/ARCH-11: antes, a mesma pasta por estudante
+    era apagada com shutil.rmtree a cada novo pedido). Pastas antigas
+    do mesmo estudante são limpas em segundo plano -- nunca guarda
+    código entre visitas, por decisão explícita (sem persistência de
+    programas)."""
+    pasta_pseudonimo = os.path.join(pasta_base, id_pseudonimo)
+    os.makedirs(pasta_pseudonimo, exist_ok=True)
+    pasta = os.path.join(pasta_pseudonimo, uuid.uuid4().hex)
     os.makedirs(pasta)
+    _limpar_pastas_antigas_em_fundo(pasta_pseudonimo)
     return pasta
 
 
