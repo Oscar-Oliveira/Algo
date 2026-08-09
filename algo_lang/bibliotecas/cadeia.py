@@ -29,8 +29,13 @@ FUNCOES = {
     "caracter": (
         ["cadeia", "inteiro"], "caracter",
         # 0-baseado, tal como os arrays. Um índice fora dos limites dá
-        # IndexError, apanhado pelo mesmo tratamento amigável que já existe
-        # para os arrays ("índice fora dos limites").
-        "def cadeia_caracter(s, i):\n    return s[i]\n",
+        # IndexError -- reencaminhado como _AlgoIndiceCadeiaInvalido (AL-09,
+        # definida no cabeçalho de codegen.py) para a mensagem amigável
+        # distinguir "posição de texto" de "posição de array".
+        "def cadeia_caracter(s, i):\n"
+        "    try:\n"
+        "        return s[i]\n"
+        "    except IndexError:\n"
+        "        raise _AlgoIndiceCadeiaInvalido(i) from None\n",
     ),
 }

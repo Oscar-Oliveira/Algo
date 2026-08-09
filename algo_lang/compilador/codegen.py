@@ -17,6 +17,14 @@ import sys
 sys.setrecursionlimit(10000)
 
 
+class _AlgoIndiceCadeiaInvalido(IndexError):
+    """AL-09: subclasse de IndexError, para as bibliotecas de texto
+    (ex. cadeia.caracter) distinguirem um índice fora dos limites de
+    TEXTO de um índice fora dos limites de ARRAY -- apanhada antes do
+    'except IndexError' genérico, mais abaixo neste ficheiro."""
+    pass
+
+
 def _algo_fmt(v):
     """Formata valores para exibicao (escrever) ao estilo portugues."""
     if isinstance(v, bool):
@@ -193,6 +201,11 @@ class GeradorCodigo:
         self.emit('if __name__ == "__main__":', 0)
         self.emit("try:", 1)
         self.emit("_algo_programa()", 2)
+        self.emit("except _AlgoIndiceCadeiaInvalido:", 1)
+        self.emit(
+            'print("Erro em tempo de execução: tentaste aceder a uma posição de '
+            'texto que não existe (índice fora dos limites).")', 2)
+        self.emit("sys.exit(1)", 2)
         self.emit("except IndexError:", 1)
         self.emit(
             'print("Erro em tempo de execução: tentaste aceder a uma posição de '

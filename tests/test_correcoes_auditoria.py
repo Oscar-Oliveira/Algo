@@ -836,6 +836,42 @@ def test_array_com_tamanho_positivo_calculado_em_runtime_continua_a_funcionar():
     assert saida.strip() == "9 0 0"
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-09 -- IndexError distingue array de texto ----------
+
+def test_indice_fora_dos_limites_em_cadeia_caracter_menciona_texto_nao_array():
+    import os
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Cadeia
+        inicio
+            escrever(cadeia.caracter("abc", 10))
+    """)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert resultado.returncode == 1
+    assert "posição de texto" in resultado.stdout
+    assert "posição de array" not in resultado.stdout
+
+
+def test_indice_fora_dos_limites_em_array_continua_a_mencionar_array():
+    import os
+    codigo_py = compilar("""
+        algoritmo "T"
+        inicio
+            v:inteiro[3]
+            escrever(v[10])
+    """)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert resultado.returncode == 1
+    assert "posição de array" in resultado.stdout
+    assert "posição de texto" not in resultado.stdout
+
+
 # ---------- AUDIT_PLAN Fase 2: AL-02 -- ^ com expoente negativo ----------
 
 def test_potencia_com_expoente_literal_nao_negativo_continua_inteiro():
