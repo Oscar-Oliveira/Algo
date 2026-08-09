@@ -212,13 +212,16 @@ class VerificadorTipos:
                         dim_expr.linha)
         if d.inicial is not None:
             if isinstance(d.inicial, A.ArrayLiteral):
-                if d.dims is None:  # pragma: no cover -- o parser só produz ArrayLiteral quando dims existe
+                # AL-16: o parser já não sabe se 'd' é um array -- este
+                # caso (ex.: "x:inteiro = {1,2,3}") é agora genuinamente
+                # possível e tem de ser apanhado aqui.
+                if d.dims is None:
                     raise ErroSemantico(
                         f"'{d.nome}' não é um array; não pode ser inicializado com {{...}}",
                         d.linha)
                 self._verificar_array_literal(d.inicial, d.tipo, len(d.dims), escopo)
             elif isinstance(d.inicial, A.EstruturaLiteral):
-                if d.dims is not None:  # pragma: no cover -- o parser só produz EstruturaLiteral quando dims é None
+                if d.dims is not None:
                     raise ErroSemantico(
                         f"'{d.nome}' é um array; usa '{{valor, valor, ...}}' para o "
                         f"inicializar, não '{{campo: valor}}'", d.linha)
@@ -282,15 +285,19 @@ class VerificadorTipos:
                     f"mas recebeu '{tipo_valor}'", lit.linha)
 
     def _verificar_array_literal(self, lit: A.ArrayLiteral, tipo_elemento, profundidade, escopo):
+        # AL-16: desde que o parser deixou de saber de antemão quantas
+        # dimensões esperar (_parse_literal_chaveta é genérico), estas
+        # duas verificações de forma passaram a ser o único sítio que as
+        # apanha -- já não são garantidas pelo parser.
         for elem in lit.elementos:
             if profundidade > 1:
-                if not isinstance(elem, A.ArrayLiteral):  # pragma: no cover -- o parser já exige '{' aninhado neste caso
+                if not isinstance(elem, A.ArrayLiteral):
                     raise ErroSemantico(
                         f"esperava-se uma lista aninhada {{...}} (o array tem "
                         f"{profundidade} dimensões)", lit.linha)
                 self._verificar_array_literal(elem, tipo_elemento, profundidade - 1, escopo)
             else:
-                if isinstance(elem, A.ArrayLiteral):  # pragma: no cover -- o parser já rejeita '{' a mais
+                if isinstance(elem, A.ArrayLiteral):
                     raise ErroSemantico(
                         "demasiados níveis de aninhamento em {...} para as dimensões "
                         "declaradas", lit.linha)
@@ -516,6 +523,18 @@ class VerificadorTipos:
                     f"'{expr.nome}' é um procedimento e não devolve valor; não pode "
                     f"ser usado dentro de uma expressão", expr.linha)
             return tipo_retorno, 0
+        if isinstance(expr, (A.ArrayLiteral, A.EstruturaLiteral)):
+            # AL-16: um literal '{...}' não tem um tipo próprio -- só faz
+            # sentido onde o tipo/forma esperado já é conhecido pelo
+            # contexto (valor inicial de uma declaração, ou argumento de
+            # uma chamada com um parâmetro do tipo certo, tratados antes
+            # de chegar aqui). Nas outras posições (ex.: operando de '+',
+            # dentro de escrever(...)), não há informação suficiente.
+            raise ErroSemantico(
+                "um literal '{...}' só pode ser usado para inicializar uma variável "
+                "ou como argumento de uma função/procedimento com um parâmetro do "
+                "tipo certo -- aqui não há informação suficiente para saber que "
+                "forma se espera", expr.linha)
         raise ErroSemantico(  # pragma: no cover -- todos os tipos de expressão da AST são tratados acima
             f"expressão não reconhecida: {type(expr).__name__}", getattr(expr, "linha", 0))
 
@@ -690,7 +709,17 @@ class VerificadorTipos:
                             f"que uma vez na mesma chamada a '{chamada.nome}'",
                             chamada.linha)
                     nomes_ref_simples_usados.add(arg.nome)
-            tipo, _ = self._tipo_expr(arg, escopo)
+            if isinstance(arg, A.EstruturaLiteral):
+                # AL-16: um literal de estrutura não tem tipo próprio --
+                # valida-se diretamente contra o tipo do parâmetro (mesma
+                # lógica já usada para o valor inicial de uma declaração).
+                # Um parâmetro 'por_referencia' já teria sido rejeitado
+                # acima (só aceita A.LValue), por isso chegar aqui implica
+                # sempre um parâmetro por valor.
+                self._verificar_estrutura_literal(arg, p.tipo, escopo)
+                tipo = p.tipo
+            else:
+                tipo, _ = self._tipo_expr(arg, escopo)
             if not self._compativel(p.tipo, tipo):
                 raise ErroSemantico(
                     f"o parâmetro '{p.nome}' de '{chamada.nome}' espera "

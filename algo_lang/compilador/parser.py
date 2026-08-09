@@ -165,40 +165,41 @@ class Parser:
             if len(nomes) > 1:
                 raise ErroSintatico(
                     "não é possível inicializar várias variáveis na mesma linha", linha)
-            if dims is not None:
-                inicial = self._parse_array_literal(len(dims))
-            elif self.ver("LBRACE"):
-                if self._proximo_parece_campo_literal():
-                    inicial = self._parse_estrutura_literal()
-                else:
-                    raise ErroSintatico(
-                        f"'{{...}}' só pode inicializar um array (falta '[tamanho]' a "
-                        f"seguir ao tipo de '{nomes[0]}') ou uma estrutura (com a forma "
-                        f"'{{campo: valor, ...}}')", linha)
-            else:
-                inicial = self._parse_expr()
+            # AL-16: '{...}' já não é tratado à parte aqui -- _parse_primario
+            # reconhece-o em qualquer posição de expressão (incluindo este
+            # valor inicial); se a FORMA não corresponder a 'tipo'/'dims'
+            # (ex.: '{...}' para inicializar algo que não é array nem
+            # estrutura), semantics.py é que dá o erro claro.
+            inicial = self._parse_expr()
         self.esperar("NEWLINE")
         return [A.Declaracao(tipo, nome, dims, linha, inicial) for nome in nomes]
 
-    def _parse_array_literal(self, profundidade):
+    def _parse_literal_chaveta(self):
+        """Um literal '{...}' -- array ('{v1, v2, ...}', possivelmente
+        aninhado para arrays multidimensionais) ou estrutura
+        ('{campo: valor, ...}'), disambiguado pela forma do conteúdo
+        logo a seguir a '{'. AL-16: usado tanto no valor inicial de uma
+        declaração como em qualquer posição de expressão (ex.:
+        argumento de uma chamada, via _parse_primario) -- a verificação
+        de que a FORMA (nº de dimensões do array / tipo dos campos)
+        corresponde ao que é esperado no contexto é feita inteiramente
+        em semantics.py, não aqui; o parser só reconhece a sintaxe,
+        sem precisar de saber de antemão quantas dimensões esperar."""
+        if self._proximo_parece_campo_literal():
+            return self._parse_estrutura_literal()
+        return self._parse_array_literal_generico()
+
+    def _parse_array_literal_generico(self):
         linha = self.atual().linha
         self.esperar("LBRACE")
         elementos = []
         if not self.ver("RBRACE"):
-            elementos.append(self._parse_elemento_array_literal(profundidade))
+            elementos.append(self._parse_expr())
             while self.ver("COMMA"):
                 self.avancar()
-                elementos.append(self._parse_elemento_array_literal(profundidade))
+                elementos.append(self._parse_expr())
         self.esperar("RBRACE")
         return A.ArrayLiteral(elementos, linha)
-
-    def _parse_elemento_array_literal(self, profundidade):
-        if profundidade > 1:
-            return self._parse_array_literal(profundidade - 1)
-        if self.ver("LBRACE"):
-            raise ErroSintatico(
-                "'{...}' a mais para as dimensões declaradas do array", self.atual().linha)
-        return self._parse_expr()
 
     def _proximo_parece_campo_literal(self):
         """Olha para os tokens a seguir a '{' (sem consumir) para decidir se
@@ -636,6 +637,11 @@ class Parser:
             expr = self._parse_expr()
             self.esperar("RPAREN")
             return expr
+        if tok.tipo == "LBRACE":
+            # AL-16: literal de array/estrutura como expressão geral, não
+            # só como valor inicial de uma declaração (ex.: argumento de
+            # uma chamada com um parâmetro do tipo certo).
+            return self._parse_literal_chaveta()
         if tok.tipo == "ID":
             chamada = self._parse_chamada_biblioteca_ou_none()
             if chamada is not None:

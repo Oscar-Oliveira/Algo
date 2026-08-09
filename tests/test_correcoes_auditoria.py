@@ -1861,6 +1861,94 @@ def test_incluir_transitivo_diamante_nao_duplica(tmp_path):
     assert nomes == ["fComum"]
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-16 -- literais {...} como expressões gerais ----------
+
+def test_literal_de_estrutura_como_argumento_de_funcao():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:decimal
+            y:decimal
+        funcao distanciaAOrigemQuadrado(p:Ponto):decimal
+            devolver p.x * p.x + p.y * p.y
+        inicio
+            escrever(distanciaAOrigemQuadrado({x: 3.0, y: 4.0}))
+    """)
+    assert saida.strip() == "25.0"
+
+
+def test_literal_de_estrutura_como_argumento_de_procedimento():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        procedimento mostrar(p:Ponto)
+            escrever(p.x, " ", p.y)
+        inicio
+            mostrar({x: 1, y: 2})
+    """)
+    assert saida.strip() == "1 2"
+
+
+def test_literal_de_estrutura_como_argumento_com_campos_omitidos():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        procedimento mostrar(p:Ponto)
+            escrever(p.x, " ", p.y)
+        inicio
+            mostrar({x: 5})
+    """)
+    assert saida.strip() == "5 0"
+
+
+def test_literal_de_estrutura_como_segundo_argumento_junto_de_ref():
+    """Confirma o caminho de geração de código separado para chamadas
+    com parâmetros 'ref' (_gerar_chamada_stmt), não só o caminho normal
+    de expressão."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento atualizar(ref contador:inteiro, p:Ponto)
+            contador = contador + p.x
+        inicio
+            n:inteiro = 10
+            atualizar(n, {x: 5})
+            escrever(n)
+    """)
+    assert saida.strip() == "15"
+
+
+def test_literal_de_array_multidimensional_continua_a_funcionar():
+    """Regressão: a generalização do parser (deixou de precisar de
+    saber a profundidade de antemão) não pode partir arrays
+    multidimensionais existentes."""
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            m:inteiro[2][2] = {{1, 2}, {3, 4}}
+            escrever(m[0][0], " ", m[0][1], " ", m[1][0], " ", m[1][1])
+    """)
+    assert saida.strip() == "1 2 3 4"
+
+
+def test_literal_chaveta_em_posicao_nao_suportada_da_erro_claro_nao_crash():
+    """Fora de uma declaração ou de um argumento de chamada, um '{...}'
+    não tem informação suficiente para saber que forma se espera --
+    tem de dar um ErroSemantico claro, nunca um erro interno tipo
+    'expressão não reconhecida'."""
+    with pytest.raises(ErroSemantico, match="não há informação suficiente"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                escrever({1, 2, 3})
+        """)
+
+
 def test_indentacao_mista_entre_linhas_diferentes_da_erro_de_compilacao():
     """AL-15: promovido de aviso do linter a erro de compilação -- uma
     linha com tabs e outra com espaços no mesmo ficheiro já não chega

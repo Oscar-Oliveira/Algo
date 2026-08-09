@@ -182,7 +182,12 @@ def test_array_literal_tipo_incompativel_da_erro():
 
 
 def test_array_literal_aninhamento_errado_da_erro():
-    with pytest.raises(ErroSintatico, match="dimensões"):
+    """AL-16: esta verificação de forma passou do parser (ErroSintatico)
+    para semantics.py (ErroSemantico) -- o parser deixou de saber de
+    antemão quantas dimensões esperar, para poder aceitar '{...}' como
+    expressão geral (ex.: argumento de uma chamada), não só como valor
+    inicial de uma declaração."""
+    with pytest.raises(ErroSemantico, match="dimensões"):
         compilar("""
             algoritmo "T"
             inicio
@@ -191,7 +196,7 @@ def test_array_literal_aninhamento_errado_da_erro():
 
 
 def test_array_literal_em_variavel_nao_array_da_erro():
-    with pytest.raises(ErroSintatico, match="array"):
+    with pytest.raises(ErroSemantico, match="array"):
         compilar("""
             algoritmo "T"
             inicio

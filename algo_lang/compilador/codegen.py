@@ -272,11 +272,32 @@ class GeradorCodigo:
             return DEFAULT_POR_TIPO[tipo]
         return f"{tipo}()"   # instância por omissão de uma estrutura
 
+    def _gerar_lista_args(self, args, f_def, tipos) -> str:
+        """AL-16: um argumento pode ser um literal de estrutura (ex.:
+        f({x: 1, y: 2})) -- precisa do tipo do PARÂMETRO correspondente
+        para saber que classe Python construir (o literal em si não sabe
+        o seu próprio tipo). Partilhado entre chamadas usadas como
+        expressão e chamadas usadas como instrução solta (esta última
+        com o seu próprio caminho de geração para parâmetros 'ref')."""
+        args_py = []
+        for i, a in enumerate(args):
+            if isinstance(a, A.EstruturaLiteral) and f_def is not None and i < len(f_def.parametros):
+                args_py.append(self._expr_estrutura_literal(a, f_def.parametros[i].tipo, tipos))
+            else:
+                args_py.append(self._expr(a, tipos))
+        return ", ".join(args_py)
+
+    def _expr_estrutura_literal(self, lit: A.EstruturaLiteral, tipo_nome: str, tipos) -> str:
+        """AL-16: um A.EstruturaLiteral não sabe o seu próprio tipo (só os
+        campos) -- quem chama tem sempre de indicar 'tipo_nome' a partir
+        do contexto (o tipo declarado, ou o tipo do parâmetro que recebe
+        o literal numa chamada)."""
+        kwargs = ", ".join(f"{nome}={self._expr(valor, tipos)}" for nome, valor in lit.campos)
+        return f"{tipo_nome}({kwargs})"
+
     def _gerar_declaracao(self, d: A.Declaracao, nivel, tipos):
         if d.inicial is not None and isinstance(d.inicial, A.EstruturaLiteral):
-            kwargs = ", ".join(
-                f"{nome}={self._expr(valor, tipos)}" for nome, valor in d.inicial.campos)
-            self.emit(f"{d.nome} = {d.tipo}({kwargs})", nivel)
+            self.emit(f"{d.nome} = {self._expr_estrutura_literal(d.inicial, d.tipo, tipos)}", nivel)
             return
         if d.inicial is not None and isinstance(d.inicial, A.Chamada):
             f_def = self._encontrar_funcao(d.inicial.nome)
@@ -286,7 +307,7 @@ class GeradorCodigo:
                     for p, a in zip(f_def.parametros, d.inicial.args)
                     if p.por_referencia
                 ]
-                args_str = ", ".join(self._expr(a, tipos) for a in d.inicial.args)
+                args_str = self._gerar_lista_args(d.inicial.args, f_def, tipos)
                 self.emit(f"{d.nome}, {', '.join(out_vars)} = {d.inicial.nome}({args_str})", nivel)
                 return
         if d.inicial is not None:
@@ -474,7 +495,7 @@ class GeradorCodigo:
                 for p, a in zip(f_def.parametros, chamada.args)
                 if p.por_referencia
             ]
-            args_str = ", ".join(self._expr(a, tipos) for a in chamada.args)
+            args_str = self._gerar_lista_args(chamada.args, f_def, tipos)
             if f_def.eh_procedimento:
                 self.emit(f"{', '.join(out_vars)} = {chamada.nome}({args_str})", nivel)
             else:
@@ -547,7 +568,7 @@ class GeradorCodigo:
             if expr.op == "-":
                 return f"(-{self._expr(expr.operando, tipos)})"
         if isinstance(expr, A.Chamada):
-            args = ", ".join(self._expr(a, tipos) for a in expr.args)
+            args = self._gerar_lista_args(expr.args, self._encontrar_funcao(expr.nome), tipos)
             nome_py = expr.nome.replace(".", "_") if "." in expr.nome else expr.nome
             return f"{nome_py}({args})"
         if isinstance(expr, A.ArrayLiteral):
