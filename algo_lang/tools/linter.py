@@ -31,7 +31,11 @@ class Linter:
     def analisar(self):
         self.avisos = []
         self._verificar_rotinas_nunca_chamadas()
-        self._verificar_indentacao_consistente()
+        # AL-31: a verificação de indentação mista entre linhas foi
+        # promovida a erro de compilação (AL-15, lexer.py:tokenizar) --
+        # um ficheiro com essa mistura já não chega a compilar, por isso
+        # nunca chegaria aqui; o aviso equivalente do linter ficou
+        # inalcançável na prática e foi removido.
         self._verificar_inclusoes_duplicadas()
         self._verificar_importares_duplicados()
         self._verificar_casos_duplicados_em_escolha()
@@ -366,37 +370,6 @@ class Linter:
         if isinstance(a, A.LValue) and isinstance(b, A.LValue):
             return self._mesma_variavel(a, b)
         return False
-
-    def _verificar_indentacao_consistente(self):
-        """O lexer já garante que CADA LINHA usa só tabs ou só grupos de 4
-        espaços (nunca uma mistura na mesma linha) -- isso é um erro de
-        compilação, não um aviso. O que o lexer não vê é a consistência
-        ao longo do FICHEIRO INTEIRO: uma linha indentada com tabs e
-        outra com espaços são cada uma válida isoladamente, mas misturar
-        os dois estilos no mesmo ficheiro é um cheiro de estilo -- avisa
-        aqui."""
-        if not self.codigo_fonte:
-            return
-        usa_tabs = False
-        usa_espacos = False
-        primeira_linha_tab = None
-        primeira_linha_espaco = None
-        for num, linha in enumerate(self.codigo_fonte.split("\n"), start=1):
-            sem_indent = linha.lstrip(" \t")
-            bruto = linha[: len(linha) - len(sem_indent)]
-            if not bruto or not sem_indent.strip():
-                continue
-            if "\t" in bruto and not usa_tabs:
-                usa_tabs = True
-                primeira_linha_tab = num
-            elif " " in bruto and not usa_espacos:
-                usa_espacos = True
-                primeira_linha_espaco = num
-        if usa_tabs and usa_espacos:
-            self.avisos.append(Aviso(
-                f"o ficheiro mistura indentação por tabs (ex: linha {primeira_linha_tab}) "
-                f"e por espaços (ex: linha {primeira_linha_espaco}) -- escolhe só um dos "
-                f"dois estilos e usa-o em todo o ficheiro", primeira_linha_espaco))
 
     def _verificar_inclusoes_duplicadas(self):
         """_resolver_inclusoes (cli.py e online/executor.py) ignora
