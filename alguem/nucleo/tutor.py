@@ -38,6 +38,15 @@ PEDIDO_DE_REGENERACAO = (
     "nunca código nem a solução passo a passo."
 )
 
+# AG-21: distinta de RESPOSTA_SEGURA_POR_OMISSAO -- esta não é uma
+# recusa pedagógica (o Alguem decidiu não ajudar mais), é um erro de
+# comunicação com o fornecedor de IA.
+RESPOSTA_ERRO_FORNECEDOR = (
+    "Não consegui obter uma resposta agora -- houve um problema de "
+    "comunicação com o fornecedor de IA. Tenta outra vez daqui a "
+    "pouco."
+)
+
 
 class Alguem:
     def __init__(self, fornecedor: AgenteLLM, politica: PoliticaPedagogica,
@@ -125,7 +134,10 @@ class Alguem:
         self.historico.append({"role": "user", "content": mensagem_do_estudante})
 
         if self.guardiao is None:
-            resposta = self.fornecedor.responder(self.historico)
+            try:
+                resposta = self.fornecedor.responder(self.historico)
+            except Exception as erro:
+                return self._falhar_turno(turno, mensagem_do_estudante, erro)
             self.historico.append({"role": "assistant", "content": resposta})
             self.registador.resposta_final(
                 turno, resposta, num_tentativas=1, veio_de_recusa_segura=False)
@@ -133,7 +145,10 @@ class Alguem:
 
         mensagens_tentativa = list(self.historico)
         for tentativa in range(1, MAX_TENTATIVAS + 1):
-            resposta = self.fornecedor.responder(mensagens_tentativa)
+            try:
+                resposta = self.fornecedor.responder(mensagens_tentativa)
+            except Exception as erro:
+                return self._falhar_turno(turno, mensagem_do_estudante, erro)
             classificacao = self.guardiao.classificar(resposta)
             nivel_aproximado = NIVEL_APROXIMADO_POR_CLASSIFICACAO[classificacao]
             aceitavel = self._aceitavel(classificacao, nivel_aproximado, turno)
@@ -175,6 +190,19 @@ class Alguem:
         """Fecha o ficheiro de log desta sessão -- chamar quando a
         conversa com o estudante terminar (ex: escreveu 'sair')."""
         self.registador.fim_sessao()
+
+    def _falhar_turno(self, turno: int, mensagem_do_estudante: str, erro: Exception) -> str:
+        """AG-21: uma falha de rede/API a meio de um turno não pode
+        deixar o histórico com uma mensagem 'user' sem resposta
+        correspondente (a API da Anthropic, por exemplo, exige
+        alternância estrita user/assistant, e falharia logo no turno
+        seguinte) -- remove a mensagem incompleta do estudante. AG-22:
+        regista um evento de falha explícito, para o turno não
+        desaparecer sem explicação das métricas de investigação."""
+        assert self.historico[-1] == {"role": "user", "content": mensagem_do_estudante}
+        self.historico.pop()
+        self.registador.falha_turno(turno, mensagem_do_estudante, str(erro))
+        return RESPOSTA_ERRO_FORNECEDOR
 
     def _aceitavel(self, classificacao: Classificacao, nivel_aproximado: int, turno: int) -> bool:
         if classificacao not in CLASSIFICACOES_BLOQUEAVEIS:

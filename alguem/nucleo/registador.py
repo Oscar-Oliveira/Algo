@@ -97,6 +97,14 @@ class Registador:
             "veio_de_recusa_segura": veio_de_recusa_segura,
         })
 
+    def falha_turno(self, turno: int, mensagem_estudante: str, motivo: str) -> None:
+        self._escrever({
+            "tipo": "falha_turno",
+            "turno": turno,
+            "mensagem_estudante": mensagem_estudante,
+            "motivo": motivo,
+        })
+
     def fim_sessao(self) -> None:
         self._escrever({"tipo": "fim_sessao", "num_turnos": self.turno_atual})
         self._ficheiro.close()

@@ -24,6 +24,16 @@ class FornecedorControlavel(AgenteLLM):
         return self._respostas.pop(0)
 
 
+class FornecedorQueFalha(AgenteLLM):
+    """Simula uma falha de rede/API na chamada ao fornecedor (AG-21/AG-22)."""
+    @property
+    def nome(self):
+        return "falha"
+
+    def responder(self, mensagens):
+        raise ConnectionError("falha de rede simulada")
+
+
 def _ler_eventos(caminho):
     with open(caminho, encoding="utf-8") as f:
         return [json.loads(linha) for linha in f if linha.strip()]
@@ -136,6 +146,46 @@ def test_considerar_ficheiros_a_meio_da_conversa_regista_evento(tmp_path):
     eventos = _ler_eventos(registador.caminho)
     eventos_ficheiros = [e for e in eventos if e["tipo"] == "ficheiros_atualizados"]
     assert eventos_ficheiros[-1]["ficheiros"] == ["outro.algo"]
+
+
+# ---------- AG-21 + AG-22: falha do fornecedor a meio de um turno ----------
+
+def test_falha_do_fornecedor_regista_evento_falha_turno_e_nao_deixa_mensagem_pendurada(tmp_path):
+    from alguem.nucleo.tutor import RESPOSTA_ERRO_FORNECEDOR
+    fornecedor = FornecedorQueFalha(modelo="x", api_key="x")
+    registador = Registador(id_estudante="est-1", pasta_logs=str(tmp_path))
+    alguem = Alguem(fornecedor, PoliticaPedagogica(), registador=registador)
+    resposta = alguem.conversar("uma pergunta")
+
+    assert resposta == RESPOSTA_ERRO_FORNECEDOR
+    # a mensagem do estudante não fica no histórico sem resposta
+    # correspondente -- quebraria a alternância estrita user/assistant
+    # exigida por alguns fornecedores (ex. Anthropic) no turno seguinte
+    assert len(alguem.historico) == 1
+
+    eventos = _ler_eventos(registador.caminho)
+    falhas = [e for e in eventos if e["tipo"] == "falha_turno"]
+    assert len(falhas) == 1
+    assert falhas[0]["turno"] == 1
+    assert falhas[0]["mensagem_estudante"] == "uma pergunta"
+    assert "falha de rede simulada" in falhas[0]["motivo"]
+    # o turno falhado não pode aparecer como se tivesse tido uma
+    # resposta final normal -- distorceria as métricas de investigação
+    assert not any(e["tipo"] == "resposta_final" for e in eventos)
+
+
+def test_falha_do_fornecedor_sem_guardiao_tambem_regista_e_nao_deixa_pendurado(tmp_path):
+    from alguem.nucleo.tutor import RESPOSTA_ERRO_FORNECEDOR
+    fornecedor = FornecedorQueFalha(modelo="x", api_key="x")
+    registador = Registador(id_estudante="est-1", pasta_logs=str(tmp_path))
+    politica = PoliticaPedagogica(usar_guardiao=False)
+    alguem = Alguem(fornecedor, politica, registador=registador)
+    resposta = alguem.conversar("uma pergunta")
+
+    assert resposta == RESPOSTA_ERRO_FORNECEDOR
+    assert len(alguem.historico) == 1
+    eventos = _ler_eventos(registador.caminho)
+    assert any(e["tipo"] == "falha_turno" for e in eventos)
 
 
 def test_sem_registador_explicito_usa_um_por_omissao_isolado_pelo_conftest(tmp_path):
