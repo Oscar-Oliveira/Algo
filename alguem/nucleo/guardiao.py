@@ -17,16 +17,44 @@ import re
 from enum import Enum
 
 from ..fornecedores.base import AgenteLLM
+from .conhecimento_algo import _PALAVRAS_CHAVE
+
+# ARCH-07: as palavras-chave usadas nos padrões abaixo vêm de
+# _PALAVRAS_CHAVE (que por sua vez vem de algo_lang.compilador.lexer,
+# com fallback só se algo_lang não estiver acessível -- ver
+# conhecimento_algo.py) -- nunca escritas à mão isoladamente aqui, para
+# esta heurística de segurança nunca ficar desatualizada em silêncio
+# se a linguagem ganhar ou renomear uma palavra-chave. Esta asserção
+# falha alto e cedo (import time) em vez de a heurística simplesmente
+# deixar de reconhecer a palavra sem ninguém notar.
+_PALAVRAS_USADAS_NOS_PADROES = {
+    "algoritmo", "funcao", "procedimento", "para", "de", "fazer", "enquanto", "se", "entao",
+}
+assert _PALAVRAS_USADAS_NOS_PADROES <= set(_PALAVRAS_CHAVE), (
+    "guardiao.py: uma ou mais palavras-chave usadas na heurística de deteção de "
+    "código ALGO já não existem em PALAVRAS_CHAVE -- a linguagem mudou, esta "
+    "heurística de segurança tem de ser atualizada a par"
+)
 
 # Blocos de código markdown (```...```), ou uma linha que já parece
-# claramente ALGO/Python real (não prosa) -- inclui palavras-chave do
-# ALGO seguidas de estrutura de código, para apanhar mesmo sem vir
-# dentro de ```.
+# claramente ALGO ou Python real (não prosa) -- inclui palavras-chave
+# seguidas de estrutura de código, para apanhar mesmo sem vir dentro de
+# ```. GOAL-01: reconhece Python também, não só ALGO -- o estudante
+# sabe que o ALGO compila para Python, por isso pedir a solução "só em
+# Python" é uma via óbvia de contornar uma heurística que só olhasse
+# para sintaxe ALGO.
 _PADRAO_BLOCO_CODIGO = re.compile(r"```")
 _PADRAO_LINHA_CODIGO_ALGO = re.compile(
     r"^\s*(algoritmo\s+\"|funcao\s+\w+\(|procedimento\s+\w+\(|"
     r"para\s+\w+\s+de\s+.+\s+fazer\s*$|enquanto\s+.+\s+fazer\s*$|"
     r"se\s+.+\s+entao\s*$)",
+    re.MULTILINE,
+)
+_PADRAO_LINHA_CODIGO_PYTHON = re.compile(
+    r"^\s*(def\s+\w+\s*\(.*\)\s*:\s*$|class\s+\w+.*:\s*$|"
+    r"for\s+\w+\s+in\s+.+:\s*$|while\s+.+:\s*$|"
+    r"import\s+\w+|from\s+\w+\s+import\s+|"
+    r"print\s*\(|return\s+\S)",
     re.MULTILINE,
 )
 
@@ -108,6 +136,8 @@ class GuardiaoPedagogico:
         if _PADRAO_BLOCO_CODIGO.search(resposta):
             return Classificacao.CODE
         if _PADRAO_LINHA_CODIGO_ALGO.search(resposta):
+            return Classificacao.CODE
+        if _PADRAO_LINHA_CODIGO_PYTHON.search(resposta):
             return Classificacao.CODE
         return None
 

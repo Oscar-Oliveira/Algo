@@ -54,6 +54,53 @@ def test_heuristica_nao_dispara_para_texto_normal():
     assert resultado == Classificacao.SAFE
 
 
+# ---------- GOAL-01: heurística também reconhece Python, não só ALGO ----------
+
+@pytest.mark.parametrize("resposta", [
+    "def dobro(n):\n    return n * 2",
+    "for i in range(10):\n    print(i)",
+    "while x < 10:\n    x = x + 1",
+    "import math",
+    "from math import sqrt",
+    "class Ponto:\n    pass",
+    "print('resultado:', x)",
+])
+def test_heuristica_deteta_sintaxe_python_sem_marcadores_markdown(resposta):
+    """Um estudante pode pedir a solução 'só em Python, não em ALGO' --
+    a heurística tem de reconhecer isso tal como reconhece ALGO."""
+    guardiao = GuardiaoPedagogico(FornecedorControlavel([], modelo="x", api_key="x"))
+    assert guardiao.classificar(resposta) == Classificacao.CODE
+
+
+# ---------- UX-07: a heurística não pode ter falsos positivos em
+# dicas de nível 5 (pseudocódigo parcial), explicitamente permitidas
+# pela política por omissão ----------
+
+def test_heuristica_nao_dispara_para_exemplo_real_de_nivel_5():
+    """O próprio exemplo de nível 5 documentado em escada_de_ajuda.py
+    -- se a heurística o bloqueasse, estaria a impedir exatamente o
+    tipo de ajuda que o sistema é suposto poder dar."""
+    from alguem.nucleo.escada_de_ajuda import ESCADA_DE_AJUDA
+    exemplo_nivel_5 = next(n.exemplo for n in ESCADA_DE_AJUDA if n.numero == 5)
+    guardiao = GuardiaoPedagogico(FornecedorControlavel(["PARTIAL_SOLUTION"], modelo="x", api_key="x"))
+    resultado = guardiao.classificar(exemplo_nivel_5)
+    assert resultado == Classificacao.PARTIAL_SOLUTION  # veio do LLM, não da heurística
+
+
+@pytest.mark.parametrize("dica_nivel_5", [
+    "Podes começar assim:\nler primeiro valor\nmaior <- ______\ndepois "
+    "percorre o resto e compara.",
+    "Pensa numa estrutura destas: para cada elemento, verifica se é "
+    "maior do que o atual e atualiza se for.",
+    "Uma pista: precisas de uma variável para guardar o total e outra "
+    "para o contador, mas ainda tens de decidir onde inicializar cada uma.",
+])
+def test_heuristica_nao_dispara_para_dicas_de_nivel_5_plausiveis(dica_nivel_5):
+    guardiao = GuardiaoPedagogico(FornecedorControlavel(["PARTIAL_SOLUTION"], modelo="x", api_key="x"))
+    resultado = guardiao.classificar(dica_nivel_5)
+    assert resultado == Classificacao.PARTIAL_SOLUTION
+
+
 # ---------- classificação por LLM ----------
 
 @pytest.mark.parametrize("resposta_llm,esperado", [
