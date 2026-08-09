@@ -872,6 +872,54 @@ def test_indice_fora_dos_limites_em_array_continua_a_mencionar_array():
     assert "posição de texto" not in resultado.stdout
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-13 -- escapes em literais de texto ----------
+
+def test_escape_de_aspa_dentro_de_string():
+    saida = executar(r'''algoritmo "T"
+inicio
+    escrever("ele disse \"ola\"")
+''')
+    assert saida.strip() == 'ele disse "ola"'
+
+
+def test_escape_de_barra_invertida_dentro_de_string():
+    saida = executar(r'''algoritmo "T"
+inicio
+    escrever("c:\\pasta")
+''')
+    assert saida.strip() == r"c:\pasta"
+
+
+def test_escape_de_quebra_de_linha_dentro_de_string():
+    saida = executar(r'''algoritmo "T"
+inicio
+    escrever("linha1\nlinha2")
+''')
+    assert saida.strip() == "linha1\nlinha2"
+
+
+def test_backslash_seguido_de_escape_desconhecido_fica_literal():
+    """'\\t' não é um escape reconhecido (só \\", \\\\, \\n são) -- fica
+    tal-e-qual (backslash + t) em vez de virar tab ou desaparecer."""
+    saida = executar(r'''algoritmo "T"
+inicio
+    escrever("a\tb")
+''')
+    assert saida.strip() == r"a\tb"
+
+
+def test_minimo_tambem_suporta_escapes_de_string():
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(r'''algoritmo "T"
+inicio
+    escrever("ele disse \"ola\"")
+''')
+    codigo_py = gerar_python_minimo(programa)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.stdout.strip() == 'ele disse "ola"'
+
+
 # ---------- AUDIT_PLAN Fase 2: AL-02 -- ^ com expoente negativo ----------
 
 def test_potencia_com_expoente_literal_nao_negativo_continua_inteiro():

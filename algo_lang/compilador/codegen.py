@@ -522,8 +522,12 @@ class GeradorCodigo:
             return ""
         if isinstance(expr, A.Literal):
             if expr.tipo in ("cadeia", "caracter"):
-                escapado = expr.valor.replace("\\", "\\\\").replace('"', '\\"')
-                return f'"{escapado}"'
+                # AL-13: repr() em vez de escapar à mão -- desde que o
+                # lexer passou a suportar \n dentro de literais, o valor
+                # pode conter uma quebra de linha real, que um simples
+                # '"..."' não representa em Python; repr() trata sempre
+                # corretamente aspas, backslash e quebras de linha.
+                return repr(expr.valor)
             if expr.tipo == "booleano":
                 return "True" if expr.valor else "False"
             return repr(expr.valor)

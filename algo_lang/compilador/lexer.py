@@ -168,9 +168,17 @@ def _tokenizar_linha(linha, linha_num):
             i += 1
             continue
         if c == '"':
+            # AL-13: escapes reconhecidos dentro de literais de texto --
+            # \" (aspa literal), \\ (barra invertida literal), \n (quebra
+            # de linha). Um '\' seguido de outra coisa qualquer não é uma
+            # sequência de escape reconhecida e fica tal-e-qual no valor.
             j = i + 1
             buf = []
             while j < n and linha[j] != '"':
+                if linha[j] == "\\" and j + 1 < n and linha[j + 1] in ('"', "\\", "n"):
+                    buf.append({'"': '"', "\\": "\\", "n": "\n"}[linha[j + 1]])
+                    j += 2
+                    continue
                 buf.append(linha[j])
                 j += 1
             if j >= n:

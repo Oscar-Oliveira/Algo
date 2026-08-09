@@ -410,8 +410,8 @@ class GeradorCodigo:
             return ""
         if isinstance(expr, A.Literal):
             if expr.tipo in ("cadeia", "caracter"):
-                escapado = expr.valor.replace("\\", "\\\\").replace('"', '\\"')
-                return f'"{escapado}"'
+                # AL-13: repr() -- ver a mesma nota em codegen.py.
+                return repr(expr.valor)
             if expr.tipo == "booleano":
                 return "True" if expr.valor else "False"
             return repr(expr.valor)
