@@ -30,7 +30,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 ### 3.1 `algo_lang/` — Bugs e Segurança (25 findings)
 
-- **AL-06** [BUG · MÉDIA · Baixo] `semantics.py:202-212` + `codegen.py:257-264`. Tamanho de array calculado em runtime que dê negativo gera silenciosamente um array vazio, sem erro. Recomendação: adicionar guarda de runtime (`if tam < 0: raise ...`) na construção de arrays, com mensagem amigável em português.
 - **AL-07** [QUALIDADE DE CÓDIGO · ALTA · Alto] `compilador/codegen.py` + `codegen_minimo.py`. ~13 funções quase byte-a-byte duplicadas entre os dois geradores (ver ARCH-01 para o impacto estrutural). Recomendação: extrair uma camada de dispatch/funções partilhadas; tratar como refactor dedicado, não uma correção pontual.
 - **AL-08** [UX/BUG · BAIXA · Baixo] `codegen.py:180-183`. `except ValueError` genérico mostra sempre "valor inválido", já melhorado para incluir a mensagem Python real entre parênteses, mas continua sem localizar/traduzir essa mensagem (ver UX-01). Recomendação: mapear as causas conhecidas (`math domain error`, `invalid literal for int()`, etc.) para frases em português; manter o genérico como fallback.
 - **AL-09** [BUG · BAIXA · Baixo] `codegen.py:167-171`. Mensagem de `IndexError` fala sempre em "posição de array", mesmo quando o erro vem de `cadeia.caracter` fora dos limites. Recomendação: distinguir a origem do erro (array vs. cadeia) antes de formatar a mensagem.
@@ -182,7 +181,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 2 — Robustez do compilador
 - **Objetivo**: corrigir os defeitos funcionais do compilador identificados na secção 3.1 que ainda não foram tratados na Fase 0.
-- **Resolve**: ~~AL-02~~, ~~AL-04~~, ~~AL-05~~ (ver AUDIT_DONE.md), AL-06, AL-09, AL-12, AL-13, AL-15, AL-16, AL-18, AL-19, AL-21, AL-28, AL-29, AL-31, AL-33, AL-34, AL-35, AL-36.
+- **Resolve**: ~~AL-02~~, ~~AL-04~~, ~~AL-05~~, ~~AL-06~~ (ver AUDIT_DONE.md), AL-09, AL-12, AL-13, AL-15, AL-16, AL-18, AL-19, AL-21, AL-28, AL-29, AL-31, AL-33, AL-34, AL-35, AL-36.
 - **Componentes**: `algo_lang/compilador/*`, `algo_lang/bibliotecas/*`, `algo_lang/tools/linter.py`, `algo_lang/cli.py`.
 - **Dependências**: Fase 0 (`codegen.py` já alterado, evitar conflitos).
 - **Riscos**: AL-05 (semântica de `div`/`mod`) exige uma decisão de produto documentada antes de implementar — pode alterar o comportamento de programas existentes; não implementar sem essa decisão explícita.

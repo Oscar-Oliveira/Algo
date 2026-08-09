@@ -82,6 +82,18 @@ def _algo_mod(a, b):
     primeiro operando, ao contrario do % nativo do Python."""
     return a - _algo_div(a, b) * b
 
+
+def _algo_verificar_tamanho_array(tam):
+    """Um tamanho de array calculado em runtime (nao um literal, ja
+    apanhado em compilacao) que de negativo silenciosamente produzia
+    um array vazio -- range(negativo) do Python nao levanta erro
+    nenhum. ValueError e reaproveitado de propósito: ja ha um
+    'except ValueError' no programa gerado que traduz para a mensagem
+    amigavel de 'Erro em tempo de execucao: valor invalido (...)'."""
+    if tam < 0:
+        raise ValueError(f"tamanho de array não pode ser negativo (é {tam})")
+    return tam
+
 '''
 
 OPS_BIN = {
@@ -278,7 +290,7 @@ class GeradorCodigo:
             return self._valor_default(tipo)
         tam = self._expr(dims_exprs[0], tipos)
         interior = self._construir_array_aninhado(tipo, dims_exprs[1:], tipos)
-        return f"[{interior} for _ in range({tam})]"
+        return f"[{interior} for _ in range(_algo_verificar_tamanho_array({tam}))]"
 
     # -------- funções --------
     def _gerar_funcao(self, f: A.FuncaoDef):

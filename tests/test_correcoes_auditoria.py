@@ -799,6 +799,43 @@ def test_minimo_div_mod_tambem_e_truncado_e_sem_funcoes_de_apoio():
     assert resultado.stdout.strip() == "-3-1"
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-06 -- tamanho de array negativo em runtime ----------
+
+def test_array_com_tamanho_negativo_calculado_em_runtime_da_erro_amigavel():
+    """Ao contrário do literal (já apanhado em compilação, ver
+    test_array_com_tamanho_negativo_literal_da_erro), um tamanho só
+    conhecido em runtime (variável) que dê negativo produzia
+    silenciosamente um array vazio -- range(negativo) não levanta
+    erro nenhum no Python."""
+    import os
+    codigo_py = compilar("""
+        algoritmo "T"
+        inicio
+            n:inteiro = -3
+            v:inteiro[n]
+            escrever("nunca chega aqui")
+    """)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert resultado.returncode == 1
+    assert "nunca chega aqui" not in resultado.stdout
+    assert "não pode ser negativo" in resultado.stdout
+
+
+def test_array_com_tamanho_positivo_calculado_em_runtime_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            n:inteiro = 3
+            v:inteiro[n]
+            v[0] = 9
+            escrever(v[0], " ", v[1], " ", v[2])
+    """)
+    assert saida.strip() == "9 0 0"
+
+
 # ---------- AUDIT_PLAN Fase 2: AL-02 -- ^ com expoente negativo ----------
 
 def test_potencia_com_expoente_literal_nao_negativo_continua_inteiro():
