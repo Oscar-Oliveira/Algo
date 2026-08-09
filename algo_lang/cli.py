@@ -24,6 +24,13 @@ def _pasta_saida(caminho_algo: str):
     pasta_base = os.path.dirname(os.path.abspath(caminho_algo))
     nome_base = os.path.splitext(os.path.basename(caminho_algo))[0]
     pasta = os.path.join(pasta_base, nome_base)
+    if os.path.isfile(pasta):
+        # AL-33: os.makedirs(..., exist_ok=True) só tolera a pasta já
+        # existir -- se já houver um FICHEIRO com este nome, levanta
+        # FileExistsError/NotADirectoryError não tratado.
+        print(f"❌ Erro: não é possível criar a pasta '{pasta}' -- já existe um "
+              f"ficheiro com esse nome. Renomeia ou remove esse ficheiro e tenta outra vez.")
+        sys.exit(1)
     os.makedirs(pasta, exist_ok=True)
     return pasta, nome_base
 

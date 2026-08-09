@@ -1760,6 +1760,30 @@ def test_linter_nao_assinala_funcao_recursiva_chamada_a_partir_do_principal():
     assert not any("'fatorial'" in a.mensagem and "nunca é chamada" in a.mensagem for a in avisos)
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-33 -- pasta de saída colide com um ficheiro ----------
+
+def test_pasta_saida_com_ficheiro_no_caminho_da_erro_amigavel(tmp_path, capsys):
+    from algo_lang.cli import _pasta_saida
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text('algoritmo "T"\ninicio\n    escrever(1)\n', encoding="utf-8")
+    # Cria um FICHEIRO (não pasta) exatamente onde a pasta de saída iria ficar.
+    (tmp_path / "prog").write_text("já sou um ficheiro", encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        _pasta_saida(str(algo_path))
+    assert exc.value.code == 1
+    assert "já existe um ficheiro" in capsys.readouterr().out
+
+
+def test_pasta_saida_normal_continua_a_funcionar(tmp_path):
+    import os
+    from algo_lang.cli import _pasta_saida
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text('algoritmo "T"\ninicio\n    escrever(1)\n', encoding="utf-8")
+    pasta, nome_base = _pasta_saida(str(algo_path))
+    assert nome_base == "prog"
+    assert os.path.isdir(pasta)
+
+
 def test_indentacao_mista_entre_linhas_diferentes_da_erro_de_compilacao():
     """AL-15: promovido de aviso do linter a erro de compilação -- uma
     linha com tabs e outra com espaços no mesmo ficheiro já não chega
