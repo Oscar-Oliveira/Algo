@@ -1784,6 +1784,29 @@ def test_pasta_saida_normal_continua_a_funcionar(tmp_path):
     assert os.path.isdir(pasta)
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-34 -- .algo com codificação inválida ----------
+
+def test_ficheiro_algo_com_bytes_invalidos_utf8_da_erro_amigavel(tmp_path, capsys):
+    from algo_lang.cli import _ler_ficheiro_algo
+    algo_path = tmp_path / "prog.algo"
+    # 0xE9 sozinho não é UTF-8 válido (é 'é' em Latin-1, por exemplo).
+    algo_path.write_bytes(b'algoritmo "T"\ninicio\n    escrever("caf\xe9")\n')
+    with pytest.raises(SystemExit) as exc:
+        _ler_ficheiro_algo(str(algo_path))
+    assert exc.value.code == 1
+    assert "UTF-8" in capsys.readouterr().out
+
+
+def test_carregar_ficheiro_algo_com_codificacao_invalida_da_erro_amigavel(tmp_path, capsys):
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_bytes(b'algoritmo "T"\ninicio\n    escrever("caf\xe9")\n')
+    with pytest.raises(SystemExit) as exc:
+        _carregar_e_resolver_inclusoes(str(algo_path))
+    assert exc.value.code == 1
+    assert "UTF-8" in capsys.readouterr().out
+
+
 def test_indentacao_mista_entre_linhas_diferentes_da_erro_de_compilacao():
     """AL-15: promovido de aviso do linter a erro de compilação -- uma
     linha com tabs e outra com espaços no mesmo ficheiro já não chega

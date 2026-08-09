@@ -35,6 +35,20 @@ def _pasta_saida(caminho_algo: str):
     return pasta, nome_base
 
 
+def _ler_ficheiro_algo(caminho: str) -> str:
+    """Lê um .algo como UTF-8 -- AL-34: sem isto, um ficheiro noutra
+    codificação (ex: Latin-1 guardado por engano) levantava
+    UnicodeDecodeError não tratado, um traceback confuso em vez de uma
+    sugestão do que fazer."""
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            return f.read()
+    except UnicodeDecodeError as e:
+        print(f"❌ Erro: não consegui ler '{caminho}' como texto UTF-8 ({e}) -- "
+              f"confirma a codificação do ficheiro (grava-o como UTF-8 no teu editor).")
+        sys.exit(1)
+
+
 def _resolver_inclusoes(programa, pasta_base, ja_incluidos=None):
     """Lê os ficheiros de 'incluir' e junta as suas funções/declarações
     ao programa principal."""
@@ -51,8 +65,7 @@ def _resolver_inclusoes(programa, pasta_base, ja_incluidos=None):
         if not os.path.isfile(caminho):
             print(f"❌ Erro na linha {inc.linha}: ficheiro incluído '{inc.caminho}' não encontrado")
             sys.exit(1)
-        with open(caminho, "r", encoding="utf-8") as f:
-            codigo = f.read()
+        codigo = _ler_ficheiro_algo(caminho)
         declaracoes, funcoes, estruturas = parse_biblioteca(codigo)
 
         nomes_estruturas_existentes = {e.nome for e in programa.estruturas}
@@ -91,8 +104,7 @@ def _carregar_e_resolver_inclusoes(caminho_algo: str):
     if not os.path.isfile(caminho_algo):
         print(f"Erro: ficheiro '{caminho_algo}' não encontrado.")
         sys.exit(1)
-    with open(caminho_algo, "r", encoding="utf-8") as f:
-        codigo = f.read()
+    codigo = _ler_ficheiro_algo(caminho_algo)
     pasta_base = os.path.dirname(os.path.abspath(caminho_algo))
     try:
         programa = parse(codigo)
