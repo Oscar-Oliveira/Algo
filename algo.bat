@@ -5,6 +5,16 @@ rem mao. Este script encontra (ou cria, na primeira vez) um venv ao lado
 rem dele proprio, instala o pacote la dentro se for preciso, e depois
 rem chama o 'algo' de dentro desse venv diretamente.
 
+rem AL-35: as mensagens do compilador usam emojis (ex: ❌) -- sem isto, a
+rem code page por omissao da consola do Windows (normalmente 850/1252,
+rem nao UTF-8) faz o Python falhar a escrever essas mensagens
+rem (UnicodeEncodeError) em vez de as mostrar. chcp muda a code page da
+rem propria consola; PYTHONIOENCODING garante o mesmo independentemente
+rem da code page, incluindo quando a saida e redirecionada para um
+rem ficheiro/pipe (onde chcp nao tem efeito nenhum).
+chcp 65001 >nul
+set "PYTHONIOENCODING=utf-8"
+
 set "DIR=%~dp0"
 rem %~dp0 vem sempre com uma barra invertida no fim (ex: "C:\pasta\").
 rem Isso parte quando a metemos entre aspas mesmo antes de outra aspa de
