@@ -1721,6 +1721,45 @@ def test_linter_global_usada_so_dentro_de_uma_funcao_nao_e_falso_positivo():
     assert not any("'total'" in a.mensagem and "nunca é usada" in a.mensagem for a in avisos)
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-29 -- linter e autochamadas (dead code) ----------
+
+def test_linter_assinala_funcao_puramente_autorrecursiva_nunca_chamada_de_fora():
+    """Uma função que só se chama a si própria (nunca é chamada de
+    'inicio' nem de outra rotina) é código morto -- a autochamada não
+    deve contar como 'uso' que a livra do aviso."""
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        funcao nuncaChamada(n:inteiro):inteiro
+            se n <= 0 entao
+                devolver 0
+            senao
+                devolver nuncaChamada(n - 1)
+        inicio
+            escrever("ola")
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert any("'nuncaChamada'" in a.mensagem and "nunca é chamada" in a.mensagem for a in avisos)
+
+
+def test_linter_nao_assinala_funcao_recursiva_chamada_a_partir_do_principal():
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        funcao fatorial(n:inteiro):inteiro
+            se n <= 1 entao
+                devolver 1
+            senao
+                devolver n * fatorial(n - 1)
+        inicio
+            escrever(fatorial(5))
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert not any("'fatorial'" in a.mensagem and "nunca é chamada" in a.mensagem for a in avisos)
+
+
 def test_indentacao_mista_entre_linhas_diferentes_da_erro_de_compilacao():
     """AL-15: promovido de aviso do linter a erro de compilação -- uma
     linha com tabs e outra com espaços no mesmo ficheiro já não chega

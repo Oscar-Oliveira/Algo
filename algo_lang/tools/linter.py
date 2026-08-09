@@ -154,13 +154,24 @@ class Linter:
     # ---------- verificações ----------
     def _verificar_rotinas_nunca_chamadas(self):
         chamadas = set()
-        for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
+        corpos_com_dono = (
+            [(self.programa.corpo, None)] + [(f.corpo, f.nome) for f in self.programa.funcoes]
+        )
+        for stmts, dono in corpos_com_dono:
             for s in self._todas_as_stmts(stmts):
                 nomes = set()
+                chamadas_aqui = set()
                 for e in self._expressoes_lidas(s):
-                    self._extrair_lvalues_e_chamadas(e, nomes, chamadas)
+                    self._extrair_lvalues_e_chamadas(e, nomes, chamadas_aqui)
                 if isinstance(s, A.ChamadaStmt):
-                    self._extrair_lvalues_e_chamadas(s.chamada, set(), chamadas)
+                    self._extrair_lvalues_e_chamadas(s.chamada, set(), chamadas_aqui)
+                if dono is not None:
+                    # AL-29: uma rotina que só se chama a si própria não
+                    # deve contar como "usada" por essa autochamada -- só
+                    # chamadas vindas de FORA (de outra rotina, ou do
+                    # programa principal) contam.
+                    chamadas_aqui.discard(dono)
+                chamadas |= chamadas_aqui
         for f in self.programa.funcoes:
             if f.nome not in chamadas:
                 if f.eh_procedimento:
