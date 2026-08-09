@@ -968,6 +968,51 @@ def test_math_absoluto_de_decimal_continua_decimal():
     assert saida.strip() == "5.5"
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-21 -- cadeia.subcadeia fora dos limites ----------
+
+def test_subcadeia_dentro_dos_limites_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        importar Cadeia
+        inicio
+            escrever(cadeia.subcadeia("algoritmo", 0, 4))
+    """)
+    assert saida.strip() == "algo"
+
+
+def test_subcadeia_fim_fora_dos_limites_da_erro_amigavel():
+    import os
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Cadeia
+        inicio
+            escrever(cadeia.subcadeia("abc", 0, 10))
+    """)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert resultado.returncode == 1
+    assert "posição de texto" in resultado.stdout
+    assert "Traceback" not in resultado.stdout
+
+
+def test_subcadeia_inicio_negativo_da_erro_amigavel():
+    import os
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Cadeia
+        inicio
+            escrever(cadeia.subcadeia("abc", -1, 2))
+    """)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert resultado.returncode == 1
+    assert "posição de texto" in resultado.stdout
+
+
 # ---------- AUDIT_PLAN Fase 2: AL-02 -- ^ com expoente negativo ----------
 
 def test_potencia_com_expoente_literal_nao_negativo_continua_inteiro():
