@@ -127,6 +127,39 @@ def test_classificacoes_bloqueaveis_sao_exatamente_code_e_full_solution():
     assert CLASSIFICACOES_BLOQUEAVEIS == {Classificacao.CODE, Classificacao.FULL_SOLUTION}
 
 
+# ---------- AG-11: falha de rede/API durante a classificação ----------
+
+class FornecedorQueFalha(AgenteLLM):
+    """Simula uma falha de rede/API a meio da chamada de classificação."""
+    @property
+    def nome(self):
+        return "falha"
+
+    def responder(self, mensagens):
+        raise RuntimeError("falha de rede simulada")
+
+
+def test_classificacao_por_llm_com_erro_de_rede_falha_para_o_lado_seguro():
+    """Uma exceção durante a chamada ao classificador não pode
+    propagar-se sem controlo -- tem de ser tratada como se a resposta
+    tivesse revelado demasiado, nunca deixada passar por omissão."""
+    guardiao = GuardiaoPedagogico(FornecedorQueFalha(modelo="x", api_key="x"))
+    resultado = guardiao.classificar("resposta qualquer sem código")
+    assert resultado == Classificacao.FULL_SOLUTION
+
+
+# ---------- AG-12: correspondência exata, não substring ----------
+
+def test_classificacao_por_llm_ignora_correspondencia_de_substring():
+    """Uma categoria a aparecer como substring de outra palavra (ex.
+    'SAFE' dentro de 'UNSAFE') não pode ser confundida com a própria
+    categoria -- a correspondência tem de ser exata (âncora)."""
+    guardiao = GuardiaoPedagogico(FornecedorControlavel(
+        ["Isto seria UNSAFE dizer diretamente."], modelo="x", api_key="x"))
+    resultado = guardiao.classificar("resposta qualquer sem código")
+    assert resultado == Classificacao.FULL_SOLUTION  # não reconhecida -- lado seguro
+
+
 # ---------- integração no Tutor: regeneração ----------
 
 def test_resposta_safe_passa_direto_sem_regenerar():

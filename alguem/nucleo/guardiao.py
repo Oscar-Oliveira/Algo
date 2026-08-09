@@ -143,9 +143,19 @@ class GuardiaoPedagogico:
 
     def _classificar_por_llm(self, resposta: str) -> Classificacao:
         pedido = [{"role": "user", "content": PROMPT_CLASSIFICACAO.format(resposta=resposta)}]
-        texto = self.fornecedor.responder(pedido).strip().upper()
+        try:
+            texto = self.fornecedor.responder(pedido).strip().upper()
+        except Exception:
+            # AG-11: uma falha de rede/API a meio da classificação não
+            # pode deixar a resposta original passar sem verificação --
+            # falha para o lado seguro, tal como uma categoria não
+            # reconhecida logo abaixo.
+            return Classificacao.FULL_SOLUTION
         for classificacao in Classificacao:
-            if classificacao.value in texto:
+            # AG-12: igualdade exata (âncora), não substring -- "isto
+            # não é FULL_SOLUTION" contém "FULL_SOLUTION" como
+            # substring mas não é essa categoria.
+            if texto == classificacao.value:
                 return classificacao
         # resposta do LLM não bateu com nenhuma categoria conhecida --
         # falha para o lado seguro (trata como se tivesse revelado
