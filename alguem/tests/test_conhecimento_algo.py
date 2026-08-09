@@ -45,6 +45,30 @@ def test_referencia_de_sintaxe_tem_caminho_de_reserva_se_algo_lang_faltar(tmp_pa
     assert "UserWarning" in resultado.stderr or "Warning" in resultado.stderr
 
 
+# ---------- AG-30: a captura na importação cobre mais do que ImportError ----------
+
+def test_conhecimento_algo_cai_para_reserva_se_a_importacao_falhar_por_outro_motivo():
+    """Alargado de 'except ImportError' para 'except Exception' --
+    algo_lang PRESENTE mas com um erro inesperado a meio da importação
+    (ex: um tipo primitivo corrompido, não apenas o pacote em falta)
+    também tem de cair para a lista de reserva, não propagar e impedir
+    o Alguem de arrancar. Corrompe NUMERICOS de propósito para que a
+    linha 'NUMERICOS | TEXTUAIS' levante TypeError, não ImportError --
+    testa exatamente o alargamento, não o caminho já coberto antes."""
+    import importlib
+    from algo_lang.compilador import semantics as semantics_real
+    import alguem.nucleo.conhecimento_algo as modulo
+
+    numericos_originais = semantics_real.NUMERICOS
+    try:
+        semantics_real.NUMERICOS = ["isto-nao-e-um-set"]  # '|' com um set levanta TypeError
+        importlib.reload(modulo)
+        assert "reserva" in modulo._FONTE
+    finally:
+        semantics_real.NUMERICOS = numericos_originais
+        importlib.reload(modulo)  # repõe o estado normal para os testes seguintes
+
+
 def test_referencia_inclui_regras_chave_da_sintaxe():
     from alguem.nucleo.conhecimento_algo import REFERENCIA_SINTAXE
     assert "algoritmo" in REFERENCIA_SINTAXE

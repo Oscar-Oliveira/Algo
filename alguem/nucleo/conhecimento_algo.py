@@ -23,7 +23,11 @@ try:
     _TIPOS_PRIMITIVOS = sorted(NUMERICOS | TEXTUAIS | {"booleano"})
     _PALAVRAS_CHAVE = sorted(PALAVRAS_CHAVE)
     _FONTE = "algo_lang (importado diretamente do compilador)"
-except ImportError:  # pragma: no cover -- testado por subprocesso isolado (test_conhecimento_algo.py), a medição de cobertura não segue por processos separados com cwd diferente
+except Exception:  # pragma: no cover -- testado por subprocesso isolado (test_conhecimento_algo.py), a medição de cobertura não segue por processos separados com cwd diferente
+    # AG-30: alargado de ImportError para Exception -- um algo_lang
+    # presente mas corrompido/incompatível (ex: PALAVRAS_CHAVE
+    # renomeada, um erro de sintaxe no próprio módulo) também tem de
+    # cair para a lista de reserva, não só a ausência do pacote.
     warnings.warn(
         "Não consegui importar algo_lang -- o Alguem vai usar uma lista de "
         "palavras-chave de reserva, que pode não estar atualizada. Corre o "
