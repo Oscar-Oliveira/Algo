@@ -664,13 +664,18 @@ def parse(codigo: str) -> A.Programa:
 
 def parse_biblioteca(codigo: str):
     """Interpreta um ficheiro incluído (via 'incluir') como uma biblioteca:
-    apenas declarações globais, 'estrutura' e definições de função/
-    procedimento, sem cabeçalho 'algoritmo' nem bloco 'inicio'."""
+    apenas declarações globais, 'estrutura', definições de função/
+    procedimento e, para suportar 'incluir' transitivo (AL-36: uma
+    biblioteca incluir outra), também 'incluir' -- sem cabeçalho
+    'algoritmo' nem bloco 'inicio'. Devolve (declaracoes, funcoes,
+    estruturas, inclusoes); quem chama é responsável por resolver as
+    inclusões recursivamente (ver cli.py/online/executor.py)."""
     tokens = tokenizar(codigo)
     parser = Parser(tokens)
     declaracoes = []
     funcoes = []
     estruturas = []
+    inclusoes = []
     while not parser.ver("EOF"):
         if parser.ver("FUNCAO") or parser.ver("PROCEDIMENTO"):
             funcoes.append(parser._parse_funcao_def())
@@ -678,12 +683,14 @@ def parse_biblioteca(codigo: str):
             estruturas.append(parser._parse_estrutura_def())
         elif parser.ver("CONSTANTE"):
             declaracoes.append(parser._parse_constante())
+        elif parser.ver("INCLUIR"):
+            inclusoes.append(parser._parse_incluir())
         elif parser.ver("ID"):
             declaracoes.extend(parser._parse_declaracao_global())
         else:
             raise ErroSintatico(
                 "um ficheiro incluído só pode conter declarações de variáveis, "
-                f"'constante', 'estrutura', 'funcao' ou 'procedimento' "
+                f"'constante', 'estrutura', 'funcao', 'procedimento' ou 'incluir' "
                 f"(encontrou {parser.atual().tipo})",
                 parser.atual().linha)
-    return declaracoes, funcoes, estruturas
+    return declaracoes, funcoes, estruturas, inclusoes

@@ -51,10 +51,18 @@ def _ler_ficheiro_algo(caminho: str) -> str:
 
 def _resolver_inclusoes(programa, pasta_base, ja_incluidos=None):
     """Lê os ficheiros de 'incluir' e junta as suas funções/declarações
-    ao programa principal."""
+    ao programa principal -- recursivamente (AL-36: uma biblioteca
+    incluída também pode ter 'incluir'), com deduplicação por caminho
+    absoluto partilhada por toda a árvore de inclusões, para nunca
+    processar o mesmo ficheiro duas vezes nem entrar em ciclo infinito
+    (ex.: A inclui B, B inclui A)."""
     if ja_incluidos is None:
         ja_incluidos = set()
-    for inc in programa.inclusoes:
+    _resolver_lista_de_inclusoes(programa, programa.inclusoes, pasta_base, ja_incluidos)
+
+
+def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
+    for inc in inclusoes:
         caminho = inc.caminho
         if not os.path.isabs(caminho):
             caminho = os.path.join(pasta_base, caminho)
@@ -66,7 +74,7 @@ def _resolver_inclusoes(programa, pasta_base, ja_incluidos=None):
             print(f"❌ Erro na linha {inc.linha}: ficheiro incluído '{inc.caminho}' não encontrado")
             sys.exit(1)
         codigo = _ler_ficheiro_algo(caminho)
-        declaracoes, funcoes, estruturas = parse_biblioteca(codigo)
+        declaracoes, funcoes, estruturas, inclusoes_aninhadas = parse_biblioteca(codigo)
 
         nomes_estruturas_existentes = {e.nome for e in programa.estruturas}
         for e in estruturas:
@@ -94,6 +102,13 @@ def _resolver_inclusoes(programa, pasta_base, ja_incluidos=None):
                 sys.exit(1)
             programa.declaracoes.append(d)
             nomes_decl_existentes.add(d.nome)
+
+        # As inclusões desta biblioteca resolvem-se relativas à PRÓPRIA
+        # pasta dela, não a pasta_base original -- um 'incluir "x.algo"'
+        # dentro de lib/a.algo procura lib/x.algo, não a pasta do
+        # ficheiro principal.
+        _resolver_lista_de_inclusoes(
+            programa, inclusoes_aninhadas, os.path.dirname(caminho), ja_incluidos)
 
 
 def _carregar_e_resolver_inclusoes(caminho_algo: str):

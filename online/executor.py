@@ -140,10 +140,8 @@ def _resolver_inclusoes(programa, pasta_base) -> None:
     sys.exit(1) -- levanta ErroCompilacao em vez disso. A lógica em si
     (ler cada ficheiro incluído, juntar as suas funções/estruturas/
     declarações ao programa principal) é a mesma; só a forma de
-    reportar erro muda. Não suporta inclusões aninhadas (uma
-    biblioteca incluir outra) -- o próprio compilador também não:
-    parse_biblioteca() não trata 'incluir', é uma limitação da
-    linguagem em si, não desta reimplementação.
+    reportar erro muda. AL-36: suporta inclusões aninhadas (uma
+    biblioteca incluir outra), tal como cli.py.
 
     ON-02: 'inc.caminho' vem do código do estudante -- um caminho
     absoluto ou com '../' permitiria ler qualquer ficheiro do servidor.
@@ -152,10 +150,20 @@ def _resolver_inclusoes(programa, pasta_base) -> None:
     absoluto, por isso o realpath resolve para fora do prefixo em
     ambos os casos -- tratados da mesma forma, com a mesma mensagem de
     erro de 'não encontrado', para não revelar se o caminho existe
-    fora da pasta permitida)."""
+    fora da pasta permitida). As inclusões aninhadas continuam
+    confinadas à MESMA 'pasta_base' (nunca à pasta do ficheiro incluído
+    que as trouxe) -- o editor web não tem subpastas, todos os
+    ficheiros do estudante vivem sempre lado a lado, por isso isto não
+    muda o comportamento prático, só evita alargar por engano o
+    perímetro de segurança se essa suposição alguma vez deixar de ser
+    verdade."""
     ja_incluidos = set()
     pasta_base_real = os.path.realpath(pasta_base)
-    for inc in programa.inclusoes:
+    _resolver_lista_de_inclusoes(programa, programa.inclusoes, pasta_base, pasta_base_real, ja_incluidos)
+
+
+def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, pasta_base_real, ja_incluidos) -> None:
+    for inc in inclusoes:
         caminho_real = os.path.realpath(os.path.join(pasta_base, inc.caminho))
         try:
             dentro_da_pasta = os.path.commonpath([caminho_real, pasta_base_real]) == pasta_base_real
@@ -172,7 +180,7 @@ def _resolver_inclusoes(programa, pasta_base) -> None:
         with open(caminho_real, "r", encoding="utf-8") as f:
             codigo = f.read()
         try:
-            declaracoes, funcoes, estruturas = parse_biblioteca(codigo)
+            declaracoes, funcoes, estruturas, inclusoes_aninhadas = parse_biblioteca(codigo)
         except (ErroLexico, ErroSintatico) as e:
             raise ErroCompilacao(f"Erro em '{inc.caminho}': {e}") from e
 
@@ -202,6 +210,9 @@ def _resolver_inclusoes(programa, pasta_base) -> None:
                     f"com uma variável global já declarada.")
             programa.declaracoes.append(d)
             nomes_decl_existentes.add(d.nome)
+
+        _resolver_lista_de_inclusoes(
+            programa, inclusoes_aninhadas, pasta_base, pasta_base_real, ja_incluidos)
 
 
 def _validar_nome_ficheiro(nome: str, pasta_estudante: str) -> str:

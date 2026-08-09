@@ -1807,6 +1807,60 @@ def test_carregar_ficheiro_algo_com_codificacao_invalida_da_erro_amigavel(tmp_pa
     assert "UTF-8" in capsys.readouterr().out
 
 
+# ---------- AUDIT_PLAN Fase 2: AL-36 -- 'incluir' transitivo a sério ----------
+
+def test_incluir_transitivo_resolve_biblioteca_que_inclui_outra(tmp_path):
+    """principal.algo inclui meio.algo, que por sua vez inclui
+    fundo.algo -- antes do AL-36, isto falhava com erro de sintaxe
+    (parse_biblioteca não reconhecia 'incluir' dentro de uma
+    biblioteca)."""
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+    (tmp_path / "fundo.algo").write_text(
+        "funcao triplo(n:inteiro):inteiro\n    devolver n * 3\n", encoding="utf-8")
+    (tmp_path / "meio.algo").write_text(
+        'incluir "fundo.algo"\nfuncao dobro(n:inteiro):inteiro\n    devolver n * 2\n',
+        encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "T"\nincluir "meio.algo"\ninicio\n    escrever(dobro(triplo(5)))\n',
+        encoding="utf-8")
+    programa = _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
+    nomes = {f.nome for f in programa.funcoes}
+    assert nomes == {"dobro", "triplo"}
+
+
+def test_incluir_transitivo_circular_nao_entra_em_ciclo_infinito(tmp_path):
+    """a.algo inclui b.algo, b.algo inclui a.algo de volta -- tem de
+    terminar (deduplicação partilhada por toda a árvore), não
+    recursão infinita."""
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+    (tmp_path / "a.algo").write_text(
+        'incluir "b.algo"\nfuncao fA():inteiro\n    devolver 1\n', encoding="utf-8")
+    (tmp_path / "b.algo").write_text(
+        'incluir "a.algo"\nfuncao fB():inteiro\n    devolver 2\n', encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "T"\nincluir "a.algo"\ninicio\n    escrever(fA() + fB())\n',
+        encoding="utf-8")
+    programa = _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
+    nomes = {f.nome for f in programa.funcoes}
+    assert nomes == {"fA", "fB"}
+
+
+def test_incluir_transitivo_diamante_nao_duplica(tmp_path):
+    """principal inclui b e c; b e c incluem, cada um, comum.algo --
+    comum só deve ser processado uma vez."""
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+    (tmp_path / "comum.algo").write_text(
+        "funcao fComum():inteiro\n    devolver 42\n", encoding="utf-8")
+    (tmp_path / "b.algo").write_text('incluir "comum.algo"\n', encoding="utf-8")
+    (tmp_path / "c.algo").write_text('incluir "comum.algo"\n', encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "T"\nincluir "b.algo"\nincluir "c.algo"\ninicio\n    escrever(fComum())\n',
+        encoding="utf-8")
+    programa = _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
+    nomes = [f.nome for f in programa.funcoes]
+    assert nomes == ["fComum"]
+
+
 def test_indentacao_mista_entre_linhas_diferentes_da_erro_de_compilacao():
     """AL-15: promovido de aviso do linter a erro de compilação -- uma
     linha com tabs e outra com espaços no mesmo ficheiro já não chega

@@ -96,6 +96,38 @@ def test_incluir_resolve_funcao_de_outro_ficheiro(tmp_path):
     assert "def dobro(n):" in conteudo
 
 
+# ---------- AL-36: 'incluir' transitivo ----------
+
+def test_incluir_transitivo_biblioteca_que_inclui_outra(tmp_path):
+    principal = 'algoritmo "T"\nincluir "meio.algo"\ninicio\n    escrever(dobro(triplo(5)))\n'
+    meio = 'incluir "fundo.algo"\nfuncao dobro(n:inteiro):inteiro\n    devolver n * 2\n'
+    fundo = "funcao triplo(n:inteiro):inteiro\n    devolver n * 3\n"
+    caminho_py = executor.compilar_codigo(
+        [{"nome": "principal.algo", "conteudo": principal},
+         {"nome": "meio.algo", "conteudo": meio},
+         {"nome": "fundo.algo", "conteudo": fundo}],
+        "principal.algo", str(tmp_path))
+    with open(caminho_py, encoding="utf-8") as f:
+        conteudo = f.read()
+    assert "def dobro(n):" in conteudo
+    assert "def triplo(n):" in conteudo
+
+
+def test_incluir_transitivo_circular_nao_entra_em_ciclo_infinito(tmp_path):
+    principal = 'algoritmo "T"\nincluir "a.algo"\ninicio\n    escrever(fA() + fB())\n'
+    a = 'incluir "b.algo"\nfuncao fA():inteiro\n    devolver 1\n'
+    b = 'incluir "a.algo"\nfuncao fB():inteiro\n    devolver 2\n'
+    caminho_py = executor.compilar_codigo(
+        [{"nome": "principal.algo", "conteudo": principal},
+         {"nome": "a.algo", "conteudo": a},
+         {"nome": "b.algo", "conteudo": b}],
+        "principal.algo", str(tmp_path))
+    with open(caminho_py, encoding="utf-8") as f:
+        conteudo = f.read()
+    assert "def fA():" in conteudo
+    assert "def fB():" in conteudo
+
+
 def test_incluir_ficheiro_em_falta_da_erro_claro(tmp_path):
     principal = 'algoritmo "T"\nincluir "nao_existe.algo"\ninicio\n    escrever(1)\n'
     with pytest.raises(executor.ErroCompilacao, match="não encontrado"):
