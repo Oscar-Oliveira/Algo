@@ -1,7 +1,12 @@
-fastapi
-uvicorn[standard]
-bcrypt
-cryptography
-python-multipart
-itsdangerous
-websockets
+# ON-30: versões fixadas às testadas neste projeto (== em vez de sem
+# limite nenhum) -- evita que um "pip install" puxe silenciosamente
+# uma versão nova incompatível ou com uma regressão. Rever/atualizar
+# periodicamente com `pip list --outdated` e `pip-audit` (não há
+# pipeline de CI neste repositório para automatizar isto).
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+bcrypt==5.0.0
+cryptography==50.0.0
+python-multipart==0.0.32
+itsdangerous==2.2.0
+websockets==17.0.1
