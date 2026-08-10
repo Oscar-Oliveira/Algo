@@ -51,9 +51,25 @@ def _validar_email(email: str) -> str:
     return email
 
 
+# ON-13: lista curta e propositadamente pequena (não o rockyou completo
+# -- só as passwords mais óbvias, que qualquer verificador rápido
+# apanharia) das passwords mais comuns, para recusar os casos mais
+# flagrantes ("password123", "12345678") sem impor uma política de
+# complexidade pesada a estudantes.
+PASSWORDS_COMUNS = {
+    "password", "password1", "12345678", "123456789",
+    "1234567890", "qwerty123", "qwertyuiop", "letmein123", "iloveyou",
+    "admin1234", "welcome123", "abc123456", "senha1234", "senha12345",
+    "12345678910", "00000000", "11111111", "asdfghjkl", "changeme123",
+}
+
+
 def _validar_password(password: str) -> None:
     if len(password) < 8:
         raise ErroAutenticacao("A password tem de ter pelo menos 8 caracteres.")
+    if password.lower() in PASSWORDS_COMUNS:
+        raise ErroAutenticacao(
+            "Essa password é demasiado comum e fácil de adivinhar -- escolhe outra.")
 
 
 def _emails_admin() -> set[str]:
@@ -68,8 +84,11 @@ def registar(email: str, password: str, caminho_bd: str | None = None) -> int:
     chamadores existentes a mudar. 'aprovado' fica True se
     ONLINE_EMAIL_ADMIN não estiver configurada, ou se este email for
     um dos admins -- caso contrário a conta fica pendente até um admin
-    a aprovar. Levanta ErroAutenticacao se o email já estiver em uso
-    ou os dados forem inválidos."""
+    a aprovar. Levanta ErroAutenticacao se os dados forem inválidos ou
+    se o email já estiver em uso -- ON-12: a mensagem para email já em
+    uso é deliberadamente genérica (não diz "já existe conta"), para
+    não revelar a quem regista quais emails já têm conta -- a mesma
+    filosofia já aplicada em autenticar()."""
     email = _validar_email(email)
     _validar_password(password)
     password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
@@ -86,7 +105,10 @@ def registar(email: str, password: str, caminho_bd: str | None = None) -> int:
             )
             return cursor.lastrowid
     except sqlite3.IntegrityError as e:
-        raise ErroAutenticacao("Já existe uma conta com este email.") from e
+        raise ErroAutenticacao(
+            "Não foi possível concluir o registo com estes dados. Se já "
+            "tens conta, tenta entrar em vez de registar."
+        ) from e
 
 
 def esta_aprovado(estudante_id: int, caminho_bd: str | None = None) -> bool:

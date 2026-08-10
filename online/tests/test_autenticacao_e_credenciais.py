@@ -63,6 +63,20 @@ def test_mensagem_de_erro_igual_para_email_inexistente_e_password_errada():
     assert mensagem1 is not None and mensagem1 == mensagem2
 
 
+# ---------- ON-13: bloqueio de passwords comuns ----------
+
+@pytest.mark.parametrize("password_comum", [
+    "password", "PASSWORD", "12345678", "qwerty123", "iloveyou",
+])
+def test_registar_com_password_comum_da_erro(password_comum):
+    with pytest.raises(autenticacao.ErroAutenticacao, match="comum"):
+        autenticacao.registar("a@b.com", password_comum)
+
+
+def test_registar_com_password_incomum_funciona():
+    autenticacao.registar("a@b.com", "umaPasswordBemMenosObvia9")  # não deve levantar
+
+
 # ---------- ON-11: rate limiting de login por conta ----------
 
 def test_login_bloqueia_apos_tentativas_falhadas_repetidas():
@@ -116,8 +130,11 @@ def test_duracao_do_bloqueio_cresce_exponencialmente_ate_um_teto(tentativas, min
 
 def test_registar_email_duplicado():
     autenticacao.registar("a@b.com", "password123")
-    with pytest.raises(autenticacao.ErroAutenticacao, match="Já existe"):
+    with pytest.raises(autenticacao.ErroAutenticacao) as excinfo:
         autenticacao.registar("a@b.com", "outrapassword")
+    # ON-12: a mensagem é deliberadamente genérica -- não confirma que
+    # o motivo é especificamente o email já existir
+    assert "Já existe" not in str(excinfo.value)
 
 
 def test_registar_email_invalido():
