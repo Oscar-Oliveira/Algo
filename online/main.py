@@ -65,7 +65,18 @@ if not _chave_sessao:
         "gera uma (ex: python3 -c \"import secrets; print(secrets.token_hex(32))\") "
         "e define-a antes de arrancar o servidor."
     )
-app.add_middleware(SessionMiddleware, secret_key=_chave_sessao, https_only=False)
+# ON-25: sem isto, a sessão usava o default implícito do Starlette
+# (nunca expira, dura até o browser fechar/o cookie ser apagado) --
+# agora explícito e configurável (segundos; omissão: 14 dias).
+SESSAO_MAX_AGE_SEGUNDOS = int(os.environ.get("ONLINE_SESSAO_MAX_AGE_SEGUNDOS", str(14 * 24 * 3600)))
+# ON-35: 'False' por omissão para não partir o desenvolvimento local
+# sem TLS -- em produção, atrás de HTTPS, definir ONLINE_HTTPS_ONLY=1
+# para o cookie de sessão nunca ser enviado em texto simples.
+_HTTPS_ONLY = os.environ.get("ONLINE_HTTPS_ONLY", "").strip().lower() in ("1", "true", "yes")
+app.add_middleware(
+    SessionMiddleware, secret_key=_chave_sessao,
+    max_age=SESSAO_MAX_AGE_SEGUNDOS, https_only=_HTTPS_ONLY,
+)
 
 # ON-22: sem isto, um pedido HTTP com um corpo enorme (ex. um
 # "ficheiro" de várias centenas de MB no JSON de /api/fluxograma) era

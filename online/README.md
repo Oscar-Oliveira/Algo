@@ -139,6 +139,13 @@ O servidor recusa-se a arrancar sem as duas variáveis de ambiente --
 de propósito, para nunca gerar uma chave nova sozinho (isso tornaria
 todas as credenciais já guardadas ilegíveis no reinício seguinte).
 
+Variáveis de ambiente opcionais (ON-25/ON-35): `ONLINE_SESSAO_MAX_AGE_SEGUNDOS`
+(omissão: 14 dias) controla há quanto tempo uma sessão fica válida;
+`ONLINE_HTTPS_ONLY=1` (omissão: desligado, para não partir o
+desenvolvimento local sem TLS) faz o cookie de sessão nunca ser
+enviado em texto simples -- definir sempre que o serviço estiver atrás
+de HTTPS em produção.
+
 ## Testes
 
 ```bash

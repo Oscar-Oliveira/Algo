@@ -808,6 +808,23 @@ def test_get_nunca_e_bloqueado_pela_verificacao_de_origem(cliente):
     assert r.status_code == 200
 
 
+# ---------- ON-25 + ON-35: max_age explícito e https_only configurável ----------
+
+def test_cookie_de_sessao_tem_max_age_explicito(cliente):
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    set_cookie = r.headers.get("set-cookie", "")
+    assert "max-age=" in set_cookie.lower()
+    assert main.SESSAO_MAX_AGE_SEGUNDOS == 14 * 24 * 3600
+
+
+def test_https_only_desligado_por_omissao_para_dev_local(cliente):
+    """Omissão desligada (para não partir o desenvolvimento local sem
+    TLS) -- o cookie não deve ter o atributo Secure por omissão."""
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    set_cookie = r.headers.get("set-cookie", "")
+    assert "secure" not in set_cookie.lower()
+
+
 # ---------- ON-17: bcrypt lento não pode bloquear o servidor inteiro ----------
 
 def test_login_lento_nao_bloqueia_pedido_concorrente_nao_relacionado(cliente, monkeypatch):
