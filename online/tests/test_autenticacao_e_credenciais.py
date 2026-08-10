@@ -303,6 +303,22 @@ def test_guardar_credencial_substitui_a_anterior():
     assert c.host == "http://8.8.8.8:11434"
 
 
+# ---------- ON-15: 'host' só é suportado pelo fornecedor ollama ----------
+
+def test_host_em_fornecedor_que_nao_e_ollama_da_erro():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    with pytest.raises(credenciais.ErroCredencial, match="ollama"):
+        credenciais.guardar_credencial(
+            id_est, "openai", "gpt-4o-mini", "sk-teste", host="http://8.8.8.8:11434")
+
+
+def test_host_em_ollama_continua_a_funcionar():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
+    c = credenciais.obter_credencial(id_est)
+    assert c.host == "http://8.8.8.8:11434"
+
+
 def test_credencial_fornecedor_desconhecido():
     id_est = autenticacao.registar("a@b.com", "password123")
     with pytest.raises(credenciais.ErroCredencial, match="desconhecido"):

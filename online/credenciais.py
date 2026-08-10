@@ -63,6 +63,13 @@ def guardar_credencial(estudante_id: int, fornecedor: str, modelo: str,
         raise ErroCredencial("Indica o modelo a usar.")
     if fornecedor != "ollama" and not api_key:
         raise ErroCredencial(f"O fornecedor '{fornecedor}' precisa de uma chave de API.")
+    # ON-15: 'host' só faz sentido para o Ollama (URL do servidor local/
+    # rede onde corre) -- outros fornecedores usam sempre o mesmo
+    # endpoint fixo. Sem isto, um host era guardado silenciosamente para
+    # qualquer fornecedor e só dava um erro confuso mais tarde, quando
+    # o Alguem tentasse mesmo usar a credencial.
+    if host and fornecedor != "ollama":
+        raise ErroCredencial(f"O campo 'host' só é suportado pelo fornecedor 'ollama', não '{fornecedor}'.")
     if host:
         _validar_host_ollama(host)
 
