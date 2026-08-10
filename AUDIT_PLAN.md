@@ -51,7 +51,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 - **ON-12** [SEGURANÇA · MÉDIA · Baixo] `autenticacao.py:42-50`. Registo revela explicitamente se um email já tem conta, ao contrário do login (mensagem genérica). Recomendação: uniformizar para mensagem genérica também no registo, ou aceitar o trade-off de UX e documentar a decisão.
 - **ON-13** [SEGURANÇA · MÉDIA · Baixo] `autenticacao.py:29-31`. Password mínima só valida comprimento (8 caracteres). Recomendação: verificação contra uma lista curta de passwords comuns (ex. `rockyou`-top-1000 reduzida).
 - **ON-15** [BUG · BAIXA · Baixo] `credenciais.py` + `alguem_ponte.py`. Campo `host` é incluído sempre que presente, mesmo para fornecedores que não o suportam (gera erro amigável a jusante, mas evitável). Recomendação: só incluir `host` para o fornecedor Ollama.
-- **ON-19** [SEGURANÇA · ALTA · Baixo] `main.py:58-69`. O handler global de exceções devolve a mensagem interna da exceção diretamente ao cliente em qualquer erro 500. Recomendação: mensagem genérica ao cliente, log completo (com stack trace) só no servidor.
 - **ON-20** [BUG · MÉDIA · Baixo] `main.py` (várias rotas). Corpo JSON malformado ou de tipo errado resulta em 500 em vez de 400. Recomendação: validar com modelos Pydantic ou `try/except` explícito à volta de `request.json()`.
 - **ON-21** [SEGURANÇA · ALTA · Baixo] `main.py:165` vs. `148-152`. A página do editor é acessível diretamente pela pasta estática (`/estatico/editor.html`), sem verificação de sessão, contornando o guard da rota `/editor`. Recomendação: mover `editor.html` para fora da pasta estática pública, ou verificar sessão também no `StaticFiles` (middleware dedicado).
 - **ON-22** [SEGURANÇA/DESEMPENHO · MÉDIA · Baixo] `main.py` (geral). Sem limite de tamanho de mensagem/pedido nas rotas e WebSockets. Recomendação: middleware de limite de tamanho de corpo, e `max_size` explícito nas ligações WebSocket.
@@ -162,7 +161,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 4 — Robustez e segurança da app online
 - **Objetivo**: fechar os problemas de autenticação, sessão, validação de entrada e XSS na aplicação web.
-- **Resolve**: ON-10, ON-11, ON-12, ON-13, ON-15, ON-19, ON-20, ON-21, ON-22, ON-23, ON-25, ON-26, ON-30, ON-35, ON-33, ON-34.
+- **Resolve**: ON-10, ON-11, ON-12, ON-13, ON-15, ~~ON-19~~, ON-20, ON-21, ON-22, ON-23, ON-25, ON-26, ON-30, ON-35, ON-33, ON-34.
 - **Componentes**: `online/autenticacao.py`, `online/main.py`, `online/cifragem.py`, `online/estatico/app.js`, `requerimentos.txt`.
 - **Alterações principais**: rate limiting de login por conta; mensagens de erro genéricas ao cliente; validação de corpo JSON com 400 explícito; remover acesso direto a `editor.html` sem sessão; limites de tamanho de mensagem/pedido; verificação de origem/CSRF; `textContent`/sanitização em vez de `innerHTML` para erro e SVG; pinning de dependências; `https_only` configurável.
 - **Dependências**: Fase 1 (mesmos ficheiros de rotas já alterados).

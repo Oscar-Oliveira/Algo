@@ -705,7 +705,24 @@ def test_erro_inesperado_devolve_sempre_json():
                 "fornecedor": "openai", "modelo": "x", "api_key": "sk-teste"})
     assert r.status_code == 500
     corpo = r.json()  # nunca deve levantar exceção -- tem de ser sempre JSON válido
-    assert "algo inesperado" in corpo["detail"]
+    assert "detail" in corpo
+
+
+def test_erro_inesperado_nao_revela_a_mensagem_da_excecao_ao_cliente(caplog):
+    """ON-19: a mensagem da exceção (podia conter caminhos internos,
+    nomes de tabelas SQL, etc.) só pode ir para o log do servidor --
+    nunca para a resposta JSON devolvida ao cliente."""
+    with TestClient(main.app, raise_server_exceptions=False) as cliente:
+        cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+        with patch("credenciais.guardar_credencial", side_effect=RuntimeError("segredo interno")):
+            with caplog.at_level("ERROR", logger="online"):
+                r = cliente.post("/api/credencial", json={
+                    "fornecedor": "openai", "modelo": "x", "api_key": "sk-teste"})
+    corpo = r.json()
+    assert "segredo interno" not in corpo["detail"]
+    assert corpo["detail"] == "Erro interno do servidor. Tenta outra vez daqui a pouco."
+    # mas fica registado no log do servidor, para diagnóstico
+    assert "segredo interno" in caplog.text
 
 
 # ---------- ON-17: bcrypt lento não pode bloquear o servidor inteiro ----------

@@ -7,6 +7,7 @@ sessões na base de dados)."""
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import tempfile
 
@@ -32,6 +33,8 @@ from alguem.scripts import metricas
 from alguem.nucleo import registador as registador_alguem
 
 PASTA_ESTATICO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estatico")
+
+_logger = logging.getLogger("online")
 
 
 @asynccontextmanager
@@ -69,10 +72,16 @@ async def tratador_de_erros_inesperados(request: Request, exc: Exception):
     página de erro em texto simples -- o frontend tenta sempre fazer
     resposta.json(), e isso falhava com uma mensagem confusa
     ("Unexpected token 'I', "Internal S"...") em vez do erro real.
-    Agora qualquer erro não tratado devolve sempre JSON."""
+    Agora qualquer erro não tratado devolve sempre JSON.
+
+    ON-19: a mensagem da exceção em si NÃO vai para o cliente -- podia
+    revelar detalhes internos (caminhos do servidor, nomes de tabelas
+    SQL, etc.). Fica só no log do servidor, com traceback completo."""
+    _logger.error(
+        "Erro não tratado em %s %s", request.method, request.url.path, exc_info=exc)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Erro interno do servidor: {exc}"},
+        content={"detail": "Erro interno do servidor. Tenta outra vez daqui a pouco."},
     )
 
 
