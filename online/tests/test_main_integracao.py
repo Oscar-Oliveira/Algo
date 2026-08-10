@@ -774,6 +774,40 @@ def test_pedido_dentro_do_limite_nao_e_afetado(cliente, monkeypatch):
     assert r.status_code == 200
 
 
+# ---------- ON-23: verificação de Origin/Referer contra CSRF ----------
+
+def test_post_com_origin_de_outro_site_e_rejeitado(cliente):
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"},
+                      headers={"Origin": "https://site-malicioso.example"})
+    assert r.status_code == 403
+
+
+def test_post_com_referer_de_outro_site_e_rejeitado(cliente):
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"},
+                      headers={"Referer": "https://site-malicioso.example/pagina"})
+    assert r.status_code == 403
+
+
+def test_post_sem_origin_nem_referer_nao_e_bloqueado(cliente):
+    """Um cliente não-browser (ex: chamada direta à API) não envia
+    Origin/Referer -- não deve ser bloqueado só por isso."""
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    assert r.status_code == 200
+
+
+def test_post_com_origin_do_proprio_site_nao_e_bloqueado(cliente):
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"},
+                      headers={"Origin": "http://testserver"})
+    assert r.status_code == 200
+
+
+def test_get_nunca_e_bloqueado_pela_verificacao_de_origem(cliente):
+    """A verificação só se aplica a métodos que mutam estado -- GET
+    tem de continuar a funcionar independentemente do Origin."""
+    r = cliente.get("/", headers={"Origin": "https://site-malicioso.example"})
+    assert r.status_code == 200
+
+
 # ---------- ON-17: bcrypt lento não pode bloquear o servidor inteiro ----------
 
 def test_login_lento_nao_bloqueia_pedido_concorrente_nao_relacionado(cliente, monkeypatch):

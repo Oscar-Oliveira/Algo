@@ -12,6 +12,7 @@ import os
 import tempfile
 
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from fastapi import BackgroundTasks, FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -91,6 +92,35 @@ async def limitar_tamanho_do_corpo(request: Request, call_next):
                 content={"detail": "Pedido excede o tamanho máximo permitido."},
             )
     return await call_next(request)
+
+
+# ON-23: defesa mínima contra CSRF nas rotas de mutação de estado -- a
+# sessão já usa cookies SameSite=Lax por omissão (Starlette), que já
+# impede o browser de enviar o cookie num POST cross-site na maioria
+# dos casos modernos; isto é uma segunda camada explícita, não
+# dependente só desse comportamento implícito de SameSite.
+METODOS_MUTAVEIS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def verificar_origem(request: Request, call_next):
+    """Compara o Origin (ou o Referer, se Origin não vier) com o Host
+    do próprio pedido -- só bloqueia se um dos dois estiver presente e
+    não corresponder. Um pedido sem nenhum dos dois (ex: um cliente
+    não-browser a chamar a API diretamente) não é bloqueado só por
+    isso -- o objetivo é travar um browser a ser instruído por OUTRO
+    site a submeter aqui, não policiar todos os clientes possíveis."""
+    if request.method in METODOS_MUTAVEIS:
+        candidato = request.headers.get("origin") or request.headers.get("referer")
+        if candidato:
+            host_candidato = urlsplit(candidato).netloc
+            if host_candidato and host_candidato != request.headers.get("host", ""):
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Origem do pedido não autorizada."},
+                )
+    return await call_next(request)
+
 
 # Confirma logo ao arrancar que ONLINE_CHAVE_CIFRAGEM está definida E é
 # uma chave Fernet válida -- sem isto, o erro só aparecia mais tarde,
