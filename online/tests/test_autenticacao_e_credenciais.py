@@ -63,6 +63,57 @@ def test_mensagem_de_erro_igual_para_email_inexistente_e_password_errada():
     assert mensagem1 is not None and mensagem1 == mensagem2
 
 
+# ---------- ON-11: rate limiting de login por conta ----------
+
+def test_login_bloqueia_apos_tentativas_falhadas_repetidas():
+    autenticacao.registar("a@b.com", "password123")
+    for _ in range(autenticacao.LIMIAR_TENTATIVAS_LOGIN):
+        with pytest.raises(autenticacao.ErroAutenticacao, match="incorretos"):
+            autenticacao.autenticar("a@b.com", "password_errada")
+    # mesmo com a password CORRETA, a conta está bloqueada agora
+    with pytest.raises(autenticacao.ErroAutenticacao, match="Demasiadas tentativas"):
+        autenticacao.autenticar("a@b.com", "password123")
+
+
+def test_login_bloqueado_nao_verifica_a_password(monkeypatch):
+    """Depois de bloqueada, nem sequer deve chamar bcrypt.checkpw --
+    poupa ciclos numa conta já bloqueada."""
+    autenticacao.registar("a@b.com", "password123")
+    for _ in range(autenticacao.LIMIAR_TENTATIVAS_LOGIN):
+        with pytest.raises(autenticacao.ErroAutenticacao):
+            autenticacao.autenticar("a@b.com", "password_errada")
+
+    def checkpw_que_nao_deveria_ser_chamado(*a, **kw):
+        raise AssertionError("bcrypt.checkpw não devia ser chamado numa conta bloqueada")
+    monkeypatch.setattr(autenticacao.bcrypt, "checkpw", checkpw_que_nao_deveria_ser_chamado)
+
+    with pytest.raises(autenticacao.ErroAutenticacao, match="Demasiadas tentativas"):
+        autenticacao.autenticar("a@b.com", "password123")
+
+
+def test_login_bem_sucedido_repoe_o_contador_de_falhas():
+    autenticacao.registar("a@b.com", "password123")
+    for _ in range(autenticacao.LIMIAR_TENTATIVAS_LOGIN - 1):
+        with pytest.raises(autenticacao.ErroAutenticacao):
+            autenticacao.autenticar("a@b.com", "password_errada")
+    autenticacao.autenticar("a@b.com", "password123")  # repõe o contador
+    for _ in range(autenticacao.LIMIAR_TENTATIVAS_LOGIN - 1):
+        with pytest.raises(autenticacao.ErroAutenticacao, match="incorretos"):
+            autenticacao.autenticar("a@b.com", "password_errada")
+    autenticacao.autenticar("a@b.com", "password123")  # continua a funcionar, não bloqueou
+
+
+@pytest.mark.parametrize("tentativas,minimo,maximo", [
+    (5, 60, 60),
+    (6, 120, 120),
+    (7, 240, 240),
+    (20, 3600, 3600),  # nunca ultrapassa o teto
+])
+def test_duracao_do_bloqueio_cresce_exponencialmente_ate_um_teto(tentativas, minimo, maximo):
+    duracao = autenticacao._duracao_bloqueio_segundos(tentativas)
+    assert minimo <= duracao <= maximo
+
+
 def test_registar_email_duplicado():
     autenticacao.registar("a@b.com", "password123")
     with pytest.raises(autenticacao.ErroAutenticacao, match="Já existe"):

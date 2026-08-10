@@ -27,7 +27,9 @@ CREATE TABLE IF NOT EXISTS estudante (
     id_pseudonimo TEXT NOT NULL UNIQUE,
     criado_em TEXT NOT NULL DEFAULT (datetime('now')),
     aprovado INTEGER NOT NULL DEFAULT 1,
-    admin INTEGER NOT NULL DEFAULT 0
+    admin INTEGER NOT NULL DEFAULT 0,
+    tentativas_login_falhadas INTEGER NOT NULL DEFAULT 0,
+    bloqueado_ate TEXT
 );
 
 CREATE TABLE IF NOT EXISTS credencial_llm (
@@ -47,6 +49,11 @@ CREATE TABLE IF NOT EXISTS credencial_llm (
 _COLUNAS_NOVAS_ESTUDANTE = {
     "aprovado": "ALTER TABLE estudante ADD COLUMN aprovado INTEGER NOT NULL DEFAULT 1",
     "admin": "ALTER TABLE estudante ADD COLUMN admin INTEGER NOT NULL DEFAULT 0",
+    # ON-11: contador e prazo de bloqueio para rate limiting de login por conta.
+    "tentativas_login_falhadas": (
+        "ALTER TABLE estudante ADD COLUMN tentativas_login_falhadas INTEGER NOT NULL DEFAULT 0"
+    ),
+    "bloqueado_ate": "ALTER TABLE estudante ADD COLUMN bloqueado_ate TEXT",
 }
 
 

@@ -17,12 +17,27 @@ import os
 import re
 import sqlite3
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 
 from bd import sessao_bd
 
 PADRAO_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# ON-11: rate limiting de login por CONTA (não por IP -- não penaliza
+# uma rede escolar/institucional partilhada). Backoff progressivo: a
+# duração do bloqueio dobra a cada tentativa falhada a mais, a partir
+# de LIMIAR_TENTATIVAS_LOGIN, até um teto -- nunca bloqueia uma conta
+# indefinidamente por um esquecimento de password.
+LIMIAR_TENTATIVAS_LOGIN = 5
+DURACAO_BASE_BLOQUEIO_SEGUNDOS = 60
+DURACAO_MAXIMA_BLOQUEIO_SEGUNDOS = 3600
+
+
+def _duracao_bloqueio_segundos(tentativas: int) -> int:
+    excesso = max(0, tentativas - LIMIAR_TENTATIVAS_LOGIN)
+    return min(DURACAO_BASE_BLOQUEIO_SEGUNDOS * (2 ** excesso), DURACAO_MAXIMA_BLOQUEIO_SEGUNDOS)
 
 
 class ErroAutenticacao(Exception):
@@ -102,17 +117,52 @@ def autenticar(email: str, password: str, caminho_bd: str | None = None) -> int:
     para não revelar quais emails têm conta (a mensagem de 'conta
     pendente' já é diferente de propósito -- só é mostrada depois de a
     password já ter sido confirmada como correta, por isso não revela
-    nada que o próprio estudante não soubesse já)."""
+    nada que o próprio estudante não soubesse já).
+
+    ON-11: depois de LIMIAR_TENTATIVAS_LOGIN falhas seguidas, a conta
+    fica bloqueada por um período que cresce a cada falha a mais (ver
+    _duracao_bloqueio_segundos) -- verificado ANTES de comparar a
+    password, para não gastar ciclos de bcrypt numa conta já bloqueada."""
     email = email.strip().lower()
     with sessao_bd(caminho_bd) as bd:
         linha = bd.execute(
-            "SELECT id, password_hash, aprovado, admin FROM estudante WHERE email = ?", (email,)
+            "SELECT id, password_hash, aprovado, admin, tentativas_login_falhadas, bloqueado_ate "
+            "FROM estudante WHERE email = ?", (email,)
         ).fetchone()
     erro = ErroAutenticacao("Email ou password incorretos.")
     if linha is None:
         raise erro
+
+    agora = datetime.now(timezone.utc)
+    if linha["bloqueado_ate"]:
+        bloqueado_ate = datetime.fromisoformat(linha["bloqueado_ate"])
+        if agora < bloqueado_ate:
+            minutos_restantes = max(1, int((bloqueado_ate - agora).total_seconds() // 60))
+            raise ErroAutenticacao(
+                f"Demasiadas tentativas falhadas. Tenta novamente daqui a "
+                f"{minutos_restantes} minuto(s)."
+            )
+
     if not bcrypt.checkpw(password.encode("utf-8"), linha["password_hash"]):
+        tentativas = linha["tentativas_login_falhadas"] + 1
+        bloqueado_ate_novo = None
+        if tentativas >= LIMIAR_TENTATIVAS_LOGIN:
+            duracao = _duracao_bloqueio_segundos(tentativas)
+            bloqueado_ate_novo = (agora + timedelta(seconds=duracao)).isoformat()
+        with sessao_bd(caminho_bd) as bd:
+            bd.execute(
+                "UPDATE estudante SET tentativas_login_falhadas = ?, bloqueado_ate = ? WHERE id = ?",
+                (tentativas, bloqueado_ate_novo, linha["id"]),
+            )
         raise erro
+
+    # password correta -- repõe o contador de falhas
+    if linha["tentativas_login_falhadas"] or linha["bloqueado_ate"]:
+        with sessao_bd(caminho_bd) as bd:
+            bd.execute(
+                "UPDATE estudante SET tentativas_login_falhadas = 0, bloqueado_ate = NULL WHERE id = ?",
+                (linha["id"],),
+            )
 
     # bootstrap tardio: se o email só se tornou admin DEPOIS de a conta
     # já existir (ONLINE_EMAIL_ADMIN configurada mais tarde), atualiza-a
