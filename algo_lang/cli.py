@@ -267,8 +267,9 @@ def cmd_compila(args):
     caminho_py = compilar_ficheiro(args.ficheiro, minimo=args.minimo)
     print(f"✔ Compilado para: {caminho_py}")
     if args.minimo:
-        print("  (modo --minimo: sem verificação de tipos prévia -- um erro de "
-              "tipos só aparece ao correr o .py, como erro nativo do Python)")
+        print("  (modo --minimo: sem verificação de tipos prévia nem rede de "
+              "segurança em runtime -- qualquer erro, de tipos ou em tempo de "
+              "execução, só aparece ao correr o .py, como erro nativo do Python)")
 
 
 def cmd_fluxograma(args):
@@ -428,6 +429,11 @@ def _mostrar_ajuda(ultimo_ficheiro):
     print("               seco\" por trás do ALGO. Por ser Python nativo, mostra")
     print("               'True'/'False' em vez de 'verdadeiro'/'falso' -- é")
     print("               esperado, não é um bug")
+    print("               ATENÇÃO (UX-02): --minimo não tem nenhuma rede de")
+    print("               segurança para erros em tempo de execução -- um erro")
+    print("               (índice inválido, divisão por zero, etc.) aparece como")
+    print("               um traceback Python cru, com nomes internos, não a")
+    print("               mensagem amigável em português do modo normal")
     print()
     print("  Exemplos:")
     print("    compila soma.algo")

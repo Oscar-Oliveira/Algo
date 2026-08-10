@@ -59,7 +59,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 ### 3.5 Experiência de Utilização (19 findings)
 
-- **UX-02** [UX · ALTA · Médio] `codegen_minimo.py` não tem nenhum tratamento de erro em runtime — qualquer falha vira um traceback Python cru com nomes internos, e o texto de ajuda de `--minimo` não avisa sobre isto. Recomendação: ou adicionar tratamento equivalente ao modo normal, ou reforçar o aviso na ajuda do comando de que erros de runtime aparecerão como Python puro.
 - **UX-05** [UX · BAIXA/MÉDIA · Baixo] Termos "léxico"/"sintático"/"semântico" usados nas mensagens de erro nunca são explicados no manual (`online/estatico/ajuda.html`). Recomendação: um parágrafo curto no manual explicando a diferença, em linguagem simples.
 - **UX-06** [UX · BAIXA · Baixo] `cli.py:85` não usa o prefixo `❌` que a maioria das outras mensagens de erro usa, quebrando a consistência visual que o estudante aprende a reconhecer.
 - **UX-11** [UX · CRÍTICA · Médio] `visualizador/algo-trace-viewer.html:8-11` carrega React/ReactDOM/Babel/Tailwind de CDNs externos sem qualquer fallback — se a rede escolar bloquear esses domínios (o mesmo risco que já motivou um fallback dedicado para o CodeMirror), o visualizador de rasto fica em branco sem explicação. Recomendação: aplicar o mesmo padrão de fallback local já usado para o CodeMirror.
@@ -148,7 +147,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 5 — UX crítica e "quick wins"
 - **Objetivo**: eliminar os pontos de confusão/abandono mais graves para um estudante iniciante, incluindo o único finding UX classificado CRÍTICA.
-- **Resolve**: ~~UX-01~~, UX-02, ~~UX-03~~, ~~UX-04~~, UX-05, UX-06, UX-11, UX-12, UX-13, UX-14, UX-15, UX-16, UX-17, UX-18, ~~UX-19~~, ~~AL-08~~, ~~AL-23~~, ~~AL-24~~, ON-37, FEAT-02, FEAT-03.
+- **Resolve**: ~~UX-01~~, ~~UX-02~~, ~~UX-03~~, ~~UX-04~~, UX-05, UX-06, UX-11, UX-12, UX-13, UX-14, UX-15, UX-16, UX-17, UX-18, ~~UX-19~~, ~~AL-08~~, ~~AL-23~~, ~~AL-24~~, ON-37, FEAT-02, FEAT-03.
 - **Componentes**: `algo_lang/compilador/codegen.py` (mensagens), `algo_lang/tools/tracer.py`, `algo_lang/cli.py` (`_mostrar_banner`), `online/estatico/visualizador/algo-trace-viewer.html`, `online/estatico/app.js`, `online/estatico/editor.html`, `online/estatico/estilo.css`, `online/modo_codemirror.py`.
 - **Alterações principais**: localizar mensagens de runtime comuns (`math domain error`, etc.); incluir número de linha em erros de runtime; fallback local para os CDNs do visualizador de rasto (replicar o padrão já usado para o CodeMirror); painel do Alguém visível/destacado por omissão; indicador "a pensar..." no chat; reativar o chat após erro de credencial; ligar erros de compilação ao gutter do CodeMirror; rótulos de texto na toolbar; logo ASCII art no banner da consola (FEAT-03); toggle de tema claro/escuro no `online`, persistido em `localStorage` (FEAT-02).
 - **Dependências**: Fase 2 (mensagens de erro do compilador). Pode correr em paralelo com as Fases 3 e 4.

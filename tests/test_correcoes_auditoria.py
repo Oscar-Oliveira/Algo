@@ -2185,3 +2185,28 @@ inicio
 """)
     assert resultado.returncode == 1
     assert "(linha 3)" in resultado.stdout
+
+
+# ---------- UX-02: aviso reforçado sobre --minimo não ter rede de segurança em runtime ----------
+
+def test_ajuda_do_minimo_avisa_sobre_erros_de_runtime_crus(capsys):
+    # substrings sem acentos de propósito -- capsys em consola Windows sem
+    # code page UTF-8 mistura carateres acentuados (mesma causa da AL-35,
+    # aqui a afetar a captura do teste, não o comportamento em si)
+    from algo_lang.cli import _mostrar_ajuda
+    _mostrar_ajuda(ultimo_ficheiro=None)
+    saida = capsys.readouterr().out
+    assert "UX-02" in saida
+    assert "traceback Python cru" in saida
+
+
+def test_compilar_com_minimo_avisa_na_consola_sobre_erros_de_runtime(tmp_path, capsys):
+    from algo_lang.cli import cmd_compila
+    import argparse
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
+    args = argparse.Namespace(ficheiro=str(algo_path), minimo=True)
+    cmd_compila(args)
+    saida = capsys.readouterr().out
+    assert "rede de" in saida
+    assert "runtime" in saida
