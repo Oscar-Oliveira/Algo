@@ -204,18 +204,21 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
 
     consola_final = buffer_saida.getvalue()
 
-    # o próprio runtime já apanha os erros de execução comuns (e falhas de
-    # 'afirmar') e imprime uma mensagem antes de sys.exit(1), em vez de
-    # levantar uma exceção Python -- detetamos isso a partir da consola
-    ultima_linha_consola = consola_final.rstrip().splitlines()[-1] if consola_final.strip() else ""
-    eh_erro_runtime = ultima_linha_consola.endswith((
-        "índice fora dos limites).",
-        "divisão por zero.",
-        "a função nunca chega ao caso base).",
-    )) or ultima_linha_consola.strip().startswith("❌ Afirmação falhou")
-    if resultado_erro["valor"] is None and eh_erro_runtime:
-        linha_erro = passos[-1]["linha"] if passos else None
-        resultado_erro["valor"] = {"mensagem": ultima_linha_consola.strip(), "linha": linha_erro}
+    # AL-23/AL-24: o próprio runtime já apanha os erros de execução comuns
+    # (e falhas de 'afirmar') e regista a mensagem/linha em
+    # _ALGO_ERRO_RUNTIME antes de sys.exit(1) (ver
+    # codegen.py:_algo_registar_erro_runtime) -- lido diretamente do
+    # namespace da execução, em vez de inferir a partir do texto impresso
+    # na consola. A deteção antiga (endswith de frases fixas) cobria só 3
+    # dos 4 tipos de erro (faltava ValueError, AL-23) e corria o risco de
+    # um escrever() legítimo do próprio estudante coincidir por acaso com
+    # uma dessas frases (AL-24) -- este canal não depende de texto nenhum.
+    erro_runtime = namespace.get("_ALGO_ERRO_RUNTIME")
+    if resultado_erro["valor"] is None and erro_runtime is not None:
+        linha_erro = erro_runtime["linha"]
+        if linha_erro is None:
+            linha_erro = passos[-1]["linha"] if passos else None
+        resultado_erro["valor"] = {"mensagem": erro_runtime["mensagem"], "linha": linha_erro}
 
     return {
         "passos": passos,

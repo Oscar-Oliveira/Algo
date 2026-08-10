@@ -153,6 +153,33 @@ def test_trace_deteta_divisao_por_zero(tmp_path):
     assert "divisão por zero" in resultado["erro"]["mensagem"]
 
 
+def test_trace_deteta_valueerror(tmp_path):
+    """AL-23: o tracer não cobria ValueError -- confirma que agora
+    também fica marcado como erro, com mensagem e linha."""
+    resultado = _trace("""
+        algoritmo "T"
+        importar Math
+        inicio
+            escrever(math.raiz(-4))
+    """, tmp_path=tmp_path)
+    assert resultado["erro"] is not None
+    assert "domínio válido" in resultado["erro"]["mensagem"]
+    assert resultado["erro"]["linha"] == 4
+
+
+def test_trace_nao_confunde_escrever_legitimo_com_uma_frase_de_erro(tmp_path):
+    """AL-24: a deteção antiga por endswith() de frases fixas dava falso
+    positivo se um escrever() legítimo terminasse com uma dessas frases
+    -- agora não depende de texto nenhum, só do canal _ALGO_ERRO_RUNTIME,
+    que só um erro real preenche."""
+    resultado = _trace("""
+        algoritmo "T"
+        inicio
+            escrever("o resultado é: divisão por zero.")
+    """, tmp_path=tmp_path)
+    assert resultado["erro"] is None
+
+
 def test_trace_senao_se_mapeia_para_a_sua_propria_linha(tmp_path):
     """Regressão: os ramos de 'senao se' têm de apontar para a sua
     própria linha, não para a linha do 'se' inicial."""

@@ -41,7 +41,7 @@ def _algo_ler_inteiro(prompt=""):
         try:
             return int(input(prompt))
         except ValueError:
-            print("Valor invalido. Introduza um numero inteiro.")
+            print("Valor inválido. Introduza um número inteiro.")
 
 
 def _algo_ler_decimal(prompt=""):
@@ -49,7 +49,7 @@ def _algo_ler_decimal(prompt=""):
         try:
             return float(input(prompt))
         except ValueError:
-            print("Valor invalido. Introduza um numero decimal.")
+            print("Valor inválido. Introduza um número decimal.")
 
 
 def _algo_ler_booleano(prompt=""):
@@ -59,7 +59,7 @@ def _algo_ler_booleano(prompt=""):
             return True
         if resp in ("falso", "f", "false"):
             return False
-        print("Valor invalido. Introduza 'verdadeiro' ou 'falso'.")
+        print("Valor inválido. Introduza 'verdadeiro' ou 'falso'.")
 
 
 def _algo_ler_texto(prompt=""):
@@ -71,7 +71,7 @@ def _algo_ler_caracter(prompt=""):
         resp = input(prompt)
         if len(resp) == 1:
             return resp
-        print("Valor invalido. Introduza exatamente 1 caracter.")
+        print("Valor inválido. Introduza exatamente 1 caracter.")
 
 
 def _algo_div(a, b):
@@ -89,6 +89,67 @@ def _algo_mod(a, b):
     """mod: resto da divisao truncada (_algo_div) -- sinal igual ao do
     primeiro operando, ao contrario do % nativo do Python."""
     return a - _algo_div(a, b) * b
+
+
+def _algo_traduzir_valueerro(msg):
+    """AL-08/UX-01: traduz as causas mais comuns de ValueError para
+    portugues, em vez de mostrar sempre a mensagem crua do Python --
+    mantem o generico (mensagem original entre parenteses) como
+    recurso para causas nao mapeadas."""
+    msg_min = msg.lower()
+    if "math domain error" in msg_min:
+        return ("o valor está fora do domínio válido desta operação "
+                 "(ex: raiz quadrada de um número negativo).")
+    if "negative number cannot be raised to a fractional power" in msg_min:
+        return "não é possível elevar um número negativo a um expoente fracionário."
+    if "invalid literal for int()" in msg_min:
+        return "o texto não pode ser convertido para um número inteiro."
+    if "could not convert string to float" in msg_min:
+        return "o texto não pode ser convertido para um número decimal."
+    return f"valor inválido ({msg})."
+
+
+def _algo_linha_do_erro(erro):
+    """UX-04: percorre o traceback da excecao à procura do frame mais
+    profundo que ainda corresponda a uma linha ALGO conhecida (via
+    _ALGO_MAPA_LINHAS, definido mais abaixo neste ficheiro, ja que so
+    fica completo depois de todo o codigo ser gerado) -- nao basta o
+    frame mais profundo de todos, que costuma estar DENTRO de uma
+    biblioteca (ex: math_raiz -> _math.sqrt), sem linha ALGO
+    correspondente; fica sempre com o último frame mapeado antes de
+    'descer' para código interno. Devolve None se não encontrar
+    nenhum."""
+    tb = erro.__traceback__
+    linha_algo = None
+    while tb is not None:
+        candidato = _ALGO_MAPA_LINHAS.get(tb.tb_lineno)
+        if candidato is not None:
+            linha_algo = candidato
+        tb = tb.tb_next
+    return linha_algo
+
+
+def _algo_sufixo_linha(erro):
+    linha_algo = _algo_linha_do_erro(erro)
+    return f" (linha {linha_algo})" if linha_algo else ""
+
+
+_ALGO_ERRO_RUNTIME = None
+
+
+def _algo_registar_erro_runtime(mensagem, linha):
+    """AL-23/AL-24: substitui a deteção frágil por texto (endswith de
+    frases fixas) que existia em tools/tracer.py -- cada ponto do
+    runtime que apanha um erro e termina o programa regista aqui a
+    mensagem e a linha, um canal que não depende de nenhuma frase
+    específica nem corre o risco de um escrever() legítimo do próprio
+    estudante coincidir por acaso com uma dessas frases. Chamada como
+    função (não atribuição direta) de propósito -- funciona
+    corretamente seja qual for o scope de onde é chamada (corpo
+    principal ou dentro de uma função/procedimento), sem precisar de
+    'global' em cada local de chamada."""
+    global _ALGO_ERRO_RUNTIME
+    _ALGO_ERRO_RUNTIME = {"mensagem": mensagem, "linha": linha}
 
 
 def _algo_verificar_tamanho_array(tam):
@@ -198,30 +259,52 @@ class GeradorCodigo:
         self._linha_algo_atual = None
         self.linhas.append("")
 
+        # UX-04: o mapa de linhas (.py gerado -> linha ALGO original) já
+        # é sempre construído durante a geração (ver emit()) -- embutido
+        # aqui como dados simples no próprio ficheiro gerado, para os
+        # handlers de erro em runtime logo a seguir conseguirem mostrar
+        # a que linha ALGO corresponde um erro, mesmo fora do modo
+        # --debug (que usa este mesmo mapa de forma independente, via
+        # tools/tracer.py, correndo o programa sob sys.settrace()).
+        self.linhas.append(f"_ALGO_MAPA_LINHAS = {self.mapa_linhas!r}")
+        self.linhas.append("")
+
         self.emit('if __name__ == "__main__":', 0)
         self.emit("try:", 1)
         self.emit("_algo_programa()", 2)
-        self.emit("except _AlgoIndiceCadeiaInvalido:", 1)
+        self.emit("except _AlgoIndiceCadeiaInvalido as _algo_erro:", 1)
         self.emit(
-            'print("Erro em tempo de execução: tentaste aceder a uma posição de '
-            'texto que não existe (índice fora dos limites).")', 2)
+            '_algo_msg = f"Erro em tempo de execução: tentaste aceder a uma posição de '
+            'texto que não existe (índice fora dos limites).{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
-        self.emit("except IndexError:", 1)
+        self.emit("except IndexError as _algo_erro:", 1)
         self.emit(
-            'print("Erro em tempo de execução: tentaste aceder a uma posição de '
-            'array que não existe (índice fora dos limites).")', 2)
+            '_algo_msg = f"Erro em tempo de execução: tentaste aceder a uma posição de '
+            'array que não existe (índice fora dos limites).{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
-        self.emit("except ZeroDivisionError:", 1)
-        self.emit('print("Erro em tempo de execução: divisão por zero.")', 2)
-        self.emit("sys.exit(1)", 2)
-        self.emit("except RecursionError:", 1)
+        self.emit("except ZeroDivisionError as _algo_erro:", 1)
         self.emit(
-            'print("Erro em tempo de execução: recursão infinita '
-            '(a função nunca chega ao caso base).")', 2)
+            '_algo_msg = f"Erro em tempo de execução: divisão por zero.{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
+        self.emit("sys.exit(1)", 2)
+        self.emit("except RecursionError as _algo_erro:", 1)
+        self.emit(
+            '_algo_msg = f"Erro em tempo de execução: recursão infinita '
+            '(a função nunca chega ao caso base).{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
         self.emit("except ValueError as _algo_erro:", 1)
         self.emit(
-            'print(f"Erro em tempo de execução: valor inválido ({_algo_erro}).")', 2)
+            '_algo_msg = f"Erro em tempo de execução: '
+            '{_algo_traduzir_valueerro(str(_algo_erro))}{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
         self.linhas.append("")
         return "\n".join(self.linhas)
@@ -411,9 +494,11 @@ class GeradorCodigo:
         self.emit(f"if not ({cond_py}):", nivel)
         if stmt.mensagem is not None:
             msg_py = self._expr(stmt.mensagem, tipos)
-            self.emit(f'print({prefixo_literal} + " — " + str({msg_py}))', nivel + 1)
+            self.emit(f'_algo_msg = {prefixo_literal} + " — " + str({msg_py})', nivel + 1)
         else:
-            self.emit(f'print({prefixo_literal})', nivel + 1)
+            self.emit(f'_algo_msg = {prefixo_literal}', nivel + 1)
+        self.emit("print(_algo_msg)", nivel + 1)
+        self.emit(f"_algo_registar_erro_runtime(_algo_msg, {stmt.linha})", nivel + 1)
         self.emit("sys.exit(1)", nivel + 1)
 
     def _gerar_corpo(self, corpo, nivel, tipos):

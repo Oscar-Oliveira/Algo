@@ -2088,3 +2088,100 @@ def test_flowchart_texto_expr_com_chavetas_produz_dot_seguro():
     verificar(programa)
     dot = gerar_dot(programa.corpo, programa.nome)
     assert "{codigo malicioso}" in dot
+
+
+def _correr_esperando_erro(codigo_algo):
+    """Compila e corre um programa ALGO, sem levantar em caso de erro
+    (ao contrário de apoio.executar) -- para testar precisamente os
+    casos em que o programa termina com erro em tempo de execução."""
+    import os
+    codigo_py = compilar(codigo_algo)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    return subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True,
+        encoding="utf-8", timeout=10, env=env)
+
+
+# ---------- AL-08 + UX-01: mensagens de ValueError traduzidas para português ----------
+
+def test_raiz_de_negativo_traduz_math_domain_error():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Math
+inicio
+    escrever(math.raiz(-4))
+""")
+    assert resultado.returncode == 1
+    assert "domínio válido" in resultado.stdout
+    assert "math domain error" not in resultado.stdout.lower()
+
+
+def test_valueerror_sem_causa_mapeada_mantem_o_generico():
+    """Uma causa não mapeada continua a mostrar a mensagem original do
+    Python entre parênteses, como recurso -- nunca deve ficar muda. O
+    tamanho de array negativo (_algo_verificar_tamanho_array) tem a sua
+    própria mensagem em português mas não está na lista de causas
+    mapeadas do tradutor, por isso passa pelo fallback genérico "valor
+    inválido (...)" -- só é detetável em runtime quando o tamanho vem
+    de uma variável, não de um literal (que já falha em compilação)."""
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    n:inteiro = -1
+    v:inteiro[n]
+    escrever(1)
+""")
+    assert resultado.returncode == 1
+    assert "não pode ser negativo" in resultado.stdout
+
+
+# ---------- UX-04: número de linha ALGO nas mensagens de erro em runtime ----------
+
+def test_erro_de_indice_de_array_mostra_a_linha_algo():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+v:inteiro[3]
+inicio
+    escrever("linha 4")
+    escrever(v[10])
+""")
+    assert resultado.returncode == 1
+    assert "(linha 5)" in resultado.stdout
+
+
+def test_erro_de_divisao_por_zero_mostra_a_linha_algo():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+x:inteiro = 5
+y:inteiro = 0
+inicio
+    escrever(x / y)
+""")
+    assert resultado.returncode == 1
+    assert "(linha 5)" in resultado.stdout
+
+
+def test_erro_de_valueerror_mostra_a_linha_algo():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Math
+inicio
+    escrever("antes")
+    escrever(math.raiz(-4))
+""")
+    assert resultado.returncode == 1
+    assert "(linha 5)" in resultado.stdout
+
+
+def test_erro_dentro_de_uma_funcao_mostra_a_linha_correta():
+    """A linha reportada é a do local real do erro, mesmo quando este
+    acontece dentro de uma função chamada a partir do corpo principal."""
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+funcao dividir(a:inteiro, b:inteiro):inteiro
+    devolver a div b
+inicio
+    escrever(dividir(10, 0))
+""")
+    assert resultado.returncode == 1
+    assert "(linha 3)" in resultado.stdout

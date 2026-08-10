@@ -31,9 +31,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 ### 3.1 `algo_lang/` — Bugs e Segurança (25 findings)
 
 - **AL-07** [QUALIDADE DE CÓDIGO · ALTA · Alto] `compilador/codegen.py` + `codegen_minimo.py`. ~13 funções quase byte-a-byte duplicadas entre os dois geradores (ver ARCH-01 para o impacto estrutural). Recomendação: extrair uma camada de dispatch/funções partilhadas; tratar como refactor dedicado, não uma correção pontual.
-- **AL-08** [UX/BUG · BAIXA · Baixo] `codegen.py:180-183`. `except ValueError` genérico mostra sempre "valor inválido", já melhorado para incluir a mensagem Python real entre parênteses, mas continua sem localizar/traduzir essa mensagem (ver UX-01). Recomendação: mapear as causas conhecidas (`math domain error`, `invalid literal for int()`, etc.) para frases em português; manter o genérico como fallback.
-- **AL-23** [BUG · MÉDIA · Baixo] `tools/tracer.py:190-201`. Deteção de erro no trace cobre 3 dos 4 handlers de `codegen.py`; falta o padrão do `ValueError` (ligado a AL-08). Recomendação: adicionar o padrão em falta a `eh_erro_runtime`.
-- **AL-24** [BUG · BAIXA · Baixo] `tools/tracer.py:190-201`. A mesma deteção por `endswith` de frases fixas pode dar falso positivo se um `escrever` legítimo terminar com uma dessas frases. Recomendação: marcar a linha de erro com um prefixo/sentinel interno em vez de inferir por texto.
 
 ### 3.2 `alguem/` — Bugs e Segurança (21 findings)
 
@@ -62,10 +59,7 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 ### 3.5 Experiência de Utilização (19 findings)
 
-- **UX-01** [UX · ALTA · Baixo] `codegen.py:180-182`. Exceções Python cruas (ex. `math domain error` de `math.raiz` com argumento negativo) aparecem sem tradução dentro de uma frase em português. Recomendação: mapear as causas comuns para mensagens em português (ligado a AL-08).
 - **UX-02** [UX · ALTA · Médio] `codegen_minimo.py` não tem nenhum tratamento de erro em runtime — qualquer falha vira um traceback Python cru com nomes internos, e o texto de ajuda de `--minimo` não avisa sobre isto. Recomendação: ou adicionar tratamento equivalente ao modo normal, ou reforçar o aviso na ajuda do comando de que erros de runtime aparecerão como Python puro.
-- **UX-03** [UX · MÉDIA · Baixo, dep. AL-23] `tools/tracer.py:210-215`. O modo de rasto (`--debug`/`--json`/web) não marca como erro um `ValueError` de runtime (ex. `math.raiz` negativo) — o campo `erro` fica `None` e o trace simplesmente pára sem explicação visível na interface.
-- **UX-04** [UX · MÉDIA · Baixo] Erros de runtime (índice, divisão, recursão, valor inválido) não incluem número de linha fora do modo `--debug`, ao contrário dos erros de compilação. Recomendação: propagar a linha corrente (já disponível via mapa de linhas do codegen) para as mensagens de erro em runtime.
 - **UX-05** [UX · BAIXA/MÉDIA · Baixo] Termos "léxico"/"sintático"/"semântico" usados nas mensagens de erro nunca são explicados no manual (`online/estatico/ajuda.html`). Recomendação: um parágrafo curto no manual explicando a diferença, em linguagem simples.
 - **UX-06** [UX · BAIXA · Baixo] `cli.py:85` não usa o prefixo `❌` que a maioria das outras mensagens de erro usa, quebrando a consistência visual que o estudante aprende a reconhecer.
 - **UX-11** [UX · CRÍTICA · Médio] `visualizador/algo-trace-viewer.html:8-11` carrega React/ReactDOM/Babel/Tailwind de CDNs externos sem qualquer fallback — se a rede escolar bloquear esses domínios (o mesmo risco que já motivou um fallback dedicado para o CodeMirror), o visualizador de rasto fica em branco sem explicação. Recomendação: aplicar o mesmo padrão de fallback local já usado para o CodeMirror.
@@ -76,7 +70,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 - **UX-16** [UX · BAIXA/MÉDIA · Baixo] Barra de ferramentas principal (Executar/Fluxograma/Rasto/Verificador/...) é só ícones SVG com `title` como único rótulo — pouco descobrível, e tooltips não aparecem de forma fiável em dispositivos táteis. Recomendação: rótulos de texto visíveis, pelo menos nos botões principais.
 - **UX-17** [UX · BAIXA · Baixo] Após registo, o estudante fica num estado de espera sem indicação de prazo nem contacto ("Aguarda a aprovação de um administrador"). Recomendação: indicar a quem contactar/prazo esperado.
 - **UX-18** [UX · BAIXA · Baixo] Mesma falha (execução longa/possível ciclo infinito) tem tom diferente entre CLI (nomeia a causa provável) e web (só diz "excedeu o tempo limite", sem sugerir causa). Recomendação: uniformizar a mensagem entre as duas superfícies.
-- **UX-19** [UX · BAIXA · Baixo] Strings do runtime Python gerado (`codegen.py:9-68`) misturam texto sem acentos ("Valor invalido") com texto acentuado no resto do mesmo ficheiro — visível a quem usa `--mostrar-python`/`--minimo`. Recomendação: uniformizar para PT-PT/PT-BR acentuado, consistente com o resto do projeto.
 
 ### 3.6 Alinhamento com o Objetivo Pedagógico (5 findings)
 
@@ -155,7 +148,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 5 — UX crítica e "quick wins"
 - **Objetivo**: eliminar os pontos de confusão/abandono mais graves para um estudante iniciante, incluindo o único finding UX classificado CRÍTICA.
-- **Resolve**: UX-01 a UX-06, UX-11 a UX-19, AL-08, AL-23, AL-24, ON-37, FEAT-02, FEAT-03.
+- **Resolve**: ~~UX-01~~, UX-02, ~~UX-03~~, ~~UX-04~~, UX-05, UX-06, UX-11, UX-12, UX-13, UX-14, UX-15, UX-16, UX-17, UX-18, ~~UX-19~~, ~~AL-08~~, ~~AL-23~~, ~~AL-24~~, ON-37, FEAT-02, FEAT-03.
 - **Componentes**: `algo_lang/compilador/codegen.py` (mensagens), `algo_lang/tools/tracer.py`, `algo_lang/cli.py` (`_mostrar_banner`), `online/estatico/visualizador/algo-trace-viewer.html`, `online/estatico/app.js`, `online/estatico/editor.html`, `online/estatico/estilo.css`, `online/modo_codemirror.py`.
 - **Alterações principais**: localizar mensagens de runtime comuns (`math domain error`, etc.); incluir número de linha em erros de runtime; fallback local para os CDNs do visualizador de rasto (replicar o padrão já usado para o CodeMirror); painel do Alguém visível/destacado por omissão; indicador "a pensar..." no chat; reativar o chat após erro de credencial; ligar erros de compilação ao gutter do CodeMirror; rótulos de texto na toolbar; logo ASCII art no banner da consola (FEAT-03); toggle de tema claro/escuro no `online`, persistido em `localStorage` (FEAT-02).
 - **Dependências**: Fase 2 (mensagens de erro do compilador). Pode correr em paralelo com as Fases 3 e 4.
