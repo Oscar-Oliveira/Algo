@@ -462,6 +462,46 @@ def test_fluxograma_erro_de_sintaxe(tmp_path):
         executor.gerar_fluxograma_svg(ficheiros, principal, str(tmp_path))
 
 
+# ---------- ON-34: sanitização do SVG antes de ser devolvido ----------
+
+def test_sanitizar_svg_remove_elemento_script():
+    svg_malicioso = (
+        '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script>'
+        '<circle cx="5" cy="5" r="4"/></svg>'
+    )
+    resultado = executor._sanitizar_svg(svg_malicioso)
+    assert "<script" not in resultado
+    assert "circle" in resultado
+
+
+def test_sanitizar_svg_remove_atributos_de_evento():
+    svg_malicioso = (
+        '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">'
+        '<rect onmouseover="alert(2)" width="1" height="1"/></svg>'
+    )
+    resultado = executor._sanitizar_svg(svg_malicioso)
+    assert "onload" not in resultado
+    assert "onmouseover" not in resultado
+    assert "rect" in resultado
+
+
+def test_sanitizar_svg_remove_href_javascript():
+    svg_malicioso = (
+        '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+        '<a xlink:href="javascript:alert(1)"><text>clica</text></a></svg>'
+    )
+    resultado = executor._sanitizar_svg(svg_malicioso)
+    assert "javascript:" not in resultado
+
+
+def test_gerar_fluxograma_svg_real_nunca_contem_script_nem_atributos_de_evento(tmp_path):
+    ficheiros, principal = _um_ficheiro('algoritmo "T"\ninicio\n    escrever("ola")\n')
+    resultado = executor.gerar_fluxograma_svg(ficheiros, principal, str(tmp_path))
+    assert "<script" not in resultado["svg"]
+    assert " onload=" not in resultado["svg"]
+    assert " onerror=" not in resultado["svg"]
+
+
 def test_fluxograma_com_condicoes_e_ciclos(tmp_path):
     codigo = '''algoritmo "T"
 inicio

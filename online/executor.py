@@ -18,6 +18,12 @@ import sys
 import tempfile
 import time
 import uuid
+import xml.etree.ElementTree as ET
+
+_NS_SVG = "http://www.w3.org/2000/svg"
+_NS_XLINK = "http://www.w3.org/1999/xlink"
+ET.register_namespace("", _NS_SVG)
+ET.register_namespace("xlink", _NS_XLINK)
 
 _RAIZ_PROJETO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _RAIZ_PROJETO not in sys.path:
@@ -418,6 +424,44 @@ class ErroFluxograma(Exception):
 NOME_PRINCIPAL_PARA_FLUXOGRAMA = "Principal"
 
 
+def _remover_scripts(elemento: ET.Element) -> None:
+    for filho in list(elemento):
+        tag_local = filho.tag.rsplit("}", 1)[-1]
+        if tag_local == "script":
+            elemento.remove(filho)
+        else:
+            _remover_scripts(filho)
+
+
+def _sanitizar_svg(svg: str) -> str:
+    """ON-34: o SVG vem do graphviz, gerado a partir do código do
+    estudante, e o frontend insere-o diretamente via innerHTML -- um
+    <script> ou um atributo de evento (onload, onerror, ...) no SVG
+    executaria no browser de quem o vir. Os rótulos que flowchart.py
+    gera são sempre texto simples entre aspas (nunca rótulos HTML-like
+    do graphviz), por isso já vêm devidamente escapados pelo próprio
+    graphviz -- isto é defesa em profundidade, não a correção de um XSS
+    já reproduzido. Remove qualquer <script> e qualquer atributo 'on*'
+    ou 'href'/'xlink:href' com esquema javascript:, sem depender de
+    nenhuma biblioteca de sanitização externa (só a stdlib)."""
+    try:
+        raiz = ET.fromstring(svg)
+    except ET.ParseError as e:
+        raise ErroFluxograma(f"O graphviz devolveu um SVG inválido: {e}") from e
+
+    _remover_scripts(raiz)
+    for elemento in raiz.iter():
+        for nome_attr in list(elemento.attrib):
+            nome_local = nome_attr.rsplit("}", 1)[-1].lower()
+            valor = elemento.attrib[nome_attr]
+            if nome_local.startswith("on"):
+                del elemento.attrib[nome_attr]
+            elif nome_local in ("href",) and valor.strip().lower().startswith("javascript:"):
+                del elemento.attrib[nome_attr]
+
+    return ET.tostring(raiz, encoding="unicode")
+
+
 def gerar_fluxograma_svg(ficheiros: list[dict], nome_principal: str, pasta_estudante: str,
                           nome_rotina: str | None = None) -> dict:
     """Compila e gera o fluxograma em SVG (texto, fácil de embutir
@@ -480,6 +524,7 @@ def gerar_fluxograma_svg(ficheiros: list[dict], nome_principal: str, pasta_estud
 
     with open(caminho_svg, encoding="utf-8") as f:
         svg = f.read()
+    svg = _sanitizar_svg(svg)
 
     return {"svg": svg, "rotinas": rotinas_disponiveis, "rotina_atual": rotina_atual}
 

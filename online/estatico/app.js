@@ -351,6 +351,18 @@ botaoVoltarExecucao.addEventListener("click", () => mostrarVistaPainelTerminal("
 
 // ---------- fluxograma ----------
 
+// ON-33: a mensagem de erro pode conter texto derivado do código do
+// estudante (ex: um erro de compilação a citar um identificador) --
+// nunca interpolar diretamente em innerHTML. textContent escapa
+// sempre, independentemente do conteúdo.
+function mostrarErroEm(elemento, mensagem) {
+  elemento.innerHTML = "";
+  const p = document.createElement("p");
+  p.className = "mensagem-erro";
+  p.textContent = mensagem;
+  elemento.appendChild(p);
+}
+
 const campoRotinaFluxograma = document.getElementById("campo-rotina-fluxograma");
 
 async function carregarFluxograma(nomeRotina) {
@@ -364,9 +376,13 @@ async function carregarFluxograma(nomeRotina) {
     });
     const dados = await resposta.json();
     if (!resposta.ok) {
-      conteudo.innerHTML = `<p class="mensagem-erro">${dados.detail || "Não foi possível gerar o fluxograma."}</p>`;
+      mostrarErroEm(conteudo, dados.detail || "Não foi possível gerar o fluxograma.");
       return;
     }
+    // ON-34: o servidor já sanitiza este SVG (ver
+    // executor._sanitizar_svg) antes de o devolver -- mas continua a
+    // ser HTML de terceiros (graphviz) inserido via innerHTML, por
+    // isso não é tratado como texto simples como o resto desta função.
     conteudo.innerHTML = dados.svg;
 
     // só reconstrói o seletor se a lista de rotinas mudou (ex: 1ª vez,
@@ -384,7 +400,7 @@ async function carregarFluxograma(nomeRotina) {
     campoRotinaFluxograma.value = dados.rotina_atual;
   } catch (erro) {
     console.error(erro);
-    conteudo.innerHTML = `<p class="mensagem-erro">Não foi possível contactar o servidor: ${erro && erro.message ? erro.message : erro}</p>`;
+    mostrarErroEm(conteudo, "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro));
   }
 }
 
@@ -413,7 +429,7 @@ async function carregarLinter() {
     });
     const dados = await resposta.json();
     if (!resposta.ok) {
-      conteudo.innerHTML = `<p class="mensagem-erro">${dados.detail || "Não foi possível correr o verificador."}</p>`;
+      mostrarErroEm(conteudo, dados.detail || "Não foi possível correr o verificador.");
       return;
     }
     if (dados.avisos.length === 0) {
@@ -431,7 +447,7 @@ async function carregarLinter() {
     conteudo.appendChild(lista);
   } catch (erro) {
     console.error(erro);
-    conteudo.innerHTML = `<p class="mensagem-erro">Não foi possível contactar o servidor: ${erro && erro.message ? erro.message : erro}</p>`;
+    mostrarErroEm(conteudo, "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro));
   }
 }
 

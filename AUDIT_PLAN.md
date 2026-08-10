@@ -57,8 +57,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 - **ON-25** [SEGURANÇA · BAIXA · Baixo] `main.py:46`. Sessão sem tempo de expiração explícito (usa o default implícito do Starlette). Recomendação: `max_age` explícito e documentado.
 - **ON-26** [SEGURANÇA · MÉDIA · Médio] `main.py:364-368` (a citação original de `alguem_ponte.py:261-265` estava desatualizada) + `alguem/nucleo/tutor.py:71-91`. Nenhuma validação de tamanho/formato do conteúdo de ficheiros antes de entrar no pacote `alguem` via `ws_alguem`. Recomendação: aplicar o mesmo limite de AG-28 no ponto de entrada do `online`.
 - **ON-30** [SEGURANÇA/OPERAÇÕES · MÉDIA · Baixo] `requerimentos.txt`. Nenhuma dependência com versão fixada. Recomendação: fixar versões (ou pelo menos limites superiores) e configurar `pip-audit`/`dependabot`.
-- **ON-33** [SEGURANÇA · ALTA · Baixo] `estatico/app.js:367` (linha deslocada desde a citação original 289). `innerHTML` com a mensagem de erro do fluxograma, que pode conter texto derivado da entrada do estudante. Recomendação: `textContent` em vez de `innerHTML`, ou sanitização explícita.
-- **ON-34** [SEGURANÇA · ALTA · Baixo] `estatico/app.js:370` (linha deslocada desde 292). SVG devolvido pelo servidor inserido diretamente via `innerHTML`, sem sanitização do lado do cliente. Recomendação: sanitizar no servidor antes de devolver (o SVG vem do `graphviz`, gerado a partir do código do estudante) ou usar uma biblioteca de sanitização de SVG no cliente.
 - **ON-35** [SEGURANÇA · MÉDIA · Baixo] `main.py:46` (`SessionMiddleware`). Sem HTTPS forçado nem redirecionamento do lado do cliente. Recomendação: `https_only=True` configurável por ambiente, aplicado sempre que o serviço estiver atrás de TLS.
 - **ON-37** [BUG · BAIXA · Baixo] `modo_codemirror.py:29-33`. Fallback silencioso para categoria genérica em palavras-chave não classificadas. Recomendação: log de aviso quando isto acontece, para detetar keywords novas não mapeadas.
 - **ON-38** [QUALIDADE DE CÓDIGO/SEGURANÇA · ALTA · Médio] `online/tests/`. Nenhum teste cobre os cenários de maior risco (path traversal, SSRF, rate limiting, payloads grandes, CSRF). Recomendação: suite de testes de segurança dedicada, a crescer junto com as correções das Fases 0-1-4.
@@ -160,7 +158,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 4 — Robustez e segurança da app online
 - **Objetivo**: fechar os problemas de autenticação, sessão, validação de entrada e XSS na aplicação web.
-- **Resolve**: ON-10, ON-11, ON-12, ON-13, ON-15, ~~ON-19~~, ON-20, ~~ON-21~~, ON-22, ON-23, ON-25, ON-26, ON-30, ON-35, ON-33, ON-34.
+- **Resolve**: ON-10, ON-11, ON-12, ON-13, ON-15, ~~ON-19~~, ON-20, ~~ON-21~~, ON-22, ON-23, ON-25, ON-26, ON-30, ON-35, ~~ON-33~~, ~~ON-34~~.
 - **Componentes**: `online/autenticacao.py`, `online/main.py`, `online/cifragem.py`, `online/estatico/app.js`, `requerimentos.txt`.
 - **Alterações principais**: rate limiting de login por conta; mensagens de erro genéricas ao cliente; validação de corpo JSON com 400 explícito; remover acesso direto a `editor.html` sem sessão; limites de tamanho de mensagem/pedido; verificação de origem/CSRF; `textContent`/sanitização em vez de `innerHTML` para erro e SVG; pinning de dependências; `https_only` configurável.
 - **Dependências**: Fase 1 (mesmos ficheiros de rotas já alterados).
