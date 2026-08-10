@@ -734,6 +734,30 @@ def test_erro_inesperado_nao_revela_a_mensagem_da_excecao_ao_cliente(caplog):
     assert "segredo interno" in caplog.text
 
 
+# ---------- ON-20: corpo JSON malformado devolve 400, não 500 ----------
+
+@pytest.mark.parametrize("rota", ["/api/registar", "/api/entrar"])
+def test_corpo_nao_json_devolve_400(cliente, rota):
+    r = cliente.post(rota, content=b"isto nao e json valido {{{",
+                      headers={"Content-Type": "application/json"})
+    assert r.status_code == 400
+    assert "JSON" in r.json()["detail"]
+
+
+def test_corpo_json_que_nao_e_objeto_devolve_400(cliente):
+    """JSON sintaticamente válido (uma lista), mas não o objeto que a
+    rota espera -- antes rebentava com AttributeError ao tentar
+    '.get()' numa lista, e caía no handler global como 500."""
+    r = cliente.post("/api/registar", json=["nao", "e", "um", "objeto"])
+    assert r.status_code == 400
+    assert "objeto" in r.json()["detail"]
+
+
+def test_corpo_json_valido_continua_a_funcionar(cliente):
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    assert r.status_code == 200
+
+
 # ---------- ON-17: bcrypt lento não pode bloquear o servidor inteiro ----------
 
 def test_login_lento_nao_bloqueia_pedido_concorrente_nao_relacionado(cliente, monkeypatch):

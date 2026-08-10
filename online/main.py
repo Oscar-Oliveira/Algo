@@ -107,6 +107,22 @@ def estudante_atual(request: Request) -> int:
     return id_estudante
 
 
+async def corpo_json(request: Request) -> dict:
+    """ON-20: um corpo malformado (JSON inválido, ou JSON válido mas
+    não um objeto -- ex. uma lista ou uma string solta) fazia
+    request.json() levantar, ou o '.get()' seguinte rebentar com
+    AttributeError -- ambos caíam no handler global de exceções como
+    500, em vez de um 400 claro. Usado em vez de 'await request.json()'
+    diretamente em todas as rotas que esperam um corpo JSON objeto."""
+    try:
+        dados = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Corpo do pedido tem de ser JSON válido.")
+    if not isinstance(dados, dict):
+        raise HTTPException(status_code=400, detail="Corpo do pedido tem de ser um objeto JSON.")
+    return dados
+
+
 async def admin_atual(id_estudante: int = Depends(estudante_atual)) -> int:
     """Dependência: como estudante_atual, mas exige também que a conta
     seja admin (ver autenticacao.eh_admin) -- 403 caso contrário."""
@@ -129,7 +145,7 @@ async def pasta_execucao_atual(id_estudante: int = Depends(estudante_atual)) -> 
 
 @app.post("/api/registar")
 async def rota_registar(request: Request):
-    dados = await request.json()
+    dados = await corpo_json(request)
     try:
         id_estudante = await run_in_threadpool(
             autenticacao.registar, dados.get("email", ""), dados.get("password", ""))
@@ -143,7 +159,7 @@ async def rota_registar(request: Request):
 
 @app.post("/api/entrar")
 async def rota_entrar(request: Request):
-    dados = await request.json()
+    dados = await corpo_json(request)
     try:
         id_estudante = await run_in_threadpool(
             autenticacao.autenticar, dados.get("email", ""), dados.get("password", ""))
@@ -246,7 +262,7 @@ async def rota_obter_credencial(id_estudante: int = Depends(estudante_atual)):
 
 @app.post("/api/credencial")
 async def rota_guardar_credencial(request: Request, id_estudante: int = Depends(estudante_atual)):
-    dados = await request.json()
+    dados = await corpo_json(request)
     try:
         await run_in_threadpool(
             credenciais.guardar_credencial,
@@ -457,7 +473,7 @@ async def ws_alguem(websocket: WebSocket):
 
 @app.post("/api/fluxograma")
 async def rota_fluxograma(request: Request, pasta_estudante: str = Depends(pasta_execucao_atual)):
-    dados = await request.json()
+    dados = await corpo_json(request)
     try:
         # ON-08: gerar_fluxograma_svg chama o binário 'dot' (graphviz) de
         # forma síncrona e bloqueante -- sem isto, travava o event loop
@@ -475,7 +491,7 @@ async def rota_fluxograma(request: Request, pasta_estudante: str = Depends(pasta
 
 @app.post("/api/linter")
 async def rota_linter(request: Request, pasta_estudante: str = Depends(pasta_execucao_atual)):
-    dados = await request.json()
+    dados = await corpo_json(request)
     try:
         avisos = executor.analisar_linter(
             dados.get("ficheiros", []), dados.get("principal", ""), pasta_estudante)
@@ -486,7 +502,7 @@ async def rota_linter(request: Request, pasta_estudante: str = Depends(pasta_exe
 
 @app.post("/api/rasto")
 async def rota_rasto(request: Request, pasta_estudante: str = Depends(pasta_execucao_atual)):
-    dados = await request.json()
+    dados = await corpo_json(request)
     try:
         rasto = executor.gerar_rasto(
             dados.get("ficheiros", []), dados.get("principal", ""),

@@ -48,7 +48,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 - **ON-10** [SEGURANÇA · BAIXA · Baixo] `cifragem.py:32-42`. Nenhuma validação de entropia da chave de cifragem, só do formato Fernet. Recomendação: documentar claramente no README como gerar a chave (já existe comando sugerido) e, opcionalmente, avisar se a chave parecer previsível.
 - **ON-15** [BUG · BAIXA · Baixo] `credenciais.py` + `alguem_ponte.py`. Campo `host` é incluído sempre que presente, mesmo para fornecedores que não o suportam (gera erro amigável a jusante, mas evitável). Recomendação: só incluir `host` para o fornecedor Ollama.
-- **ON-20** [BUG · MÉDIA · Baixo] `main.py` (várias rotas). Corpo JSON malformado ou de tipo errado resulta em 500 em vez de 400. Recomendação: validar com modelos Pydantic ou `try/except` explícito à volta de `request.json()`.
 - **ON-22** [SEGURANÇA/DESEMPENHO · MÉDIA · Baixo] `main.py` (geral). Sem limite de tamanho de mensagem/pedido nas rotas e WebSockets. Recomendação: middleware de limite de tamanho de corpo, e `max_size` explícito nas ligações WebSocket.
 - **ON-23** [SEGURANÇA · MÉDIA · Médio] `main.py` (geral). Sem token CSRF nem verificação de origem nas rotas de mutação de estado. Recomendação: verificação de `Origin`/`Referer` nas rotas sensíveis, no mínimo; token CSRF explícito se se quiser defesa robusta.
 - **ON-25** [SEGURANÇA · BAIXA · Baixo] `main.py:46`. Sessão sem tempo de expiração explícito (usa o default implícito do Starlette). Recomendação: `max_age` explícito e documentado.
@@ -155,7 +154,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 4 — Robustez e segurança da app online
 - **Objetivo**: fechar os problemas de autenticação, sessão, validação de entrada e XSS na aplicação web.
-- **Resolve**: ON-10, ~~ON-11~~, ~~ON-12~~, ~~ON-13~~, ON-15, ~~ON-19~~, ON-20, ~~ON-21~~, ON-22, ON-23, ON-25, ON-26, ON-30, ON-35, ~~ON-33~~, ~~ON-34~~.
+- **Resolve**: ON-10, ~~ON-11~~, ~~ON-12~~, ~~ON-13~~, ON-15, ~~ON-19~~, ~~ON-20~~, ~~ON-21~~, ON-22, ON-23, ON-25, ON-26, ON-30, ON-35, ~~ON-33~~, ~~ON-34~~.
 - **Componentes**: `online/autenticacao.py`, `online/main.py`, `online/cifragem.py`, `online/estatico/app.js`, `requerimentos.txt`.
 - **Alterações principais**: rate limiting de login por conta; mensagens de erro genéricas ao cliente; validação de corpo JSON com 400 explícito; remover acesso direto a `editor.html` sem sessão; limites de tamanho de mensagem/pedido; verificação de origem/CSRF; `textContent`/sanitização em vez de `innerHTML` para erro e SVG; pinning de dependências; `https_only` configurável.
 - **Dependências**: Fase 1 (mesmos ficheiros de rotas já alterados).
