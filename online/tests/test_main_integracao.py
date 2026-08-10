@@ -43,6 +43,15 @@ def test_editor_sem_sessao_redireciona(cliente):
     assert r.headers["location"] == "/"
 
 
+def test_paginas_com_guarda_de_sessao_nao_sao_acessiveis_via_pasta_estatica(cliente):
+    """ON-21: editor.html/ajuda.html/admin.html não podem estar na
+    pasta montada publicamente (/estatico/...) -- isso contornava por
+    completo a verificação de sessão das rotas /editor, /ajuda, /admin."""
+    for nome in ("editor.html", "ajuda.html", "admin.html"):
+        r = cliente.get(f"/estatico/{nome}")
+        assert r.status_code == 404
+
+
 def test_registar_da_acesso_ao_editor(cliente):
     r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     assert r.status_code == 200

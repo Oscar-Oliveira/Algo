@@ -34,6 +34,17 @@ from alguem.nucleo import registador as registador_alguem
 
 PASTA_ESTATICO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estatico")
 
+# ON-21: editor.html/ajuda.html/admin.html NÃO vivem em PASTA_ESTATICO --
+# essa pasta é montada publicamente via StaticFiles mais abaixo, o que
+# tornava estas páginas acessíveis diretamente em /estatico/editor.html
+# (etc.), contornando por completo a verificação de sessão feita pelas
+# rotas /editor, /ajuda e /admin. Os recursos que estas páginas usam
+# (CSS/JS/CodeMirror) continuam em PASTA_ESTATICO, com caminhos
+# absolutos ("/estatico/...") -- servir o HTML de outra pasta não
+# quebra isso, já que o browser resolve os recursos a partir do URL do
+# pedido (/editor), não da localização física do ficheiro.
+PASTA_PAGINAS_PRIVADAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paginas_privadas")
+
 _logger = logging.getLogger("online")
 
 
@@ -263,14 +274,14 @@ async def pagina_inicial(request: Request):
 async def pagina_editor(request: Request):
     if request.session.get("id_estudante") is None:
         return RedirectResponse("/")
-    return FileResponse(os.path.join(PASTA_ESTATICO, "editor.html"))
+    return FileResponse(os.path.join(PASTA_PAGINAS_PRIVADAS, "editor.html"))
 
 
 @app.get("/ajuda")
 async def pagina_ajuda(request: Request):
     if request.session.get("id_estudante") is None:
         return RedirectResponse("/")
-    return FileResponse(os.path.join(PASTA_ESTATICO, "ajuda.html"))
+    return FileResponse(os.path.join(PASTA_PAGINAS_PRIVADAS, "ajuda.html"))
 
 
 @app.get("/admin")
@@ -278,7 +289,7 @@ async def pagina_admin(request: Request):
     id_estudante = request.session.get("id_estudante")
     if id_estudante is None or not await run_in_threadpool(autenticacao.eh_admin, id_estudante):
         return RedirectResponse("/editor")
-    return FileResponse(os.path.join(PASTA_ESTATICO, "admin.html"))
+    return FileResponse(os.path.join(PASTA_PAGINAS_PRIVADAS, "admin.html"))
 
 
 @app.get("/modo-algo.js")
