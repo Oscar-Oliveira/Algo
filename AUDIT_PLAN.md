@@ -46,7 +46,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 ### 3.3 `online/` — Bugs e Segurança (31 findings)
 
-- **ON-10** [SEGURANÇA · BAIXA · Baixo] `cifragem.py:32-42`. Nenhuma validação de entropia da chave de cifragem, só do formato Fernet. Recomendação: documentar claramente no README como gerar a chave (já existe comando sugerido) e, opcionalmente, avisar se a chave parecer previsível.
 - **ON-30** [SEGURANÇA/OPERAÇÕES · MÉDIA · Baixo] `requerimentos.txt`. Nenhuma dependência com versão fixada. Recomendação: fixar versões (ou pelo menos limites superiores) e configurar `pip-audit`/`dependabot`.
 - **ON-37** [BUG · BAIXA · Baixo] `modo_codemirror.py:29-33`. Fallback silencioso para categoria genérica em palavras-chave não classificadas. Recomendação: log de aviso quando isto acontece, para detetar keywords novas não mapeadas.
 - **ON-38** [QUALIDADE DE CÓDIGO/SEGURANÇA · ALTA · Médio] `online/tests/`. Nenhum teste cobre os cenários de maior risco (path traversal, SSRF, rate limiting, payloads grandes, CSRF). Recomendação: suite de testes de segurança dedicada, a crescer junto com as correções das Fases 0-1-4.
@@ -148,7 +147,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 4 — Robustez e segurança da app online
 - **Objetivo**: fechar os problemas de autenticação, sessão, validação de entrada e XSS na aplicação web.
-- **Resolve**: ON-10, ~~ON-11~~, ~~ON-12~~, ~~ON-13~~, ~~ON-15~~, ~~ON-19~~, ~~ON-20~~, ~~ON-21~~, ~~ON-22~~, ~~ON-23~~, ~~ON-25~~, ~~ON-26~~, ON-30, ~~ON-35~~, ~~ON-33~~, ~~ON-34~~.
+- **Resolve**: ~~ON-10~~, ~~ON-11~~, ~~ON-12~~, ~~ON-13~~, ~~ON-15~~, ~~ON-19~~, ~~ON-20~~, ~~ON-21~~, ~~ON-22~~, ~~ON-23~~, ~~ON-25~~, ~~ON-26~~, ON-30, ~~ON-35~~, ~~ON-33~~, ~~ON-34~~.
 - **Componentes**: `online/autenticacao.py`, `online/main.py`, `online/cifragem.py`, `online/estatico/app.js`, `requerimentos.txt`.
 - **Alterações principais**: rate limiting de login por conta; mensagens de erro genéricas ao cliente; validação de corpo JSON com 400 explícito; remover acesso direto a `editor.html` sem sessão; limites de tamanho de mensagem/pedido; verificação de origem/CSRF; `textContent`/sanitização em vez de `innerHTML` para erro e SVG; pinning de dependências; `https_only` configurável.
 - **Dependências**: Fase 1 (mesmos ficheiros de rotas já alterados).

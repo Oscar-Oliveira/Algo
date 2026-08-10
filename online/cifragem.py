@@ -10,11 +10,29 @@ credenciais já guardadas ficassem ilegíveis na próxima vez que o
 servidor reiniciasse."""
 from __future__ import annotations
 
+import base64
 import os
 
 from cryptography.fernet import Fernet, InvalidToken
 
 VARIAVEL_AMBIENTE_CHAVE = "ONLINE_CHAVE_CIFRAGEM"
+
+# ON-10: não é uma análise de entropia a sério (isso exigiria mais do
+# que só contar valores de byte distintos) -- é só uma rede de
+# segurança contra os casos mais flagrantes (ex: a chave toda a
+# zeros, ou um padrão curto repetido), que quase de certeza não vieram
+# de Fernet.generate_key() (ver gerar_chave_nova()). Uma chave gerada
+# corretamente tem, na prática, quase sempre perto de 32 valores de
+# byte distintos nos seus 32 bytes.
+_MINIMO_BYTES_DISTINTOS = 8
+
+
+def _chave_parece_pouco_aleatoria(chave: str) -> bool:
+    try:
+        bruto = base64.urlsafe_b64decode(chave.encode("ascii"))
+    except Exception:
+        return False  # formato inválido -- Fernet(...) já rejeita isto à parte
+    return len(set(bruto)) < _MINIMO_BYTES_DISTINTOS
 
 
 class ErroCifragem(Exception):
@@ -37,9 +55,15 @@ def _obter_fernet() -> Fernet:
             f"Gera uma com gerar_chave_nova() e define-a antes de arrancar o servidor."
         )
     try:
-        return Fernet(chave.encode("ascii"))
+        fernet = Fernet(chave.encode("ascii"))
     except ValueError as e:
         raise ErroCifragem(f"{VARIAVEL_AMBIENTE_CHAVE} não é uma chave Fernet válida.") from e
+    if _chave_parece_pouco_aleatoria(chave):
+        raise ErroCifragem(
+            f"{VARIAVEL_AMBIENTE_CHAVE} parece pouco aleatória (poucos valores de "
+            f"byte distintos) -- gera sempre com gerar_chave_nova(), nunca escrita à mão."
+        )
+    return fernet
 
 
 def validar_chave_configurada() -> None:

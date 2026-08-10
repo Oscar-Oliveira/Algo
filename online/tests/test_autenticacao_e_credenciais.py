@@ -27,6 +27,21 @@ def test_cifragem_sem_variavel_de_ambiente_da_erro_claro(monkeypatch):
         cifragem.cifrar("x")
 
 
+# ---------- ON-10: rejeitar chaves de cifragem obviamente pouco aleatórias ----------
+
+def test_cifragem_com_chave_pouco_aleatoria_da_erro_claro(monkeypatch):
+    import base64
+    chave_fraca = base64.urlsafe_b64encode(b"\x00" * 32).decode("ascii")
+    monkeypatch.setenv(cifragem.VARIAVEL_AMBIENTE_CHAVE, chave_fraca)
+    with pytest.raises(cifragem.ErroCifragem, match="pouco aleatória"):
+        cifragem.cifrar("x")
+
+
+def test_cifragem_com_chave_gerada_normalmente_nao_e_rejeitada():
+    chave_boa = cifragem.gerar_chave_nova()
+    assert not cifragem._chave_parece_pouco_aleatoria(chave_boa)
+
+
 # ---------- autenticação ----------
 
 def test_registar_e_autenticar():
