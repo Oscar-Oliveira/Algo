@@ -519,8 +519,9 @@ async def ws_alguem(websocket: WebSocket):
             dados = await websocket.receive_json()
             if dados.get("tipo") == "ficheiro":
                 ficheiros_recebidos = dados.get("ficheiros", [])
-                tutor.considerar_ficheiros(
+                ficheiros_visiveis = alguem_ponte.limitar_ficheiros_visiveis(
                     [(f["nome"], f["conteudo"]) for f in ficheiros_recebidos])
+                tutor.considerar_ficheiros(ficheiros_visiveis)
                 continue
             mensagem_estudante = dados.get("texto", "")
             if not mensagem_estudante:

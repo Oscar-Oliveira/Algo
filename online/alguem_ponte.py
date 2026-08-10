@@ -16,6 +16,7 @@ if _RAIZ_PROJETO not in sys.path:
 
 from alguem.fornecedores import criar_fornecedor, ErroFornecedorLLM
 from alguem.nucleo import Alguem, PoliticaPedagogica, Registador
+from alguem.nucleo.ficheiros_visiveis import LIMITE_FICHEIROS, LIMITE_BYTES_TOTAL
 
 from credenciais import obter_credencial, CredencialLLM
 from autenticacao import obter_id_pseudonimo
@@ -27,6 +28,29 @@ POLITICA_POR_OMISSAO = PoliticaPedagogica()
 
 class ErroAlguemIndisponivel(Exception):
     pass
+
+
+def limitar_ficheiros_visiveis(ficheiros: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """ON-26: aplica o MESMO limite de AG-28 (alguem/nucleo/
+    ficheiros_visiveis.py) aqui, no ponto de entrada do online -- os
+    ficheiros que chegam por /ws/alguem (mensagem 'tipo: ficheiro')
+    vêm diretamente do browser do estudante, sem passar pela resolução
+    de 'incluir' que AG-28 já protege. Sem isto, nada impedia o
+    browser de enviar um número arbitrário de ficheiros, ou ficheiros
+    enormes, inflando sem controlo o prompt enviado ao LLM."""
+    resultado: list[tuple[str, str]] = []
+    bytes_acumulados = 0
+    for nome, conteudo in ficheiros:
+        if len(resultado) >= LIMITE_FICHEIROS or bytes_acumulados >= LIMITE_BYTES_TOTAL:
+            break
+        espaco_restante = LIMITE_BYTES_TOTAL - bytes_acumulados
+        conteudo_bytes = conteudo.encode("utf-8")
+        if len(conteudo_bytes) > espaco_restante:
+            conteudo = conteudo_bytes[:espaco_restante].decode("utf-8", errors="ignore")
+            conteudo += "\n\n[... ficheiro truncado, excede o limite de tamanho total permitido ...]"
+        bytes_acumulados += len(conteudo.encode("utf-8"))
+        resultado.append((nome, conteudo))
+    return resultado
 
 
 def construir_alguem(
