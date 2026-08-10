@@ -758,6 +758,22 @@ def test_corpo_json_valido_continua_a_funcionar(cliente):
     assert r.status_code == 200
 
 
+# ---------- ON-22: limite de tamanho do corpo do pedido ----------
+
+def test_pedido_com_corpo_demasiado_grande_e_rejeitado(cliente, monkeypatch):
+    monkeypatch.setattr(main, "LIMITE_TAMANHO_CORPO_BYTES", 100)
+    corpo_grande = json.dumps({"email": "a@b.com", "password": "x" * 500})
+    r = cliente.post("/api/registar", content=corpo_grande,
+                      headers={"Content-Type": "application/json"})
+    assert r.status_code == 413
+
+
+def test_pedido_dentro_do_limite_nao_e_afetado(cliente, monkeypatch):
+    monkeypatch.setattr(main, "LIMITE_TAMANHO_CORPO_BYTES", 100)
+    r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    assert r.status_code == 200
+
+
 # ---------- ON-17: bcrypt lento não pode bloquear o servidor inteiro ----------
 
 def test_login_lento_nao_bloqueia_pedido_concorrente_nao_relacionado(cliente, monkeypatch):

@@ -66,6 +66,32 @@ if not _chave_sessao:
     )
 app.add_middleware(SessionMiddleware, secret_key=_chave_sessao, https_only=False)
 
+# ON-22: sem isto, um pedido HTTP com um corpo enorme (ex. um
+# "ficheiro" de várias centenas de MB no JSON de /api/fluxograma) era
+# lido inteiro para memória antes de qualquer validação.
+LIMITE_TAMANHO_CORPO_BYTES = 2_000_000
+
+
+@app.middleware("http")
+async def limitar_tamanho_do_corpo(request: Request, call_next):
+    """Rejeita cedo com base no cabeçalho Content-Length -- não cobre
+    transferência chunked sem esse cabeçalho (raro nos clientes deste
+    projeto: o próprio frontend usa fetch() com um corpo JSON simples,
+    que o browser define sempre), mas é a defesa de baixo esforço que
+    cobre o caso real, sem precisar de um middleware de terceiros."""
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            tamanho = int(content_length)
+        except ValueError:
+            tamanho = None
+        if tamanho is not None and tamanho > LIMITE_TAMANHO_CORPO_BYTES:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Pedido excede o tamanho máximo permitido."},
+            )
+    return await call_next(request)
+
 # Confirma logo ao arrancar que ONLINE_CHAVE_CIFRAGEM está definida E é
 # uma chave Fernet válida -- sem isto, o erro só aparecia mais tarde,
 # ao tentar guardar a primeira credencial, como um 500 confuso em vez

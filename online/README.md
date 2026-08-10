@@ -132,7 +132,7 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 export ONLINE_CHAVE_CIFRAGEM="<a chave gerada acima>"
 export ONLINE_CHAVE_SESSAO="<a segunda chave gerada acima>"
 
-uvicorn main:app --reload
+uvicorn main:app --reload --ws-max-size 2000000
 ```
 
 O servidor recusa-se a arrancar sem as duas variáveis de ambiente --

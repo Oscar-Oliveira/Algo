@@ -35,4 +35,8 @@ USER algo
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# ON-22: --ws-max-size explícito (2 MB) em vez de confiar no default
+# implícito do uvicorn -- limita o tamanho de uma única mensagem
+# WebSocket (ex: /ws/executar, /ws/alguem), consistente com
+# LIMITE_TAMANHO_CORPO_BYTES já aplicado às rotas HTTP em main.py.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--ws-max-size", "2000000"]
