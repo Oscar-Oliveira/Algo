@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import json
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -71,6 +72,26 @@ def test_app_js_tem_indicador_de_a_pensar(cliente):
     assert r.status_code == 200
     assert "mostrarIndicadorAPensar" in r.text
     assert "esconderIndicadorAPensar" in r.text
+
+
+# ---------- UX-14: input desativado + link para Definições sem credencial ----------
+
+def test_app_js_desativa_entrada_alguem_quando_falta_credencial(cliente):
+    """Antes, se faltasse credencial LLM o servidor enviava "erro" e
+    fechava o socket, e depois disso escrever e submeter no chat não
+    fazia absolutamente nada, sem novo aviso nem estado desativado
+    visível. Sem teste de browser disponível, confirma-se ao nível do
+    conteúdo servido que a entrada é desativada e que existe um link
+    persistente para Definições nesse caso."""
+    r = cliente.get("/estatico/app.js")
+    assert r.status_code == 200
+    assert "desativarEntradaAlguem" in r.text
+    assert "ativarEntradaAlguem" in r.text
+    assert "if (!alguemPronto) desativarEntradaAlguem();" in r.text
+
+    editor_html = (Path(__file__).parent.parent / "paginas_privadas" / "editor.html").read_text(encoding="utf-8")
+    assert 'id="aviso-credencial-alguem"' in editor_html
+    assert 'id="botao-ir-definicoes"' in editor_html
 
 
 # ---------- páginas e sessão ----------

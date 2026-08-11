@@ -193,20 +193,46 @@ formEntradaTerminal.addEventListener("submit", (evento) => {
 // ---------- Alguem ----------
 
 const conversaAlguem = document.getElementById("conversa-alguem");
+const entradaAlguem = document.getElementById("entrada-alguem");
+const botaoEnviarAlguem = document.querySelector("#form-alguem button[type=submit]");
+const avisoCredencialAlguem = document.getElementById("aviso-credencial-alguem");
 let wsAlguem = null;
 
+// UX-14: se faltar (ou for inválida) a credencial LLM, o servidor envia
+// "erro" e fecha o socket ANTES de mandar "pronto" -- sem isto, escrever e
+// submeter no chat depois disso não fazia absolutamente nada, sem aviso.
+let alguemPronto = false;
+
+function desativarEntradaAlguem() {
+  entradaAlguem.disabled = true;
+  botaoEnviarAlguem.disabled = true;
+  avisoCredencialAlguem.classList.remove("escondido");
+}
+
+function ativarEntradaAlguem() {
+  entradaAlguem.disabled = false;
+  botaoEnviarAlguem.disabled = false;
+  avisoCredencialAlguem.classList.add("escondido");
+}
+
 function ligarAlguem() {
+  alguemPronto = false;
   const protocolo = window.location.protocol === "https:" ? "wss:" : "ws:";
   wsAlguem = new WebSocket(`${protocolo}//${window.location.host}/ws/alguem`);
 
   wsAlguem.addEventListener("message", (evento) => {
     const dados = JSON.parse(evento.data);
     if (dados.tipo === "pronto" || dados.tipo === "resposta") {
+      if (dados.tipo === "pronto") {
+        alguemPronto = true;
+        ativarEntradaAlguem();
+      }
       esconderIndicadorAPensar();
       adicionarMensagem(dados.mensagem || dados.texto, "mensagem-alguem");
     } else if (dados.tipo === "erro") {
       esconderIndicadorAPensar();
       adicionarMensagem(dados.mensagem, "mensagem-erro-chat");
+      if (!alguemPronto) desativarEntradaAlguem();
     }
   });
 }
@@ -296,6 +322,7 @@ function fecharDefinicoes() {
 }
 
 document.getElementById("botao-definicoes-alguem").addEventListener("click", abrirDefinicoes);
+document.getElementById("botao-ir-definicoes").addEventListener("click", abrirDefinicoes);
 document.getElementById("botao-fechar-definicoes").addEventListener("click", fecharDefinicoes);
 
 document.getElementById("form-definicoes").addEventListener("submit", async (evento) => {
