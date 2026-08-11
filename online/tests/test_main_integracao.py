@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 import bd
 import main
 import autenticacao
+import executor
 
 
 @pytest.fixture
@@ -242,6 +243,29 @@ def test_conta_pendente_indica_a_quem_contactar(cliente, monkeypatch):
 
     entrar_js = (Path(__file__).parent.parent / "estatico" / "entrar.js").read_text(encoding="utf-8")
     assert "contacta o professor ou administrador responsável" in entrar_js
+
+
+# ---------- UX-18: mensagem de timeout uniforme entre CLI e web ----------
+
+async def _timeout_falso(execucao, callback_linha, limite_segundos=None):
+    raise TimeoutError()
+
+
+def test_ws_executar_timeout_nomeia_a_causa_provavel(cliente, monkeypatch):
+    """Antes, a web só dizia "excedeu o tempo limite", sem nomear a
+    causa provável (possível ciclo infinito), ao contrário da consola
+    (algo_lang/cli.py, modo --debug/--json). Substitui-se
+    correr_com_limite_de_tempo por um stub que levanta TimeoutError de
+    imediato -- sem esperar por um timeout real (lento e dependeria de
+    temporização exata)."""
+    monkeypatch.setattr(executor, "correr_com_limite_de_tempo", _timeout_falso)
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    with cliente.websocket_connect("/ws/executar") as ws:
+        ws.send_json(_msg('algoritmo "T"\ninicio\n    escrever("ola")\n'))
+        assert ws.receive_json()["tipo"] == "compilado"
+        m = ws.receive_json()
+    assert m["tipo"] == "erro"
+    assert "possível ciclo infinito" in m["mensagem"]
 
 
 def test_admin_pendentes_exige_admin(cliente, monkeypatch):

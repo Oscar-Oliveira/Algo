@@ -461,7 +461,9 @@ async def ws_executar(websocket: WebSocket):
             except TimeoutError:
                 await websocket.send_json({
                     "tipo": "erro",
-                    "mensagem": "Execução interrompida: excedeu o tempo limite.",
+                    # UX-18: uniformizado com o aviso equivalente da consola
+                    # (cli.py, modo --debug/--json), que já nomeia esta causa provável.
+                    "mensagem": "Execução interrompida: excedeu o tempo limite (possível ciclo infinito).",
                 })
             except executor.SaidaExcessiva:
                 await websocket.send_json({

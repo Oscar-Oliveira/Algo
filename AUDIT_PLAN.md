@@ -58,7 +58,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 ### 3.5 Experiência de Utilização (19 findings)
 
-- **UX-18** [UX · BAIXA · Baixo] Mesma falha (execução longa/possível ciclo infinito) tem tom diferente entre CLI (nomeia a causa provável) e web (só diz "excedeu o tempo limite", sem sugerir causa). Recomendação: uniformizar a mensagem entre as duas superfícies.
 
 ### 3.6 Alinhamento com o Objetivo Pedagógico (5 findings)
 
@@ -136,7 +135,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 5 — UX crítica e "quick wins"
 - **Objetivo**: eliminar os pontos de confusão/abandono mais graves para um estudante iniciante, incluindo o único finding UX classificado CRÍTICA.
-- **Resolve**: ~~UX-01~~, ~~UX-02~~, ~~UX-03~~, ~~UX-04~~, ~~UX-05~~, ~~UX-06~~, ~~UX-11~~, ~~UX-12~~, ~~UX-13~~, ~~UX-14~~, ~~UX-15~~, ~~UX-16~~, ~~UX-17~~, UX-18, ~~UX-19~~, ~~AL-08~~, ~~AL-23~~, ~~AL-24~~, ~~ON-37~~, FEAT-02, ~~FEAT-03~~.
+- **Resolve**: ~~UX-01~~, ~~UX-02~~, ~~UX-03~~, ~~UX-04~~, ~~UX-05~~, ~~UX-06~~, ~~UX-11~~, ~~UX-12~~, ~~UX-13~~, ~~UX-14~~, ~~UX-15~~, ~~UX-16~~, ~~UX-17~~, ~~UX-18~~, ~~UX-19~~, ~~AL-08~~, ~~AL-23~~, ~~AL-24~~, ~~ON-37~~, FEAT-02, ~~FEAT-03~~.
 - **Componentes**: `algo_lang/compilador/codegen.py` (mensagens), `algo_lang/tools/tracer.py`, `algo_lang/cli.py` (`_mostrar_banner`), `online/estatico/visualizador/algo-trace-viewer.html`, `online/estatico/app.js`, `online/estatico/editor.html`, `online/estatico/estilo.css`, `online/modo_codemirror.py`.
 - **Alterações principais**: localizar mensagens de runtime comuns (`math domain error`, etc.); incluir número de linha em erros de runtime; fallback local para os CDNs do visualizador de rasto (replicar o padrão já usado para o CodeMirror); painel do Alguém visível/destacado por omissão; indicador "a pensar..." no chat; reativar o chat após erro de credencial; ligar erros de compilação ao gutter do CodeMirror; rótulos de texto na toolbar; logo ASCII art no banner da consola (FEAT-03); toggle de tema claro/escuro no `online`, persistido em `localStorage` (FEAT-02).
 - **Dependências**: Fase 2 (mensagens de erro do compilador). Pode correr em paralelo com as Fases 3 e 4.
