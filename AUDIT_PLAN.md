@@ -80,7 +80,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 **alguem** — AG-01 (sem retry/backoff nos fornecedores LLM); AG-02 (sem tracking de tokens/custo); AG-03 (timeout HTTP fixo de 60s, não configurável); AG-08 (`URL_API` como propriedade a sobrepor atributo de classe, frágil a refactor); AG-09 (`except TypeError` demasiado amplo na fábrica de fornecedores); AG-17 (ficheiro de log sem gestor de contexto); AG-19 (sem rotação/limite de tamanho dos logs); AG-24 (até 4 chamadas LLM por turno sem visibilidade de custo — ligado a AG-02); AG-25 (guardião reutiliza sempre o modelo caro do tutor principal — ligado a GOAL-03, mas aqui como oportunidade de poupança de custo, não de segurança); AG-29 (importar `conhecimento_algo.py` insere caminho em `sys.path` como efeito colateral global).
 
-**online** — ON-24 (atribuição redundante + import a meio de função em `main.py`); ON-28 (sem `HEALTHCHECK` no Dockerfile); ON-29 (imagem base sem digest fixado); ON-31 (`pyproject.toml` sem metadados de projeto).
+**online** — ON-28 (sem `HEALTHCHECK` no Dockerfile); ON-29 (imagem base sem digest fixado); ON-31 (`pyproject.toml` sem metadados de projeto).
 
 **Arquitetura** — ARCH-10 (arquitetura de logging só em disco local, sem abstração de armazenamento — teto de escalabilidade horizontal, aceitável para o âmbito atual de uma VM/sala de aula); ARCH-14 (ligação SQLite nova por pedido, sem pooling — igualmente aceitável ao âmbito atual, mas o primeiro ponto a rearquitetar se o volume crescer).
 
@@ -143,7 +143,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 6 — Qualidade de código e arquitetura
 - **Objetivo**: reduzir a duplicação e o acoplamento estrutural que tornam o projeto frágil a mudanças futuras, feito só depois de as correções funcionais estarem estáveis.
-- **Resolve**: AL-07, ARCH-01, ARCH-02, ARCH-03, ARCH-04, ARCH-05, ARCH-06, ARCH-13, ARCH-15, ON-24.
+- **Resolve**: AL-07, ARCH-01, ARCH-02, ARCH-03, ARCH-04, ARCH-05, ARCH-06, ARCH-13, ARCH-15, ~~ON-24~~.
 - **Componentes**: `compilador/codegen.py` + `codegen_minimo.py`, `tools/linter.py`, `alguem/fornecedores/`, `online/credenciais.py`.
 - **Alterações principais**: extrair uma camada de dispatch/funções partilhadas entre os dois geradores de código; remover a dependência invertida de `codegen.py` sobre `tools/flowchart.py`; unificar deteção de inclusões duplicadas; unificar a lista de fornecedores válidos entre `alguem` e `online`; extrair helper HTTP partilhado para os fornecedores que ainda não o usam.
 - **Dependências**: Fases 0-2 (evitar refatorizar ficheiros ainda a mudar por razões de segurança/correção).
