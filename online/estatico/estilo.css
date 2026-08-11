@@ -250,6 +250,8 @@ button { font: inherit; cursor: pointer; }
 .mensagem-estudante { align-self: flex-end; background: var(--ambar-forte); color: #fff; }
 .mensagem-alguem { align-self: flex-start; background: var(--tinta-clara); border: 1px solid var(--tinta-borda); }
 .mensagem-erro-chat { align-self: center; color: var(--erro); font-size: 0.8rem; }
+.indicador-a-pensar { color: var(--texto-esmaecido); font-style: italic; animation: pulsar-a-pensar 1.4s ease-in-out infinite; }
+@keyframes pulsar-a-pensar { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 
 .form-alguem { display: flex; gap: 0.5rem; padding: 0.7rem 1rem; border-top: 1px solid var(--tinta-borda); }
 .form-alguem input { flex: 1; }

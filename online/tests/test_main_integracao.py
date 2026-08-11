@@ -61,6 +61,18 @@ def test_painel_do_alguem_nao_e_escondido_ao_carregar(cliente):
     assert "alternarPainelAlguem(); // painel do Alguem começa escondido" not in r.text
 
 
+# ---------- UX-13: indicador "a pensar..." no chat ----------
+
+def test_app_js_tem_indicador_de_a_pensar(cliente):
+    """Sem teste de browser disponível, confirma-se ao nível do
+    conteúdo servido que a lógica do indicador existe e está ligada ao
+    envio de mensagens e à receção de resposta/erro."""
+    r = cliente.get("/estatico/app.js")
+    assert r.status_code == 200
+    assert "mostrarIndicadorAPensar" in r.text
+    assert "esconderIndicadorAPensar" in r.text
+
+
 # ---------- páginas e sessão ----------
 
 def test_pagina_inicial_sem_sessao(cliente):

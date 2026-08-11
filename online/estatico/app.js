@@ -202,8 +202,10 @@ function ligarAlguem() {
   wsAlguem.addEventListener("message", (evento) => {
     const dados = JSON.parse(evento.data);
     if (dados.tipo === "pronto" || dados.tipo === "resposta") {
+      esconderIndicadorAPensar();
       adicionarMensagem(dados.mensagem || dados.texto, "mensagem-alguem");
     } else if (dados.tipo === "erro") {
+      esconderIndicadorAPensar();
       adicionarMensagem(dados.mensagem, "mensagem-erro-chat");
     }
   });
@@ -217,6 +219,26 @@ function adicionarMensagem(texto, classe) {
   conversaAlguem.scrollTop = conversaAlguem.scrollHeight;
 }
 
+// UX-13: até 4-6 chamadas LLM encadeadas por turno (guardião a
+// reclassificar/regenerar) podem levar vários segundos -- sem isto, o
+// chat parecia parado, sem nenhum sinal de que o pedido foi recebido.
+let indicadorAPensar = null;
+
+function mostrarIndicadorAPensar() {
+  if (indicadorAPensar) return;
+  indicadorAPensar = document.createElement("div");
+  indicadorAPensar.className = "mensagem mensagem-alguem indicador-a-pensar";
+  indicadorAPensar.textContent = "A pensar…";
+  conversaAlguem.appendChild(indicadorAPensar);
+  conversaAlguem.scrollTop = conversaAlguem.scrollHeight;
+}
+
+function esconderIndicadorAPensar() {
+  if (!indicadorAPensar) return;
+  indicadorAPensar.remove();
+  indicadorAPensar = null;
+}
+
 document.getElementById("form-alguem").addEventListener("submit", (evento) => {
   evento.preventDefault();
   const campo = document.getElementById("entrada-alguem");
@@ -225,6 +247,7 @@ document.getElementById("form-alguem").addEventListener("submit", (evento) => {
   adicionarMensagem(texto, "mensagem-estudante");
   wsAlguem.send(JSON.stringify({ texto }));
   campo.value = "";
+  mostrarIndicadorAPensar();
 });
 
 document.getElementById("botao-mostrar-ficheiro").addEventListener("click", () => {
