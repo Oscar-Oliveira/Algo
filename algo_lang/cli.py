@@ -117,7 +117,7 @@ def _carregar_e_resolver_inclusoes(caminho_algo: str):
     normal chama verificar() a seguir, o modo --minimo propositadamente
     não chama."""
     if not os.path.isfile(caminho_algo):
-        print(f"Erro: ficheiro '{caminho_algo}' não encontrado.")
+        print(f"❌ Erro: ficheiro '{caminho_algo}' não encontrado.")
         sys.exit(1)
     codigo = _ler_ficheiro_algo(caminho_algo)
     pasta_base = os.path.dirname(os.path.abspath(caminho_algo))

@@ -34,9 +34,21 @@ def _correr_consola(entrada, timeout=15, tmp_path=None):
             f"import sys; sys.path.insert(0, {str(raiz_copia)!r}); "
             "from algo_lang.cli import main; main()"
         )
+        # PYTHONIOENCODING=utf-8 (para o processo FILHO) + encoding="utf-8"
+        # explícito aqui (para o PAI decodificar o que o filho escreveu):
+        # sem os dois, um caminho gerado por tempfile que confunda o
+        # shlex.split() da consola (backslashes do Windows interpretados
+        # como escapes) pode acabar por imprimir uma mensagem de erro com
+        # "❌" (UX-06) -- sem o primeiro, UnicodeEncodeError no filho ao
+        # escrever; sem o segundo, UnicodeDecodeError na thread leitora
+        # do subprocess.run ao tentar decodificar UTF-8 como cp1252 (o
+        # 'text=True' sozinho usa a codificação preferida do SO, cp1252
+        # neste Windows). Mesma causa de fundo da AL-35, aqui a afetar só
+        # este helper de testes (algo.bat já força chcp 65001/PYTHONIOENCODING).
+        env = dict(os.environ, PYTHONIOENCODING="utf-8")
         return subprocess.run(
             [sys.executable, "-c", script], input=entrada, cwd=str(raiz_copia),
-            capture_output=True, text=True, timeout=timeout)
+            capture_output=True, encoding="utf-8", timeout=timeout, env=env)
     finally:
         if contexto:
             contexto.cleanup()

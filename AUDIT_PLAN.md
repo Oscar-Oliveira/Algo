@@ -43,7 +43,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 
 ### 3.3 `online/` — Bugs e Segurança (31 findings)
 
-- **ON-37** [BUG · BAIXA · Baixo] `modo_codemirror.py:29-33`. Fallback silencioso para categoria genérica em palavras-chave não classificadas. Recomendação: log de aviso quando isto acontece, para detetar keywords novas não mapeadas.
 - **ON-38** [QUALIDADE DE CÓDIGO/SEGURANÇA · ALTA · Médio] `online/tests/`. Nenhum teste cobre os cenários de maior risco (path traversal, SSRF, rate limiting, payloads grandes, CSRF). Recomendação: suite de testes de segurança dedicada, a crescer junto com as correções das Fases 0-1-4.
 
 ### 3.4 Arquitetura e Qualidade de Código (13 findings)
@@ -60,7 +59,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 ### 3.5 Experiência de Utilização (19 findings)
 
 - **UX-05** [UX · BAIXA/MÉDIA · Baixo] Termos "léxico"/"sintático"/"semântico" usados nas mensagens de erro nunca são explicados no manual (`online/estatico/ajuda.html`). Recomendação: um parágrafo curto no manual explicando a diferença, em linguagem simples.
-- **UX-06** [UX · BAIXA · Baixo] `cli.py:85` não usa o prefixo `❌` que a maioria das outras mensagens de erro usa, quebrando a consistência visual que o estudante aprende a reconhecer.
 - **UX-11** [UX · CRÍTICA · Médio] `visualizador/algo-trace-viewer.html:8-11` carrega React/ReactDOM/Babel/Tailwind de CDNs externos sem qualquer fallback — se a rede escolar bloquear esses domínios (o mesmo risco que já motivou um fallback dedicado para o CodeMirror), o visualizador de rasto fica em branco sem explicação. Recomendação: aplicar o mesmo padrão de fallback local já usado para o CodeMirror.
 - **UX-12** [UX · ALTA · Baixo] `app.js:522`. O painel do Alguém começa escondido por omissão, só descoberto por um pequeno ícone no topo — um estudante novo na web pode nunca descobrir que o tutor existe (ao contrário da CLI, onde `?` é anunciado no banner inicial). Recomendação: painel visível por omissão na primeira visita, ou um destaque mais visível (badge/animação) na primeira sessão.
 - **UX-13** [UX · MÉDIA · Baixo] Sem indicador de "a pensar…" enquanto se espera a resposta do tutor — combinado com até 4-6 chamadas LLM encadeadas por turno (ver AG-24), o chat pode parecer parado vários segundos.
@@ -147,7 +145,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 5 — UX crítica e "quick wins"
 - **Objetivo**: eliminar os pontos de confusão/abandono mais graves para um estudante iniciante, incluindo o único finding UX classificado CRÍTICA.
-- **Resolve**: ~~UX-01~~, ~~UX-02~~, ~~UX-03~~, ~~UX-04~~, UX-05, UX-06, UX-11, UX-12, UX-13, UX-14, UX-15, UX-16, UX-17, UX-18, ~~UX-19~~, ~~AL-08~~, ~~AL-23~~, ~~AL-24~~, ON-37, FEAT-02, FEAT-03.
+- **Resolve**: ~~UX-01~~, ~~UX-02~~, ~~UX-03~~, ~~UX-04~~, UX-05, ~~UX-06~~, UX-11, UX-12, UX-13, UX-14, UX-15, UX-16, UX-17, UX-18, ~~UX-19~~, ~~AL-08~~, ~~AL-23~~, ~~AL-24~~, ~~ON-37~~, FEAT-02, FEAT-03.
 - **Componentes**: `algo_lang/compilador/codegen.py` (mensagens), `algo_lang/tools/tracer.py`, `algo_lang/cli.py` (`_mostrar_banner`), `online/estatico/visualizador/algo-trace-viewer.html`, `online/estatico/app.js`, `online/estatico/editor.html`, `online/estatico/estilo.css`, `online/modo_codemirror.py`.
 - **Alterações principais**: localizar mensagens de runtime comuns (`math domain error`, etc.); incluir número de linha em erros de runtime; fallback local para os CDNs do visualizador de rasto (replicar o padrão já usado para o CodeMirror); painel do Alguém visível/destacado por omissão; indicador "a pensar..." no chat; reativar o chat após erro de credencial; ligar erros de compilação ao gutter do CodeMirror; rótulos de texto na toolbar; logo ASCII art no banner da consola (FEAT-03); toggle de tema claro/escuro no `online`, persistido em `localStorage` (FEAT-02).
 - **Dependências**: Fase 2 (mensagens de erro do compilador). Pode correr em paralelo com as Fases 3 e 4.

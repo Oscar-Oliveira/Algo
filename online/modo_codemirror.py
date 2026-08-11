@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import sys
 import os
+import warnings
 
 _RAIZ_PROJETO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _RAIZ_PROJETO not in sys.path:
@@ -29,8 +30,16 @@ _LITERAIS_LOGICOS = {"verdadeiro", "falso"}
 _PALAVRAS_NAO_CLASSIFICADAS = PALAVRAS_CHAVE - _PALAVRAS_ACAO - _PALAVRAS_LOGICAS - _LITERAIS_LOGICOS
 # Se o compilador ganhar uma palavra-chave nova que este ficheiro ainda
 # não sabe classificar, cai para "acao" por omissão -- feio mas
-# inofensivo (destaque a mais, não código a menos), e é imediatamente
-# visível ao rever o ficheiro, ao contrário de silenciosamente faltar.
+# inofensivo (destaque a mais, não código a menos). ON-37: antes disto
+# era só "imediatamente visível ao rever o ficheiro" -- na prática,
+# ninguém revê este ficheiro sempre que o lexer muda. Agora avisa
+# explicitamente, para o fallback silencioso não passar despercebido.
+if _PALAVRAS_NAO_CLASSIFICADAS:
+    warnings.warn(
+        f"modo_codemirror: {len(_PALAVRAS_NAO_CLASSIFICADAS)} palavra(s)-chave "
+        f"não classificada(s) ({', '.join(sorted(_PALAVRAS_NAO_CLASSIFICADAS))}) -- "
+        f"a cair para a categoria 'acao' por omissão. Classifica-a(s) "
+        f"explicitamente em _PALAVRAS_ACAO ou _PALAVRAS_LOGICAS.", stacklevel=2)
 
 
 def gerar_js_modo() -> str:

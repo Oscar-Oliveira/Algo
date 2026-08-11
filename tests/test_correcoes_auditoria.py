@@ -2210,3 +2210,13 @@ def test_compilar_com_minimo_avisa_na_consola_sobre_erros_de_runtime(tmp_path, c
     saida = capsys.readouterr().out
     assert "rede de" in saida
     assert "runtime" in saida
+
+
+# ---------- UX-06: consistência do prefixo ❌ nas mensagens de erro da consola ----------
+
+def test_ficheiro_nao_encontrado_usa_o_prefixo_de_erro_padrao(tmp_path, capsys):
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+    with pytest.raises(SystemExit):
+        _carregar_e_resolver_inclusoes(str(tmp_path / "nao_existe.algo"))
+    saida = capsys.readouterr().out
+    assert "❌" in saida
