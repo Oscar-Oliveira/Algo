@@ -14,6 +14,7 @@ function criarEditor() {
       indentUnit: 4,
       tabSize: 4,
       indentWithTabs: false,
+      gutters: ["CodeMirror-linenumbers", "gutter-erro"],
     });
   } catch (erro) {
     // Nunca deixar uma falha aqui impedir o resto da página de
@@ -128,6 +129,44 @@ function obterTodosOsFicheiros() {
 
 renderizarSeparadoresDeFicheiros();
 
+// ---------- UX-15: marcador de erro no gutter do CodeMirror ----------
+// Antes, um erro de compilação só aparecia como texto no terminal, sem
+// nenhum apontador no próprio editor -- apesar do CodeMirror já estar
+// carregado. As mensagens de erro do compilador seguem sempre o formato
+// "Erro ... na linha N: ..." (ver lexer.py/parser.py/semantics.py), e um
+// erro num ficheiro incluído vem prefixado com "Erro em '<nome>': ...".
+let linhaComMarcadorDeErro = null;
+
+function limparMarcadorDeErro() {
+  if (linhaComMarcadorDeErro === null) return;
+  if (editor.clearGutter) editor.clearGutter("gutter-erro");
+  if (editor.removeLineClass) editor.removeLineClass(linhaComMarcadorDeErro, "background", "linha-com-erro");
+  linhaComMarcadorDeErro = null;
+}
+
+function marcarErroNoEditor(mensagem) {
+  limparMarcadorDeErro();
+  if (!editor.setGutterMarker) return; // CodeMirror não carregou -- a mensagem já aparece no terminal
+  const linhaMatch = mensagem.match(/na linha (\d+)/);
+  if (!linhaMatch) return;
+  const ficheiroMatch = mensagem.match(/^Erro em '([^']+)':/);
+  const nomeFicheiro = ficheiroMatch ? ficheiroMatch[1] : ficheiros[0].nome;
+  const indice = ficheiros.findIndex((f) => f.nome === nomeFicheiro);
+  if (indice === -1) return;
+  if (indice !== indiceFicheiroAtivo) mudarParaFicheiro(indice);
+
+  const linha = parseInt(linhaMatch[1], 10) - 1;
+  const marcador = document.createElement("span");
+  marcador.className = "gutter-marcador-erro";
+  marcador.title = mensagem;
+  marcador.textContent = "●";
+  editor.setGutterMarker(linha, "gutter-erro", marcador);
+  editor.addLineClass(linha, "background", "linha-com-erro");
+  if (editor.scrollIntoView) editor.scrollIntoView({ line: linha, ch: 0 }, 80);
+  linhaComMarcadorDeErro = linha;
+}
+
+if (editor.on) editor.on("change", limparMarcadorDeErro);
 
 const formEntradaTerminal = document.getElementById("form-entrada-terminal");
 const entradaTerminal = document.getElementById("entrada-terminal");
@@ -140,12 +179,25 @@ function escreverNoTerminal(texto, classe) {
   terminal.scrollTop = terminal.scrollHeight;
 }
 
+// UX-15: clicar na mensagem de erro salta de volta para a linha
+// marcada no editor (útil se o estudante já tiver deslocado o editor).
+function escreverErroCompilacaoNoTerminal(mensagem) {
+  const linha = document.createElement("div");
+  linha.className = "linha-erro linha-erro-clicavel";
+  linha.textContent = mensagem;
+  linha.title = "Clica para ir para a linha no editor";
+  linha.addEventListener("click", () => marcarErroNoEditor(mensagem));
+  terminal.appendChild(linha);
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
 let wsExecucao = null;
 
 document.getElementById("botao-executar").addEventListener("click", () => {
   mostrarVistaPainelTerminal("execucao");
   document.querySelector(".painel-terminal").scrollIntoView({ behavior: "smooth", block: "start" });
   terminal.innerHTML = "";
+  limparMarcadorDeErro();
   formEntradaTerminal.classList.add("escondido");
   if (wsExecucao) wsExecucao.close();
 
@@ -159,7 +211,8 @@ document.getElementById("botao-executar").addEventListener("click", () => {
   wsExecucao.addEventListener("message", (evento) => {
     const dados = JSON.parse(evento.data);
     if (dados.tipo === "erro_compilacao") {
-      escreverNoTerminal(dados.mensagem, "linha-erro");
+      escreverErroCompilacaoNoTerminal(dados.mensagem);
+      marcarErroNoEditor(dados.mensagem);
     } else if (dados.tipo === "compilado") {
       escreverNoTerminal("-- a executar --", "linha-sistema");
       formEntradaTerminal.classList.remove("escondido");

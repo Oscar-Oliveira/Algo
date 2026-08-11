@@ -94,6 +94,23 @@ def test_app_js_desativa_entrada_alguem_quando_falta_credencial(cliente):
     assert 'id="botao-ir-definicoes"' in editor_html
 
 
+# ---------- UX-15: marcador de erro no gutter do CodeMirror ----------
+
+def test_app_js_marca_erro_de_compilacao_no_editor(cliente):
+    """Antes, um erro de compilação só aparecia como texto no
+    terminal, sem nenhum marcador na margem do CodeMirror nem
+    "clicar para saltar para a linha". Sem teste de browser
+    disponível, confirma-se ao nível do conteúdo servido que a lógica
+    de marcação/salto existe e está ligada à receção de
+    "erro_compilacao"."""
+    r = cliente.get("/estatico/app.js")
+    assert r.status_code == 200
+    assert "marcarErroNoEditor" in r.text
+    assert "limparMarcadorDeErro" in r.text
+    assert '"gutter-erro"' in r.text
+    assert "escreverErroCompilacaoNoTerminal(dados.mensagem);\n      marcarErroNoEditor(dados.mensagem);" in r.text
+
+
 # ---------- páginas e sessão ----------
 
 def test_pagina_inicial_sem_sessao(cliente):

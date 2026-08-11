@@ -232,6 +232,13 @@ button { font: inherit; cursor: pointer; }
 }
 .terminal .linha-erro { color: var(--erro); }
 .terminal .linha-sistema { color: var(--texto-esmaecido); font-style: italic; }
+.terminal .linha-erro-clicavel { cursor: pointer; text-decoration: underline dotted; }
+.terminal .linha-erro-clicavel:hover { color: #fff; }
+
+/* UX-15: marcador de erro no gutter do CodeMirror */
+.gutter-erro { width: 0.9rem; }
+.gutter-marcador-erro { color: var(--erro); cursor: default; }
+.CodeMirror .linha-com-erro { background: rgba(217, 105, 90, 0.15); }
 
 .form-entrada-terminal { border-top: 1px solid var(--tinta-borda); padding: 0.6rem 1rem; }
 #entrada-terminal, #entrada-alguem {
