@@ -535,7 +535,10 @@ function alternarPainelAlguem() {
 }
 
 botaoAlternarAlguem.addEventListener("click", alternarPainelAlguem);
-alternarPainelAlguem(); // painel do Alguem começa escondido
+// UX-12: painel do Alguem visível por omissão -- antes começava
+// escondido, só descoberto por um ícone pequeno no topo; um estudante
+// novo na web podia nunca descobrir que o tutor existe (ao contrário
+// da CLI, onde "?" é anunciado logo no banner inicial).
 
 // ---------- painéis redimensionáveis (arrastar os divisores) ----------
 

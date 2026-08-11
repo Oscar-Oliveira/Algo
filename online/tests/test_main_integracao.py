@@ -48,6 +48,19 @@ def test_visualizador_de_rasto_vendor_files_acessiveis(cliente):
         assert r.status_code == 200, nome
 
 
+# ---------- UX-12: painel do Alguem visível por omissão ----------
+
+def test_painel_do_alguem_nao_e_escondido_ao_carregar(cliente):
+    """Antes, app.js chamava alternarPainelAlguem() logo no arranque só
+    para o esconder -- um estudante novo na web podia nunca descobrir
+    que o tutor existe. Sem teste de browser disponível neste projeto
+    (sem framework de testes JS), confirma-se ao nível do conteúdo
+    servido que essa chamada de arranque já não existe."""
+    r = cliente.get("/estatico/app.js")
+    assert r.status_code == 200
+    assert "alternarPainelAlguem(); // painel do Alguem começa escondido" not in r.text
+
+
 # ---------- páginas e sessão ----------
 
 def test_pagina_inicial_sem_sessao(cliente):
