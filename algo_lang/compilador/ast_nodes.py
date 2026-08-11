@@ -267,3 +267,46 @@ def coletar_identificadores(programa):
             nomes.append((c.nome, e.linha))
 
     return nomes
+
+
+def texto_expr(expr):
+    """Representação textual legível de uma expressão -- usada nos
+    rótulos do fluxograma (tools/flowchart.py) e nas mensagens de
+    'afirmar' (compilador/codegen.py). ARCH-02: vive aqui, não em
+    tools/flowchart.py, porque tools/ deve depender do compilador, não
+    o inverso -- codegen.py importar isto de tools/flowchart.py fazia
+    uma mudança pensada só para o fluxograma alterar silenciosamente as
+    mensagens de 'afirmar' nos programas gerados.
+
+    Devolve texto NÃO escapado -- pode conter aspas/chavetas/backslash
+    vindos de literais do próprio código do estudante. Nunca embutir o
+    resultado diretamente numa f-string ou noutro código a reavaliar
+    (usar repr() para isso, como em codegen.py:_gerar_afirmar); os
+    chamadores em tools/flowchart.py passam sempre o resultado por
+    _escapar() antes de o inserir num rótulo DOT."""
+    if isinstance(expr, Literal):
+        if expr.tipo == "cadeia":
+            return f'"{expr.valor}"'
+        if expr.tipo == "caracter":
+            return f"'{expr.valor}'"
+        if expr.tipo == "booleano":
+            return "verdadeiro" if expr.valor else "falso"
+        return str(expr.valor)
+    if isinstance(expr, LValue):
+        base = expr.nome
+        for tag, valor in expr.acessos:
+            base += f"[{texto_expr(valor)}]" if tag == "indice" else f".{valor}"
+        return base
+    if isinstance(expr, BinOp):
+        return f"{texto_expr(expr.esq)} {expr.op} {texto_expr(expr.dire)}"
+    if isinstance(expr, UnOp):
+        return f"{expr.op} {texto_expr(expr.operando)}"
+    if isinstance(expr, Chamada):
+        args = ", ".join(texto_expr(a) for a in expr.args)
+        return f"{expr.nome}({args})"
+    if isinstance(expr, ArrayLiteral):
+        return "{" + ", ".join(texto_expr(e) for e in expr.elementos) + "}"
+    if isinstance(expr, EstruturaLiteral):
+        campos = ", ".join(f"{nome}: {texto_expr(valor)}" for nome, valor in expr.campos)
+        return "{" + campos + "}"
+    return "?"  # pragma: no cover -- os 7 tipos de expressão da AST estão todos tratados acima

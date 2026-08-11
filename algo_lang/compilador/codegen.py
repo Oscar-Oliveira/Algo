@@ -3,7 +3,7 @@
 
 from . import ast_nodes as A
 from .. import bibliotecas
-from ..tools.flowchart import texto_expr
+from .ast_nodes import texto_expr
 
 
 class ErroInternoCompilador(Exception):

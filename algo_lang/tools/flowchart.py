@@ -3,48 +3,15 @@
 linguagem ALGO."""
 
 from ..compilador import ast_nodes as A
+# ARCH-02: texto_expr vive em compilador/ast_nodes.py (não aqui), para
+# não inverter a camada documentada do pipeline -- tools/ depende do
+# compilador, nunca o inverso. Reexportado aqui só para não obrigar a
+# mudar todos os chamadores já existentes neste ficheiro.
+from ..compilador.ast_nodes import texto_expr
 
 
 def _escapar(texto: str) -> str:
     return texto.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-
-
-def texto_expr(expr):
-    """Representação textual legível de uma expressão (usada nos rótulos
-    do fluxograma e nas mensagens de 'afirmar').
-
-    Devolve texto NÃO escapado — pode conter aspas/chavetas/backslash vindos
-    de literais do próprio código do estudante. Nunca embutir o resultado
-    diretamente numa f-string ou noutro código a reavaliar (usar repr() para
-    isso, como em codegen.py:_gerar_afirmar); os chamadores neste ficheiro
-    passam sempre o resultado por _escapar() antes de o inserir num rótulo
-    DOT."""
-    if isinstance(expr, A.Literal):
-        if expr.tipo == "cadeia":
-            return f'"{expr.valor}"'
-        if expr.tipo == "caracter":
-            return f"'{expr.valor}'"
-        if expr.tipo == "booleano":
-            return "verdadeiro" if expr.valor else "falso"
-        return str(expr.valor)
-    if isinstance(expr, A.LValue):
-        base = expr.nome
-        for tag, valor in expr.acessos:
-            base += f"[{texto_expr(valor)}]" if tag == "indice" else f".{valor}"
-        return base
-    if isinstance(expr, A.BinOp):
-        return f"{texto_expr(expr.esq)} {expr.op} {texto_expr(expr.dire)}"
-    if isinstance(expr, A.UnOp):
-        return f"{expr.op} {texto_expr(expr.operando)}"
-    if isinstance(expr, A.Chamada):
-        args = ", ".join(texto_expr(a) for a in expr.args)
-        return f"{expr.nome}({args})"
-    if isinstance(expr, A.ArrayLiteral):
-        return "{" + ", ".join(texto_expr(e) for e in expr.elementos) + "}"
-    if isinstance(expr, A.EstruturaLiteral):
-        campos = ", ".join(f"{nome}: {texto_expr(valor)}" for nome, valor in expr.campos)
-        return "{" + campos + "}"
-    return "?"  # pragma: no cover -- os 7 tipos de expressão da AST estão todos tratados acima
 
 
 class GeradorFluxograma:

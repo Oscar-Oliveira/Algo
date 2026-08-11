@@ -2258,3 +2258,25 @@ def test_erro_interno_de_codegen_nao_e_um_erro_semantico():
         gerador._gerar_stmt(no_bogus, 1, {})
     assert not isinstance(exc_info.value, ErroSemantico)
     assert "Erro interno do compilador" in str(exc_info.value)
+
+
+# ---------- ARCH-02: texto_expr não vem de tools/flowchart.py ----------
+
+def test_codegen_nao_depende_de_tools():
+    """Antes, codegen.py importava texto_expr de tools/flowchart.py,
+    invertendo a camada documentada do pipeline (tools/ deveria
+    depender do compilador, não o inverso) -- uma mudança em
+    texto_expr pensada só para o fluxograma alterava silenciosamente
+    as mensagens de 'afirmar' nos programas gerados. texto_expr vive
+    agora em compilador/ast_nodes.py, importado por ambos."""
+    import ast
+    import inspect
+    from algo_lang.compilador import codegen
+    from algo_lang.compilador.ast_nodes import texto_expr as texto_expr_no_ast_nodes
+    assert codegen.texto_expr is texto_expr_no_ast_nodes
+
+    arvore = ast.parse(inspect.getsource(codegen))
+    modulos_importados = [
+        node.module for node in ast.walk(arvore) if isinstance(node, ast.ImportFrom)
+    ]
+    assert not any(m and "tools" in m for m in modulos_importados)
