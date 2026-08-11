@@ -340,6 +340,14 @@ def test_credencial_fornecedor_desconhecido():
         credenciais.guardar_credencial(id_est, "naoexiste", "x", "chave")
 
 
+def test_fornecedores_validos_vem_do_registo_real_do_alguem():
+    """ARCH-13: antes uma segunda lista mantida à mão, que podia
+    desatualizar-se em relação a alguem/fornecedores/__init__.py sem
+    nenhum erro até alguém notar."""
+    from alguem.fornecedores import FORNECEDORES
+    assert credenciais.FORNECEDORES_VALIDOS == frozenset(FORNECEDORES)
+
+
 def test_credencial_sem_chave_quando_e_obrigatoria():
     id_est = autenticacao.registar("a@b.com", "password123")
     with pytest.raises(credenciais.ErroCredencial, match="precisa de uma chave"):

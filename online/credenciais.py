@@ -10,10 +10,16 @@ import socket
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from alguem.fornecedores import FORNECEDORES
 from bd import sessao_bd
 from cifragem import cifrar, decifrar
 
-FORNECEDORES_VALIDOS = {"openrouter", "gemini", "openai", "anthropic", "huggingface", "ollama", "opencode"}
+# ARCH-13: antes uma segunda lista mantida à mão aqui, que podia ficar
+# desatualizada em relação ao registo real -- adicionar um fornecedor
+# novo em alguem/fornecedores/__init__.py não o tornava disponível na
+# web até alguém lembrar de atualizar esta lista também, sem erro
+# nenhum até se notar.
+FORNECEDORES_VALIDOS = frozenset(FORNECEDORES)
 
 
 class ErroCredencial(Exception):
