@@ -9,7 +9,10 @@ function criarEditor() {
     }
     return CodeMirror.fromTextArea(areaTexto, {
       lineNumbers: true,
-      theme: "material-darker",
+      // FEAT-02: "default" é o tema claro embutido no próprio
+      // codemirror.css -- não precisa de nenhum ficheiro vendorizado
+      // à parte, ao contrário de material-darker.css.
+      theme: window.obterTema && window.obterTema() === "claro" ? "default" : "material-darker",
       mode: "algo",
       indentUnit: 4,
       tabSize: 4,
@@ -31,6 +34,13 @@ function criarEditor() {
 }
 
 const editor = criarEditor();
+
+// FEAT-02: mantém o tema do CodeMirror sincronizado com o resto da
+// página quando o estudante alterna o tema depois do editor já estar criado.
+window.addEventListener("algo-tema-mudou", (evento) => {
+  if (!editor.setOption) return;
+  editor.setOption("theme", evento.detail === "claro" ? "default" : "material-darker");
+});
 
 // ---------- gestão de vários ficheiros (para 'incluir') ----------
 

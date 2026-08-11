@@ -16,6 +16,22 @@
   font-size: 16px;
 }
 
+/* FEAT-02: tema claro -- as páginas da aplicação (editor/admin/ajuda)
+   usam sempre as variáveis --tinta*/--texto-claro, nunca cores fixas,
+   por isso um segundo bloco de variáveis chega para trocar de tema
+   sem tocar em cada regra individual. */
+:root[data-theme="light"] {
+  --tinta: var(--creme);
+  --tinta-clara: var(--creme-forte);
+  --tinta-borda: #d8d2c2;
+  --texto-claro: var(--texto-escuro);
+  --texto-esmaecido: #7a7566;
+  --ambar: #b8791f;
+  --ambar-forte: #a9721c;
+  --erro: #b23b2c;
+  --sucesso: #3f7a4f;
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -195,6 +211,11 @@ button { font: inherit; cursor: pointer; }
   padding: 0.7rem 1.2rem; border-bottom: 1px solid var(--tinta-borda); background: var(--tinta-clara);
 }
 .acoes-topo { display: flex; gap: 0.6rem; }
+/* FEAT-02: o botão de tema mostra o ícone do tema para onde vai
+   trocar (sol => trocar para claro, lua => trocar para escuro). */
+#botao-tema .icone-tema-claro { display: none; }
+:root[data-theme="light"] #botao-tema .icone-tema-escuro { display: none; }
+:root[data-theme="light"] #botao-tema .icone-tema-claro { display: block; }
 .acoes-codigo { display: flex; gap: 0.5rem; }
 /* UX-16: só o ícone + title era pouco descobrível, e tooltips não
    aparecem de forma fiável em dispositivos táteis -- rótulo visível

@@ -268,6 +268,33 @@ def test_ws_executar_timeout_nomeia_a_causa_provavel(cliente, monkeypatch):
     assert "possível ciclo infinito" in m["mensagem"]
 
 
+# ---------- FEAT-02: escolha de tema claro/escuro ----------
+
+def test_tema_js_servido_e_ligado_nas_paginas_privadas(cliente):
+    """Sem framework de testes JS/browser disponível, confirma-se ao
+    nível do conteúdo servido que tema.js existe, tem a lógica
+    esperada (persistência em localStorage, deteção por
+    prefers-color-scheme), e que as 3 páginas privadas (editor/admin/
+    ajuda) o carregam e têm o botão de alternância."""
+    r = cliente.get("/estatico/tema.js")
+    assert r.status_code == 200
+    assert "localStorage" in r.text
+    assert "prefers-color-scheme" in r.text
+    assert "obterTema" in r.text
+
+    base = Path(__file__).parent.parent / "paginas_privadas"
+    for nome in ("editor.html", "admin.html", "ajuda.html"):
+        conteudo = (base / nome).read_text(encoding="utf-8")
+        assert '<script src="/estatico/tema.js"></script>' in conteudo
+        assert 'id="botao-tema"' in conteudo
+
+
+def test_estilo_css_define_tema_claro(cliente):
+    r = cliente.get("/estatico/estilo.css")
+    assert r.status_code == 200
+    assert ':root[data-theme="light"]' in r.text
+
+
 def test_admin_pendentes_exige_admin(cliente, monkeypatch):
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
     cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
