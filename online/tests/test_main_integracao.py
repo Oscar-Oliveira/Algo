@@ -111,6 +111,24 @@ def test_app_js_marca_erro_de_compilacao_no_editor(cliente):
     assert "escreverErroCompilacaoNoTerminal(dados.mensagem);\n      marcarErroNoEditor(dados.mensagem);" in r.text
 
 
+# ---------- UX-16: rótulos de texto na barra de ferramentas principal ----------
+
+def test_botoes_principais_da_toolbar_tem_rotulo_de_texto():
+    """Antes, Executar/Fluxograma/Rasto/Verificador eram só ícones SVG
+    com 'title' como único rótulo -- pouco descobrível, e tooltips não
+    aparecem de forma fiável em dispositivos táteis."""
+    editor_html = (Path(__file__).parent.parent / "paginas_privadas" / "editor.html").read_text(encoding="utf-8")
+    for id_botao, rotulo in [
+        ("botao-executar", "Executar"),
+        ("botao-fluxograma", "Fluxograma"),
+        ("botao-rasto", "Rasto"),
+        ("botao-linter", "Verificador"),
+    ]:
+        inicio = editor_html.index(f'id="{id_botao}"')
+        fim = editor_html.index("</button>", inicio)
+        assert f'<span class="rotulo-botao">{rotulo}</span>' in editor_html[inicio:fim]
+
+
 # ---------- páginas e sessão ----------
 
 def test_pagina_inicial_sem_sessao(cliente):

@@ -196,6 +196,11 @@ button { font: inherit; cursor: pointer; }
 }
 .acoes-topo { display: flex; gap: 0.6rem; }
 .acoes-codigo { display: flex; gap: 0.5rem; }
+/* UX-16: só o ícone + title era pouco descobrível, e tooltips não
+   aparecem de forma fiável em dispositivos táteis -- rótulo visível
+   nos botões principais da barra de ferramentas. */
+.acoes-codigo .botao-icone { width: auto; padding: 0 0.7rem; gap: 0.4rem; font-size: 0.82rem; font-weight: 500; }
+.rotulo-botao { white-space: nowrap; }
 
 .disposicao-editor {
   flex: 1; display: grid; grid-template-columns: 1.3fr 6px 1fr 6px 1fr;
