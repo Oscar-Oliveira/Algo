@@ -375,7 +375,21 @@ def _linha_com_ficheiro_por_omissao(comando, resto, ultimo_ficheiro):
 LINHA = "-" * 62
 
 
+# FEAT-03: só ASCII puro (sem emojis/Unicode), pelo mesmo motivo da
+# AL-35 -- a consola do Windows sem code page UTF-8 (algo.bat não
+# configura chcp 65001) mostraria caracteres partidos logo na primeira
+# coisa que o estudante vê.
+_LOGO_ASCII = r"""
+    _    _     ____   ___
+   / \  | |   / ___| / _ \
+  / _ \ | |  | |  _ | | | |
+ / ___ \| |__| |_| || |_| |
+/_/   \_\_____\____| \___/
+"""
+
+
 def _mostrar_banner():
+    print(_LOGO_ASCII)
     print(LINHA)
     print("  Consola ALGO")
     print(LINHA)

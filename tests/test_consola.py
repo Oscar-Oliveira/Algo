@@ -60,6 +60,17 @@ def test_consola_abre_com_algo_sem_argumentos(tmp_path):
     assert "Consola ALGO" in resultado.stdout
 
 
+def test_consola_mostra_logo_ascii_no_banner(tmp_path):
+    """FEAT-03: só ASCII puro -- confirma que não há nenhum caráter
+    fora do intervalo ASCII no logo, para nunca aparecer partido numa
+    consola Windows sem code page UTF-8."""
+    from algo_lang.cli import _LOGO_ASCII
+    assert all(ord(c) < 128 for c in _LOGO_ASCII)
+    resultado = _correr_consola("sair\n")
+    assert resultado.returncode == 0
+    assert _LOGO_ASCII.strip("\n") in resultado.stdout
+
+
 def test_consola_executa_um_ficheiro(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ola")\n', encoding="utf-8")
