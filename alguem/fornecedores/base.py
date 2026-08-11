@@ -14,6 +14,9 @@ saber, qual é o fornecedor concreto por trás.
 """
 from __future__ import annotations
 
+import json
+import urllib.error
+import urllib.request
 from abc import ABC, abstractmethod
 
 
@@ -57,3 +60,29 @@ class AgenteLLM(ABC):
         """Envia a conversa ao modelo e devolve o texto da resposta.
         Levanta ErroFornecedorLLM em caso de falha (rede, API,
         resposta em formato inesperado)."""
+
+
+def pedir_json(url: str, corpo: dict, cabecalhos: dict, nome_exibicao: str,
+                timeout: int = 60) -> dict:
+    """POST de 'corpo' como JSON para 'url', devolve a resposta já
+    descodificada. Transporte HTTP partilhado por todos os
+    fornecedores (ARCH-06) -- cada um continua a construir o seu
+    próprio corpo/cabeçalhos e a interpretar a sua própria forma de
+    resposta, só este bloco de rede + tratamento de erro é comum.
+    'nome_exibicao' vai literal nas mensagens de erro (ex: 'Anthropic',
+    'openrouter') -- não normalizado aqui, para não mudar o texto que
+    cada fornecedor já mostrava antes desta extração."""
+    pedido = urllib.request.Request(
+        url, data=json.dumps(corpo).encode("utf-8"), method="POST", headers=cabecalhos)
+    try:
+        with urllib.request.urlopen(pedido, timeout=timeout) as resposta:
+            return json.loads(resposta.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        corpo_erro = e.read().decode("utf-8", errors="replace")
+        raise ErroFornecedorLLM(
+            f"A {nome_exibicao} recusou o pedido (HTTP {e.code}): {corpo_erro}"
+        ) from e
+    except urllib.error.URLError as e:
+        raise ErroFornecedorLLM(
+            f"Não foi possível contactar a {nome_exibicao}: {e.reason}"
+        ) from e

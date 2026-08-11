@@ -14,11 +14,7 @@ usar isto porque falam formatos genuinamente diferentes (system prompt
 separado, papéis diferentes, resposta com outra estrutura)."""
 from __future__ import annotations
 
-import json
-import urllib.request
-import urllib.error
-
-from .base import AgenteLLM, ErroFornecedorLLM
+from .base import AgenteLLM, ErroFornecedorLLM, pedir_json
 
 
 class _FornecedorEstiloOpenAI(AgenteLLM):
@@ -36,25 +32,11 @@ class _FornecedorEstiloOpenAI(AgenteLLM):
         }
 
     def responder(self, mensagens: list[dict]) -> str:
-        corpo = json.dumps({
+        corpo = {
             "model": self.modelo,
             "messages": mensagens,
-        }).encode("utf-8")
-
-        pedido = urllib.request.Request(
-            self.URL_API, data=corpo, method="POST", headers=self._cabecalhos())
-        try:
-            with urllib.request.urlopen(pedido, timeout=60) as resposta:
-                dados = json.loads(resposta.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            corpo_erro = e.read().decode("utf-8", errors="replace")
-            raise ErroFornecedorLLM(
-                f"A {self.nome} recusou o pedido (HTTP {e.code}): {corpo_erro}"
-            ) from e
-        except urllib.error.URLError as e:
-            raise ErroFornecedorLLM(
-                f"Não foi possível contactar a {self.nome}: {e.reason}"
-            ) from e
+        }
+        dados = pedir_json(self.URL_API, corpo, self._cabecalhos(), self.nome)
 
         try:
             conteudo = dados["choices"][0]["message"]["content"]

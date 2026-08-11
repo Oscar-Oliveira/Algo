@@ -12,11 +12,7 @@ diferente do "chat completions" da OpenAI:
   string direta."""
 from __future__ import annotations
 
-import json
-import urllib.request
-import urllib.error
-
-from .base import AgenteLLM, ErroFornecedorLLM
+from .base import AgenteLLM, ErroFornecedorLLM, pedir_json
 
 URL_API = "https://api.anthropic.com/v1/messages"
 VERSAO_API = "2023-06-01"
@@ -53,28 +49,12 @@ class FornecedorAnthropic(AgenteLLM):
         if sistema is not None:
             corpo["system"] = sistema
 
-        pedido = urllib.request.Request(
-            URL_API,
-            data=json.dumps(corpo).encode("utf-8"),
-            method="POST",
-            headers={
-                "x-api-key": self.api_key,
-                "anthropic-version": VERSAO_API,
-                "Content-Type": "application/json",
-            },
-        )
-        try:
-            with urllib.request.urlopen(pedido, timeout=60) as resposta:
-                dados = json.loads(resposta.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            corpo_erro = e.read().decode("utf-8", errors="replace")
-            raise ErroFornecedorLLM(
-                f"A Anthropic recusou o pedido (HTTP {e.code}): {corpo_erro}"
-            ) from e
-        except urllib.error.URLError as e:
-            raise ErroFornecedorLLM(
-                f"Não foi possível contactar a Anthropic: {e.reason}"
-            ) from e
+        cabecalhos = {
+            "x-api-key": self.api_key,
+            "anthropic-version": VERSAO_API,
+            "Content-Type": "application/json",
+        }
+        dados = pedir_json(URL_API, corpo, cabecalhos, "Anthropic")
 
         try:
             blocos_texto = [b["text"] for b in dados["content"] if b.get("type") == "text"]

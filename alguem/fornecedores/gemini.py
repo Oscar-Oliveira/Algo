@@ -7,11 +7,7 @@ lista. Este ficheiro é onde essa tradução acontece -- o resto do
 Alguem continua a falar sempre no formato neutro."""
 from __future__ import annotations
 
-import json
-import urllib.request
-import urllib.error
-
-from .base import AgenteLLM, ErroFornecedorLLM
+from .base import AgenteLLM, ErroFornecedorLLM, pedir_json
 
 URL_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
@@ -49,24 +45,7 @@ class FornecedorGemini(AgenteLLM):
             corpo["systemInstruction"] = instrucao_sistema
 
         url = f"{URL_API_BASE}/{self.modelo}:generateContent?key={self.api_key}"
-        pedido = urllib.request.Request(
-            url,
-            data=json.dumps(corpo).encode("utf-8"),
-            method="POST",
-            headers={"Content-Type": "application/json"},
-        )
-        try:
-            with urllib.request.urlopen(pedido, timeout=60) as resposta:
-                dados = json.loads(resposta.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            corpo_erro = e.read().decode("utf-8", errors="replace")
-            raise ErroFornecedorLLM(
-                f"A Gemini recusou o pedido (HTTP {e.code}): {corpo_erro}"
-            ) from e
-        except urllib.error.URLError as e:
-            raise ErroFornecedorLLM(
-                f"Não foi possível contactar a Gemini: {e.reason}"
-            ) from e
+        dados = pedir_json(url, corpo, {"Content-Type": "application/json"}, "Gemini")
 
         try:
             texto = dados["candidates"][0]["content"]["parts"][0]["text"]
