@@ -33,7 +33,7 @@ from algo_lang.compilador.parser import parse, parse_biblioteca
 from algo_lang.compilador.semantics import verificar, ErroSemantico
 from algo_lang.compilador.lexer import ErroLexico
 from algo_lang.compilador.parser import ErroSintatico
-from algo_lang.compilador.codegen import gerar_python, gerar_python_com_mapa
+from algo_lang.compilador.codegen import gerar_python, gerar_python_com_mapa, ErroInternoCompilador
 from algo_lang.tools.flowchart import gerar_dot
 from algo_lang.tools.tracer import gerar_trace
 from algo_lang.tools import linter as linter_modulo
@@ -297,6 +297,10 @@ def compilar_codigo(ficheiros: list[dict], nome_principal: str, pasta_estudante:
         codigo_py = gerar_python(programa)
     except ErroSemantico as e:
         raise ErroCompilacao(str(e)) from e
+    except ErroInternoCompilador as e:  # pragma: no cover -- verificar() já garantiu que o programa é válido antes disto
+        raise ErroCompilacao(
+            f"{e} -- isto é um bug do próprio ALGO, não do teu programa."
+        ) from e
 
     caminho_py = caminho_principal.rsplit(".", 1)[0] + ".py"
     with open(caminho_py, "w", encoding="utf-8") as f:

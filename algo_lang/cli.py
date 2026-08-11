@@ -11,7 +11,7 @@ import argparse
 from .compilador.lexer import ErroLexico
 from .compilador.parser import parse, parse_biblioteca, ErroSintatico
 from .compilador.semantics import verificar, verificar_nomes_python, ErroSemantico
-from .compilador.codegen import gerar_python
+from .compilador.codegen import gerar_python, ErroInternoCompilador
 from .tools.flowchart import gerar_dot
 from .tools import linter as linter_modulo
 
@@ -165,8 +165,8 @@ def compilar_ficheiro(caminho_algo: str, minimo: bool = False) -> str:
         programa = _carregar_e_verificar(caminho_algo)
         try:
             codigo_py = gerar_python(programa)
-        except ErroSemantico as e:  # pragma: no cover -- verificar() já garantiu que o programa é válido antes disto
-            print(f"❌ {e}")
+        except ErroInternoCompilador as e:  # pragma: no cover -- verificar() já garantiu que o programa é válido antes disto
+            print(f"❌ {e} -- isto é um bug do próprio ALGO, não do teu programa. Por favor reporta-o.")
             sys.exit(1)
     pasta, nome_base = _pasta_saida(caminho_algo)
     sufixo = "_min" if minimo else ""
@@ -208,8 +208,8 @@ def cmd_executa_com_trace(args):
     programa = _carregar_e_verificar(args.ficheiro)
     try:
         dados = gerar_python_com_mapa(programa)
-    except ErroSemantico as e:  # pragma: no cover -- verificar() já garantiu que o programa é válido antes disto
-        print(f"❌ {e}")
+    except ErroInternoCompilador as e:  # pragma: no cover -- verificar() já garantiu que o programa é válido antes disto
+        print(f"❌ {e} -- isto é um bug do próprio ALGO, não do teu programa. Por favor reporta-o.")
         sys.exit(1)
 
     pasta, nome_base = _pasta_saida(args.ficheiro)

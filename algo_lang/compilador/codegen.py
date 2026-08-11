@@ -4,7 +4,21 @@
 from . import ast_nodes as A
 from .. import bibliotecas
 from ..tools.flowchart import texto_expr
-from .semantics import ErroSemantico
+
+
+class ErroInternoCompilador(Exception):
+    """ARCH-03: uma falha de invariante do PRÓPRIO gerador de código --
+    nunca deveria acontecer, porque verificar() (semantics.py) já
+    validou o programa antes de gerar_python() correr; os sítios que
+    levantam isto estão todos marcados '# pragma: no cover' por essa
+    razão. Distinto de propósito de ErroSemantico (semantics.py), que
+    É esperado (disparado por um erro real no programa do estudante) --
+    antes, reutilizar ErroSemantico aqui fazia um bug do próprio
+    compilador aparecer ao estudante como se fosse um erro de tipos
+    normal no seu programa."""
+    def __init__(self, mensagem):
+        super().__init__(f"Erro interno do compilador: {mensagem}")
+
 
 CABECALHO_RUNTIME = '''\
 # ============================================================
@@ -482,7 +496,8 @@ class GeradorCodigo:
         elif isinstance(stmt, A.Afirmar):
             self._gerar_afirmar(stmt, nivel, tipos)
         else:  # pragma: no cover -- todos os tipos de instrução da AST são tratados acima
-            raise ErroSemantico(f"instrução não suportada: {type(stmt).__name__}", getattr(stmt, "linha", 0))
+            raise ErroInternoCompilador(
+                f"instrução não suportada: {type(stmt).__name__} (linha {getattr(stmt, 'linha', 0)})")
 
     def _gerar_afirmar(self, stmt: A.Afirmar, nivel, tipos):
         cond_py = self._expr(stmt.condicao, tipos)
@@ -591,9 +606,9 @@ class GeradorCodigo:
     def _lvalue_de_expr(self, expr, tipos):
         if isinstance(expr, A.LValue):
             return self._lvalue(expr, tipos)
-        raise ErroSemantico(  # pragma: no cover -- semantics.py já valida isto antes
+        raise ErroInternoCompilador(  # pragma: no cover -- semantics.py já valida isto antes
             "argumentos passados por referência têm de ser uma variável, um "
-            "elemento de array ou um campo", 0)
+            "elemento de array ou um campo")
 
     def _encontrar_funcao(self, nome):
         if "." in nome:
@@ -659,8 +674,8 @@ class GeradorCodigo:
         if isinstance(expr, A.ArrayLiteral):
             elementos = ", ".join(self._expr(e, tipos) for e in expr.elementos)
             return f"[{elementos}]"
-        raise ErroSemantico(  # pragma: no cover -- todos os tipos de expressão da AST são tratados acima
-            f"expressão não suportada: {type(expr).__name__}", getattr(expr, "linha", 0))
+        raise ErroInternoCompilador(  # pragma: no cover -- todos os tipos de expressão da AST são tratados acima
+            f"expressão não suportada: {type(expr).__name__} (linha {getattr(expr, 'linha', 0)})")
 
 
 def gerar_python(programa: A.Programa) -> str:

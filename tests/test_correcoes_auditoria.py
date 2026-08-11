@@ -2236,3 +2236,25 @@ def test_visualizador_standalone_nao_depende_de_cdn_externo():
     assert "<script src=" not in conteudo
     assert "ReactDOM.createRoot" in conteudo
     assert "Babel.transform" in conteudo
+
+
+# ---------- ARCH-03: ErroInternoCompilador distinto de ErroSemantico ----------
+
+def test_erro_interno_de_codegen_nao_e_um_erro_semantico():
+    """Antes, uma falha de invariante do próprio gerador de código
+    (nunca deveria acontecer, já que verificar() valida o programa
+    antes) reutilizava ErroSemantico -- um bug real do compilador
+    apareceria ao estudante como se fosse um erro de tipos normal no
+    seu próprio programa. Testa diretamente o dispatch interno
+    (_gerar_stmt) com um nó de AST que não corresponde a nenhuma
+    instrução válida, para exercitar o ramo 'else' defensivo que só é
+    alcançável assim (por isso está marcado '# pragma: no cover')."""
+    from algo_lang.compilador.codegen import GeradorCodigo, ErroInternoCompilador
+
+    programa = parse('algoritmo "T"\ninicio\n    escrever("x")\n')
+    gerador = GeradorCodigo(programa)
+    no_bogus = object()
+    with pytest.raises(ErroInternoCompilador) as exc_info:
+        gerador._gerar_stmt(no_bogus, 1, {})
+    assert not isinstance(exc_info.value, ErroSemantico)
+    assert "Erro interno do compilador" in str(exc_info.value)
