@@ -76,24 +76,10 @@ class Linter:
         return self.avisos
 
     # ---------- utilidades de percurso ----------
-    def _nomes_declarados(self, stmts):
-        nomes = set()
-        for s in stmts:
-            if isinstance(s, A.Declaracao):
-                nomes.add(s.nome)
-            for bloco in A.subblocos(s):
-                nomes |= self._nomes_declarados(bloco)
-        return nomes
-
-    def _nomes_constantes_declaradas(self, stmts):
-        nomes = set()
-        for s in stmts:
-            if isinstance(s, A.Declaracao) and s.eh_constante:
-                nomes.add(s.nome)
-            for bloco in A.subblocos(s):
-                nomes |= self._nomes_constantes_declaradas(bloco)
-        return nomes
-
+    # ARCH-15: um único percorredor recursivo genérico (_todas_as_stmts,
+    # sobre A.subblocos), com _nomes_declarados/_nomes_constantes_declaradas
+    # como filtros derivados dele, em vez de três recursões ad hoc
+    # separadas que percorriam a mesma árvore de instruções.
     def _todas_as_stmts(self, stmts):
         """Devolve a lista achatada de todas as instruções, incluindo as
         que estão dentro de blocos aninhados (se/para/enquanto/escolher)."""
@@ -103,6 +89,13 @@ class Linter:
             for bloco in A.subblocos(s):
                 todas.extend(self._todas_as_stmts(bloco))
         return todas
+
+    def _nomes_declarados(self, stmts):
+        return {s.nome for s in self._todas_as_stmts(stmts) if isinstance(s, A.Declaracao)}
+
+    def _nomes_constantes_declaradas(self, stmts):
+        return {s.nome for s in self._todas_as_stmts(stmts)
+                if isinstance(s, A.Declaracao) and s.eh_constante}
 
     def _extrair_lvalues(self, expr, destino):
         """Atalho: extrai só os nomes de variáveis (ignora chamadas)."""
