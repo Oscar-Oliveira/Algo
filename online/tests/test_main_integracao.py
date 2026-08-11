@@ -232,6 +232,18 @@ def test_entrar_com_conta_pendente_da_403(cliente, monkeypatch):
     assert "pendente" in r.json()["detail"]
 
 
+def test_conta_pendente_indica_a_quem_contactar(cliente, monkeypatch):
+    """UX-17: antes, o estudante ficava num estado de espera sem
+    nenhuma indicação de a quem contactar se demorasse."""
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    r = cliente.post("/api/entrar", json={"email": "aluno@escola.pt", "password": "password123"})
+    assert "contacta o professor ou administrador responsável" in r.json()["detail"]
+
+    entrar_js = (Path(__file__).parent.parent / "estatico" / "entrar.js").read_text(encoding="utf-8")
+    assert "contacta o professor ou administrador responsável" in entrar_js
+
+
 def test_admin_pendentes_exige_admin(cliente, monkeypatch):
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
     cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})

@@ -28,7 +28,7 @@ async function submeter(formId, url) {
       }
       if (corpo.pendente) {
         mensagemErro.style.color = "var(--sucesso)";
-        mensagemErro.textContent = "A tua conta foi criada. Aguarda a aprovação de um administrador antes de poderes entrar.";
+        mensagemErro.textContent = "A tua conta foi criada e está à espera de aprovação. Não precisas de fazer mais nada -- vais poder entrar assim que um administrador a aprovar. Se demorar mais do que esperavas, contacta o professor ou administrador responsável por esta turma.";
         return;
       }
       window.location.href = "/editor";

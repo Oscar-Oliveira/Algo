@@ -197,7 +197,11 @@ def autenticar(email: str, password: str, caminho_bd: str | None = None) -> int:
         return linha["id"]
 
     if not linha["aprovado"]:
-        raise ErroAutenticacao("A tua conta está pendente de aprovação por um administrador.")
+        raise ErroAutenticacao(
+            "A tua conta está pendente de aprovação por um administrador -- "
+            "não precisas de te registar outra vez. Se demorar mais do que "
+            "esperavas, contacta o professor ou administrador responsável por esta turma."
+        )
     return linha["id"]
 
 
