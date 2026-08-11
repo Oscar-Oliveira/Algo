@@ -83,6 +83,7 @@
           <a href="#15-comentarios">15. Comentários</a>
           <a href="#16-afirmar">16. afirmar</a>
           <a href="#17-verificacao-de-tipos">17. Verificação de tipos</a>
+          <a href="#18-tipos-de-erro">18. Os três tipos de erro de compilação</a>
           <a href="#anexo-a">Anexo A — Sintaxe rápida</a>
           <a href="#anexo-b">Anexo B — Palavras reservadas</a>
         </nav>
@@ -646,6 +647,28 @@ inicio
             <li>Usar uma variável que nunca foi declarada</li>
             <li>Alterar uma constante</li>
           </ul>
+
+          <h2 id="18-tipos-de-erro">18. Os três tipos de erro de compilação</h2>
+          <p>Uma mensagem de erro do ALGO começa sempre por dizer QUE TIPO de erro é --
+            "Erro léxico", "Erro de sintaxe" ou "Erro semântico". Não é preciso saber a
+            diferença para corrigir o erro (a mensagem já diz o que fazer), mas ajuda a
+            perceber porque é que erros parecidos podem ser reportados de formas diferentes:</p>
+          <ul>
+            <li><strong>Léxico</strong> — o problema está nos próprios símbolos do texto, antes
+              de a linguagem sequer tentar perceber a estrutura da frase. Ex: um
+              <code>caracter</code> entre aspas simples com mais do que um símbolo, ou um
+              número mal escrito.</li>
+            <li><strong>Sintático (de sintaxe)</strong> — os símbolos existem, mas não estão
+              na ORDEM que a gramática do ALGO espera. Ex: esqueceres o <code>entao</code>
+              a seguir a um <code>se</code>, ou fechares um bloco a menos.</li>
+            <li><strong>Semântico</strong> — a frase está bem formada (compreensível
+              gramaticalmente), mas não faz sentido dado o que já foi declarado antes. Ex:
+              usar uma variável nunca declarada, ou tentar somar um <code>booleano</code> com
+              um <code>inteiro</code> (ver secção 17).</li>
+          </ul>
+          <p>É por esta ordem que o compilador procura erros: primeiro léxico, depois
+            sintático, só depois semântico -- por isso nunca vês um erro semântico
+            enquanto ainda houver um erro léxico ou de sintaxe por corrigir antes.</p>
 
           <h2 id="anexo-a">Anexo A — Referência rápida da sintaxe</h2>
           <table>

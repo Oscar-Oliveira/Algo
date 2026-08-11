@@ -72,6 +72,19 @@ def test_registar_da_acesso_a_ajuda(cliente):
     assert r.status_code == 200
 
 
+def test_ajuda_explica_os_tres_tipos_de_erro_de_compilacao(cliente):
+    """UX-05: o manual tem de explicar a diferença entre erro léxico/
+    sintático/semântico, para quem lê a mensagem de erro sem saber o
+    que esses termos significam."""
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.get("/ajuda")
+    assert r.status_code == 200
+    conteudo = r.text.lower()
+    assert "léxico" in conteudo
+    assert "sintático" in conteudo or "sintaxe" in conteudo
+    assert "semântico" in conteudo
+
+
 def test_registar_email_duplicado_da_400(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "outrapass"})
