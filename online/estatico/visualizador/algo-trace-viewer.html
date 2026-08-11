@@ -5,10 +5,14 @@
 <title>Visualizador de Execução ALGO</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjIwIiByb2xlPSJpbWciPgogIDx0aXRsZT5BbGdvIOKAlCBzw61tYm9sbzwvdGl0bGU+CiAgPGRlc2M+VW0gdHJpw6JuZ3VsbyBjb25zdHJ1w61kbyBhIHBhcnRpciBkZSBxdWF0cm8gZGVncmF1cyBhc2NlbmRlbnRlcywgcmVwcmVzZW50YW5kbyB1bSBhbGdvcml0bW8gY29tbyBzZXF1w6puY2lhIG9yZGVuYWRhIGRlIHBhc3NvcywgbmEgZm9ybWEgZGEgbGV0cmEgZ3JlZ2EgZGVsdGEuPC9kZXNjPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJhbGdvRGVncmF1cyIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZjBiZDVlIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2M5OGQyNCIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHJlY3QgeD0iOTYiICB5PSIzNSIgIHdpZHRoPSI0OCIgIGhlaWdodD0iMzUiIHJ4PSI1IiBmaWxsPSJ1cmwoI2FsZ29EZWdyYXVzKSIvPgogIDxyZWN0IHg9Ijc0IiAgeT0iNzUiICB3aWR0aD0iOTIiICBoZWlnaHQ9IjM1IiByeD0iNSIgZmlsbD0idXJsKCNhbGdvRGVncmF1cykiLz4KICA8cmVjdCB4PSI1MiIgIHk9IjExNSIgd2lkdGg9IjEzNiIgaGVpZ2h0PSIzNSIgcng9IjUiIGZpbGw9InVybCgjYWxnb0RlZ3JhdXMpIi8+CiAgPHJlY3QgeD0iMzAiICB5PSIxNTUiIHdpZHRoPSIxODAiIGhlaWdodD0iMzUiIHJ4PSI1IiBmaWxsPSJ1cmwoI2FsZ29EZWdyYXVzKSIvPgo8L3N2Zz4K">
-<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin></script>
-<script src="https://cdn.tailwindcss.com"></script>
+<!-- UX-11: vendorizado localmente (../vendor/tracer/), como já se faz
+     para o CodeMirror do editor -- antes vinha de CDNs externos sem
+     fallback nenhum; se uma rede escolar bloqueasse esses domínios, o
+     visualizador ficava em branco sem explicação nenhuma. -->
+<script src="../vendor/tracer/react.development.js" crossorigin></script>
+<script src="../vendor/tracer/react-dom.development.js" crossorigin></script>
+<script src="../vendor/tracer/babel.min.js" crossorigin></script>
+<script src="../vendor/tracer/tailwind.js"></script>
 <style>
   html, body { margin: 0; height: 100%; background: #16181D; overflow: hidden; }
   #root { height: 100%; }
@@ -524,15 +528,26 @@ function VisualizadorTraceAlgo() {
 </script>
 
 <script>
-  const codigoJSX = document.getElementById("codigo-fonte").textContent;
-  const resultado = Babel.transform(codigoJSX, {
-    presets: [["react", { runtime: "classic" }]],
-  });
-  const scriptFinal = document.createElement("script");
-  scriptFinal.textContent = resultado.code + "\n" +
-    "const raiz = ReactDOM.createRoot(document.getElementById('root'));" +
-    "raiz.render(React.createElement(VisualizadorTraceAlgo));";
-  document.body.appendChild(scriptFinal);
+  // UX-11: rede de segurança -- mesmo vendorizado localmente, uma
+  // instalação com estes ficheiros em falta (ex: cópia incompleta)
+  // não deve deixar a página em branco sem explicação nenhuma.
+  if (typeof React === "undefined" || typeof ReactDOM === "undefined" || typeof Babel === "undefined") {
+    document.getElementById("root").innerHTML =
+      '<p style="color:#eee;font-family:sans-serif;padding:2rem;">' +
+      "Não foi possível carregar React/Babel -- confirma que a pasta " +
+      "<code>vendor/tracer/</code> está presente ao lado deste ficheiro." +
+      "</p>";
+  } else {
+    const codigoJSX = document.getElementById("codigo-fonte").textContent;
+    const resultado = Babel.transform(codigoJSX, {
+      presets: [["react", { runtime: "classic" }]],
+    });
+    const scriptFinal = document.createElement("script");
+    scriptFinal.textContent = resultado.code + "\n" +
+      "const raiz = ReactDOM.createRoot(document.getElementById('root'));" +
+      "raiz.render(React.createElement(VisualizadorTraceAlgo));";
+    document.body.appendChild(scriptFinal);
+  }
 </script>
 </body>
 </html>

@@ -30,6 +30,24 @@ def _resposta_llm_falsa(texto):
     return cm
 
 
+# ---------- UX-11: visualizador de rasto sem dependência de CDN externo ----------
+
+def test_visualizador_de_rasto_nao_referencia_cdn_externo(cliente):
+    r = cliente.get("/estatico/visualizador/algo-trace-viewer.html")
+    assert r.status_code == 200
+    conteudo = r.text
+    assert "unpkg.com" not in conteudo
+    assert "cdn.tailwindcss.com" not in conteudo
+    assert '<script src="../vendor/tracer/react.development.js"' in conteudo
+
+
+def test_visualizador_de_rasto_vendor_files_acessiveis(cliente):
+    for nome in ("react.development.js", "react-dom.development.js",
+                 "babel.min.js", "tailwind.js"):
+        r = cliente.get(f"/estatico/vendor/tracer/{nome}")
+        assert r.status_code == 200, nome
+
+
 # ---------- páginas e sessão ----------
 
 def test_pagina_inicial_sem_sessao(cliente):
