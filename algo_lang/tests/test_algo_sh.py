@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import pytest
 
-RAIZ_PROJETO = pathlib.Path(__file__).resolve().parent.parent
+RAIZ_PROJETO = pathlib.Path(__file__).resolve().parent.parent.parent
 
 
 def _preparar_copia_do_projeto(tmp_path):
@@ -18,7 +18,7 @@ def _preparar_copia_do_projeto(tmp_path):
     destino = tmp_path / "projeto"
     destino.mkdir()
     shutil.copytree(RAIZ_PROJETO / "algo_lang", destino / "algo_lang",
-                     ignore=shutil.ignore_patterns("__pycache__"))
+                     ignore=shutil.ignore_patterns("__pycache__", "tests"))
     shutil.copy(RAIZ_PROJETO / "pyproject.toml", destino / "pyproject.toml")
     shutil.copy(RAIZ_PROJETO / "algo.sh", destino / "algo.sh")
     os.chmod(destino / "algo.sh", 0o755)
@@ -62,7 +62,7 @@ def test_algo_sh_funciona_com_espacos_no_caminho(tmp_path):
     pasta_com_espacos = tmp_path / "pasta com espaços"
     pasta_com_espacos.mkdir()
     shutil.copytree(RAIZ_PROJETO / "algo_lang", pasta_com_espacos / "algo_lang",
-                     ignore=shutil.ignore_patterns("__pycache__"))
+                     ignore=shutil.ignore_patterns("__pycache__", "tests"))
     shutil.copy(RAIZ_PROJETO / "pyproject.toml", pasta_com_espacos / "pyproject.toml")
     shutil.copy(RAIZ_PROJETO / "algo.sh", pasta_com_espacos / "algo.sh")
     os.chmod(pasta_com_espacos / "algo.sh", 0o755)

@@ -47,12 +47,12 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 .
 ├── algo.sh / algo.bat / algo.command   # arranque da consola local
 ├── algo_lang/          # o compilador -- nunca alterado entre CLI e online
+│   └── tests/            # suite de testes do compilador (CLI)
 ├── alguem/              # o tutor LLM -- reaproveitado tal e qual pelos dois modos
 ├── online/                # o serviço web (FastAPI) -- ver online/README.md
 ├── editors/                 # extensão de realce de sintaxe para VS Code
 ├── visualizador/              # visualizador autónomo do rasto (algo-trace-viewer.html)
 ├── exemplos/                    # programas Algo de exemplo
-├── tests/                         # suite de testes do compilador (CLI)
 └── docs/                            # manuais, sebenta, guia do docente
 ```
 
@@ -75,7 +75,7 @@ Cada parte tem documentação própria, mais detalhada do que cabe aqui:
 
 ## Estado dos testes
 
-- `algo_lang` (compilador): 334 testes — corre com `cd tests && python3 -m pytest`
+- `algo_lang` (compilador): 334 testes — corre com `python3 -m pytest algo_lang/tests/`
 - `alguem` (tutor): 173 testes — corre com `python3 -m pytest alguem/tests/`
 - `online` (serviço web): 83 testes — corre com `cd online && python3 -m pytest`
 

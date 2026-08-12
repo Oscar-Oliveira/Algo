@@ -18,7 +18,7 @@ algo = "algo_lang.cli:main"
 packages = ["algo_lang", "algo_lang.compilador", "algo_lang.tools", "algo_lang.bibliotecas"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["algo_lang/tests"]
 markers = [
     "slow: testes que criam um venv a sério (algo.sh) -- mais lentos, mas corretos",
 ]

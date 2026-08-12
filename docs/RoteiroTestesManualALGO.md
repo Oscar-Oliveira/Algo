@@ -15,7 +15,7 @@ TextEdit, VS Code, o que preferires).
 
 - [ ] Extrai o `.zip` para uma pasta à tua escolha
 - [ ] Confirma que vês estes ficheiros/pastas na raiz: `algo_lang/`,
-      `exemplos/`, `tests/`, `pyproject.toml`, `README.md`, `algo.sh`,
+      `exemplos/`, `pyproject.toml`, `README.md`, `algo.sh`,
       `algo.bat`, `algo.command`
 - [ ] Cria uma pasta à parte, por exemplo `testes-manuais/`, para lá
       colocares os ficheiros `.algo` que vais escrever ao longo deste

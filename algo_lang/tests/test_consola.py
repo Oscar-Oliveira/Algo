@@ -9,7 +9,7 @@ import textwrap
 import time
 import pytest
 
-RAIZ_PROJETO = pathlib.Path(__file__).resolve().parent.parent
+RAIZ_PROJETO = pathlib.Path(__file__).resolve().parent.parent.parent
 
 
 def _correr_consola(entrada, timeout=15, tmp_path=None):
@@ -26,7 +26,7 @@ def _correr_consola(entrada, timeout=15, tmp_path=None):
         raiz_copia = pasta_base / "projeto"
         shutil.copytree(
             RAIZ_PROJETO / "algo_lang", raiz_copia / "algo_lang",
-            ignore=shutil.ignore_patterns("__pycache__"))
+            ignore=shutil.ignore_patterns("__pycache__", "tests"))
         shutil.copytree(
             RAIZ_PROJETO / "alguem", raiz_copia / "alguem",
             ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.jsonl"))

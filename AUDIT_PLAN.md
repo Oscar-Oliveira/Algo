@@ -48,7 +48,6 @@ Formato por finding: `[Tipo · Prioridade · Esforço]` seguido de localização
 ### 3.4 Arquitetura e Qualidade de Código (13 findings)
 
 - **ARCH-01** [ARQUITETURA · ALTA · Alto] Adicionar um novo nó de AST exige alterações sincronizadas em ~9 `isinstance`/`elif` independentes espalhadas por `codegen.py`, `codegen_minimo.py`, `semantics.py`, `tools/linter.py`, `tools/flowchart.py` — sem verificação de exaustividade em tempo de compilação. Um branch esquecido falha silenciosamente (ex. o linter simplesmente não avalia o nó novo). Recomendação: introduzir um mecanismo de dispatch centralizado (visitor pattern ou registo por tipo de nó) que force, no mínimo, um erro claro quando um nó não tem handler.
-- **ARCH-05** [QUALIDADE DE CÓDIGO · BAIXA · Baixo] `tests/` de `algo_lang` vive fora da pasta do subprojeto (na raiz do repositório), ao contrário de `alguem/tests/` e `online/tests/`, apesar de `algo_lang/` ser descrito como independente. Recomendação: mover para `algo_lang/tests/` se algum dia se pretender extrair o subprojeto isoladamente; baixa urgência.
 
 ### 3.5 Experiência de Utilização (19 findings)
 
@@ -137,7 +136,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 6 — Qualidade de código e arquitetura
 - **Objetivo**: reduzir a duplicação e o acoplamento estrutural que tornam o projeto frágil a mudanças futuras, feito só depois de as correções funcionais estarem estáveis.
-- **Resolve**: AL-07, ARCH-01, ~~ARCH-02~~, ~~ARCH-03~~, ~~ARCH-04~~, ARCH-05, ~~ARCH-06~~, ~~ARCH-13~~, ~~ARCH-15~~, ~~ON-24~~.
+- **Resolve**: AL-07, ARCH-01, ~~ARCH-02~~, ~~ARCH-03~~, ~~ARCH-04~~, ~~ARCH-05~~, ~~ARCH-06~~, ~~ARCH-13~~, ~~ARCH-15~~, ~~ON-24~~.
 - **Componentes**: `compilador/codegen.py` + `codegen_minimo.py`, `tools/linter.py`, `alguem/fornecedores/`, `online/credenciais.py`.
 - **Alterações principais**: extrair uma camada de dispatch/funções partilhadas entre os dois geradores de código; remover a dependência invertida de `codegen.py` sobre `tools/flowchart.py`; unificar deteção de inclusões duplicadas; unificar a lista de fornecedores válidos entre `alguem` e `online`; extrair helper HTTP partilhado para os fornecedores que ainda não o usam.
 - **Dependências**: Fases 0-2 (evitar refatorizar ficheiros ainda a mudar por razões de segurança/correção).

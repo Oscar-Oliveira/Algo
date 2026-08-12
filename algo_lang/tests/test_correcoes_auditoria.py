@@ -2231,7 +2231,7 @@ def test_visualizador_standalone_nao_depende_de_cdn_externo():
     rede nenhuma: React/Babel/Tailwind vêm embutidos no próprio
     ficheiro, não de um CDN externo."""
     import pathlib
-    caminho = pathlib.Path(__file__).resolve().parent.parent / "visualizador" / "algo-trace-viewer.html"
+    caminho = pathlib.Path(__file__).resolve().parent.parent.parent / "visualizador" / "algo-trace-viewer.html"
     conteudo = caminho.read_text(encoding="utf-8")
     assert "unpkg.com" not in conteudo
     assert "<script src=" not in conteudo

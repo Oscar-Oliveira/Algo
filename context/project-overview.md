@@ -18,10 +18,10 @@ Three largely independent sub-projects, each with its own README with far more d
 No linter/formatter is configured. Match existing style by hand.
 
 ```bash
-# Compiler test suite — must run from tests/, not repo root
-cd tests && python3 -m pytest
-python3 -m pytest tests/test_estruturas.py -v      # single file
-python3 -m pytest tests/test_estruturas.py -k nome_do_teste  # single test
+# Compiler test suite — from repo root (ARCH-05: moved into algo_lang/, consistent with alguem/tests/ and online/tests/)
+python3 -m pytest algo_lang/tests/ -v
+python3 -m pytest algo_lang/tests/test_estruturas.py -v      # single file
+python3 -m pytest algo_lang/tests/test_estruturas.py -k nome_do_teste  # single test
 
 # Alguem (tutor) test suite (173 tests) — from repo root
 python3 -m pytest alguem/tests/ -v
@@ -34,7 +34,7 @@ cd online && python3 -m pytest -v
 algo.bat           # Windows
 ````
 
-Tests marked `slow` (in `tests/`) actually build a real venv via `algo.sh`. Skip with `-m "not slow"` for a quick loop.
+Tests marked `slow` (in `algo_lang/tests/`) actually build a real venv via `algo.sh`. Skip with `-m "not slow"` for a quick loop.
 
 The `online/` service needs two env vars to boot (it refuses to start without them): `ONLINE_CHAVE_CIFRAGEM` (Fernet key, encrypts stored LLM credentials) and `ONLINE_CHAVE_SESSAO` (session cookie signing key). Generate via `python3 -c "from cifragem import gerar_chave_nova; print(gerar_chave_nova())"` and `python3 -c "import secrets; print(secrets.token_hex(32))"`.
 
@@ -77,8 +77,8 @@ lexer.py (tokenizar) → parser.py (parse/parse_biblioteca, recursive-descent)
 
 ## Testing conventions
 
-* `tests/apoio.py` provides `compilar(codigo_algo)` and `executar(codigo_algo, entrada="")` helpers used throughout the compiler suite. They compile/run a string of Algo source and return generated Python or captured stdout.
-* Console integration tests (`tests/test_consola.py`, `tests/test_consola_alguem.py`) run the real `algo` command in a subprocess against a temporary copy of the whole project.
+* `algo_lang/tests/apoio.py` provides `compilar(codigo_algo)` and `executar(codigo_algo, entrada="")` helpers used throughout the compiler suite. They compile/run a string of Algo source and return generated Python or captured stdout.
+* Console integration tests (`algo_lang/tests/test_consola.py`, `algo_lang/tests/test_consola_alguem.py`) run the real `algo` command in a subprocess against a temporary copy of the whole project.
 * `alguem/tests/` and `online/tests/` isolate logs/DB into temporary directories via `monkeypatch` on the relevant module constants (not env vars). No test in the repository writes to the real `alguem/logs/` or a real database.
 * `docs/RoteiroTestesManualALGO.md` is a manual test script for the compiler (not automated).
 

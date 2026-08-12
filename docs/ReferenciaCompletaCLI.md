@@ -70,9 +70,9 @@ algo-lang-pacote/
 │   │   ├── flowchart.py           algo fluxograma
 │   │   ├── linter.py              algo lint
 │   │   └── tracer.py              algo executa --debug/--json
-│   └── bibliotecas/               math., cadeia. (importar Math / Cadeia)
+│   ├── bibliotecas/               math., cadeia. (importar Math / Cadeia)
+│   └── tests/                     suite de testes automatizados (pytest)
 ├── exemplos/                   ficheiros .algo de demonstração (não fazer parte do pacote)
-├── tests/                      suite de testes automatizados (pytest)
 ├── editors/vscode-algo/        extensão de realce de sintaxe para o VS Code
 ├── visualizador/                algo-trace-viewer.html -- abre os .json do --json
 ├── alguem/                      tutor de algoritmia baseado em LLM (independente do compilador)
@@ -644,15 +644,14 @@ compilação — por isso são avisos, não erros:
 
 ## Testes automatizados
 
-Há uma suite de testes (pytest) na pasta `tests/`, com 334 testes
+Há uma suite de testes (pytest) na pasta `algo_lang/tests/`, com 334 testes
 cobrindo a linguagem base, `estrutura` (incluindo literais), `constante`,
 comentários de bloco, literais de array (com N dimensões), `afirmar`,
 erros de execução amigáveis, o modo `--debug`, o linter e fluxogramas.
 
 ```bash
 pip install -e ".[dev]"     # instala o pytest
-cd tests
-pytest -v
+pytest algo_lang/tests/ -v
 ```
 
 Os testes de fluxograma que dependem do Graphviz (`dot`) são

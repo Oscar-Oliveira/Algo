@@ -18,7 +18,7 @@ import sys
 
 import pytest
 
-RAIZ_PROJETO = pathlib.Path(__file__).resolve().parent.parent
+RAIZ_PROJETO = pathlib.Path(__file__).resolve().parent.parent.parent
 
 # Função auxiliar Python, embutida como texto em cada script de teste
 # (cada teste corre num subprocesso Python limpo) -- reconhece um
@@ -99,7 +99,7 @@ def _correr(script, timeout=15):
         raiz_copia = pathlib.Path(pasta_temp) / "projeto"
         shutil.copytree(
             RAIZ_PROJETO / "algo_lang", raiz_copia / "algo_lang",
-            ignore=shutil.ignore_patterns("__pycache__"))
+            ignore=shutil.ignore_patterns("__pycache__", "tests"))
         shutil.copytree(
             RAIZ_PROJETO / "alguem", raiz_copia / "alguem",
             ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.jsonl"))
