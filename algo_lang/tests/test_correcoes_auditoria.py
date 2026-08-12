@@ -2353,3 +2353,67 @@ def test_cli_e_online_produzem_a_mesma_mensagem_de_colisao_de_sempre():
     with pytest.raises(SystemExit) as exc_info:
         _carregar_e_resolver_inclusoes(os.path.join(d, "principal.algo"))
     assert exc_info.value.code == 1
+
+
+# ---------- AL-07: base partilhada entre codegen.py e codegen_minimo.py ----------
+
+def test_geradores_de_codigo_partilham_a_mesma_base():
+    """As ~11 funções que eram bytes idênticas entre codegen.py e
+    codegen_minimo.py (percurso de lvalues, resolução de funções,
+    se/para/escolha, etc.) foram extraídas para gerador_base.py --
+    confirma que as duas classes GeradorCodigo herdam da mesma base, e
+    não têm cada uma a sua própria cópia dessas funções."""
+    from algo_lang.compilador import codegen, codegen_minimo, gerador_base
+
+    assert issubclass(codegen.GeradorCodigo, gerador_base.GeradorCodigoBase)
+    assert issubclass(codegen_minimo.GeradorCodigo, gerador_base.GeradorCodigoBase)
+
+    metodos_partilhados = [
+        "emit", "_valor_default", "_gerar_corpo", "_encontrar_funcao", "_lvalue",
+        "_tipo_final_lvalue", "_gerar_atribuicao", "_gerar_se", "_gerar_para",
+        "_gerar_escolha", "_gerar_funcao",
+    ]
+    for nome in metodos_partilhados:
+        metodo_base = getattr(gerador_base.GeradorCodigoBase, nome)
+        assert getattr(codegen.GeradorCodigo, nome) is metodo_base, nome
+        assert getattr(codegen_minimo.GeradorCodigo, nome) is metodo_base, nome
+
+
+def test_gerador_completo_e_minimo_continuam_a_produzir_codigo_correto(capsys):
+    """Verificação de ponta a ponta (sem subprocess, em processo) de
+    que a extração da base partilhada não alterou o comportamento
+    observável de nenhum dos dois geradores -- exercita função
+    recursiva, se/senão, para, e atribuição, que passam agora pela
+    base partilhada."""
+    from algo_lang.compilador.codegen import gerar_python
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+
+    codigo_algo = """\
+        algoritmo "T"
+        funcao fatorial(n:inteiro):inteiro
+            se n <= 1 entao
+                devolver 1
+            senao
+                devolver n * fatorial(n - 1)
+        inicio
+            x:inteiro = 5
+            total:inteiro = 0
+            i:inteiro
+            para i de 1 ate 3 fazer
+                total = total + i
+            escrever("fatorial: ", fatorial(x))
+            escrever("total: ", total)
+    """
+    programa1 = parse(textwrap.dedent(codigo_algo))
+    verificar(programa1)
+    py_completo = gerar_python(programa1)
+    exec(compile(py_completo, "<completo>", "exec"), {"__name__": "__main__"})
+    saida_completo = capsys.readouterr().out
+
+    programa2 = parse(textwrap.dedent(codigo_algo))
+    py_minimo = gerar_python_minimo(programa2)
+    exec(compile(py_minimo, "<minimo>", "exec"), {})
+    saida_minimo = capsys.readouterr().out
+
+    assert saida_completo == "fatorial: 120\ntotal: 6\n"
+    assert saida_minimo == "fatorial: 120\ntotal: 6\n"

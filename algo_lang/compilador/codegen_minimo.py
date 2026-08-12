@@ -15,6 +15,7 @@ gerado aqui simplesmente falha a correr, com o erro nativo do Python --
 
 from . import ast_nodes as A
 from .semantics import ErroSemantico
+from .gerador_base import GeradorCodigoBase, DEFAULT_POR_TIPO
 
 CABECALHO_RUNTIME = ""
 
@@ -52,30 +53,8 @@ BIBLIOTECA_MINIMA = {
     "cadeia.caracter": (lambda args: f"{args[0]}[{args[1]}]", None),
 }
 
-DEFAULT_POR_TIPO = {
-    "inteiro": "0",
-    "decimal": "0.0",
-    "booleano": "False",
-    "cadeia": '""',
-    "caracter": '""',
-}
 
-
-class GeradorCodigo:
-    def __init__(self, programa: A.Programa):
-        self.programa = programa
-        self.linhas = []
-        self.tabela_tipos_globais = {}   # nome -> tipo (tudo o que é global no programa)
-        self.refs_atuais = []            # nomes ref da função a gerar neste momento
-        self.estruturas = {}
-        self.mapa_linhas = {}            # nº de linha do .py gerado -> nº de linha do .algo original
-        self._linha_algo_atual = None    # linha ALGO da instrução a ser gerada neste momento
-
-    def emit(self, texto, nivel):
-        self.linhas.append("    " * nivel + texto)
-        if self._linha_algo_atual is not None:
-            self.mapa_linhas[len(self.linhas)] = self._linha_algo_atual
-
+class GeradorCodigo(GeradorCodigoBase):
     # -------- ponto de entrada --------
     def gerar(self) -> str:
         self.linhas = [
@@ -162,11 +141,6 @@ class GeradorCodigo:
         self.linhas.append("")
 
     # -------- declarações --------
-    def _valor_default(self, tipo):
-        if tipo in DEFAULT_POR_TIPO:
-            return DEFAULT_POR_TIPO[tipo]
-        return f"{tipo}()"   # instância por omissão de uma estrutura
-
     def _gerar_declaracao(self, d: A.Declaracao, nivel, tipos):
         if d.inicial is not None and isinstance(d.inicial, A.EstruturaLiteral):
             kwargs = ", ".join(
@@ -199,40 +173,6 @@ class GeradorCodigo:
         tam = self._expr(dims_exprs[0], tipos)
         interior = self._construir_array_aninhado(tipo, dims_exprs[1:], tipos)
         return f"[{interior} for _ in range({tam})]"
-
-    # -------- funções --------
-    def _gerar_funcao(self, f: A.FuncaoDef):
-        self._linha_algo_atual = f.linha
-        params_py = [p.nome for p in f.parametros]
-        self.emit(f"def {f.nome}({', '.join(params_py)}):", 0)
-
-        nomes_locais = {p.nome for p in f.parametros}
-        nomes_locais_dict = {}
-        A.coletar_declaracoes_tipadas(f.corpo, nomes_locais_dict)
-        nomes_locais |= set(nomes_locais_dict.keys())
-
-        nomes_globais_usadas = [n for n in self.tabela_tipos_globais if n not in nomes_locais]
-        if nomes_globais_usadas:
-            self.emit(f"global {', '.join(nomes_globais_usadas)}", 1)
-
-        tipos_locais = dict(self.tabela_tipos_globais)
-        for p in f.parametros:
-            tipos_locais[p.nome] = p.tipo
-
-        self.refs_atuais = [p.nome for p in f.parametros if p.por_referencia]
-
-        if not f.corpo:  # pragma: no cover -- o parser exige >=1 instrução no corpo
-            self.emit("pass", 1)
-        for stmt in f.corpo:
-            self._gerar_stmt(stmt, 1, tipos_locais)
-
-        if f.eh_procedimento and self.refs_atuais:
-            self._linha_algo_atual = f.linha
-            self.emit(f"return {', '.join(self.refs_atuais)}", 1)
-
-        self.refs_atuais = []
-        self._linha_algo_atual = None
-        self.linhas.append("")
 
     # -------- statements --------
     def _gerar_stmt(self, stmt, nivel, tipos):
@@ -283,75 +223,12 @@ class GeradorCodigo:
         else:
             self.emit(f"assert {cond_py}", nivel)
 
-    def _gerar_corpo(self, corpo, nivel, tipos):
-        if not corpo:  # pragma: no cover -- o parser exige >=1 instrução em qualquer bloco
-            self.emit("pass", nivel)
-            return
-        for stmt in corpo:
-            self._gerar_stmt(stmt, nivel, tipos)
-
-    def _gerar_atribuicao(self, stmt: A.Atribuicao, nivel, tipos):
-        if isinstance(stmt.expr, A.Chamada):
-            f_def = self._encontrar_funcao(stmt.expr.nome)
-            if f_def and any(p.por_referencia for p in f_def.parametros):
-                out_vars = [
-                    self._lvalue_de_expr(a, tipos)
-                    for p, a in zip(f_def.parametros, stmt.expr.args)
-                    if p.por_referencia
-                ]
-                args_str = ", ".join(self._expr(a, tipos) for a in stmt.expr.args)
-                alvo = self._lvalue(stmt.alvo, tipos)
-                self.emit(f"{alvo}, {', '.join(out_vars)} = {stmt.expr.nome}({args_str})", nivel)
-                return
-        alvo = self._lvalue(stmt.alvo, tipos)
-        expr = self._expr(stmt.expr, tipos)
-        self.emit(f"{alvo} = {expr}", nivel)
-
     def _gerar_ler(self, stmt: A.Ler, nivel, tipos):
         for alvo in stmt.alvos:
             tipo = self._tipo_final_lvalue(alvo, tipos)
             leitor = LEITORES_INLINE_POR_TIPO.get(tipo, "input()")
             destino = self._lvalue(alvo, tipos)
             self.emit(f"{destino} = {leitor}", nivel)
-
-    def _gerar_se(self, stmt: A.Se, nivel, tipos):
-        primeiro = True
-        for cond, corpo in stmt.ramos:
-            self._linha_algo_atual = getattr(cond, "linha", stmt.linha)
-            palavra = "if" if primeiro else "elif"
-            self.emit(f"{palavra} {self._expr(cond, tipos)}:", nivel)
-            self._gerar_corpo(corpo, nivel + 1, tipos)
-            primeiro = False
-        if stmt.senao is not None:
-            self.emit("else:", nivel)
-            self._gerar_corpo(stmt.senao, nivel + 1, tipos)
-
-    def _gerar_para(self, stmt: A.Para, nivel, tipos):
-        ini = self._expr(stmt.ini, tipos)
-        fim = self._expr(stmt.fim, tipos)
-        passo = self._expr(stmt.passo, tipos) if stmt.passo else "1"
-        self.emit(
-            f"for {stmt.var} in range({ini}, ({fim}) + (1 if ({passo}) > 0 else -1), {passo}):",
-            nivel,
-        )
-        tipos_loop = dict(tipos)
-        tipos_loop[stmt.var] = "inteiro"
-        self._gerar_corpo(stmt.corpo, nivel + 1, tipos_loop)
-
-    def _gerar_escolha(self, stmt: A.Escolha, nivel, tipos):
-        var_tmp = "_algo_escolha_val"
-        self.emit(f"{var_tmp} = {self._expr(stmt.expr, tipos)}", nivel)
-        primeiro = True
-        for valores, corpo in stmt.casos:
-            self._linha_algo_atual = getattr(valores[0], "linha", stmt.linha)
-            comparacoes = " or ".join(f"{var_tmp} == {self._expr(v, tipos)}" for v in valores)
-            palavra = "if" if primeiro else "elif"
-            self.emit(f"{palavra} {comparacoes}:", nivel)
-            self._gerar_corpo(corpo, nivel + 1, tipos)
-            primeiro = False
-        if stmt.contrario is not None:
-            self.emit("else:", nivel)
-            self._gerar_corpo(stmt.contrario, nivel + 1, tipos)
 
     def _gerar_chamada_stmt(self, stmt: A.ChamadaStmt, nivel, tipos):
         chamada = stmt.chamada
@@ -377,34 +254,7 @@ class GeradorCodigo:
             "argumentos passados por referência têm de ser uma variável, um "
             "elemento de array ou um campo", 0)
 
-    def _encontrar_funcao(self, nome):
-        if "." in nome:
-            return None
-        for f in self.programa.funcoes:
-            if f.nome == nome:
-                return f
-        return None  # pragma: no cover -- semantics.py já garante que existe, se não tiver "."
-
     # -------- lvalue / expressões --------
-    def _lvalue(self, lv: A.LValue, tipos):
-        base = lv.nome
-        for tag, valor in lv.acessos:
-            if tag == "indice":
-                base += f"[{self._expr(valor, tipos)}]"
-            else:
-                base += f".{valor}"
-        return base
-
-    def _tipo_final_lvalue(self, lv: A.LValue, tipos):
-        """Resolve o tipo final de um LValue (percorrendo acessos a campos
-        de estrutura) para escolher o leitor certo em 'ler(...)'."""
-        tipo_atual = tipos.get(lv.nome, "cadeia")
-        for tag, valor in lv.acessos:
-            if tag == "campo":
-                campos = self.estruturas.get(tipo_atual, {})
-                tipo_atual = campos.get(valor, ("cadeia", 0))[0]
-        return tipo_atual
-
     def _expr(self, expr, tipos):
         if expr is None:  # pragma: no cover -- nenhum chamador passa None (todos são guardados)
             return ""
