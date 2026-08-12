@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import asyncio
+import io
 import json
+import zipfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -776,6 +778,84 @@ def test_rasto_sem_entradas_suficientes_nao_bloqueia(cliente):
     r = cliente.post("/api/rasto", json={**_msg('algoritmo "T"\ninicio\n    a:inteiro\n    ler(a)\n    escrever(a)\n'), "entradas": []})
     assert r.status_code == 200
     assert r.json()["erro"] is not None
+
+
+# ---------- projeto: descarregar/abrir como .zip (sem persistência em BD) ----------
+
+def test_projeto_download_exige_autenticacao(cliente):
+    r = cliente.post("/api/projeto/download", json=_msg('algoritmo "T"\ninicio\nfim\n'))
+    assert r.status_code == 401
+
+
+def test_projeto_download_devolve_zip_com_os_ficheiros(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    corpo = {
+        "ficheiros": [
+            {"nome": "principal.algo", "conteudo": 'algoritmo "T"\ninicio\nfim\n'},
+            {"nome": "biblioteca.algo", "conteudo": "funcao dobro(x: inteiro): inteiro\n"},
+        ],
+        "principal": "principal.algo",
+    }
+    r = cliente.post("/api/projeto/download", json=corpo)
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/zip"
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    assert zf.namelist() == ["principal.algo", "biblioteca.algo"]
+    assert zf.read("principal.algo").decode("utf-8") == corpo["ficheiros"][0]["conteudo"]
+
+
+def test_projeto_download_sem_ficheiros_da_erro(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/projeto/download", json={"ficheiros": [], "principal": ""})
+    assert r.status_code == 400
+
+
+def test_projeto_upload_exige_autenticacao(cliente):
+    r = cliente.post("/api/projeto/upload", files={"ficheiro": ("projeto.zip", b"nao interessa", "application/zip")})
+    assert r.status_code == 401
+
+
+def test_projeto_upload_devolve_os_ficheiros(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    memoria = io.BytesIO()
+    with zipfile.ZipFile(memoria, "w") as zf:
+        zf.writestr("principal.algo", 'algoritmo "T"\ninicio\nfim\n')
+        zf.writestr("biblioteca.algo", "funcao dobro(x: inteiro): inteiro\n")
+    r = cliente.post("/api/projeto/upload", files={"ficheiro": ("projeto.zip", memoria.getvalue(), "application/zip")})
+    assert r.status_code == 200
+    assert r.json()["ficheiros"] == [
+        {"nome": "principal.algo", "conteudo": 'algoritmo "T"\ninicio\nfim\n'},
+        {"nome": "biblioteca.algo", "conteudo": "funcao dobro(x: inteiro): inteiro\n"},
+    ]
+
+
+def test_projeto_upload_rejeita_zip_invalido(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/projeto/upload", files={"ficheiro": ("projeto.zip", b"nao e um zip", "application/zip")})
+    assert r.status_code == 400
+
+
+def test_projeto_download_e_upload_fazem_ida_e_volta(cliente):
+    """O ponto central deste teste: descarregar e depois voltar a abrir
+    o mesmo projeto devolve exatamente os mesmos ficheiros, pela mesma
+    ordem -- é essa ida-e-volta que faz o .zip funcionar como "guardar"
+    sem precisar de nenhuma tabela na base de dados."""
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    corpo = {
+        "ficheiros": [
+            {"nome": "principal.algo", "conteudo": 'algoritmo "T"\ninicio\n    incluir "biblioteca.algo"\nfim\n'},
+            {"nome": "biblioteca.algo", "conteudo": "funcao dobro(x: inteiro): inteiro\n"},
+        ],
+        "principal": "principal.algo",
+    }
+    r_download = cliente.post("/api/projeto/download", json=corpo)
+    assert r_download.status_code == 200
+    r_upload = cliente.post(
+        "/api/projeto/upload",
+        files={"ficheiro": ("projeto.zip", r_download.content, "application/zip")},
+    )
+    assert r_upload.status_code == 200
+    assert r_upload.json()["ficheiros"] == corpo["ficheiros"]
 
 
 # ---------- incluir (bibliotecas próprias), de ponta a ponta ----------

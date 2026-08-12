@@ -14,7 +14,7 @@ import tempfile
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
-from fastapi import BackgroundTasks, FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi import BackgroundTasks, FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -28,6 +28,7 @@ import modo_codemirror
 import cifragem
 import credenciais
 import executor
+import projeto
 import alguem_ponte
 from alguem.fornecedores.base import ErroFornecedorLLM
 from alguem.scripts import metricas
@@ -582,3 +583,29 @@ async def rota_rasto(request: Request, pasta_estudante: str = Depends(pasta_exec
     except executor.ErroRasto as e:
         raise HTTPException(status_code=500, detail=str(e))
     return rasto
+
+
+# ---------- projeto: descarregar/abrir como .zip (sem persistência em BD) ----------
+
+@app.post("/api/projeto/download")
+async def rota_descarregar_projeto(request: Request, id_estudante: int = Depends(estudante_atual)):
+    dados = await corpo_json(request)
+    try:
+        conteudo_zip = await run_in_threadpool(projeto.construir_zip_do_projeto, dados.get("ficheiros", []))
+    except projeto.ErroProjeto as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return Response(
+        content=conteudo_zip,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="projeto.zip"'},
+    )
+
+
+@app.post("/api/projeto/upload")
+async def rota_abrir_projeto(ficheiro: UploadFile = File(...), id_estudante: int = Depends(estudante_atual)):
+    conteudo_zip = await ficheiro.read()
+    try:
+        ficheiros = await run_in_threadpool(projeto.extrair_zip_do_projeto, conteudo_zip)
+    except projeto.ErroProjeto as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ficheiros": ficheiros}

@@ -23,19 +23,6 @@ online
 - save/open project
 
 
-- lguem fechado por defeito
-- ao abrir editor a 50 %
-- ao abria alguem todos 33%
-
-
-- whitespaces
-- tab ceonver to 4 spaces
-
-- theme no admnin retirar
-
-- retirar as palavras no bototes (pode ficar apenas o executar)
-
-
 - stand alone online
 
 

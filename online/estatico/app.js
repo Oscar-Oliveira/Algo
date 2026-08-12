@@ -243,6 +243,66 @@ function obterTodosOsFicheiros() {
 
 renderizarSeparadoresDeFicheiros();
 
+// ---------- descarregar/abrir projeto (.zip, sem persistência em BD -- o
+// próprio .zip descarregado é o "guardar", tanto para reabrir aqui como na
+// consola, que já sabe abrir uma pasta normal de ficheiros .algo) ----------
+
+document.getElementById("botao-descarregar-projeto").addEventListener("click", async () => {
+  try {
+    const resposta = await fetch("/api/projeto/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(obterTodosOsFicheiros()),
+    });
+    if (!resposta.ok) {
+      const dados = await resposta.json();
+      alert(dados.detail || "Não foi possível descarregar o projeto.");
+      return;
+    }
+    const blob = await resposta.blob();
+    const url = URL.createObjectURL(blob);
+    const ligacao = document.createElement("a");
+    ligacao.href = url;
+    ligacao.download = "projeto.zip";
+    ligacao.click();
+    URL.revokeObjectURL(url);
+  } catch (erro) {
+    console.error(erro);
+    alert("Não foi possível contactar o servidor.");
+  }
+});
+
+const campoProjetoZip = document.getElementById("campo-projeto-zip");
+
+document.getElementById("botao-abrir-projeto").addEventListener("click", () => {
+  campoProjetoZip.value = "";
+  campoProjetoZip.click();
+});
+
+campoProjetoZip.addEventListener("change", async () => {
+  const ficheiro = campoProjetoZip.files[0];
+  if (!ficheiro) return;
+  if (!confirm("Isto substitui todos os ficheiros abertos no editor. Continuar?")) return;
+
+  const dadosFormulario = new FormData();
+  dadosFormulario.append("ficheiro", ficheiro);
+  try {
+    const resposta = await fetch("/api/projeto/upload", { method: "POST", body: dadosFormulario });
+    const dados = await resposta.json();
+    if (!resposta.ok) {
+      alert(dados.detail || "Não foi possível abrir o projeto.");
+      return;
+    }
+    ficheiros = dados.ficheiros;
+    indiceFicheiroAtivo = 0;
+    editor.setValue(ficheiroAtivo().conteudo);
+    renderizarSeparadoresDeFicheiros();
+  } catch (erro) {
+    console.error(erro);
+    alert("Não foi possível contactar o servidor.");
+  }
+});
+
 // ---------- UX-15: marcador de erro no gutter do CodeMirror ----------
 // Antes, um erro de compilação só aparecia como texto no terminal, sem
 // nenhum apontador no próprio editor -- apesar do CodeMirror já estar
