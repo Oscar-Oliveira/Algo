@@ -2417,3 +2417,105 @@ def test_gerador_completo_e_minimo_continuam_a_produzir_codigo_correto(capsys):
 
     assert saida_completo == "fatorial: 120\ntotal: 6\n"
     assert saida_minimo == "fatorial: 120\ntotal: 6\n"
+
+
+# ---------- ARCH-01: dispatch centralizado / exaustividade dos tipos de AST ----------
+# Adicionar um novo tipo de instrução/expressão à AST exige atualizar ~9
+# isinstance/elif espalhados por codegen.py, codegen_minimo.py, semantics.py
+# e tools/flowchart.py, sem nenhuma verificação de exaustividade em tempo
+# de compilação -- um branch esquecido falhava silenciosamente. Em vez de
+# um redesenho completo do dispatch (visitor pattern), a abordagem aqui
+# tem duas partes: (1) um teste que analisa o código-fonte de cada
+# dispatcher e falha explicitamente se um tipo de nó da AST não estiver
+# coberto, para apanhar isto em tempo de teste, não só em runtime; (2)
+# tools/flowchart.py:gerar_stmt tinha um fallback SILENCIOSO (gerava um nó
+# genérico "(instrução)" em vez de um erro) -- corrigido para levantar
+# ErroInternoFluxograma, consistente com o padrão já usado em codegen.py
+# (ErroInternoCompilador, ARCH-03).
+
+_TIPOS_STMT_DA_AST = {
+    "Declaracao", "Atribuicao", "Ler", "Escrever", "Se", "Para", "Enquanto",
+    "FazEnquanto", "Escolha", "Devolver", "ChamadaStmt", "Afirmar",
+}
+_TIPOS_EXPR_DA_AST = {
+    "LValue", "Literal", "BinOp", "UnOp", "Chamada", "ArrayLiteral", "EstruturaLiteral",
+}
+
+
+def _tipos_ast_referenciados_via_isinstance(funcao):
+    """Analisa o código-fonte de 'funcao' (via módulo ast, não execução)
+    e devolve o conjunto de nomes de classes A.X referenciados em
+    chamadas isinstance(x, A.X) ou isinstance(x, (A.X, A.Y, ...))."""
+    import ast as ast_modulo
+    import inspect as inspect_modulo
+    codigo_fonte = textwrap.dedent(inspect_modulo.getsource(funcao))
+    arvore = ast_modulo.parse(codigo_fonte)
+    tipos = set()
+    for no in ast_modulo.walk(arvore):
+        if not (isinstance(no, ast_modulo.Call) and isinstance(no.func, ast_modulo.Name)
+                and no.func.id == "isinstance" and len(no.args) == 2):
+            continue
+        segundo_arg = no.args[1]
+        candidatos = segundo_arg.elts if isinstance(segundo_arg, ast_modulo.Tuple) else [segundo_arg]
+        for c in candidatos:
+            if isinstance(c, ast_modulo.Attribute):
+                tipos.add(c.attr)
+    return tipos
+
+
+def test_dispatchers_de_instrucoes_cobrem_todos_os_tipos_de_stmt_da_ast():
+    from algo_lang.compilador import codegen, codegen_minimo, semantics
+    from algo_lang.tools import flowchart
+
+    dispatchers = {
+        "codegen.GeradorCodigo._gerar_stmt": codegen.GeradorCodigo._gerar_stmt,
+        "codegen_minimo.GeradorCodigo._gerar_stmt": codegen_minimo.GeradorCodigo._gerar_stmt,
+        "semantics.VerificadorTipos._verificar_stmt": semantics.VerificadorTipos._verificar_stmt,
+        "flowchart.GeradorFluxograma.gerar_stmt": flowchart.GeradorFluxograma.gerar_stmt,
+    }
+    problemas = {}
+    for nome, funcao in dispatchers.items():
+        faltam = _TIPOS_STMT_DA_AST - _tipos_ast_referenciados_via_isinstance(funcao)
+        if faltam:
+            problemas[nome] = faltam
+    assert not problemas, problemas
+
+
+def test_dispatchers_de_expressoes_cobrem_todos_os_tipos_de_expr_da_ast():
+    from algo_lang.compilador import codegen, codegen_minimo, semantics
+
+    # AL-16: um EstruturaLiteral não sabe o seu próprio tipo -- só faz
+    # sentido onde o tipo esperado já vem do contexto (declaração,
+    # argumento), tratado explicitamente ANTES de chamar o dispatcher
+    # genérico nesses dois ficheiros (semantics.py já rejeita todos os
+    # outros contextos antes disto correr). Cair no fallback genérico de
+    # _expr() para um EstruturaLiteral é por isso intencional, não uma
+    # lacuna -- exceção documentada, não uma falha deste teste.
+    excecoes = {
+        "codegen.GeradorCodigo._expr": {"EstruturaLiteral"},
+        "codegen_minimo.GeradorCodigo._expr": {"EstruturaLiteral"},
+    }
+    dispatchers = {
+        "codegen.GeradorCodigo._expr": codegen.GeradorCodigo._expr,
+        "codegen_minimo.GeradorCodigo._expr": codegen_minimo.GeradorCodigo._expr,
+        "semantics.VerificadorTipos._tipo_expr": semantics.VerificadorTipos._tipo_expr,
+    }
+    problemas = {}
+    for nome, funcao in dispatchers.items():
+        faltam = _TIPOS_EXPR_DA_AST - _tipos_ast_referenciados_via_isinstance(funcao) - excecoes.get(nome, set())
+        if faltam:
+            problemas[nome] = faltam
+    assert not problemas, problemas
+
+
+def test_flowchart_nao_esconde_instrucao_nao_suportada_num_no_generico():
+    """Antes, gerar_stmt() de tools/flowchart.py caía silenciosamente
+    num nó genérico "(instrução)" para qualquer tipo de instrução sem
+    handler -- sem nenhum aviso de que o fluxograma estava incompleto.
+    Testa diretamente o ramo defensivo (só alcançável com um nó bogus,
+    por isso marcado '# pragma: no cover')."""
+    from algo_lang.tools.flowchart import GeradorFluxograma, ErroInternoFluxograma
+
+    gerador = GeradorFluxograma("T")
+    with pytest.raises(ErroInternoFluxograma):
+        gerador.gerar_stmt(object(), "n1")

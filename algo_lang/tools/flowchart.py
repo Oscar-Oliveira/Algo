@@ -10,6 +10,17 @@ from ..compilador import ast_nodes as A
 from ..compilador.ast_nodes import texto_expr
 
 
+class ErroInternoFluxograma(Exception):
+    """ARCH-01: antes, um tipo de instrução sem handler em gerar_stmt()
+    caía silenciosamente num nó genérico "(instrução)" no fluxograma
+    gerado -- sem nenhum aviso de que o fluxograma estava incompleto/
+    incorreto. Levantar isto em vez disso torna o erro imediatamente
+    visível (mesmo que nunca devesse acontecer na prática, já que os
+    12 tipos de instrução da AST estão todos tratados)."""
+    def __init__(self, mensagem):
+        super().__init__(f"Erro interno do gerador de fluxogramas: {mensagem}")
+
+
 def _escapar(texto: str) -> str:
     return texto.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
@@ -145,10 +156,8 @@ class GeradorFluxograma:
         if isinstance(stmt, A.Escolha):
             return self._gerar_escolha(stmt, anterior, rotulo)
 
-        id_ = self.novo_id()  # pragma: no cover -- os 12 tipos de instrução da AST estão todos tratados acima
-        self.no(id_, "(instrução)", "box")  # pragma: no cover
-        self.aresta(anterior, id_, rotulo)  # pragma: no cover
-        return id_  # pragma: no cover
+        raise ErroInternoFluxograma(  # pragma: no cover -- os 12 tipos de instrução da AST estão todos tratados acima
+            f"instrução não suportada: {type(stmt).__name__} (linha {getattr(stmt, 'linha', 0)})")
 
     def _gerar_se(self, stmt: A.Se, anterior, rotulo):
         fim_id = self.novo_id()
