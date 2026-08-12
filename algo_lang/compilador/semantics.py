@@ -82,6 +82,14 @@ class VerificadorTipos:
         for f in programa.funcoes:
             if f.nome in self.funcoes:
                 raise ErroSemantico(f"'{f.nome}' já foi definido anteriormente", f.linha)
+            if f.nome in PRIMITIVOS:
+                raise ErroSemantico(
+                    f"'{f.nome}' é o nome de um tipo primitivo; escolhe outro "
+                    f"nome para a função/procedimento", f.linha)
+            if f.nome.lower() in self.bibliotecas_importadas:
+                raise ErroSemantico(
+                    f"'{f.nome}' já é o nome de uma biblioteca importada; "
+                    f"escolhe outro nome para a função/procedimento", f.linha)
             self.funcoes[f.nome] = f
 
         self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims)}
