@@ -182,9 +182,10 @@ inicio
           </table>
           <p class="nota">Nota: Os tipos primitivos (<code>inteiro</code>, <code>decimal</code>,
             <code>booleano</code>, <code>cadeia</code>, <code>caracter</code>) NÃO são palavras-chave —
-            são reconhecidos pela posição na frase. Isto é deliberado, para não colidirem com nomes de
-            bibliotecas (<code>cadeia</code>) ou de estruturas que tu próprio definas. Ver <a
-              href="#3-tipos-de-dados">capítulo 3</a>.
+            são reconhecidos pela posição na frase, o que permite, por exemplo, criares uma <code>estrutura</code>
+            com o mesmo nome de um tipo. Ainda assim, não podes dar a uma <em>variável</em> o nome de um tipo
+            primitivo nem de uma biblioteca importada (<code>cadeia</code>, <code>matematica</code>, ...) — é
+            rejeitado em tempo de compilação. Ver <a href="#3-tipos-de-dados">capítulo 3</a>.
           </p>
 
           <h2 id="2-estrutura-de-um-programa">2. Estrutura de um programa</h2>
@@ -306,9 +307,9 @@ a, b, c:inteiro                  // três variáveis do mesmo tipo</code></pre>
             <li>Começam por uma letra ou underscore (<code>_</code>)</li>
             <li>Podem conter letras, números e underscores</li>
             <li>Não podem ser uma palavra reservada (ver <a href="#anexo-b">Anexo B</a>)</li>
-            <li>Os tipos primitivos e os nomes de bibliotecas (<code>matematica</code>, <code>cadeia</code>) não
-              são palavras reservadas — podes ter uma variável chamada <code>total</code> mesmo que
-              exista uma biblioteca com outro nome parecido</li>
+            <li>Não podem ser um tipo primitivo (<code>inteiro</code>, <code>decimal</code>,
+              <code>booleano</code>, <code>cadeia</code>, <code>caracter</code>) nem o nome de uma
+              biblioteca que importaste (<code>matematica</code>, <code>cadeia</code>, ...)</li>
           </ul>
 
           <h3>4.4 Âmbito (visibilidade)</h3>
@@ -801,10 +802,11 @@ inicio
             fazer, enquanto, escolher, caso, contrario, funcao, procedimento, devolver, ref, importar,
             incluir, constante, afirmar, verdadeiro, falso, e, ou, nao, div, mod</code>.</p>
           <p class="nota">Nota: Os tipos primitivos (<code>inteiro</code>, <code>decimal</code>,
-            <code>booleano</code>, <code>cadeia</code>, <code>caracter</code>) não são palavras
-            reservadas — são reconhecidos pela posição na frase, não pelo nome. Isto é deliberado: evita
-            colisão com nomes de bibliotecas (<code>cadeia</code>) ou com nomes que um aluno queira dar a
-            uma variável ou estrutura sua.
+            <code>booleano</code>, <code>cadeia</code>, <code>caracter</code>) não estão nesta lista de
+            palavras reservadas do ALGO — são reconhecidos pela posição na frase, não pelo nome, o que
+            permite por exemplo definires uma <code>estrutura</code> com o mesmo nome de um tipo. Ainda
+            assim, o compilador não deixa dar a uma <em>variável</em> o nome de um tipo primitivo nem de
+            uma biblioteca importada (ver <a href="#4-variaveis">capítulo 4</a>).
           </p>
         </div>
       </div>

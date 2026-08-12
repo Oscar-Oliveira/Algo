@@ -14,19 +14,9 @@ admin llm for
 
 - activities apenas qd se chama alguem
 
-- biblioteca de convesao entre tipos
-
-- inteiro:inteiro =10
-Nota: Os tipos primitivos (inteiro, decimal, booleano, cadeia, caracter) não são palavras reservadas — são reconhecidos pela posição na frase, não pelo nome. Isto é deliberado: evita colisão com nomes de bibliotecas (cadeia) ou com nomes que um aluno queira dar a uma variável ou estrutura sua.
-
+- logs de td para analise do progresso do estudante e aconselhamento sobre conteudo a reforcar
 
 - alguem ativo
 
-
-
-
-
 - stand alone online
 
-
-- logs de td para analise do progresso do estudante e aconselhamento sobre conteudo a reforcar

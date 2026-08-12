@@ -89,6 +89,18 @@ class VerificadorTipos:
         for e in programa.estruturas:
             if e.nome in self.estruturas:
                 raise ErroSemantico(f"a estrutura '{e.nome}' já foi definida", e.linha)
+            if e.nome in self.funcoes:
+                raise ErroSemantico(
+                    f"'{e.nome}' já é o nome de uma função/procedimento; escolhe "
+                    f"outro nome para a estrutura", e.linha)
+            if e.nome in PRIMITIVOS:
+                raise ErroSemantico(
+                    f"'{e.nome}' é o nome de um tipo primitivo; escolhe outro "
+                    f"nome para a estrutura", e.linha)
+            if e.nome.lower() in self.bibliotecas_importadas:
+                raise ErroSemantico(
+                    f"'{e.nome}' já é o nome de uma biblioteca importada; "
+                    f"escolhe outro nome para a estrutura", e.linha)
             campos = {}
             for c in e.campos:
                 if c.nome in campos:
@@ -193,6 +205,22 @@ class VerificadorTipos:
     def _registar_decl(self, escopo, d: A.Declaracao):
         if self._nome_ativo(escopo, d.nome):
             raise ErroSemantico(f"a variável '{d.nome}' já foi declarada", d.linha)
+        if d.nome in self.funcoes:
+            raise ErroSemantico(
+                f"'{d.nome}' já é o nome de uma função/procedimento; escolhe "
+                f"outro nome para a variável", d.linha)
+        if d.nome in self.estruturas:
+            raise ErroSemantico(
+                f"'{d.nome}' já é o nome de uma estrutura; escolhe outro nome "
+                f"para a variável", d.linha)
+        if d.nome in self.bibliotecas_importadas:
+            raise ErroSemantico(
+                f"'{d.nome}' já é o nome de uma biblioteca importada; escolhe "
+                f"outro nome para a variável", d.linha)
+        if d.nome in PRIMITIVOS:
+            raise ErroSemantico(
+                f"'{d.nome}' é o nome de um tipo primitivo; escolhe outro nome "
+                f"para a variável", d.linha)
         self._validar_tipo(d.tipo, d.linha)
         if d.eh_constante:
             if d.inicial is None:  # pragma: no cover -- o parser já exige '=' em 'constante'
