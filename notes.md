@@ -7,15 +7,27 @@ docker compose up -d --build
 
 ---
 update -> db
-activities apenas qd se chama alguem
-codemirror 6?
-whitespaces
-
-inteiro:inteiro =10
 
 admin llm for
 - alguem  (se nenhum ativo) usa o o estudante.
 - guardian (se nenhum ativo) usa o o estudante.
 
--  tab ceonver to 4 spaces
+activities apenas qd se chama alguem
+
 - math -> matematica
+- inteiro:inteiro =10
+
+online
+- save/open project
+-  tab ceonver to 4 spaces
+- ao abrir editor a 50 %
+- ao abria alguem todos 33%
+- whitespaces
+- theme no admnin retirar
+- retirar as palavras no bototes (pode ficar apenas o executar)
+- lguem fechado por defeito
+- alguem ativo
+- standonline
+
+
+- logs de td para analise do progresso do estudante e aconselhamento sobre conteudo a reforcar
