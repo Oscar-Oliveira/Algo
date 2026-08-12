@@ -12,22 +12,31 @@ admin llm for
 - alguem  (se nenhum ativo) usa o o estudante.
 - guardian (se nenhum ativo) usa o o estudante.
 
-activities apenas qd se chama alguem
+- activities apenas qd se chama alguem
 
 - math -> matematica
 - inteiro:inteiro =10
 
+- alguem ativo
+
 online
 - save/open project
--  tab ceonver to 4 spaces
+
+
+- lguem fechado por defeito
 - ao abrir editor a 50 %
 - ao abria alguem todos 33%
+
+
 - whitespaces
+- tab ceonver to 4 spaces
+
 - theme no admnin retirar
+
 - retirar as palavras no bototes (pode ficar apenas o executar)
-- lguem fechado por defeito
-- alguem ativo
-- standonline
+
+
+- stand alone online
 
 
 - logs de td para analise do progresso do estudante e aconselhamento sobre conteudo a reforcar

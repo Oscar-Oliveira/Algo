@@ -24,7 +24,7 @@ online/
 ├── alguem_ponte.py          # constrói um Alguem a partir da credencial da BD
 ├── modo_codemirror.py    # gera o realce de sintaxe a partir do compilador
 ├── estatico/                 # HTML/CSS/JS -- sem framework de frontend
-│   ├── vendor/codemirror/      # CodeMirror auto-hospedado (não depende de CDN)
+│   ├── vendor/codemirror6/      # CodeMirror 6 auto-hospedado (não depende de CDN)
 │   └── visualizador/            # cópia do visualizador de rasto autónomo (não alterado)
 └── tests/                     # 83 testes (pytest)
 ```
@@ -58,10 +58,15 @@ em vez de um `config.json` local.
   ficheiros abertos são enviados juntos ao servidor a cada execução/
   fluxograma/rasto, e escritos na mesma pasta antes de compilar.
 - **Realce de sintaxe sem depender de nenhum CDN externo**: o
-  CodeMirror é servido localmente (descarregado uma vez via `npm`,
-  não em tempo real do browser do estudante), e o "modo" da linguagem
-  é gerado dinamicamente a partir das palavras-chave reais do
-  compilador (`/modo-algo.js`) -- nunca desatualiza.
+  CodeMirror 6 é servido localmente -- é distribuído como vários
+  pacotes npm em ESM, sem build UMD pronto a usar, por isso
+  `estatico/vendor/codemirror6/codemirror6.js` é um bundle único
+  gerado uma vez com `esbuild` fora do projeto (ver o README nessa
+  pasta; não há `package.json`/Node como dependência de build do
+  `online/`). O "modo" da linguagem (um `StreamLanguage`) é gerado
+  dinamicamente a partir das palavras-chave reais do compilador
+  (`/modo-algo.js`) -- nunca desatualiza. Tab converte sempre para 4
+  espaços e espaços/tabs ficam visíveis no editor.
 - **Identificador pseudónimo separado da conta**: os logs do Alguem
   (ver `alguem/README.md`) usam um UUID gerado no registo, nunca o
   `id` da conta nem o email -- mantém a mesma filosofia de privacidade

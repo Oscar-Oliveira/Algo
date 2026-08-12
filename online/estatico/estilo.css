@@ -224,7 +224,7 @@ button { font: inherit; cursor: pointer; }
 .rotulo-botao { white-space: nowrap; }
 
 .disposicao-editor {
-  flex: 1; display: grid; grid-template-columns: 1.3fr 6px 1fr 6px 1fr;
+  flex: 1; display: grid; grid-template-columns: 1fr 6px 1fr;
   min-height: 0;
 }
 @media (max-width: 900px) {
@@ -249,8 +249,12 @@ button { font: inherit; cursor: pointer; }
 }
 
 .painel-codigo { min-height: 300px; }
-#area-codigo { flex: 1; }
-.CodeMirror { height: 100% !important; font-family: 'JetBrains Mono', monospace; font-size: 0.92rem; }
+.painel-codigo .cm-editor { flex: 1; min-height: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.92rem; }
+.painel-codigo .cm-scroller { overflow: auto; }
+/* ARCH-06: os pontos do highlightWhitespace do CM6 vêm, por omissão,
+   com um contraste pensado para um fundo escuro -- em ambos os temas
+   ficavam demasiado fortes e competiam com o próprio código. */
+.painel-codigo .cm-highlightSpace, .painel-codigo .cm-highlightTab { opacity: 0.3 !important; }
 
 .terminal {
   flex: 1; overflow-y: auto; padding: 0.9rem 1rem; font-family: 'JetBrains Mono', monospace;
@@ -264,7 +268,7 @@ button { font: inherit; cursor: pointer; }
 /* UX-15: marcador de erro no gutter do CodeMirror */
 .gutter-erro { width: 0.9rem; }
 .gutter-marcador-erro { color: var(--erro); cursor: default; }
-.CodeMirror .linha-com-erro { background: rgba(217, 105, 90, 0.15); }
+.cm-editor .linha-com-erro { background: rgba(217, 105, 90, 0.15); }
 
 .form-entrada-terminal { border-top: 1px solid var(--tinta-borda); padding: 0.6rem 1rem; }
 #entrada-terminal, #entrada-alguem {

@@ -47,25 +47,42 @@ def gerar_js_modo() -> str:
     return f"""\
 // Gerado a partir das palavras-chave reais do compilador do ALGO --
 // ver online/modo_codemirror.py. Não editar à mão.
-CodeMirror.defineSimpleMode("algo", {{
-  start: [
-    {{regex: /\\/\\/.*/, token: "comment"}},
-    {{regex: /\\/\\*/, token: "comment", next: "comentario"}},
-    {{regex: /"(?:[^"\\\\]|\\\\.)*"/, token: "string"}},
-    {{regex: /\\b\\d+\\.\\d+\\b/, token: "number"}},
-    {{regex: /\\b\\d+\\b/, token: "number"}},
-    {{regex: /\\b({"|".join(_TIPOS)})\\b/, token: "type"}},
-    {{regex: /\\b({"|".join(sorted(_LITERAIS_LOGICOS))})\\b/, token: "atom"}},
-    {{regex: /\\b({"|".join(sorted(_PALAVRAS_LOGICAS))})\\b/, token: "operator"}},
-    {{regex: /\\b({"|".join(todas_acao)})\\b/, token: "keyword"}},
-    {{regex: /==|<>|<=|>=|=|<|>|\\+|-|\\*|\\//, token: "operator"}},
-    {{regex: /[a-zA-Z_][a-zA-Z0-9_]*/, token: "variable"}},
-  ],
-  comentario: [
-    {{regex: /.*?\\*\\//, token: "comment", next: "start"}},
-    {{regex: /.*/, token: "comment"}},
-  ],
-  meta: {{lineComment: "//"}},
+//
+// StreamLanguage do CodeMirror 6 (ver /estatico/vendor/codemirror6/):
+// a mesma ideia do antigo defineSimpleMode do CM5 -- token() é chamado
+// repetidamente a partir da posição atual, testa cada categoria por
+// ordem e devolve um nome de estilo -- mas escrita à mão em vez de
+// declarativa, porque o CM6 não tem equivalente ao defineSimpleMode.
+window.algoLanguage = CM6.StreamLanguage.define({{
+  startState() {{
+    return {{dentroComentario: false}};
+  }},
+  token(stream, state) {{
+    if (state.dentroComentario) {{
+      if (stream.match(/.*?\\*\\//)) {{
+        state.dentroComentario = false;
+      }} else {{
+        stream.skipToEnd();
+      }}
+      return "comment";
+    }}
+    if (stream.match("//")) {{ stream.skipToEnd(); return "comment"; }}
+    if (stream.match("/*")) {{ state.dentroComentario = true; return "comment"; }}
+    if (stream.match(/"(?:[^"\\\\]|\\\\.)*"/)) return "string";
+    if (stream.match(/\\d+\\.\\d+\\b/)) return "number";
+    if (stream.match(/\\d+\\b/)) return "number";
+    if (stream.match(/({"|".join(_TIPOS)})\\b/)) return "type";
+    if (stream.match(/({"|".join(sorted(_LITERAIS_LOGICOS))})\\b/)) return "atom";
+    if (stream.match(/({"|".join(sorted(_PALAVRAS_LOGICAS))})\\b/)) return "operator";
+    if (stream.match(/({"|".join(todas_acao)})\\b/)) return "keyword";
+    if (stream.match(/==|<>|<=|>=|=|<|>|\\+|-|\\*|\\//)) return "operator";
+    if (stream.match(/[a-zA-Z_][a-zA-Z0-9_]*/)) return "variableName";
+    stream.next();
+    return null;
+  }},
+  languageData: {{
+    commentTokens: {{line: "//", block: {{open: "/*", close: "*/"}}}},
+  }},
 }});
 """
 

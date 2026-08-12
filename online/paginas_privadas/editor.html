@@ -7,8 +7,6 @@
   <title>Algo — editor</title>
   <link rel="icon" href="/estatico/favicon.ico">
   <link rel="stylesheet" href="/estatico/estilo.css">
-  <link rel="stylesheet" href="/estatico/vendor/codemirror/codemirror.css">
-  <link rel="stylesheet" href="/estatico/vendor/codemirror/material-darker.css">
   <script src="/estatico/tema.js"></script>
 </head>
 
@@ -18,8 +16,8 @@
         class="marca-simbolo"> Algo</a>
     <div class="acoes-topo">
       <button id="botao-tema" type="button" class="botao-icone" title="Alternar tema"><svg
-          class="icone-botao icone-tema-escuro" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          class="icone-botao icone-tema-escuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="4.5" />
           <line x1="12" y1="1.5" x2="12" y2="3.5" />
           <line x1="12" y1="20.5" x2="12" y2="22.5" />
@@ -44,12 +42,11 @@
           <path d="M9.1 9a2.9 2.9 0 0 1 5.7.9c0 1.9-2.4 2.1-2.7 3.6" />
           <line x1="12" y1="17.2" x2="12" y2="17.3" />
         </svg></a>
-      <button id="botao-alternar-alguem" class="botao-icone" title="Esconder Alguem"><svg class="icone-botao"
+      <button id="botao-alternar-alguem" class="botao-icone" title="Mostrar Alguem"><svg class="icone-botao"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
           stroke-linejoin="round">
-          <path
-            d="M17.9 17.9A10.4 10.4 0 0 1 12 20c-7 0-11-8-11-8a18.6 18.6 0 0 1 4.2-5.2M9.9 5.2A9.7 9.7 0 0 1 12 5c7 0 11 8 11 8a18.4 18.4 0 0 1-2.2 3.1M14.1 14.1a3 3 0 1 1-4.2-4.2" />
-          <line x1="2" y1="2" x2="22" y2="22" />
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+          <circle cx="12" cy="12" r="3" />
         </svg></button>
       <button id="botao-sair" class="botao-icone" title="Sair"><svg class="icone-botao" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -77,16 +74,16 @@
               <circle cx="18" cy="12" r="2.3" />
               <path d="M6 8.3V15.7" />
               <path d="M8.2 6.6C11 6 13.7 7.6 15.4 10" />
-            </svg><span class="rotulo-botao">Fluxograma</span></button>
+            </svg></button>
           <button id="botao-rasto" class="botao-icone" title="Rasto"><svg class="icone-botao" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="2 12 7 12 9.5 18 14 6 16.5 12 22 12" />
-            </svg><span class="rotulo-botao">Rasto</span></button>
+            </svg></button>
           <button id="botao-linter" class="botao-icone" title="Verificador"><svg class="icone-botao" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="10.5" cy="10.5" r="6.5" />
               <line x1="20" y1="20" x2="15.3" y2="15.3" />
-            </svg><span class="rotulo-botao">Verificador</span></button>
+            </svg></button>
         </div>
       </div>
       <div class="barra-ficheiros">
@@ -174,9 +171,9 @@
       </div>
     </section>
 
-    <div class="divisor" data-divisor="1"></div>
+    <div class="divisor escondido" data-divisor="1"></div>
 
-    <section class="painel painel-alguem">
+    <section class="painel painel-alguem escondido">
       <div class="painel-cabecalho">
         <span>Alguém está sempre disponível para ajudar!</span>
         <div class="acoes-codigo">
@@ -243,8 +240,7 @@
     </section>
   </main>
 
-  <script src="/estatico/vendor/codemirror/codemirror.js"></script>
-  <script src="/estatico/vendor/codemirror/simple.js"></script>
+  <script src="/estatico/vendor/codemirror6/codemirror6.js"></script>
   <script src="/modo-algo.js"></script>
   <script src="/estatico/app.js"></script>
 </body>

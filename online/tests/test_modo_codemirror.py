@@ -10,7 +10,7 @@ import modo_codemirror
 
 def test_gerar_js_modo_produz_javascript_valido_o_suficiente():
     js = modo_codemirror.gerar_js_modo()
-    assert "CodeMirror.defineSimpleMode" in js
+    assert "CM6.StreamLanguage.define" in js
     assert "algoritmo" in js
 
 

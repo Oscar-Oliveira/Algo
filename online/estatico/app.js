@@ -1,24 +1,128 @@
 const CODIGO_POR_OMISSAO = 'algoritmo "MeuPrograma"\ninicio\n    escrever("ola")\n';
 
+// ---------- ligação entre o CodeMirror 6 (vendorizado, ver
+// estatico/vendor/codemirror6/) e o resto de app.js -- devolve um
+// objeto com a mesma superfície que o CodeMirror 5 antigo expunha
+// (getValue/setValue/setOption/clearGutter/removeLineClass/
+// setGutterMarker/addLineClass/scrollIntoView/on/refresh), para não
+// ter de tocar em mais nenhum sítio deste ficheiro. ----------
+
 function criarEditor() {
   const areaTexto = document.getElementById("area-codigo");
   areaTexto.value = CODIGO_POR_OMISSAO;
   try {
-    if (typeof CodeMirror === "undefined") {
+    if (typeof CM6 === "undefined" || typeof algoLanguage === "undefined") {
       throw new Error("CodeMirror não carregou -- a usar a área de texto simples.");
     }
-    return CodeMirror.fromTextArea(areaTexto, {
-      lineNumbers: true,
-      // FEAT-02: "default" é o tema claro embutido no próprio
-      // codemirror.css -- não precisa de nenhum ficheiro vendorizado
-      // à parte, ao contrário de material-darker.css.
-      theme: window.obterTema && window.obterTema() === "claro" ? "default" : "material-darker",
-      mode: "algo",
-      indentUnit: 4,
-      tabSize: 4,
-      indentWithTabs: false,
-      gutters: ["CodeMirror-linenumbers", "gutter-erro"],
+
+    const compartimentoTema = new CM6.Compartment();
+    // CM6 não vem com um "chrome" (fundo/gutters/cursor) claro por
+    // omissão como o CM5 tinha embutido no seu codemirror.css -- só
+    // syntaxHighlighting trata das cores dos tokens, não do fundo.
+    const temaClaroChrome = CM6.EditorView.theme({
+      "&": { backgroundColor: "#ffffff", color: "#1a1a1a" },
+      ".cm-content": { caretColor: "#1a1a1a" },
+      ".cm-gutters": { backgroundColor: "#f5f5f5", color: "#999", border: "none" },
+      ".cm-activeLineGutter": { backgroundColor: "#e8e8e8" },
+    }, { dark: false });
+    const temaClaro = [temaClaroChrome, CM6.syntaxHighlighting(CM6.defaultHighlightStyle)];
+    const temaEscuro = [CM6.oneDark, CM6.syntaxHighlighting(CM6.oneDarkHighlightStyle)];
+
+    // ---- marcador de erro no gutter + fundo da linha (UX-15) ----
+    const definirErroEfeito = CM6.StateEffect.define();
+    const limparErroEfeito = CM6.StateEffect.define();
+
+    class MarcadorErroGutter extends CM6.GutterMarker {
+      constructor(elemento) { super(); this.elemento = elemento; }
+      eq(outro) { return outro.elemento === this.elemento; }
+      toDOM() { return this.elemento; }
+    }
+
+    const decoracaoLinhaErro = CM6.Decoration.line({ attributes: { class: "linha-com-erro" } });
+
+    const campoErro = CM6.StateField.define({
+      create() { return { linha: null, marcador: null }; },
+      update(valor, tr) {
+        for (const efeito of tr.effects) {
+          if (efeito.is(definirErroEfeito)) valor = efeito.value;
+          if (efeito.is(limparErroEfeito)) valor = { linha: null, marcador: null };
+        }
+        return valor;
+      },
     });
+
+    const decoracoesErro = CM6.EditorView.decorations.compute([campoErro], (state) => {
+      const { linha } = state.field(campoErro);
+      if (linha === null || linha >= state.doc.lines) return CM6.Decoration.none;
+      return CM6.Decoration.set([decoracaoLinhaErro.range(state.doc.line(linha + 1).from)]);
+    });
+
+    const gutterErro = CM6.gutter({
+      class: "gutter-erro",
+      lineMarker(view, linhaInfo) {
+        const { linha, marcador } = view.state.field(campoErro);
+        if (linha === null || !marcador) return null;
+        return linhaInfo.from === view.state.doc.line(linha + 1).from ? new MarcadorErroGutter(marcador) : null;
+      },
+      lineMarkerChange: (update) => update.state.field(campoErro) !== update.startState.field(campoErro),
+    });
+
+    const escutadoresDeMudanca = [];
+
+    const view = new CM6.EditorView({
+      doc: areaTexto.value,
+      parent: areaTexto.parentNode,
+      extensions: [
+        CM6.lineNumbers(),
+        gutterErro,
+        campoErro,
+        decoracoesErro,
+        CM6.history(),
+        CM6.keymap.of([CM6.indentWithTab, ...CM6.defaultKeymap, ...CM6.historyKeymap]),
+        CM6.indentUnit.of("    "), // ARCH-06: tab converte sempre para 4 espaços, nunca insere '\t'
+        CM6.highlightWhitespace(), // ARCH-06: espaços/tabs ficam visíveis (pontos/setas) -- ver estilo.css para o ajuste de opacidade
+        // ARCH-06: indentWithTab só apanha a tecla Tab -- colar texto com
+        // tabs literais (ex: copiado de outro editor) entra pela via do
+        // clipboard, que não passa por ali. Convertemos aqui também, para
+        // nunca sobrar um '\t' visível no documento.
+        CM6.EditorView.domEventHandlers({
+          paste(evento, view) {
+            const texto = evento.clipboardData && evento.clipboardData.getData("text/plain");
+            if (!texto || texto.indexOf("\t") === -1) return false;
+            evento.preventDefault();
+            view.dispatch(view.state.replaceSelection(texto.replace(/\t/g, "    ")));
+            return true;
+          },
+        }),
+        algoLanguage,
+        compartimentoTema.of(window.obterTema && window.obterTema() === "claro" ? temaClaro : temaEscuro),
+        CM6.EditorView.updateListener.of((update) => {
+          if (update.docChanged) escutadoresDeMudanca.forEach((fn) => fn());
+        }),
+      ],
+    });
+    areaTexto.style.display = "none";
+
+    return {
+      getValue: () => view.state.doc.toString(),
+      setValue: (v) => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: v } }),
+      setOption: (nome, valor) => {
+        if (nome !== "theme") return;
+        view.dispatch({ effects: compartimentoTema.reconfigure(valor === "default" ? temaClaro : temaEscuro) });
+      },
+      clearGutter: () => view.dispatch({ effects: limparErroEfeito.of(null) }),
+      removeLineClass: () => view.dispatch({ effects: limparErroEfeito.of(null) }),
+      setGutterMarker: (linha, _gutterId, elementoDom) => {
+        view.dispatch({ effects: definirErroEfeito.of({ linha, marcador: elementoDom }) });
+      },
+      addLineClass: () => {}, // já coberto por setGutterMarker acima, que despoleta a mesma decoração de linha
+      scrollIntoView: (pos) => {
+        const linha = view.state.doc.line(Math.min(pos.line + 1, view.state.doc.lines));
+        view.dispatch({ effects: CM6.EditorView.scrollIntoView(linha.from + (pos.ch || 0), { y: "center" }) });
+      },
+      on: (evento, fn) => { if (evento === "change") escutadoresDeMudanca.push(fn); },
+      refresh: () => view.requestMeasure(),
+    };
   } catch (erro) {
     // Nunca deixar uma falha aqui impedir o resto da página de
     // funcionar (execução, Alguem, definições) -- só perdemos o
@@ -648,10 +752,9 @@ function alternarPainelAlguem() {
 }
 
 botaoAlternarAlguem.addEventListener("click", alternarPainelAlguem);
-// UX-12: painel do Alguem visível por omissão -- antes começava
-// escondido, só descoberto por um ícone pequeno no topo; um estudante
-// novo na web podia nunca descobrir que o tutor existe (ao contrário
-// da CLI, onde "?" é anunciado logo no banner inicial).
+// painel do Alguem escondido por omissão: editor e terminal a 50/50;
+// ao mostrar o Alguem, os três painéis passam a dividir o espaço
+// em partes iguais (ver alternarPainelAlguem).
 
 // ---------- painéis redimensionáveis (arrastar os divisores) ----------
 

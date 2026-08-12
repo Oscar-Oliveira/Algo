@@ -275,7 +275,9 @@ def test_tema_js_servido_e_ligado_nas_paginas_privadas(cliente):
     nível do conteúdo servido que tema.js existe, tem a lógica
     esperada (persistência em localStorage, deteção por
     prefers-color-scheme), e que as 3 páginas privadas (editor/admin/
-    ajuda) o carregam e têm o botão de alternância."""
+    ajuda) o carregam. O botão de alternância só faz sentido no editor
+    -- é a única página onde o utilizador tende a passar tempo
+    suficiente para querer trocar de tema."""
     r = cliente.get("/estatico/tema.js")
     assert r.status_code == 200
     assert "localStorage" in r.text
@@ -286,7 +288,12 @@ def test_tema_js_servido_e_ligado_nas_paginas_privadas(cliente):
     for nome in ("editor.html", "admin.html", "ajuda.html"):
         conteudo = (base / nome).read_text(encoding="utf-8")
         assert '<script src="/estatico/tema.js"></script>' in conteudo
-        assert 'id="botao-tema"' in conteudo
+
+    conteudo_editor = (base / "editor.html").read_text(encoding="utf-8")
+    assert 'id="botao-tema"' in conteudo_editor
+    for nome in ("admin.html", "ajuda.html"):
+        conteudo = (base / nome).read_text(encoding="utf-8")
+        assert 'id="botao-tema"' not in conteudo
 
 
 def test_estilo_css_define_tema_claro(cliente):
