@@ -130,7 +130,7 @@ def _algo_linha_do_erro(erro):
     _ALGO_MAPA_LINHAS, definido mais abaixo neste ficheiro, ja que so
     fica completo depois de todo o codigo ser gerado) -- nao basta o
     frame mais profundo de todos, que costuma estar DENTRO de uma
-    biblioteca (ex: math_raiz -> _math.sqrt), sem linha ALGO
+    biblioteca (ex: matematica_raiz -> _math.sqrt), sem linha ALGO
     correspondente; fica sempre com o último frame mapeado antes de
     'descer' para código interno. Devolve None se não encontrar
     nenhum."""

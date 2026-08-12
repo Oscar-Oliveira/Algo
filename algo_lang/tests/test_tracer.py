@@ -158,9 +158,9 @@ def test_trace_deteta_valueerror(tmp_path):
     também fica marcado como erro, com mensagem e linha."""
     resultado = _trace("""
         algoritmo "T"
-        importar Math
+        importar Matematica
         inicio
-            escrever(math.raiz(-4))
+            escrever(matematica.raiz(-4))
     """, tmp_path=tmp_path)
     assert resultado["erro"] is not None
     assert "domínio válido" in resultado["erro"]["mensagem"]

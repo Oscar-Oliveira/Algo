@@ -135,7 +135,7 @@ def test_passo_zero_literal_da_erro_de_compilacao():
 def test_raiz_de_negativo_da_erro_amigavel_nao_traceback(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
-        'algoritmo "T"\nimportar Math\ninicio\n    escrever(math.raiz(-4.0))\n',
+        'algoritmo "T"\nimportar Matematica\ninicio\n    escrever(matematica.raiz(-4.0))\n',
         encoding="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(algo_path)], capture_output=True, text=True)
@@ -146,7 +146,7 @@ def test_raiz_de_negativo_da_erro_amigavel_nao_traceback(tmp_path):
 def test_aleatorio_com_limites_invertidos_da_erro_amigavel(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
-        'algoritmo "T"\nimportar Math\ninicio\n    escrever(math.aleatorio(10, 1))\n',
+        'algoritmo "T"\nimportar Matematica\ninicio\n    escrever(matematica.aleatorio(10, 1))\n',
         encoding="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(algo_path)], capture_output=True, text=True)
@@ -945,25 +945,25 @@ def test_cadeia_longa_de_operadores_sem_parenteses_nao_e_afetada():
     assert saida.strip() == "200"
 
 
-# ---------- AUDIT_PLAN Fase 2: AL-19 -- math.absoluto preserva o tipo do argumento ----------
+# ---------- AUDIT_PLAN Fase 2: AL-19 -- matematica.absoluto preserva o tipo do argumento ----------
 
-def test_math_absoluto_de_inteiro_pode_ser_atribuido_a_inteiro():
+def test_matematica_absoluto_de_inteiro_pode_ser_atribuido_a_inteiro():
     saida = executar("""
         algoritmo "T"
-        importar Math
+        importar Matematica
         inicio
-            x:inteiro = math.absoluto(-5)
+            x:inteiro = matematica.absoluto(-5)
             escrever(x)
     """)
     assert saida.strip() == "5"
 
 
-def test_math_absoluto_de_decimal_continua_decimal():
+def test_matematica_absoluto_de_decimal_continua_decimal():
     saida = executar("""
         algoritmo "T"
-        importar Math
+        importar Matematica
         inicio
-            x:decimal = math.absoluto(-5.5)
+            x:decimal = matematica.absoluto(-5.5)
             escrever(x)
     """)
     assert saida.strip() == "5.5"
@@ -1078,22 +1078,22 @@ def test_sem_e_ou_com_nao_booleano():
 
 def test_sem_biblioteca_nao_importada():
     with pytest.raises(ErroSemantico, match="não foi importada"):
-        compilar('algoritmo "T"\ninicio\n    escrever(math.raiz(4.0))\n')
+        compilar('algoritmo "T"\ninicio\n    escrever(matematica.raiz(4.0))\n')
 
 
 def test_sem_metodo_de_biblioteca_inexistente():
     with pytest.raises(ErroSemantico, match="não tem nenhuma função"):
-        compilar('algoritmo "T"\nimportar Math\ninicio\n    escrever(math.naoExiste(4.0))\n')
+        compilar('algoritmo "T"\nimportar Matematica\ninicio\n    escrever(matematica.naoExiste(4.0))\n')
 
 
 def test_sem_biblioteca_numero_de_argumentos_errado():
     with pytest.raises(ErroSemantico, match="espera 1 argumento"):
-        compilar('algoritmo "T"\nimportar Math\ninicio\n    escrever(math.raiz(1, 2))\n')
+        compilar('algoritmo "T"\nimportar Matematica\ninicio\n    escrever(matematica.raiz(1, 2))\n')
 
 
 def test_sem_biblioteca_espera_numerico():
     with pytest.raises(ErroSemantico, match="espera um argumento numérico"):
-        compilar('algoritmo "T"\nimportar Math\ninicio\n    escrever(math.raiz("nao numero"))\n')
+        compilar('algoritmo "T"\nimportar Matematica\ninicio\n    escrever(matematica.raiz("nao numero"))\n')
 
 
 def test_sem_biblioteca_espera_texto():
@@ -1318,13 +1318,13 @@ def test_codegen_ler_campo_de_estrutura_aninhado():
 
 
 def test_codegen_chamada_a_biblioteca_nao_e_confundida_com_funcao_do_utilizador():
-    """Exercita _encontrar_funcao com um nome de chamada com '.' (math.raiz)
+    """Exercita _encontrar_funcao com um nome de chamada com '.' (matematica.raiz)
     -- tem de reconhecer que não é uma função do próprio programa."""
     saida = executar("""
         algoritmo "T"
-        importar Math
+        importar Matematica
         inicio
-            x:decimal = math.raiz(4.0)
+            x:decimal = matematica.raiz(4.0)
             escrever(x)
     """)
     assert saida.strip() == "2.0"
@@ -2108,9 +2108,9 @@ def _correr_esperando_erro(codigo_algo):
 def test_raiz_de_negativo_traduz_math_domain_error():
     resultado = _correr_esperando_erro("""\
 algoritmo "T"
-importar Math
+importar Matematica
 inicio
-    escrever(math.raiz(-4))
+    escrever(matematica.raiz(-4))
 """)
     assert resultado.returncode == 1
     assert "domínio válido" in resultado.stdout
@@ -2165,10 +2165,10 @@ inicio
 def test_erro_de_valueerror_mostra_a_linha_algo():
     resultado = _correr_esperando_erro("""\
 algoritmo "T"
-importar Math
+importar Matematica
 inicio
     escrever("antes")
-    escrever(math.raiz(-4))
+    escrever(matematica.raiz(-4))
 """)
     assert resultado.returncode == 1
     assert "(linha 5)" in resultado.stdout

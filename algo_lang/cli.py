@@ -426,7 +426,7 @@ def _mostrar_ajuda(ultimo_ficheiro):
     print("  Só compila -- gera o ficheiro .py ao lado do .algo, não o corre.")
     print()
     print("    --minimo   gera Python mínimo: sem verificação de tipos prévia e")
-    print("               sem funções de apoio (afirmar vira assert, math.raiz")
+    print("               sem funções de apoio (afirmar vira assert, matematica.raiz")
     print("               vira math.sqrt, etc.) -- útil para veres o Python \"a")
     print("               seco\" por trás do ALGO. Por ser Python nativo, mostra")
     print("               'True'/'False' em vez de 'verdadeiro'/'falso' -- é")
@@ -743,7 +743,7 @@ def main():
     p_compila.add_argument(
         "--minimo", action="store_true",
         help="gera o Python mais direto possível (sem funções de apoio, sem "
-             "verificação de tipos prévia) -- math./cadeia. viram chamadas "
+             "verificação de tipos prévia) -- matematica./cadeia. viram chamadas "
              "nativas do Python, afirmar vira assert",
     )
     p_compila.set_defaults(func=cmd_compila)

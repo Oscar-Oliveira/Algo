@@ -39,18 +39,30 @@ LEITORES_INLINE_POR_TIPO = {
 # equivalente -- 'args' já vem com os argumentos traduzidos para Python.
 # Módulos python que cada entrada precisa (para saber que 'import' emitir).
 BIBLIOTECA_MINIMA = {
-    "math.raiz": (lambda args: f"math.sqrt({args[0]})", "math"),
-    "math.potencia": (lambda args: f"({args[0]} ** {args[1]})", None),
-    "math.absoluto": (lambda args: f"abs({args[0]})", None),
-    "math.piso": (lambda args: f"math.floor({args[0]})", "math"),
-    "math.teto": (lambda args: f"math.ceil({args[0]})", "math"),
-    "math.aleatorio": (lambda args: f"random.randint({args[0]}, {args[1]})", "random"),
+    "matematica.raiz": (lambda args: f"math.sqrt({args[0]})", "math"),
+    "matematica.potencia": (lambda args: f"({args[0]} ** {args[1]})", None),
+    "matematica.absoluto": (lambda args: f"abs({args[0]})", None),
+    "matematica.piso": (lambda args: f"math.floor({args[0]})", "math"),
+    "matematica.teto": (lambda args: f"math.ceil({args[0]})", "math"),
+    "matematica.aleatorio": (lambda args: f"random.randint({args[0]}, {args[1]})", "random"),
     "cadeia.comprimento": (lambda args: f"len({args[0]})", None),
     "cadeia.maiusculas": (lambda args: f"{args[0]}.upper()", None),
     "cadeia.minusculas": (lambda args: f"{args[0]}.lower()", None),
     "cadeia.inverter": (lambda args: f"{args[0]}[::-1]", None),
     "cadeia.subcadeia": (lambda args: f"{args[0]}[{args[1]}:{args[2]}]", None),
     "cadeia.caracter": (lambda args: f"{args[0]}[{args[1]}]", None),
+    "conversao.paraTexto": (lambda args: f"str({args[0]})", None),
+    "conversao.paraInteiro": (lambda args: f"int({args[0]})", None),
+    "conversao.paraDecimal": (lambda args: f"float({args[0]})", None),
+    "conversao.paraBooleano": (
+        lambda args: (
+            f'(False if isinstance({args[0]}, str) and {args[0]}.strip().lower() '
+            f'in ("falso", "f", "false") else bool({args[0]}))'
+        ), None,
+    ),
+    "conversao.paraCaracter": (lambda args: f"({args[0]})", None),
+    "conversao.paraAscii": (lambda args: f"ord({args[0]})", None),
+    "conversao.deAscii": (lambda args: f"chr({args[0]})", None),
 }
 
 
@@ -66,7 +78,7 @@ class GeradorCodigo(GeradorCodigoBase):
 
         modulos_python = set()
         nomes_bibliotecas_importadas = {imp.nome.lower() for imp in self.programa.importares}
-        if "math" in nomes_bibliotecas_importadas:
+        if "matematica" in nomes_bibliotecas_importadas:
             modulos_python.add("math")
             modulos_python.add("random")
         for mod in sorted(modulos_python):

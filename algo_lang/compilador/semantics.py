@@ -8,6 +8,7 @@ from .. import bibliotecas
 
 NUMERICOS = {"inteiro", "decimal"}
 TEXTUAIS = {"cadeia", "caracter"}
+PRIMITIVOS = NUMERICOS | TEXTUAIS | {"booleano"}
 
 
 class ErroSemantico(Exception):
@@ -667,9 +668,16 @@ class VerificadorTipos:
                 if categoria == "inteiro" and tipo != "inteiro":
                     raise ErroSemantico(
                         f"'{chamada.nome}' espera um inteiro (é '{tipo}')", chamada.linha)
+                if categoria == "caracter" and tipo != "caracter":
+                    raise ErroSemantico(
+                        f"'{chamada.nome}' espera um caracter (é '{tipo}')", chamada.linha)
+                if categoria == "primitivo" and tipo not in PRIMITIVOS:
+                    raise ErroSemantico(
+                        f"'{chamada.nome}' espera um valor de tipo primitivo — inteiro, "
+                        f"decimal, booleano, cadeia ou caracter (é '{tipo}')", chamada.linha)
             if tipo_retorno == "numeric":
                 # AL-19: tipo de retorno "espelha" o do primeiro argumento
-                # numérico (ex.: math.absoluto(inteiro) devolve inteiro,
+                # numérico (ex.: matematica.absoluto(inteiro) devolve inteiro,
                 # não sempre decimal).
                 tipo_retorno = tipos_args[0]
             return tipo_retorno

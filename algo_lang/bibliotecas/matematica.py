@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Biblioteca 'math' -- importar com: importar Math  (uso: math.raiz(x), ...)"""
+"""Biblioteca 'matematica' -- importar com: importar Matematica  (uso: matematica.raiz(x), ...)"""
 
-NOME = "math"
+NOME = "matematica"
 CABECALHO = "import math as _math\nimport random as _random\n"
 
 # nome_metodo -> (categorias_dos_argumentos, tipo_de_retorno, codigo_python)
@@ -9,29 +9,29 @@ CABECALHO = "import math as _math\nimport random as _random\n"
 FUNCOES = {
     "raiz": (
         ["numeric"], "decimal",
-        "def math_raiz(x):\n    return _math.sqrt(x)\n",
+        "def matematica_raiz(x):\n    return _math.sqrt(x)\n",
     ),
     "potencia": (
         ["numeric", "numeric"], "decimal",
-        "def math_potencia(base, exp):\n    return base ** exp\n",
+        "def matematica_potencia(base, exp):\n    return base ** exp\n",
     ),
     "absoluto": (
         # AL-19: "numeric" como tipo de retorno é um marcador especial --
         # devolve o mesmo tipo do argumento (ver semantics.py:
         # _verificar_chamada), não sempre 'decimal'.
         ["numeric"], "numeric",
-        "def math_absoluto(x):\n    return abs(x)\n",
+        "def matematica_absoluto(x):\n    return abs(x)\n",
     ),
     "piso": (
         ["numeric"], "inteiro",
-        "def math_piso(x):\n    return _math.floor(x)\n",
+        "def matematica_piso(x):\n    return _math.floor(x)\n",
     ),
     "teto": (
         ["numeric"], "inteiro",
-        "def math_teto(x):\n    return _math.ceil(x)\n",
+        "def matematica_teto(x):\n    return _math.ceil(x)\n",
     ),
     "aleatorio": (
         ["inteiro", "inteiro"], "inteiro",
-        "def math_aleatorio(a, b):\n    return _random.randint(a, b)\n",
+        "def matematica_aleatorio(a, b):\n    return _random.randint(a, b)\n",
     ),
 }

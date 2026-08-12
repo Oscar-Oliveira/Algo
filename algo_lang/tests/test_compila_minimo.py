@@ -129,10 +129,10 @@ def test_minimo_afirmar_falso_da_assertionerror(tmp_path):
 
 
 @pytest.mark.parametrize("chamada_algo,esperado_python,saida_esperada", [
-    ('math.raiz(16.0)', "math.sqrt(16.0)", "4.0"),
-    ('math.absoluto(-5)', "abs((-5))", "5"),
-    ('math.piso(2.7)', "math.floor(2.7)", "2"),
-    ('math.teto(2.1)', "math.ceil(2.1)", "3"),
+    ('matematica.raiz(16.0)', "math.sqrt(16.0)", "4.0"),
+    ('matematica.absoluto(-5)', "abs((-5))", "5"),
+    ('matematica.piso(2.7)', "math.floor(2.7)", "2"),
+    ('matematica.teto(2.1)', "math.ceil(2.1)", "3"),
     ('cadeia.comprimento("abc")', 'len("abc")', "3"),
     ('cadeia.maiusculas("ola")', '"ola".upper()', "OLA"),
     ('cadeia.inverter("abc")', '"abc"[::-1]', "cba"),
@@ -141,7 +141,7 @@ def test_minimo_afirmar_falso_da_assertionerror(tmp_path):
 ])
 def test_minimo_biblioteca_mapeia_para_python_nativo(
         tmp_path, chamada_algo, esperado_python, saida_esperada):
-    lib = "Math" if chamada_algo.startswith("math.") else "Cadeia"
+    lib = "Matematica" if chamada_algo.startswith("matematica.") else "Cadeia"
     resultado, caminho_py = _compilar_minimo(tmp_path, f"""
         algoritmo "T"
         importar {lib}
@@ -378,14 +378,14 @@ def test_minimo_afirmar_sem_mensagem(tmp_path):
 def test_minimo_chamada_a_biblioteca_em_declaracao_atribuicao_e_solta(tmp_path):
     resultado, caminho_py = _compilar_minimo(tmp_path, """
         algoritmo "T"
-        importar Math
+        importar Matematica
         inicio
-            x:decimal = math.raiz(16.0)
+            x:decimal = matematica.raiz(16.0)
             escrever(x)
             y:decimal
-            y = math.raiz(4.0)
+            y = matematica.raiz(4.0)
             escrever(y)
-            math.raiz(9.0)
+            matematica.raiz(9.0)
             escrever("ok")
     """)
     r = _correr(caminho_py)

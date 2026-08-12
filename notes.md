@@ -14,13 +14,16 @@ admin llm for
 
 - activities apenas qd se chama alguem
 
-- math -> matematica
+- biblioteca de convesao entre tipos
+
 - inteiro:inteiro =10
+Nota: Os tipos primitivos (inteiro, decimal, booleano, cadeia, caracter) não são palavras reservadas — são reconhecidos pela posição na frase, não pelo nome. Isto é deliberado: evita colisão com nomes de bibliotecas (cadeia) ou com nomes que um aluno queira dar a uma variável ou estrutura sua.
+
 
 - alguem ativo
 
-online
-- save/open project
+
+
 
 
 - stand alone online

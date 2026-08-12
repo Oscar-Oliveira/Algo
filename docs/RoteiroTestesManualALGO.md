@@ -259,16 +259,16 @@ iguais
 diferentes de c (correto)
 ```
 
-### 3.8 Bibliotecas (`Math`, `Cadeia`)
+### 3.8 Bibliotecas (`Matematica`, `Cadeia`)
 
 - [ ] `testes-manuais/bibliotecas.algo`:
 
 ```
 algoritmo "Bibliotecas"
-importar Math
+importar Matematica
 importar Cadeia
 inicio
-    escrever(math.raiz(16.0))
+    escrever(matematica.raiz(16.0))
     escrever(cadeia.maiusculas("ola"))
     escrever(cadeia.inverter("abc"))
 ```

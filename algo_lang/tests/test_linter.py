@@ -366,21 +366,21 @@ def test_inclusoes_diferentes_nao_dao_aviso():
 def test_importar_duplicado_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
-        importar math
-        importar math
+        importar matematica
+        importar matematica
         inicio
             escrever("ok")
     """)
     relevantes = [a for a in avisos if "já tinha sido importada" in a.mensagem]
     assert len(relevantes) == 1
-    assert "math" in relevantes[0].mensagem
+    assert "matematica" in relevantes[0].mensagem
 
 
 def test_importar_duplicado_ignora_maiusculas_minusculas():
     avisos = _avisos("""
         algoritmo "T"
-        importar math
-        importar Math
+        importar matematica
+        importar Matematica
         inicio
             escrever("ok")
     """)
@@ -390,7 +390,7 @@ def test_importar_duplicado_ignora_maiusculas_minusculas():
 def test_importares_diferentes_nao_dao_aviso():
     avisos = _avisos("""
         algoritmo "T"
-        importar math
+        importar matematica
         importar cadeia
         inicio
             escrever("ok")

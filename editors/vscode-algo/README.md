@@ -2,7 +2,7 @@
 
 Extensão mínima que dá realce de sintaxe (cores) a ficheiros `.algo` no
 Visual Studio Code: palavras-chave, tipos, cadeias de texto, caracteres,
-comentários, números, chamadas a bibliotecas (`math.raiz`), nomes de
+comentários, números, chamadas a bibliotecas (`matematica.raiz`), nomes de
 funções/procedimentos/estruturas, etc.
 
 ## Instalação (pasta desempacotada — mais simples)

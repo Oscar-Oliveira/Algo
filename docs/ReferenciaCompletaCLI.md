@@ -70,7 +70,7 @@ algo-lang-pacote/
 │   │   ├── flowchart.py           algo fluxograma
 │   │   ├── linter.py              algo lint
 │   │   └── tracer.py              algo executa --debug/--json
-│   ├── bibliotecas/               math., cadeia. (importar Math / Cadeia)
+│   ├── bibliotecas/               matematica., cadeia., conversao. (importar Matematica / Cadeia / Conversao)
 │   └── tests/                     suite de testes automatizados (pytest)
 ├── exemplos/                   ficheiros .algo de demonstração (não fazer parte do pacote)
 ├── editors/vscode-algo/        extensão de realce de sintaxe para o VS Code
@@ -178,7 +178,7 @@ seco" por trás do ALGO, não para produção nem para ensino de erros.
 | `ler(x)` (inteiro) | `_algo_ler_inteiro()` (repete até ser válido) | `int(input())` |
 | `x:booleano = verdadeiro` | idem | idem (`True`, à Python — não "verdadeiro") |
 | `afirmar cond, "msg"` | mensagem + `sys.exit(1)` | `assert cond, "msg"` |
-| `math.raiz(x)` | função própria | `math.sqrt(x)` (o módulo `math` real) |
+| `matematica.raiz(x)` | função própria | `math.sqrt(x)` (o módulo `math` real) |
 | `cadeia.inverter(s)` | função própria | `s[::-1]` |
 | recursão/índices fora dos limites/etc. | mensagens de erro amigáveis | traceback nativo do Python |
 
@@ -237,7 +237,7 @@ API), consulta `alguem/README.md`.
 ```
 algoritmo "NomeDoPrograma"
 
-importar Math
+importar Matematica
 incluir "outroficheiro.algo"
 
 total:inteiro = 0            // variável global (visível em todas as funções)
@@ -414,30 +414,30 @@ variável local (sombra a global).
 ## Bibliotecas
 
 As funções auxiliares da linguagem estão agrupadas em bibliotecas com
-namespace, tal como `math.raiz(x)` ou `cadeia.comprimento(s)`. É preciso
+namespace, tal como `matematica.raiz(x)` ou `cadeia.comprimento(s)`. É preciso
 importar a biblioteca antes de a usar:
 
 ```
-importar Math
+importar Matematica
 importar Cadeia
 
 inicio
-    escrever(math.raiz(16.0))          // 4.0
+    escrever(matematica.raiz(16.0))    // 4.0
     escrever(cadeia.maiusculas("ola")) // OLA
 ```
 
 ### Bibliotecas embutidas
 
-**Math** (`importar Math`):
+**Matematica** (`importar Matematica`):
 
 | Função | Descrição |
 |---|---|
-| `math.raiz(x)` | raiz quadrada |
-| `math.potencia(b, e)` | b elevado a e |
-| `math.absoluto(x)` | valor absoluto |
-| `math.piso(x)` | arredonda por baixo |
-| `math.teto(x)` | arredonda por cima |
-| `math.aleatorio(a, b)` | inteiro aleatório entre a e b |
+| `matematica.raiz(x)` | raiz quadrada |
+| `matematica.potencia(b, e)` | b elevado a e |
+| `matematica.absoluto(x)` | valor absoluto |
+| `matematica.piso(x)` | arredonda por baixo |
+| `matematica.teto(x)` | arredonda por cima |
+| `matematica.aleatorio(a, b)` | inteiro aleatório entre a e b |
 
 **Cadeia** (`importar Cadeia`):
 
@@ -449,6 +449,18 @@ inicio
 | `cadeia.inverter(s)` | inverte a cadeia |
 | `cadeia.subcadeia(s, ini, fim)` | sub-cadeia entre índices (0-baseado; `fim` exclusivo, tal como as fatias do Python) |
 | `cadeia.caracter(s, i)` | o caracter na posição `i` (0-baseado, tal como os arrays) |
+
+**Conversao** (`importar Conversao`) — converte entre os 5 tipos primitivos:
+
+| Função | Descrição |
+|---|---|
+| `conversao.paraTexto(x)` | qualquer tipo primitivo → `cadeia` |
+| `conversao.paraInteiro(x)` | qualquer tipo primitivo → `inteiro` (booleano vira 0/1, decimal trunca, texto faz parse) |
+| `conversao.paraDecimal(x)` | qualquer tipo primitivo → `decimal` |
+| `conversao.paraBooleano(x)` | qualquer tipo primitivo → `booleano` (`0`/`""`/`"falso"` → falso, resto → verdadeiro) |
+| `conversao.paraCaracter(t)` | `cadeia` com exatamente 1 caracter → `caracter` |
+| `conversao.paraAscii(c)` | `caracter` → `inteiro` (código do caracter) |
+| `conversao.deAscii(i)` | `inteiro` → `caracter` (inverso de `paraAscii`) |
 
 ### Adicionar novas bibliotecas
 
@@ -605,7 +617,7 @@ tradicional de fluxograma para "sub-rotina" — em vez de tentar meter a
 lógica dessa função dentro do mesmo diagrama (o que ficaria ilegível,
 sobretudo com recursividade): o diagrama próprio dessa função é o
 `.dot`/imagem com o nome correspondente. Chamadas a bibliotecas
-(`math.raiz(...)`) não têm este destaque, porque não têm um diagrama
+(`matematica.raiz(...)`) não têm este destaque, porque não têm um diagrama
 próprio.
 
 ## Realce de sintaxe no VS Code

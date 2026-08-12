@@ -252,19 +252,19 @@ def test_chamada_a_funcao_definida_tem_contorno_duplo():
 
 
 def test_chamada_a_biblioteca_nao_tem_contorno_duplo():
-    """math.raiz(...) não é uma rotina do utilizador -- não deve ganhar o
+    """matematica.raiz(...) não é uma rotina do utilizador -- não deve ganhar o
     contorno duplo (isso é só para chamar funções/procedimentos próprios)."""
     import textwrap
     programa = parse(textwrap.dedent("""
         algoritmo "T"
-        importar Math
+        importar Matematica
         inicio
-            x:decimal = math.raiz(4.0)
+            x:decimal = matematica.raiz(4.0)
     """))
     verificar(programa)
     nomes_rotinas = {f.nome for f in programa.funcoes}
     dot = gerar_dot(programa.corpo, programa.nome, nomes_rotinas)
-    linha_x = next(l for l in dot.splitlines() if "math.raiz" in l)
+    linha_x = next(l for l in dot.splitlines() if "matematica.raiz" in l)
     assert "peripheries=2" not in linha_x
 
 

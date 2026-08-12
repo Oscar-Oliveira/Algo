@@ -190,7 +190,7 @@ inicio
           <h2 id="2-estrutura-de-um-programa">2. Estrutura de um programa</h2>
           <pre><code>algoritmo "NomeDoPrograma"
 
-importar Math
+importar Matematica
 incluir "outroficheiro.algo"
 
 constante PI:decimal = 3.14159
@@ -306,7 +306,7 @@ a, b, c:inteiro                  // três variáveis do mesmo tipo</code></pre>
             <li>Começam por uma letra ou underscore (<code>_</code>)</li>
             <li>Podem conter letras, números e underscores</li>
             <li>Não podem ser uma palavra reservada (ver <a href="#anexo-b">Anexo B</a>)</li>
-            <li>Os tipos primitivos e os nomes de bibliotecas (<code>math</code>, <code>cadeia</code>) não
+            <li>Os tipos primitivos e os nomes de bibliotecas (<code>matematica</code>, <code>cadeia</code>) não
               são palavras reservadas — podes ter uma variável chamada <code>total</code> mesmo que
               exista uma biblioteca com outro nome parecido</li>
           </ul>
@@ -514,17 +514,17 @@ inicio
 
           <h2 id="13-bibliotecas">13. Bibliotecas</h2>
           <p>As funções auxiliares da linguagem estão agrupadas em bibliotecas com namespace —
-            <code>math.raiz(x)</code>, <code>cadeia.comprimento(s)</code>. É preciso importar a
+            <code>matematica.raiz(x)</code>, <code>cadeia.comprimento(s)</code>. É preciso importar a
             biblioteca antes de a usar:
           </p>
-          <pre><code>importar Math
+          <pre><code>importar Matematica
 importar Cadeia
 
 inicio
-    escrever(math.raiz(16.0))          // 4.0
+    escrever(matematica.raiz(16.0))    // 4.0
     escrever(cadeia.maiusculas("ola")) // OLA</code></pre>
 
-          <h3>13.1 Math</h3>
+          <h3>13.1 Matematica</h3>
           <table>
             <thead>
               <tr>
@@ -534,27 +534,27 @@ inicio
             </thead>
             <tbody>
               <tr>
-                <td><code>math.raiz(x)</code></td>
+                <td><code>matematica.raiz(x)</code></td>
                 <td>raiz quadrada</td>
               </tr>
               <tr>
-                <td><code>math.potencia(b, e)</code></td>
+                <td><code>matematica.potencia(b, e)</code></td>
                 <td>b elevado a e</td>
               </tr>
               <tr>
-                <td><code>math.absoluto(x)</code></td>
+                <td><code>matematica.absoluto(x)</code></td>
                 <td>valor absoluto</td>
               </tr>
               <tr>
-                <td><code>math.piso(x)</code></td>
+                <td><code>matematica.piso(x)</code></td>
                 <td>arredonda por baixo</td>
               </tr>
               <tr>
-                <td><code>math.teto(x)</code></td>
+                <td><code>matematica.teto(x)</code></td>
                 <td>arredonda por cima</td>
               </tr>
               <tr>
-                <td><code>math.aleatorio(a, b)</code></td>
+                <td><code>matematica.aleatorio(a, b)</code></td>
                 <td>inteiro aleatório entre a e b</td>
               </tr>
             </tbody>
@@ -594,6 +594,49 @@ inicio
                 <td><code>cadeia.caracter(s, i)</code></td>
                 <td>o caracter na posição i (0-baseado, tal
                   como os arrays)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>13.3 Conversao</h3>
+          <p>Converte entre os 5 tipos primitivos (<code>importar Conversao</code>):</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Função</th>
+                <th>Descrição</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>conversao.paraTexto(x)</code></td>
+                <td>qualquer tipo primitivo → cadeia</td>
+              </tr>
+              <tr>
+                <td><code>conversao.paraInteiro(x)</code></td>
+                <td>qualquer tipo primitivo → inteiro (booleano vira 0/1,
+                  decimal trunca, texto faz parse)</td>
+              </tr>
+              <tr>
+                <td><code>conversao.paraDecimal(x)</code></td>
+                <td>qualquer tipo primitivo → decimal</td>
+              </tr>
+              <tr>
+                <td><code>conversao.paraBooleano(x)</code></td>
+                <td>qualquer tipo primitivo → booleano (0/""/"falso" →
+                  falso, resto → verdadeiro)</td>
+              </tr>
+              <tr>
+                <td><code>conversao.paraCaracter(t)</code></td>
+                <td>cadeia com exatamente 1 caracter → caracter</td>
+              </tr>
+              <tr>
+                <td><code>conversao.paraAscii(c)</code></td>
+                <td>caracter → inteiro (código do caracter)</td>
+              </tr>
+              <tr>
+                <td><code>conversao.deAscii(i)</code></td>
+                <td>inteiro → caracter (inverso de paraAscii)</td>
               </tr>
             </tbody>
           </table>

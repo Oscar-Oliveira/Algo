@@ -3,7 +3,7 @@
 
 Para adicionar uma nova biblioteca, basta criar um novo ficheiro .py nesta
 pasta com três variáveis:
-    NOME      -- nome da biblioteca em minúsculas (ex: "math")
+    NOME      -- nome da biblioteca em minúsculas (ex: "matematica")
     CABECALHO -- código Python injetado uma vez no topo do ficheiro gerado
     FUNCOES   -- dicionário nome_metodo -> (categorias_args, tipo_retorno, codigo_python)
 

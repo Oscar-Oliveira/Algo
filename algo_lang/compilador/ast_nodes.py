@@ -168,7 +168,7 @@ class UnOp(No):
 
 class Chamada(No):
     def __init__(self, nome, args, linha):
-        self.nome = nome    # pode conter '.' para chamadas de biblioteca (ex: "math.raiz")
+        self.nome = nome    # pode conter '.' para chamadas de biblioteca (ex: "matematica.raiz")
         self.args = args
         self.linha = linha
 

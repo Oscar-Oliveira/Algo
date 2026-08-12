@@ -123,7 +123,7 @@ def test_biblioteca_nao_importada_da_erro():
         compilar("""
             algoritmo "T"
             inicio
-                escrever(math.raiz(4))
+                escrever(matematica.raiz(4))
         """)
 
 

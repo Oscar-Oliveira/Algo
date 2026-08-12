@@ -129,7 +129,7 @@ class Parser:
         """Um 'tipo' é sintaticamente apenas um identificador -- pode ser um
         tipo primitivo (inteiro, decimal, ...) ou o nome de uma 'estrutura'.
         Propositadamente NÃO são palavras reservadas (para não colidirem com
-        nomes de bibliotecas como 'cadeia'/'math' ou de estruturas do
+        nomes de bibliotecas como 'cadeia'/'matematica' ou de estruturas do
         utilizador); a validade do tipo é confirmada mais tarde, em
         semantics.py, quando já sabemos que estruturas foram definidas."""
         tok = self.atual()
