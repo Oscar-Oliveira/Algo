@@ -71,7 +71,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 **alguem** — AG-01 (sem retry/backoff nos fornecedores LLM); AG-02 (sem tracking de tokens/custo); AG-03 (timeout HTTP fixo de 60s, não configurável); AG-08 (`URL_API` como propriedade a sobrepor atributo de classe, frágil a refactor); AG-09 (`except TypeError` demasiado amplo na fábrica de fornecedores); AG-17 (ficheiro de log sem gestor de contexto); AG-19 (sem rotação/limite de tamanho dos logs); AG-24 (até 4 chamadas LLM por turno sem visibilidade de custo — ligado a AG-02); AG-25 (guardião reutiliza sempre o modelo caro do tutor principal — ligado a GOAL-03, mas aqui como oportunidade de poupança de custo, não de segurança); AG-29 (importar `conhecimento_algo.py` insere caminho em `sys.path` como efeito colateral global).
 
-**online** — ON-28 (sem `HEALTHCHECK` no Dockerfile); ON-29 (imagem base sem digest fixado); ON-31 (`pyproject.toml` sem metadados de projeto).
+**online** — (todos resolvidos, ver AUDIT_DONE.md, Fase 7).
 
 **Arquitetura** — ARCH-10 (arquitetura de logging só em disco local, sem abstração de armazenamento — teto de escalabilidade horizontal, aceitável para o âmbito atual de uma VM/sala de aula); ARCH-14 (ligação SQLite nova por pedido, sem pooling — igualmente aceitável ao âmbito atual, mas o primeiro ponto a rearquitetar se o volume crescer).
 
@@ -143,7 +143,7 @@ Não são bugs — são melhorias de qualidade, robustez ou preparação para o 
 
 ### Fase 7 — Operações e infraestrutura
 - **Objetivo**: melhorias operacionais de baixo risco, sem dependências fortes de outras fases.
-- **Resolve**: ON-28, ON-29, ON-31.
+- **Resolve**: ~~ON-28~~, ~~ON-29~~, ~~ON-31~~ -- Fase 7 concluída (ver AUDIT_DONE.md).
 - **Componentes**: `Dockerfile`, `pyproject.toml`.
 - **Alterações principais**: `HEALTHCHECK`; digest fixado na imagem base; metadados de projeto em `pyproject.toml`.
 - **Dependências**: idealmente depois da Fase 0 (Dockerfile já alterado lá para o `USER`).

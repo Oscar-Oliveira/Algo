@@ -1,4 +1,9 @@
-FROM python:3.12-slim
+# ON-29: digest fixado (não só a tag "3.12-slim", que pode apontar para
+# uma imagem diferente amanhã sem aviso nenhum) -- reprodutibilidade e
+# resistência a um base image comprometido/alterado silenciosamente no
+# registo. Atualizar o digest é uma decisão deliberada (nova imagem =
+# novo `docker pull`+`docker inspect`), não um acidente de cache.
+FROM python:3.12-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
 
 # graphviz -- é isto que resolve o fluxograma, e é exatamente o tipo
 # de dependência de sistema que uma imagem Docker existe para tratar
@@ -34,6 +39,13 @@ VOLUME ["/app/online/dados"]
 USER algo
 
 EXPOSE 8000
+
+# ON-28: sem curl na imagem slim (não vale a pena instalar só para
+# isto) -- usa o próprio Python, já garantido presente, para pedir "/"
+# (rota pública, não exige sessão -- ver main.py:pagina_inicial) e
+# confirmar HTTP 200.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request as u,sys; sys.exit(0 if u.urlopen('http://localhost:8000/', timeout=2).status == 200 else 1)"
 
 # ON-22: --ws-max-size explícito (2 MB) em vez de confiar no default
 # implícito do uvicorn -- limita o tamanho de uma única mensagem

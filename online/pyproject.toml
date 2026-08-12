@@ -1,2 +1,8 @@
+[project]
+name = "algo-online"
+version = "0.1.0"
+description = "Serviço web (FastAPI) para o compilador/tutor ALGO -- editor multi-utilizador, execução isolada por estudante, tutor Alguem integrado"
+requires-python = ">=3.12"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
