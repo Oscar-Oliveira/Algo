@@ -2,6 +2,7 @@
 """Testes de regressão para os problemas encontrados na auditoria ao
 compilador: cada um destes já foi um bug real, confirmado antes de ser
 corrigido."""
+import os
 import subprocess
 import sys
 import textwrap
@@ -2280,3 +2281,75 @@ def test_codegen_nao_depende_de_tools():
         node.module for node in ast.walk(arvore) if isinstance(node, ast.ImportFrom)
     ]
     assert not any(m and "tools" in m for m in modulos_importados)
+
+
+# ---------- ARCH-04: deteção de colisão de inclusão partilhada ----------
+
+def test_mesclar_biblioteca_deteta_colisao_de_cada_tipo():
+    """A lógica de deteção de colisões (estrutura/função/variável
+    global) usada por algo_lang.cli e online.executor.py vive agora
+    num único sítio partilhado (compilador/inclusoes.py), em vez de
+    reimplementada em cada um. Testa diretamente o módulo partilhado,
+    sem depender de subprocess (que nesta máquina Windows precisa de
+    'algo' no PATH -- ver o resto deste ficheiro)."""
+    from algo_lang.compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
+
+    class ProgramaFalso:
+        def __init__(self):
+            self.estruturas = []
+            self.funcoes = []
+            self.declaracoes = []
+
+    class NoComNome:
+        def __init__(self, nome):
+            self.nome = nome
+
+    programa = ProgramaFalso()
+    programa.estruturas.append(NoComNome("Ponto"))
+    with pytest.raises(ColisaoDeInclusao) as exc_info:
+        mesclar_biblioteca_no_programa(programa, "lib.algo", [], [], [NoComNome("Ponto")])
+    assert exc_info.value.tipo == "estrutura"
+    assert exc_info.value.nome == "Ponto"
+    assert exc_info.value.caminho_origem == "lib.algo"
+
+    programa = ProgramaFalso()
+    programa.funcoes.append(NoComNome("f"))
+    with pytest.raises(ColisaoDeInclusao) as exc_info:
+        mesclar_biblioteca_no_programa(programa, "lib.algo", [], [NoComNome("f")], [])
+    assert exc_info.value.tipo == "função"
+
+    programa = ProgramaFalso()
+    programa.declaracoes.append(NoComNome("x"))
+    with pytest.raises(ColisaoDeInclusao) as exc_info:
+        mesclar_biblioteca_no_programa(programa, "lib.algo", [NoComNome("x")], [], [])
+    assert exc_info.value.tipo == "variável global"
+
+    # sem colisão: acrescenta normalmente
+    programa = ProgramaFalso()
+    mesclar_biblioteca_no_programa(programa, "lib.algo", [NoComNome("a")], [NoComNome("b")], [NoComNome("C")])
+    assert [e.nome for e in programa.estruturas] == ["C"]
+    assert [f.nome for f in programa.funcoes] == ["b"]
+    assert [d.nome for d in programa.declaracoes] == ["a"]
+
+
+def test_cli_e_online_produzem_a_mesma_mensagem_de_colisao_de_sempre():
+    """Verificação direta (sem subprocess) de que a extração do
+    ARCH-04 preservou o texto exato que cli.py já imprimia antes desta
+    mudança, incluindo o prefixo ❌ e o ponto final em falta na
+    variante de função (comportamento pré-existente, não introduzido
+    agora)."""
+    import tempfile
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+
+    d = tempfile.mkdtemp()
+    with open(os.path.join(d, "lib.algo"), "w", encoding="utf-8") as f:
+        f.write("estrutura Ponto\n    x:inteiro\n")
+    with open(os.path.join(d, "principal.algo"), "w", encoding="utf-8") as f:
+        f.write(
+            'algoritmo "Principal"\nincluir "lib.algo"\n'
+            "estrutura Ponto\n    y:inteiro\ninicio\n    escrever(1)\n"
+        )
+
+    with pytest.raises(SystemExit) as exc_info:
+        _carregar_e_resolver_inclusoes(os.path.join(d, "principal.algo"))
+    assert exc_info.value.code == 1

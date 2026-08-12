@@ -34,6 +34,7 @@ from algo_lang.compilador.semantics import verificar, ErroSemantico
 from algo_lang.compilador.lexer import ErroLexico
 from algo_lang.compilador.parser import ErroSintatico
 from algo_lang.compilador.codegen import gerar_python, gerar_python_com_mapa, ErroInternoCompilador
+from algo_lang.compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
 from algo_lang.tools.flowchart import gerar_dot
 from algo_lang.tools.tracer import gerar_trace
 from algo_lang.tools import linter as linter_modulo
@@ -190,32 +191,21 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, pasta_base_rea
         except (ErroLexico, ErroSintatico) as e:
             raise ErroCompilacao(f"Erro em '{inc.caminho}': {e}") from e
 
-        nomes_estruturas_existentes = {e.nome for e in programa.estruturas}
-        for e in estruturas:
-            if e.nome in nomes_estruturas_existentes:
+        try:
+            mesclar_biblioteca_no_programa(programa, inc.caminho, declaracoes, funcoes, estruturas)
+        except ColisaoDeInclusao as e:
+            if e.tipo == "função":
                 raise ErroCompilacao(
-                    f"A estrutura '{e.nome}' (incluída de '{inc.caminho}') colide "
-                    f"com uma estrutura já definida.")
-            programa.estruturas.append(e)
-            nomes_estruturas_existentes.add(e.nome)
-
-        nomes_existentes = {f.nome for f in programa.funcoes}
-        for f in funcoes:
-            if f.nome in nomes_existentes:
+                    f"'{e.nome}' (incluído de '{e.caminho_origem}') colide com uma "
+                    f"função já definida.") from e
+            elif e.tipo == "variável global":
                 raise ErroCompilacao(
-                    f"'{f.nome}' (incluído de '{inc.caminho}') colide com uma "
-                    f"função já definida.")
-            programa.funcoes.append(f)
-            nomes_existentes.add(f.nome)
-
-        nomes_decl_existentes = {d.nome for d in programa.declaracoes}
-        for d in declaracoes:
-            if d.nome in nomes_decl_existentes:
+                    f"A variável '{e.nome}' (incluída de '{e.caminho_origem}') colide "
+                    f"com uma variável global já declarada.") from e
+            else:
                 raise ErroCompilacao(
-                    f"A variável '{d.nome}' (incluída de '{inc.caminho}') colide "
-                    f"com uma variável global já declarada.")
-            programa.declaracoes.append(d)
-            nomes_decl_existentes.add(d.nome)
+                    f"A estrutura '{e.nome}' (incluída de '{e.caminho_origem}') colide "
+                    f"com uma estrutura já definida.") from e
 
         _resolver_lista_de_inclusoes(
             programa, inclusoes_aninhadas, pasta_base, pasta_base_real, ja_incluidos)

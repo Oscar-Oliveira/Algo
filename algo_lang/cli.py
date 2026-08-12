@@ -12,6 +12,7 @@ from .compilador.lexer import ErroLexico
 from .compilador.parser import parse, parse_biblioteca, ErroSintatico
 from .compilador.semantics import verificar, verificar_nomes_python, ErroSemantico
 from .compilador.codegen import gerar_python, ErroInternoCompilador
+from .compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
 from .tools.flowchart import gerar_dot
 from .tools import linter as linter_modulo
 
@@ -76,32 +77,19 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
         codigo = _ler_ficheiro_algo(caminho)
         declaracoes, funcoes, estruturas, inclusoes_aninhadas = parse_biblioteca(codigo)
 
-        nomes_estruturas_existentes = {e.nome for e in programa.estruturas}
-        for e in estruturas:
-            if e.nome in nomes_estruturas_existentes:
-                print(f"❌ Erro: estrutura '{e.nome}' (incluída de '{inc.caminho}') colide "
-                      f"com uma estrutura já definida")
-                sys.exit(1)
-            programa.estruturas.append(e)
-            nomes_estruturas_existentes.add(e.nome)
-
-        nomes_existentes = {f.nome for f in programa.funcoes}
-        for f in funcoes:
-            if f.nome in nomes_existentes:
-                print(f"❌ Erro: '{f.nome}' (incluído de '{inc.caminho}') colide com uma "
+        try:
+            mesclar_biblioteca_no_programa(programa, inc.caminho, declaracoes, funcoes, estruturas)
+        except ColisaoDeInclusao as e:
+            if e.tipo == "função":
+                print(f"❌ Erro: '{e.nome}' (incluído de '{e.caminho_origem}') colide com uma "
                       f"função já definida")
-                sys.exit(1)
-            programa.funcoes.append(f)
-            nomes_existentes.add(f.nome)
-
-        nomes_decl_existentes = {d.nome for d in programa.declaracoes}
-        for d in declaracoes:
-            if d.nome in nomes_decl_existentes:
-                print(f"❌ Erro: variável '{d.nome}' (incluída de '{inc.caminho}') colide "
+            elif e.tipo == "variável global":
+                print(f"❌ Erro: variável '{e.nome}' (incluída de '{e.caminho_origem}') colide "
                       f"com uma variável global já declarada")
-                sys.exit(1)
-            programa.declaracoes.append(d)
-            nomes_decl_existentes.add(d.nome)
+            else:
+                print(f"❌ Erro: estrutura '{e.nome}' (incluída de '{e.caminho_origem}') colide "
+                      f"com uma estrutura já definida")
+            sys.exit(1)
 
         # As inclusões desta biblioteca resolvem-se relativas à PRÓPRIA
         # pasta dela, não a pasta_base original -- um 'incluir "x.algo"'
