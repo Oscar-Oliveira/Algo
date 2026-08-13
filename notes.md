@@ -6,6 +6,20 @@ docker compose up -d --build
 
 
 ---
+
+Nova auditoria em compilador
+
+
+Documentacao -> em readme...
+- compilador
+    - instalação,
+- liguagem online + readme
+
+exemplos no manual em anexo
+- visualizador so no online.
+
+- stand alone online
+
 update -> db
 
 - alguem escolher o activo ativo
@@ -16,16 +30,3 @@ update -> db
 - activities apenas qd se chama alguem
 
 - logs de td para analise do progresso do estudante e aconselhamento sobre conteudo a reforcar
-
-
-
-
-- visualizador so no online.
-
-- stand alone online
-
-editor vscode no lang
-
-/isola o algo_lang
-- retirar alguem da consola? e outras cenas que não lhe pertece,,,
-
