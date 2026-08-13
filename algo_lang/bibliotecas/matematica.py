@@ -13,7 +13,10 @@ FUNCOES = {
     ),
     "potencia": (
         ["numeric", "numeric"], "decimal",
-        "def matematica_potencia(base, exp):\n    return base ** exp\n",
+        # potencia() declara sempre retorno 'decimal', mas base**exp do
+        # Python fica 'int' quando base e exp são ambos inteiros -- float()
+        # garante que o valor devolvido corresponde ao tipo declarado.
+        "def matematica_potencia(base, exp):\n    return float(base ** exp)\n",
     ),
     "absoluto": (
         # AL-19: "numeric" como tipo de retorno é um marcador especial --

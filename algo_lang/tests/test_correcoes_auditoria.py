@@ -132,6 +132,26 @@ def test_passo_zero_literal_da_erro_de_compilacao():
         """)
 
 
+def test_para_com_passo_de_efeito_lateral_so_avalia_uma_vez():
+    """'passo' entrava duas vezes no range() gerado -- uma expressão com
+    efeito lateral (ex: uma chamada de função) corria duas vezes por
+    iteração, dando um step efetivo diferente do pretendido."""
+    saida = executar("""
+        algoritmo "T"
+        contador:inteiro
+
+        funcao proximoPasso():inteiro
+            contador = contador + 1
+            devolver contador
+        inicio
+            contador = 0
+            x:inteiro
+            para x de 1 ate 5 passo proximoPasso() fazer
+                escrever(x)
+    """)
+    assert saida.split() == ["1", "2", "3", "4", "5"]
+
+
 def test_raiz_de_negativo_da_erro_amigavel_nao_traceback(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
@@ -1268,7 +1288,72 @@ def test_sem_caminhos_de_sucesso_logicos_e_conversao_numerica():
             x:decimal = 5
             escrever(" ", x)
     """)
-    assert saida == "falso verdadeiro falso\n 5\n"
+    # AL-XX: 'x' é 'decimal' -- o valor tem de ficar 5.0 (float), não 5
+    # (int), mesmo vindo de um literal inteiro (ver _coagir_decimal em
+    # gerador_base.py).
+    assert saida == "falso verdadeiro falso\n 5.0\n"
+
+
+# ---------- coerção 'inteiro' -> 'decimal' no código gerado ----------
+
+def test_parametro_e_retorno_decimal_coagem_um_valor_inteiro():
+    """Um parâmetro/retorno 'decimal' aceita um valor 'inteiro'
+    (_compativel em semantics.py), mas o Python gerado não convertia
+    sozinho -- a função devolvia/recebia int, não float."""
+    saida = executar("""
+        algoritmo "T"
+        funcao dobro(x:decimal):decimal
+            devolver x * 2
+
+        procedimento mostra(x:decimal)
+            escrever("param=", x)
+        inicio
+            escrever("retorno=", dobro(3))
+            mostra(4)
+    """)
+    assert saida.split() == ["retorno=6.0", "param=4.0"]
+
+
+def test_campo_de_estrutura_decimal_coage_um_valor_inteiro():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Conta
+            saldo:decimal
+        inicio
+            c:Conta = {saldo: 5}
+            escrever(c.saldo)
+    """)
+    assert saida.strip() == "5.0"
+
+
+def test_matematica_potencia_devolve_sempre_decimal():
+    saida = executar("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.potencia(2, 3))
+    """)
+    assert saida.strip() == "8.0"
+
+
+def test_modo_minimo_nao_coage_decimal_por_desenho():
+    """--minimo salta verificar() de propósito (sem rede de segurança
+    nenhuma) -- por isso não tem a informação (_tipo_inferido) para
+    coagir 'inteiro' -> 'decimal', ao contrário do modo normal."""
+    from algo_lang.compilador.parser import parse
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        inicio
+            media:decimal
+            media = 5
+            escrever(media)
+    """))
+    codigo_py = gerar_python_minimo(programa)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.stdout.strip() == "5"
 
 
 # ---------- lacunas de cobertura: codegen.py ----------

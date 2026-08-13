@@ -150,6 +150,20 @@ def test_comentario_linha_simples_continua_a_funcionar():
     assert saida.strip() == "ok"
 
 
+def test_comentario_linha_com_barra_asterisco_nao_e_lido_como_bloco():
+    """Um '/*' que apareça DEPOIS de um '//' na mesma linha é só texto do
+    comentário de linha -- não deve abrir um comentário de bloco real e
+    engolir o código a seguir."""
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            // nota: 2 / 4 * 3 nao e um bloco, mas parece um /* aqui
+            x:inteiro = 5
+            escrever(x)
+    """)
+    assert saida.strip() == "5"
+
+
 # ---------- literais de array ----------
 
 def test_array_literal_1d():

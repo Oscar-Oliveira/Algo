@@ -37,6 +37,7 @@ class GeradorCodigoBase:
         self.linhas = []
         self.tabela_tipos_globais = {}   # nome -> tipo (tudo o que é global no programa)
         self.refs_atuais = []            # nomes ref da função a gerar neste momento
+        self.tipo_retorno_atual = None   # tipo de retorno da função a gerar neste momento
         self.estruturas = {}
         self.mapa_linhas = {}            # nº de linha do .py gerado -> nº de linha do .algo original
         self._linha_algo_atual = None    # linha ALGO da instrução a ser gerada neste momento
@@ -51,6 +52,22 @@ class GeradorCodigoBase:
         if tipo in DEFAULT_POR_TIPO:
             return DEFAULT_POR_TIPO[tipo]
         return f"{tipo}()"   # instância por omissão de uma estrutura
+
+    def _coagir_decimal(self, expr_py: str, tipo_alvo, expr_no) -> str:
+        """'decimal' aceita um valor 'inteiro' (_compativel em semantics.py),
+        mas o Python gerado não convertia sozinho -- 'x: decimal = 5'
+        ficava com o inteiro 5, não 5.0. semantics.py anota cada nó de
+        expressão com o seu tipo inferido (expr._tipo_inferido, ver
+        VerificadorTipos._tipo_expr) durante verificar(), que corre
+        sempre antes de gerar_python(); reaproveita-se esse tipo aqui em
+        vez de o recalcular. Partilhado, mas inofensivo para
+        codegen_minimo.py: --minimo salta verificar() de propósito, por
+        isso os nós nunca têm '_tipo_inferido' nesse caminho e isto
+        nunca coage nada, consistente com --minimo não ter rede de
+        segurança nenhuma."""
+        if tipo_alvo == "decimal" and getattr(expr_no, "_tipo_inferido", None) == "inteiro":
+            return f"float({expr_py})"
+        return expr_py
 
     # -------- statements --------
     def _gerar_corpo(self, corpo, nivel, tipos):
@@ -74,7 +91,8 @@ class GeradorCodigoBase:
                 self.emit(f"{alvo}, {', '.join(out_vars)} = {stmt.expr.nome}({args_str})", nivel)
                 return
         alvo = self._lvalue(stmt.alvo, tipos)
-        expr = self._expr(stmt.expr, tipos)
+        tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
+        expr = self._coagir_decimal(self._expr(stmt.expr, tipos), tipo_alvo, stmt.expr)
         self.emit(f"{alvo} = {expr}", nivel)
 
     def _gerar_se(self, stmt: A.Se, nivel, tipos):
@@ -92,7 +110,16 @@ class GeradorCodigoBase:
     def _gerar_para(self, stmt: A.Para, nivel, tipos):
         ini = self._expr(stmt.ini, tipos)
         fim = self._expr(stmt.fim, tipos)
-        passo = self._expr(stmt.passo, tipos) if stmt.passo else "1"
+        if stmt.passo:
+            # AL-XX: 'passo' entra no range() duas vezes (direção e step) --
+            # se for avaliado inline nas duas, uma expressão com efeito
+            # lateral (chamada de função) corre duas vezes por iteração do
+            # range, dando um step efetivo errado. Avalia-se uma única vez
+            # para uma variável temporária antes do 'for'.
+            self.emit(f"_algo_passo = {self._expr(stmt.passo, tipos)}", nivel)
+            passo = "_algo_passo"
+        else:
+            passo = "1"
         self.emit(
             f"for {stmt.var} in range({ini}, ({fim}) + (1 if ({passo}) > 0 else -1), {passo}):",
             nivel,
@@ -164,6 +191,10 @@ class GeradorCodigoBase:
             tipos_locais[p.nome] = p.tipo
 
         self.refs_atuais = [p.nome for p in f.parametros if p.por_referencia]
+        # AL-XX: tipo de retorno da função a gerar neste momento -- só
+        # codegen.py o consulta (para coagir 'devolver <inteiro>' de uma
+        # função 'decimal'); irrelevante para codegen_minimo.py.
+        self.tipo_retorno_atual = f.tipo_retorno
 
         if not f.corpo:  # pragma: no cover -- o parser exige >=1 instrução no corpo
             self.emit("pass", 1)
@@ -175,5 +206,6 @@ class GeradorCodigoBase:
             self.emit(f"return {', '.join(self.refs_atuais)}", 1)
 
         self.refs_atuais = []
+        self.tipo_retorno_atual = None
         self._linha_algo_atual = None
         self.linhas.append("")

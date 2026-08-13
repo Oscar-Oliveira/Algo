@@ -357,6 +357,8 @@ class GeradorCodigo(GeradorCodigoBase):
         for i, a in enumerate(args):
             if isinstance(a, A.EstruturaLiteral) and f_def is not None and i < len(f_def.parametros):
                 args_py.append(self._expr_estrutura_literal(a, f_def.parametros[i].tipo, tipos))
+            elif f_def is not None and i < len(f_def.parametros):
+                args_py.append(self._coagir_decimal(self._expr(a, tipos), f_def.parametros[i].tipo, a))
             else:
                 args_py.append(self._expr(a, tipos))
         return ", ".join(args_py)
@@ -366,8 +368,13 @@ class GeradorCodigo(GeradorCodigoBase):
         campos) -- quem chama tem sempre de indicar 'tipo_nome' a partir
         do contexto (o tipo declarado, ou o tipo do parâmetro que recebe
         o literal numa chamada)."""
-        kwargs = ", ".join(f"{nome}={self._expr(valor, tipos)}" for nome, valor in lit.campos)
-        return f"{tipo_nome}({kwargs})"
+        campos_decl = self.estruturas.get(tipo_nome, {})
+        partes = []
+        for nome, valor in lit.campos:
+            tipo_campo = campos_decl.get(nome, ("", 0))[0]
+            expr_py = self._coagir_decimal(self._expr(valor, tipos), tipo_campo, valor)
+            partes.append(f"{nome}={expr_py}")
+        return f"{tipo_nome}({', '.join(partes)})"
 
     def _gerar_declaracao(self, d: A.Declaracao, nivel, tipos):
         if d.inicial is not None and isinstance(d.inicial, A.EstruturaLiteral):
@@ -385,7 +392,8 @@ class GeradorCodigo(GeradorCodigoBase):
                 self.emit(f"{d.nome}, {', '.join(out_vars)} = {d.inicial.nome}({args_str})", nivel)
                 return
         if d.inicial is not None:
-            self.emit(f"{d.nome} = {self._expr(d.inicial, tipos)}", nivel)
+            expr_py = self._coagir_decimal(self._expr(d.inicial, tipos), d.tipo, d.inicial)
+            self.emit(f"{d.nome} = {expr_py}", nivel)
         elif d.dims is None:
             self.emit(f"{d.nome} = {self._valor_default(d.tipo)}", nivel)
         else:
@@ -429,7 +437,7 @@ class GeradorCodigo(GeradorCodigoBase):
         elif isinstance(stmt, A.Escolha):
             self._gerar_escolha(stmt, nivel, tipos)
         elif isinstance(stmt, A.Devolver):
-            valor = self._expr(stmt.expr, tipos)
+            valor = self._coagir_decimal(self._expr(stmt.expr, tipos), self.tipo_retorno_atual, stmt.expr)
             if self.refs_atuais:
                 self.emit(f"return {valor}, {', '.join(self.refs_atuais)}", nivel)
             else:

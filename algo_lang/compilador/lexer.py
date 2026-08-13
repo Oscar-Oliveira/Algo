@@ -61,6 +61,20 @@ def _remover_comentarios_bloco(codigo: str) -> str:
     dentro_char = False
     while i < n:
         c = codigo[i]
+        if not dentro_str and not dentro_char and c == "/" and i + 1 < n and codigo[i + 1] == "/":
+            # AL-XX: um '//' de comentário de linha tem de "esconder" o
+            # resto da linha desta passagem -- senão um '/*' que apareça
+            # depois de um '//' na mesma linha (ex.: "// 2 / 4 * 3, nao
+            # e um bloco") é lido como abertura real de comentário de
+            # bloco. A remoção efetiva do '//' acontece mais tarde, em
+            # _remover_comentario (linha a linha); aqui só avançamos até
+            # à quebra de linha sem interpretar o conteúdo.
+            j = i
+            while j < n and codigo[j] != "\n":
+                j += 1
+            resultado.append(codigo[i:j])
+            i = j
+            continue
         if not dentro_str and not dentro_char and c == "/" and i + 1 < n and codigo[i + 1] == "*":
             j = i + 2
             while j + 1 < n and not (codigo[j] == "*" and codigo[j + 1] == "/"):

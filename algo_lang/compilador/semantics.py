@@ -525,7 +525,13 @@ class VerificadorTipos:
         return tipo, dims
 
     def _tipo_expr(self, expr, escopo):
+        """Cada 'return' de sucesso também guarda o tipo em
+        expr._tipo_inferido -- codegen.py reaproveita-o para decidir onde
+        inserir coerções 'inteiro' -> 'decimal' (ex.: 'x: decimal = 5' ou
+        devolver um inteiro de uma função 'decimal'), sem duplicar aqui
+        toda a lógica de inferência de tipos."""
         if isinstance(expr, A.Literal):
+            expr._tipo_inferido = expr.tipo
             return expr.tipo, 0
         if isinstance(expr, A.LValue):
             tipo, dims = self._tipo_lvalue(expr, escopo)
@@ -533,20 +539,25 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"'{expr.nome}' é um array; falta indexá-lo (ex: {expr.nome}[i])",
                     expr.linha)
+            expr._tipo_inferido = tipo
             return tipo, 0
         if isinstance(expr, A.BinOp):
-            return self._tipo_binop(expr, escopo)
+            tipo, dims = self._tipo_binop(expr, escopo)
+            expr._tipo_inferido = tipo
+            return tipo, dims
         if isinstance(expr, A.UnOp):
             tipo, _ = self._tipo_expr(expr.operando, escopo)
             if expr.op == "nao":
                 if tipo != "booleano":
                     raise ErroSemantico(
                         f"'nao' só se aplica a valores booleanos (é '{tipo}')", expr.linha)
+                expr._tipo_inferido = "booleano"
                 return "booleano", 0
             if expr.op == "-":
                 if tipo not in NUMERICOS:
                     raise ErroSemantico(
                         f"'-' unário só se aplica a números (é '{tipo}')", expr.linha)
+                expr._tipo_inferido = tipo
                 return tipo, 0
         if isinstance(expr, A.Chamada):
             if self._tem_ref(expr):
@@ -559,6 +570,7 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"'{expr.nome}' é um procedimento e não devolve valor; não pode "
                     f"ser usado dentro de uma expressão", expr.linha)
+            expr._tipo_inferido = tipo_retorno
             return tipo_retorno, 0
         if isinstance(expr, (A.ArrayLiteral, A.EstruturaLiteral)):
             # AL-16: um literal '{...}' não tem um tipo próprio -- só faz
