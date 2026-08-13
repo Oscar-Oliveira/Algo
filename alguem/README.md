@@ -367,19 +367,17 @@ verdadeiras, só pode ser confirmada por
 ti**, fora deste ambiente.
 
 Todos os testes isolam os logs numa pasta temporária própria, sem
-variáveis de ambiente: os testes deste pacote usam `monkeypatch` direto
-às constantes de `registador.py`/`identidade.py`; os testes que correm
-o comando `algo` a sério, num subprocesso (`algo_lang/tests/test_consola.py` e
-`algo_lang/tests/test_consola_alguem.py`, na suite do ALGO), copiam o projeto
-inteiro para uma pasta temporária e correm a partir de lá. Nenhum
-teste escreve alguma vez na pasta real `alguem/logs/`.
+variáveis de ambiente: usam `monkeypatch` direto às constantes de
+`registador.py`/`identidade.py`. Nenhum teste escreve alguma vez na
+pasta real `alguem/logs/`.
 
 ```bash
 cd alguem
 python3 -m pytest tests/ -v
 ```
 
-A integração com a consola (`?`, `ficheiros`, `ficheiro nome.algo`)
-está testada em `algo_lang/tests/test_consola_alguem.py`, na suite do próprio
-ALGO (`algo_lang/tests/`), não aqui — é lá que faz sentido, porque
-testa o `cli.py` do ALGO, não este pacote.
+O Alguem não tem `cli.py` próprio nem está ligado à consola do ALGO
+(`algo_lang/`) -- a única forma de o invocar é através do serviço web
+(`online/alguem_ponte.py:construir_alguem`). Essa integração está
+testada em `online/tests/test_alguem_ponte.py` e
+`online/tests/test_main_integracao.py`, não aqui.

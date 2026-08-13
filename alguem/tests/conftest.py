@@ -6,12 +6,8 @@ um Alguem sem passar um Registador explícito, escreve alguma vez para
 a pasta real 'alguem/logs/' ou para o ficheiro real '.estudante_id' --
 tudo fica isolado numa pasta temporária, através de monkeypatch direto
 às constantes dos módulos (sem variáveis de ambiente). Isto só
-funciona para testes que correm DENTRO deste processo -- os testes que
-correm o comando 'algo' a sério, num subprocesso (tests/test_consola.py
-e tests/test_consola_alguem.py, na suite do ALGO), usam outra técnica:
-copiam o projeto todo para uma pasta temporária e correm a partir de
-lá, já que um monkeypatch neste processo não tem qualquer efeito
-noutro processo."""
+funciona para testes que correm DENTRO deste processo -- um monkeypatch
+neste processo não tem qualquer efeito num subprocesso à parte."""
 import pytest
 
 from alguem.nucleo import registador as registador_mod

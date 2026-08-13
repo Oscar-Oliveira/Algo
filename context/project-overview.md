@@ -56,7 +56,7 @@ lexer.py (tokenizar) → parser.py (parse/parse_biblioteca, recursive-descent)
 
 ## Alguem (tutor) architecture (`alguem/`)
 
-* Entry point is `algo_lang/cli.py:_chamar_alguem`, triggered by `?` in the console. `alguem/` deliberately has no `cli.py` of its own, so there is only one way to invoke it.
+* Entry point is `online/alguem_ponte.py:construir_alguem`. `alguem/` deliberately has no `cli.py` of its own and is no longer reachable from the `algo_lang/` console (removed on purpose to keep the compiler free of any dependency on it) — the web service is the only way to invoke it.
 * `nucleo/tutor.py` (class `Alguem`) holds the conversation. Each turn goes through `nucleo/system_prompt.py` (built from `nucleo/politica_pedagogica.py`, a configurable policy) and then through `nucleo/guardiao.py`, a *second*, independent pass that classifies the response (`SAFE`/`HINT`/`PARTIAL_SOLUTION`/`FULL_SOLUTION`/`CODE`) and discards plus regenerates it (up to two attempts, then a fixed safe refusal) if it leaks too much. A rejected response never enters conversation history.
 * `nucleo/conhecimento_algo.py` imports keyword lists directly from `algo_lang.compilador.lexer` rather than hand-duplicating them.
 * `nucleo/ficheiros_visiveis.py` gives the tutor visibility into whatever `.algo` file the student last acted on in the console (by name, resolving `incluir` recursively via regex, deliberately not the real parser, so it still works on files with syntax errors).
@@ -78,7 +78,7 @@ lexer.py (tokenizar) → parser.py (parse/parse_biblioteca, recursive-descent)
 ## Testing conventions
 
 * `algo_lang/tests/apoio.py` provides `compilar(codigo_algo)` and `executar(codigo_algo, entrada="")` helpers used throughout the compiler suite. They compile/run a string of Algo source and return generated Python or captured stdout.
-* Console integration tests (`algo_lang/tests/test_consola.py`, `algo_lang/tests/test_consola_alguem.py`) run the real `algo` command in a subprocess against a temporary copy of the whole project.
+* Console integration tests (`algo_lang/tests/test_consola.py`) run the real `algo` command in a subprocess against a temporary copy of `algo_lang/`.
 * `alguem/tests/` and `online/tests/` isolate logs/DB into temporary directories via `monkeypatch` on the relevant module constants (not env vars). No test in the repository writes to the real `alguem/logs/` or a real database.
 * `docs/RoteiroTestesManualALGO.md` is a manual test script for the compiler (not automated).
 

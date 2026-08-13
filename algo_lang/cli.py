@@ -326,8 +326,7 @@ COMANDOS_COM_FICHEIRO = {
     "lint": set(),
 }
 
-# Atalhos de uma letra para os comandos mais usados na consola -- '?' fica
-# de fora de propósito, reservado para outra coisa no futuro.
+# Atalhos de uma letra para os comandos mais usados na consola.
 ATALHOS_CONSOLA = {
     "e": "executa",
     "c": "compila",
@@ -392,9 +391,6 @@ def _mostrar_banner():
     print()
     print("    ajuda  (a)                     esta lista, com mais detalhe e exemplos")
     print("    sair                           termina a consola")
-    print()
-    print("    ?                              chama o Alguem, o teu tutor de algoritmia")
-    print("    ? <pergunta>                   chama o Alguem já com uma pergunta")
     print()
     print("  Depois de usares um ficheiro uma vez, os comandos seguintes")
     print("  reutilizam-no -- não precisas de repetir o nome.")
@@ -468,25 +464,6 @@ def _mostrar_ajuda(ultimo_ficheiro):
     print()
 
     print(LINHA)
-    print("  ? [pergunta]")
-    print(LINHA)
-    print("  Chama o Alguem, o teu tutor de algoritmia -- uma conversa, não um")
-    print("  comando. Ajuda-te a pensar no problema, mas não escreve código nem")
-    print("  dá a solução. Se já usaste um ficheiro nesta sessão, mostra-lho")
-    print("  automaticamente ao Alguem, com o nome, e também qualquer ficheiro")
-    print("  que ele inclua (via 'incluir') -- para ele poder responder a")
-    print("  perguntas sobre o código específico que estás a fazer.")
-    print()
-    print("  Dentro da conversa:")
-    print("    ficheiros             mostra que ficheiros o Alguem tem visíveis")
-    print("    ficheiro nome.algo    troca o ficheiro em que o Alguem se baseia")
-    print()
-    print("  Exemplos:")
-    print("    ?")
-    print("    ? não sei como calcular a média de vários números")
-    print()
-
-    print(LINHA)
     print("  outros comandos")
     print(LINHA)
     print("    ajuda    (atalho: a)   mostra esta mensagem")
@@ -526,122 +503,6 @@ def _ler_linha_prompt(prompt):
     return bytes_linha.decode("utf-8", errors="replace")
 
 
-def _resolver_caminho_por_nome(nome, ficheiro_base):
-    """Encontra um ficheiro a partir de um nome que o estudante escreveu
-    à mão dentro da conversa com o Alguem -- tenta o caminho tal e qual
-    (relativo à pasta atual), e depois relativo à pasta do ficheiro que
-    já estava ativo (para 'ficheiro outro.algo' funcionar mesmo estando
-    a trabalhar dentro de uma subpasta)."""
-    candidatos = [nome]
-    if ficheiro_base:
-        candidatos.append(os.path.join(os.path.dirname(os.path.abspath(ficheiro_base)), nome))
-    for candidato in candidatos:
-        if os.path.isfile(candidato):
-            return candidato
-    return None
-
-
-def _chamar_alguem(ultimo_ficheiro, mensagem_inicial=None):
-    """Chama o Alguem a partir da consola do ALGO ('?') -- é a ÚNICA
-    forma de o chamar (não há script de arranque próprio). Importação
-    preguiçosa de propósito -- a consola do ALGO continua a funcionar
-    normalmente mesmo que a pasta alguem/ não exista, ou não esteja
-    configurada (config.json em falta/incompleto): mostra-se um erro
-    amigável e volta-se ao prompt do 'algo>', sem fechar nada."""
-    try:
-        import alguem
-    except ImportError:
-        # alguem/ vive ao lado de algo_lang/ (não dentro) -- em instalações
-        # editáveis (o caso normal deste projeto, via algo.sh/algo.bat)
-        # __file__ aponta para a árvore de código-fonte original, por isso
-        # subir um nível a partir daqui chega à pasta onde ambas vivem.
-        raiz_projeto = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if raiz_projeto not in sys.path:
-            sys.path.insert(0, raiz_projeto)
-        try:
-            import alguem
-        except ImportError:
-            print("❌ Não encontrei a pasta 'alguem/' ao lado desta -- o Alguem "
-                  "só está disponível se a tiveres também.")
-            return
-
-    ficheiro_ativo = ultimo_ficheiro
-    ficheiros_visiveis = []
-    if ficheiro_ativo:
-        ficheiros_visiveis = alguem.resolver_ficheiros_visiveis(ficheiro_ativo)
-
-    try:
-        tutor = alguem.criar_alguem(ficheiros_visiveis=ficheiros_visiveis)
-    except alguem.ErroConfiguracao as e:
-        print(f"❌ {e}")
-        return
-
-    print(LINHA)
-    print("A chamar o Alguem...")
-    print("Olá! Sou o Alguem, o teu tutor de algoritmia.")
-    if ficheiros_visiveis:
-        nomes = ", ".join(nome for nome, _ in ficheiros_visiveis)
-        print(f"(tenho visibilidade de: {nomes})")
-    else:
-        print("(ainda não tenho nenhum ficheiro visível -- escreve "
-              "'ficheiro nome.algo' para me mostrares um)")
-    print("(escreve 'sair' para voltares à consola do ALGO, 'ficheiros' para "
-          "veres o que tenho visível, ou 'ficheiro nome.algo' para trocares)")
-    print(LINHA)
-
-    mensagem = mensagem_inicial
-    try:
-        while True:
-            if mensagem is None:
-                try:
-                    mensagem = _ler_linha_prompt("\ntu> ").strip()
-                except (EOFError, KeyboardInterrupt):
-                    print()
-                    break
-            if not mensagem:
-                mensagem = None
-                continue
-            if mensagem.lower() in ("sair", "exit", "quit"):
-                print("Alguem> Até já!")
-                break
-            if mensagem.lower() in ("ficheiros", "ficheiro?"):
-                if ficheiros_visiveis:
-                    nomes = ", ".join(nome for nome, _ in ficheiros_visiveis)
-                    print(f"Tenho visibilidade de: {nomes}")
-                else:
-                    print("Ainda não tenho nenhum ficheiro visível.")
-                mensagem = None
-                continue
-            if mensagem.lower().startswith("ficheiro "):
-                nome_pedido = mensagem[len("ficheiro "):].strip()
-                caminho = _resolver_caminho_por_nome(nome_pedido, ficheiro_ativo)
-                if caminho is None:
-                    print(f"❌ Não encontrei '{nome_pedido}'.")
-                else:
-                    ficheiro_ativo = caminho
-                    ficheiros_visiveis = alguem.resolver_ficheiros_visiveis(caminho)
-                    tutor.considerar_ficheiros(ficheiros_visiveis)
-                    nomes = ", ".join(nome for nome, _ in ficheiros_visiveis)
-                    print(f"OK -- agora tenho visibilidade de: {nomes}")
-                mensagem = None
-                continue
-
-            try:
-                resposta = tutor.conversar(mensagem)
-            except alguem.ErroFornecedorLLM as e:
-                print(f"❌ {e}")
-            else:
-                print(f"\nAlguem> {resposta}")
-            mensagem = None
-    finally:
-        # garante que a sessão fica sempre corretamente fechada no log,
-        # seja qual for a forma como se saiu da conversa (sair/exit/
-        # quit, EOF, Ctrl+C, ou um erro inesperado qualquer)
-        tutor.fechar_sessao()
-
-    print(LINHA)
-
-
 def cmd_consola(parser):
     """Consola interativa: cada linha é um dos comandos normais
     (executa/compila/fluxograma/lint) sem o 'algo' à frente, sem teres de
@@ -667,9 +528,6 @@ def cmd_consola(parser):
             break
         if linha in ("ajuda", "help", "a"):
             _mostrar_ajuda(ultimo_ficheiro)
-            continue
-        if linha == "?" or linha.startswith("? "):
-            _chamar_alguem(ultimo_ficheiro, mensagem_inicial=linha[2:].strip() or None)
             continue
 
         try:

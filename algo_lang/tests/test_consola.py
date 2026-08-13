@@ -14,11 +14,10 @@ RAIZ_PROJETO = pathlib.Path(__file__).resolve().parent.parent.parent
 
 def _correr_consola(entrada, timeout=15, tmp_path=None):
     """Corre a consola do ALGO num subprocesso -- a partir de uma CÓPIA
-    completa do projeto, numa pasta temporária, para que o '?' (que
-    chama o Alguem) escreva os logs/identidade só nessa cópia, nunca
-    na pasta real do pacote alguem/. Sem variáveis de ambiente: o
-    isolamento vem só de sys.path apontar para a cópia, não para o
-    algo_lang/alguem instalados."""
+    completa de algo_lang/, numa pasta temporária, para que os testes
+    nunca escrevam artefactos (.py/.dot/.json gerados) na árvore real do
+    repositório. Sem variáveis de ambiente: o isolamento vem só de
+    sys.path apontar para a cópia, não para o algo_lang instalado."""
     import tempfile
     contexto = tempfile.TemporaryDirectory() if tmp_path is None else None
     pasta_base = pathlib.Path(contexto.name) if contexto else tmp_path
@@ -27,9 +26,6 @@ def _correr_consola(entrada, timeout=15, tmp_path=None):
         shutil.copytree(
             RAIZ_PROJETO / "algo_lang", raiz_copia / "algo_lang",
             ignore=shutil.ignore_patterns("__pycache__", "tests"))
-        shutil.copytree(
-            RAIZ_PROJETO / "alguem", raiz_copia / "alguem",
-            ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.jsonl"))
         script = (
             f"import sys; sys.path.insert(0, {str(raiz_copia)!r}); "
             "from algo_lang.cli import main; main()"
@@ -355,10 +351,11 @@ def test_consola_atalho_a_para_ajuda():
 
 
 def test_consola_interrogacao_nao_e_atalho_de_ajuda():
-    """Pedido explícito: '?' ficou reservado para outra coisa (chamar o
-    Alguem, ver test_consola_alguem.py) -- continua a não ser sinónimo
-    de 'ajuda'."""
-    resultado = _correr_consola("?\nsair\nsair\n")
+    """'?' não está ligado a nenhum comando (o Alguem deixou de fazer
+    parte da consola do ALGO -- só continua acessível via online/) --
+    confirma que continua a não ser sinónimo de 'ajuda', só um comando
+    desconhecido como outro qualquer."""
+    resultado = _correr_consola("?\nsair\n")
     assert resultado.returncode == 0
     assert "atalho: e" not in resultado.stdout
-    assert "A chamar o Alguem" in resultado.stdout
+    assert "escreve 'ajuda'" in resultado.stdout
