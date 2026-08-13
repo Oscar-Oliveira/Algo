@@ -1356,6 +1356,62 @@ def test_modo_minimo_nao_coage_decimal_por_desenho():
     assert resultado.stdout.strip() == "5"
 
 
+# ---------- colisão com o nome interno gerado de uma biblioteca ----------
+
+def test_funcao_com_nome_interno_de_biblioteca_da_erro():
+    """Antes, 'funcao matematica_raiz(...)' era gerada DEPOIS da função da
+    biblioteca no Python de saída e sobrepunha-se-lhe silenciosamente --
+    todas as chamadas a matematica.raiz(...) no resto do programa
+    passavam a chamar a função do estudante, sem nenhum aviso."""
+    with pytest.raises(ErroSemantico, match="matematica_raiz"):
+        compilar("""
+            algoritmo "T"
+            importar Matematica
+
+            funcao matematica_raiz(x:decimal):decimal
+                devolver 999.0
+            inicio
+                escrever(matematica.raiz(4.0))
+        """)
+
+
+def test_estrutura_com_nome_interno_de_biblioteca_da_erro():
+    with pytest.raises(ErroSemantico, match="matematica_raiz"):
+        compilar("""
+            algoritmo "T"
+            importar Matematica
+            estrutura matematica_raiz
+                x:inteiro
+            inicio
+                escrever(matematica.raiz(4.0))
+        """)
+
+
+def test_variavel_com_nome_interno_de_biblioteca_da_erro():
+    with pytest.raises(ErroSemantico, match="matematica_raiz"):
+        compilar("""
+            algoritmo "T"
+            importar Matematica
+            inicio
+                matematica_raiz:inteiro = 1
+                escrever(matematica.raiz(4.0))
+        """)
+
+
+def test_nome_igual_a_funcao_de_biblioteca_nao_importada_e_permitido():
+    """A colisão só é um problema se a biblioteca estiver mesmo importada
+    -- se 'Matematica' nunca é importada, 'matematica_raiz' não é gerada
+    para lado nenhum e o nome do estudante é inofensivo."""
+    saida = executar("""
+        algoritmo "T"
+        funcao matematica_raiz(x:decimal):decimal
+            devolver x
+        inicio
+            escrever(matematica_raiz(4.0))
+    """)
+    assert saida.strip() == "4.0"
+
+
 # ---------- lacunas de cobertura: codegen.py ----------
 
 def test_codegen_atribuicao_a_partir_de_funcao_com_ref():

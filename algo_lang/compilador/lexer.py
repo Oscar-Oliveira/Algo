@@ -10,7 +10,7 @@ PALAVRAS_CHAVE = {
     "escolher", "caso", "contrario",
     "funcao", "procedimento", "devolver", "ref",
     "importar", "incluir",
-    "verdadeiro", "falso",
+    "verdadeiro", "falso", "nulo",
     "e", "ou", "nao",
     "div", "mod",
     "constante", "afirmar",

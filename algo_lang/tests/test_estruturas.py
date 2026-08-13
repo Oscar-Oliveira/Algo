@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Testes para a funcionalidade 'estrutura' (registos/structs)."""
+import subprocess
+
 import pytest
 
 from algo_lang.compilador.lexer import ErroLexico
@@ -160,3 +162,94 @@ def test_campo_duplicado_da_erro():
             inicio
                 escrever(1)
         """)
+
+
+# ---------- 'nulo' e estruturas auto-referenciadas (listas ligadas, árvores) ----------
+
+def test_estrutura_auto_referenciada_nao_recursa_infinitamente():
+    """Antes, declarar 'n:No' com um campo 'seguinte:No' rebentava com
+    RecursionError -- o valor por omissão de um campo do próprio tipo
+    era sempre construído eagerly. Agora o campo fica 'nulo'."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+            seguinte:No
+        inicio
+            n:No
+            escrever(n.valor, "|", n.seguinte == nulo)
+    """)
+    assert saida.strip() == "0|verdadeiro"
+
+
+def test_lista_ligada_construida_e_percorrida_com_nulo():
+    saida = executar("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+            seguinte:No
+        inicio
+            a:No
+            b:No
+            a.valor = 1
+            a.seguinte = b
+            b.valor = 2
+            b.seguinte = nulo
+
+            atual:No = a
+            enquanto atual <> nulo fazer
+                escrever(atual.valor)
+                atual = atual.seguinte
+    """)
+    assert saida.split() == ["1", "2"]
+
+
+def test_aceder_a_campo_de_nulo_da_erro_amigavel_nao_traceback(tmp_path):
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\n'
+        'estrutura No\n'
+        '    valor:inteiro\n'
+        '    seguinte:No\n'
+        'inicio\n'
+        '    n:No\n'
+        '    escrever(n.seguinte.valor)\n',
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(algo_path)], capture_output=True, text=True)
+    assert "Traceback" not in resultado.stdout
+    assert "campo 'valor' de um valor nulo" in resultado.stdout
+
+
+def test_nulo_incompativel_com_tipo_primitivo_da_erro():
+    with pytest.raises(ErroSemantico, match="nulo"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                x:inteiro = nulo
+                escrever(x)
+        """)
+
+
+def test_nulo_nao_pode_ser_usado_como_identificador():
+    with pytest.raises(ErroSintatico):
+        compilar("""
+            algoritmo "T"
+            inicio
+                nulo:inteiro = 5
+                escrever(nulo)
+        """)
+
+
+def test_mutuamente_recursivas_tambem_nao_recursam_infinitamente():
+    saida = executar("""
+        algoritmo "T"
+        estrutura A
+            b:B
+        estrutura B
+            a:A
+        inicio
+            x:A
+            escrever(x.b == nulo)
+    """)
+    assert saida.strip() == "verdadeiro"

@@ -122,6 +122,7 @@ class GeradorCodigo(GeradorCodigoBase):
 
     def _gerar_estrutura(self, e: A.EstruturaDef):
         self._linha_algo_atual = e.linha
+        recursivas = self._estruturas_recursivas()
         params_kwargs = []
         for c in e.campos:
             if c.dims is not None or c.tipo not in DEFAULT_POR_TIPO:
@@ -145,7 +146,9 @@ class GeradorCodigo(GeradorCodigoBase):
                 valor_default = self._construir_array_aninhado(c.tipo, c.dims, {})
                 self.emit(f"self.{c.nome} = {c.nome} if {c.nome} is not None else {valor_default}", 2)
             elif c.tipo not in DEFAULT_POR_TIPO:
-                valor_default = self._valor_default(c.tipo)
+                # AL-39: campo de tipo (direta ou mutuamente) recursivo --
+                # ver a mesma nota em codegen.py.
+                valor_default = "None" if c.tipo in recursivas else self._valor_default(c.tipo)
                 self.emit(f"self.{c.nome} = {c.nome} if {c.nome} is not None else {valor_default}", 2)
             else:
                 self.emit(f"self.{c.nome} = {c.nome}", 2)

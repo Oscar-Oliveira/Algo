@@ -44,6 +44,8 @@ def _algo_fmt(v):
     """Formata valores para exibicao (escrever) ao estilo portugues."""
     if isinstance(v, bool):
         return "verdadeiro" if v else "falso"
+    if v is None:
+        return "nulo"
     return str(v)
 
 
@@ -122,6 +124,20 @@ def _algo_traduzir_valueerro(msg):
     if "could not convert string to float" in msg_min:
         return "o texto não pode ser convertido para um número decimal."
     return f"valor inválido ({msg})."
+
+
+def _algo_traduzir_attributeerror(msg):
+    """Num programa ALGO válido, um AttributeError só pode acontecer ao
+    aceder a um campo de um valor 'nulo' -- semantics.py já garante em
+    compilação que todos os outros acessos a campos existem e têm o
+    tipo certo. Tenta extrair o nome do campo da mensagem nativa do
+    Python (ex.: "'NoneType' object has no attribute 'seguinte'") para
+    uma mensagem mais específica; sem isso, cai num genérico."""
+    prefixo, sufixo = "'NoneType' object has no attribute '", "'"
+    if msg.startswith(prefixo) and msg.endswith(sufixo):
+        campo = msg[len(prefixo):-len(sufixo)]
+        return f"tentaste aceder ao campo '{campo}' de um valor nulo."
+    return "tentaste aceder a um campo de um valor nulo."  # pragma: no cover -- defensivo
 
 
 def _algo_linha_do_erro(erro):
@@ -295,6 +311,13 @@ class GeradorCodigo(GeradorCodigoBase):
         self.emit("print(_algo_msg)", 2)
         self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
+        self.emit("except AttributeError as _algo_erro:", 1)
+        self.emit(
+            '_algo_msg = f"Erro em tempo de execução: '
+            '{_algo_traduzir_attributeerror(str(_algo_erro))}{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
+        self.emit("sys.exit(1)", 2)
         self.emit("except ValueError as _algo_erro:", 1)
         self.emit(
             '_algo_msg = f"Erro em tempo de execução: '
@@ -307,6 +330,7 @@ class GeradorCodigo(GeradorCodigoBase):
 
     def _gerar_estrutura(self, e: A.EstruturaDef):
         self._linha_algo_atual = e.linha
+        recursivas = self._estruturas_recursivas()
         params_kwargs = []
         for c in e.campos:
             if c.dims is not None or c.tipo not in DEFAULT_POR_TIPO:
@@ -330,7 +354,11 @@ class GeradorCodigo(GeradorCodigoBase):
                 valor_default = self._construir_array_aninhado(c.tipo, c.dims, {})
                 self.emit(f"self.{c.nome} = {c.nome} if {c.nome} is not None else {valor_default}", 2)
             elif c.tipo not in DEFAULT_POR_TIPO:
-                valor_default = self._valor_default(c.tipo)
+                # AL-39: se 'c.tipo' é (direta ou mutuamente) recursivo,
+                # construir a instância por omissão nunca terminaria --
+                # fica 'None' (nulo), tal como o estudante teria de
+                # escrever explicitamente para terminar uma lista ligada.
+                valor_default = "None" if c.tipo in recursivas else self._valor_default(c.tipo)
                 self.emit(f"self.{c.nome} = {c.nome} if {c.nome} is not None else {valor_default}", 2)
             else:
                 self.emit(f"self.{c.nome} = {c.nome}", 2)

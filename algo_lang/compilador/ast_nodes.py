@@ -147,7 +147,7 @@ class LValue(No):
 class Literal(No):
     def __init__(self, valor, tipo, linha=0):
         self.valor = valor
-        self.tipo = tipo   # 'inteiro' | 'decimal' | 'booleano' | 'cadeia' | 'caracter'
+        self.tipo = tipo   # 'inteiro' | 'decimal' | 'booleano' | 'cadeia' | 'caracter' | 'nulo'
         self.linha = linha
 
 

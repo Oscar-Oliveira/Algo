@@ -53,6 +53,38 @@ class GeradorCodigoBase:
             return DEFAULT_POR_TIPO[tipo]
         return f"{tipo}()"   # instância por omissão de uma estrutura
 
+    def _estruturas_recursivas(self):
+        """Nomes de estrutura que são (direta ou mutuamente) recursivas --
+        ex.: 'No' com um campo 'seguinte: No' (lista ligada), ou duas
+        estruturas com campos cruzados. self._valor_default(tipo) para
+        um desses nomes nunca termina (o valor por omissão de um campo
+        do próprio tipo seria outra instância, com outro campo do
+        próprio tipo, ad infinitum) -- por isso os SEUS campos desse
+        tipo têm de ficar 'None' (nulo) em vez de construídos eagerly;
+        ver o uso em _gerar_estrutura (codegen.py / codegen_minimo.py).
+        Percorre só campos escalares (dims_n == 0); um campo array
+        nunca recursa porque começa vazio (o elemento nunca chega a ser
+        construído em compilação nem em runtime)."""
+        grafo = {
+            nome: [tipo for tipo, dims_n in campos.values()
+                   if dims_n == 0 and tipo in self.estruturas]
+            for nome, campos in self.estruturas.items()
+        }
+        recursivas = set()
+        for origem in grafo:
+            pilha = list(grafo[origem])
+            vistos = set()
+            while pilha:
+                atual = pilha.pop()
+                if atual == origem:
+                    recursivas.add(origem)
+                    break
+                if atual in vistos:
+                    continue
+                vistos.add(atual)
+                pilha.extend(grafo.get(atual, []))
+        return recursivas
+
     def _coagir_decimal(self, expr_py: str, tipo_alvo, expr_no) -> str:
         """'decimal' aceita um valor 'inteiro' (_compativel em semantics.py),
         mas o Python gerado não convertia sozinho -- 'x: decimal = 5'

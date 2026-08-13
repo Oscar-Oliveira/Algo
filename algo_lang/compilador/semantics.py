@@ -78,6 +78,18 @@ class VerificadorTipos:
                     f"{disponiveis}", imp.linha)
             self.bibliotecas_importadas[chave] = self.registo_bibliotecas[chave]
 
+        # nome_python_gerado (ex.: "matematica_raiz") -> "biblioteca.metodo"
+        # (ex.: "matematica.raiz"), só para bibliotecas importadas -- uma
+        # função/estrutura/variável do estudante com o MESMO nome que o
+        # nome Python interno de uma função de biblioteca sobrepunha-se-lhe
+        # silenciosamente no código gerado (a definição do estudante vem
+        # depois no ficheiro), sem nenhum erro a avisar.
+        self.nomes_internos_bibliotecas = {
+            f"{nome_biblioteca}_{metodo}": f"{nome_biblioteca}.{metodo}"
+            for nome_biblioteca, info in self.bibliotecas_importadas.items()
+            for metodo in info["funcoes"]
+        }
+
         self.funcoes = {}
         for f in programa.funcoes:
             if f.nome in self.funcoes:
@@ -90,6 +102,12 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"'{f.nome}' já é o nome de uma biblioteca importada; "
                     f"escolhe outro nome para a função/procedimento", f.linha)
+            if f.nome in self.nomes_internos_bibliotecas:
+                raise ErroSemantico(
+                    f"'{f.nome}' colide com o nome interno gerado para "
+                    f"'{self.nomes_internos_bibliotecas[f.nome]}' (biblioteca "
+                    f"importada); escolhe outro nome para a função/procedimento",
+                    f.linha)
             self.funcoes[f.nome] = f
 
         self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims)}
@@ -109,6 +127,11 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"'{e.nome}' já é o nome de uma biblioteca importada; "
                     f"escolhe outro nome para a estrutura", e.linha)
+            if e.nome in self.nomes_internos_bibliotecas:
+                raise ErroSemantico(
+                    f"'{e.nome}' colide com o nome interno gerado para "
+                    f"'{self.nomes_internos_bibliotecas[e.nome]}' (biblioteca "
+                    f"importada); escolhe outro nome para a estrutura", e.linha)
             campos = {}
             for c in e.campos:
                 if c.nome in campos:
@@ -225,6 +248,11 @@ class VerificadorTipos:
             raise ErroSemantico(
                 f"'{d.nome}' já é o nome de uma biblioteca importada; escolhe "
                 f"outro nome para a variável", d.linha)
+        if d.nome in self.nomes_internos_bibliotecas:
+            raise ErroSemantico(
+                f"'{d.nome}' colide com o nome interno gerado para "
+                f"'{self.nomes_internos_bibliotecas[d.nome]}' (biblioteca "
+                f"importada); escolhe outro nome para a variável", d.linha)
         if d.nome in PRIMITIVOS:
             raise ErroSemantico(
                 f"'{d.nome}' é o nome de um tipo primitivo; escolhe outro nome "
@@ -671,6 +699,10 @@ class VerificadorTipos:
             return True
         if a in TEXTUAIS and b in TEXTUAIS:
             return True
+        # 'nulo' compara-se com qualquer tipo de estrutura (ex.: 'enquanto
+        # no <> nulo fazer ...', o idioma de percurso de uma lista ligada).
+        if (a == "nulo" and b in self.estruturas) or (b == "nulo" and a in self.estruturas):
+            return True
         return a == b
 
     def _compativel(self, tipo_alvo, tipo_valor):
@@ -679,6 +711,11 @@ class VerificadorTipos:
         if tipo_alvo == "decimal" and tipo_valor == "inteiro":
             return True
         if tipo_alvo == "cadeia" and tipo_valor == "caracter":
+            return True
+        # 'nulo' é aceite em qualquer sítio que espere uma estrutura (campo,
+        # declaração, parâmetro, retorno) -- é o valor que representa "esta
+        # referência ainda não aponta para nenhuma instância".
+        if tipo_valor == "nulo" and tipo_alvo in self.estruturas:
             return True
         return False
 

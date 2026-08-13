@@ -632,6 +632,9 @@ class Parser:
         if tok.tipo == "FALSO":
             self.avancar()
             return A.Literal(False, "booleano", tok.linha)
+        if tok.tipo == "NULO":
+            self.avancar()
+            return A.Literal(None, "nulo", tok.linha)
         if tok.tipo == "LPAREN":
             self.avancar()
             expr = self._parse_expr()
