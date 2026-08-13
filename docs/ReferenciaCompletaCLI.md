@@ -71,9 +71,9 @@ algo-lang-pacote/
 │   │   ├── linter.py              algo lint
 │   │   └── tracer.py              algo executa --debug/--json
 │   ├── bibliotecas/               matematica., cadeia., conversao. (importar Matematica / Cadeia / Conversao)
-│   └── tests/                     suite de testes automatizados (pytest)
+│   ├── tests/                     suite de testes automatizados (pytest)
+│   └── editors/vscode-algo/       extensão de realce de sintaxe para o VS Code
 ├── exemplos/                   ficheiros .algo de demonstração (não fazer parte do pacote)
-├── editors/vscode-algo/        extensão de realce de sintaxe para o VS Code
 ├── visualizador/                algo-trace-viewer.html -- abre os .json do --json
 ├── alguem/                      tutor de algoritmia baseado em LLM (independente do compilador)
 │   ├── README.md                  configuração, arquitetura, como chamar
@@ -623,11 +623,11 @@ próprio.
 ## Realce de sintaxe no VS Code
 
 Há uma extensão mínima de realce de sintaxe (cores) para ficheiros
-`.algo` em `editors/vscode-algo/`. Para instalar, copia essa pasta para
-a pasta de extensões do VS Code (`~/.vscode/extensions/` no
+`.algo` em `algo_lang/editors/vscode-algo/`. Para instalar, copia essa
+pasta para a pasta de extensões do VS Code (`~/.vscode/extensions/` no
 macOS/Linux, `%USERPROFILE%\.vscode\extensions\` no Windows) e reinicia
 o editor. Instruções completas e detalhes técnicos em
-`editors/vscode-algo/README.md`.
+`algo_lang/editors/vscode-algo/README.md`.
 
 ## Linter
 

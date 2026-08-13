@@ -185,8 +185,8 @@ Nos dois casos, funciona exatamente da mesma forma que `algo executa
 Isto dá cor ao teu código ALGO no VS Code (palavras-chave a azul,
 texto a laranja, etc.), tornando-o muito mais fácil de ler.
 
-1. Dentro da pasta do ALGO, entra em `editors/vscode-algo/` — repara
-   que esta é a pasta que vais copiar, não o que está dentro dela.
+1. Dentro da pasta do ALGO, entra em `algo_lang/editors/vscode-algo/` —
+   repara que esta é a pasta que vais copiar, não o que está dentro dela.
 2. Copia essa pasta inteira (`vscode-algo`) para a pasta de extensões
    do VS Code:
    - **Windows**: cola em `%USERPROFILE%\.vscode\extensions\`
@@ -425,8 +425,8 @@ Quando receberes uma versão nova do ALGO:
   mesmo comando de dentro da pasta nova.
 
 A extensão do VS Code (secção 6) só precisa de ser reinstalada se a
-pasta `editors/vscode-algo` tiver mudado — copia-a outra vez por cima
-da anterior, se não tiveres a certeza.
+pasta `algo_lang/editors/vscode-algo` tiver mudado — copia-a outra vez
+por cima da anterior, se não tiveres a certeza.
 
 ---
 
