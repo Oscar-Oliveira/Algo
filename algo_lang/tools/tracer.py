@@ -139,20 +139,41 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         pilha.reverse()
         return pilha
 
+    def _indice_do_ultimo_passo_em_principal():
+        """AL-71: encontra o último passo cuja pilha estava diretamente em
+        _algo_programa (só "Principal", sem nenhuma função aninhada) --
+        NÃO presumir que é sempre 'passos[-1]'. Se a ÚLTIMA instrução do
+        'inicio' chamar uma função do utilizador, essa chamada gera mais
+        passos (dentro da função chamada) DEPOIS do passo da própria
+        instrução; sobrescrever sempre passos[-1] corrompia o passo
+        errado -- o último passo de dentro da função ficava com a pilha
+        trocada (perdia o frame da função, sobrava só "Principal") e com
+        a consola já avançada a mais (incluindo saída gerada DEPOIS
+        desse passo). Devolve None se não encontrar nenhum (não deve
+        acontecer -- a própria instrução que levou a esta chamada tem de
+        ter gerado um passo em _algo_programa antes de entrar em
+        qualquer função)."""
+        for i in range(len(passos) - 1, -1, -1):
+            pilha = passos[i]["pilha"]
+            if len(pilha) == 1 and pilha[0]["nome"] == "Principal":
+                return i
+        return None  # pragma: no cover -- defensivo, ver docstring
+
     def tracer(frame, evento, arg):
         if evento == "return":
             # a função principal terminou -- o 'line' da sua última instrução
             # só regista o estado ANTES dela correr, por isso o efeito dessa
             # última linha (consola/variáveis) nunca aparecia em nenhum
-            # passo. Aqui, no retorno, já correu -- atualiza o último passo
+            # passo. Aqui, no retorno, já correu -- atualiza esse passo
             # em vez de acrescentar um novo, para não violar "um passo por
             # linha executada".
             if (passos and frame.f_code.co_filename == caminho_py
                     and frame.f_code.co_name == NOME_FUNCAO_PRINCIPAL):
                 pilha_final = construir_pilha(frame)
-                if pilha_final:
-                    passos[-1] = {
-                        "linha": passos[-1]["linha"],
+                indice = _indice_do_ultimo_passo_em_principal()
+                if pilha_final and indice is not None:
+                    passos[indice] = {
+                        "linha": passos[indice]["linha"],
                         "consola": buffer_saida.getvalue(),
                         "pilha": pilha_final,
                     }

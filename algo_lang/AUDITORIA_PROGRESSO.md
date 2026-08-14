@@ -83,30 +83,26 @@ ver nota no topo deste ficheiro). Todas as correções têm teste de
 regressão em `algo_lang/tests/test_correcoes_auditoria.py` (secção
 "Segunda auditoria") ou em `test_linter.py`.
 
-### Bug adicional encontrado (fora da lista B1-B30), NÃO corrigido
+### Bug adicional encontrado (fora da lista B1-B30) -- CORRIGIDO -- AL-71
 
 Ao escrever o teste de regressão de B27, descobri um bug distinto e
 pré-existente em `tools/tracer.py:gerar_trace` (`tracer()`, o ramo do
-evento `"return"` para `NOME_FUNCAO_PRINCIPAL`, por volta da linha
-133-150): quando a ÚLTIMA instrução do bloco `inicio` é uma chamada a
-uma função/procedimento do utilizador (ex.: `escrever(f(10))` como
-última linha), o código que "corrige" o último passo ao `_algo_programa`
-terminar sobrescreve `passos[-1]` -- mas nesse momento `passos[-1]` é o
+evento `"return"` para `NOME_FUNCAO_PRINCIPAL`): quando a ÚLTIMA
+instrução do bloco `inicio` é uma chamada a uma função/procedimento do
+utilizador (ex.: `escrever(f(10))` como última linha), o código que
+"corrige" o último passo ao `_algo_programa` terminar sobrescrevia
+sempre `passos[-1]` -- mas nesse momento `passos[-1]` podia ser o
 ÚLTIMO PASSO DENTRO DA FUNÇÃO CHAMADA (ex. 'f'), não o passo da própria
 `_algo_programa`. O resultado: o último passo do trace de dentro da
-função fica com a pilha errada (só "Principal", perdendo o frame da
-função) e com a consola já avançada demais. Reproduzido isoladamente;
-não está descrito em nenhum dos B1-B30 da auditoria original, por isso
-não foi corrigido nesta passagem -- fica aqui registado para uma
-próxima. Repro mínimo:
-```
-algoritmo "T"
-funcao f(x:inteiro):inteiro
-    devolver x + 1
-inicio
-    escrever(f(10))
-```
-(sem instrução nenhuma depois do `escrever(f(10))`).
+função ficava com a pilha errada (só "Principal", perdendo o frame da
+função) e com a consola já avançada demais; o passo real da última
+instrução nunca era atualizado com o efeito de a ter executado.
+
+Corrigido (2026-08-14, mesma sessão): `_indice_do_ultimo_passo_em_principal()`
+procura o último passo com pilha só "Principal" (não presume
+`passos[-1]`) antes de o sobrescrever. Teste de regressão:
+`test_trace_nao_corrompe_passo_quando_ultima_instrucao_chama_funcao`
+em `test_correcoes_auditoria.py`.
 
 ---
 

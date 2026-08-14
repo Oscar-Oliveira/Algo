@@ -3233,19 +3233,12 @@ def test_variavel_de_inicio_usada_so_numa_funcao_nao_da_falso_positivo():
 def test_trace_mostra_variavel_local_com_nome_comecado_por_underscore(tmp_path):
     from algo_lang.compilador.codegen import gerar_python_com_mapa
     from algo_lang.tools.tracer import gerar_trace
-    # NOTA: a chamada a 'f' não pode ser a ÚLTIMA instrução do programa --
-    # há um bug pré-existente e distinto (não B27/B28, encontrado ao
-    # escrever este teste) em que o passo final de uma função chamada
-    # como última instrução do 'inicio' é indevidamente sobreposto pelo
-    # fecho de _algo_programa (ver nota em AUDITORIA_PROGRESSO.md);
-    # uma instrução a seguir evita tropeçar nesse bug diferente aqui.
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         funcao f(_x:inteiro):inteiro
             devolver _x + 1
         inicio
             escrever(f(10))
-            escrever("fim")
     """))
     verificar(programa)
     dados = gerar_python_com_mapa(programa)
@@ -3261,6 +3254,49 @@ def test_trace_mostra_variavel_local_com_nome_comecado_por_underscore(tmp_path):
         for frame in passo["pilha"]:
             variaveis_vistas.update(frame["variaveis"].keys())
     assert "_x" in variaveis_vistas
+
+
+# ---------- AL-71: tracer -- passo errado sobreposto quando a última instrução chama uma função ----------
+
+def test_trace_nao_corrompe_passo_quando_ultima_instrucao_chama_funcao(tmp_path):
+    """Bug adicional (fora de B1-B30, encontrado ao escrever o teste de
+    B27): quando a ÚLTIMA instrução do 'inicio' chama uma função, o
+    fecho de _algo_programa sobrescrevia sempre 'passos[-1]' -- que,
+    nesse caso, é o último passo DENTRO da função chamada, não o passo
+    da própria instrução em _algo_programa. O passo de dentro da função
+    ficava com a pilha errada (perdia o frame da função) e a consola
+    já avançada demais; o passo real da última instrução nunca era
+    atualizado com o efeito de a ter executado (a saída do escrever)."""
+    from algo_lang.compilador.codegen import gerar_python_com_mapa
+    from algo_lang.tools.tracer import gerar_trace
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        funcao f(x:inteiro):inteiro
+            devolver x + 1
+        inicio
+            escrever(f(10))
+    """))
+    verificar(programa)
+    dados = gerar_python_com_mapa(programa)
+    caminho_py = str(tmp_path / "prog.py")
+    with open(caminho_py, "w", encoding="utf-8") as fh:
+        fh.write(dados["codigo"])
+    resultado = gerar_trace(
+        dados["codigo"], caminho_py, dados["mapa_linhas"],
+        dados["nomes_globais"], dados["nomes_funcoes"])
+    assert resultado["erro"] is None
+    assert resultado["consolaFinal"] == "11\n"
+
+    passo_da_funcao = next(
+        p for p in resultado["passos"]
+        if any(frame["nome"] == "f" for frame in p["pilha"]))
+    assert passo_da_funcao["pilha"][-1]["variaveis"] == {"x": 10}
+    assert passo_da_funcao["consola"] == ""
+
+    passo_principal = next(
+        p for p in resultado["passos"]
+        if len(p["pilha"]) == 1 and p["pilha"][0]["nome"] == "Principal")
+    assert passo_principal["consola"] == "11\n"
 
 
 # ---------- B28 (AL-68): tracer -- linha salta para trás; OverflowError não traduzido ----------
