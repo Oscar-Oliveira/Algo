@@ -234,7 +234,13 @@ class GeradorCodigoBase:
             self._gerar_stmt(stmt, 1, tipos_locais)
 
         if f.eh_procedimento and self.refs_atuais:
-            self._linha_algo_atual = f.linha
+            # AL-68/B28: NÃO reatribuir _linha_algo_atual = f.linha aqui --
+            # isso mapeava este 'return' sintético para a linha da
+            # ASSINATURA do procedimento (mais cedo no ficheiro do que a
+            # última instrução real gerada), fazendo o número de linha no
+            # trace "saltar para trás" num procedimento só com parâmetros
+            # 'ref' (ex.: 3, 4, 5, 2). Mantém o valor já deixado pela
+            # última instrução real do corpo, gerada no laço acima.
             self.emit(f"return {', '.join(self.refs_atuais)}", 1)
 
         self.refs_atuais = []

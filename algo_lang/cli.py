@@ -67,7 +67,13 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
         caminho = inc.caminho
         if not os.path.isabs(caminho):
             caminho = os.path.join(pasta_base, caminho)
-        caminho = os.path.normpath(caminho)
+        # AL-62/B22: os.path.normcase, não só normpath -- em sistemas de
+        # ficheiros case-insensitive (Windows/macOS, onde este projeto é
+        # desenvolvido), "lib.algo" e "LIB.algo" são o MESMO ficheiro, mas
+        # normpath sozinho não normaliza capitalização; sem isto, a
+        # segunda referência "colidia" com a primeira em vez de ser
+        # reconhecida como o mesmo ficheiro já incluído.
+        caminho = os.path.normcase(os.path.normpath(caminho))
         if caminho in ja_incluidos:
             continue
         ja_incluidos.add(caminho)
@@ -249,6 +255,15 @@ def cmd_executa_com_trace(args):
             json.dump(trace_final, f, ensure_ascii=False, indent=1)
         print(f"\n✔ Trace gerado: {caminho_json} ({len(resultado['passos'])} passo(s))")
         print("  Abre o visualizador web e carrega este ficheiro para navegar passo a passo.")
+
+    if resultado["erro"] or resultado["limiteExcedido"]:
+        # AL-61/B21: cmd_executa (sem --debug/--json) propaga o código de
+        # saída real do subprocesso; este caminho nunca chamava sys.exit,
+        # por isso o MESMO programa com erro em runtime dava 'exit 1' sem
+        # --json e 'exit 0' com --json -- qualquer script/CI/corretor
+        # automático que confie no código de saída via um programa
+        # ALGO com erro como bem-sucedido.
+        sys.exit(1)
 
 
 def cmd_compila(args):
@@ -554,17 +569,25 @@ def cmd_consola(parser):
                 print("(escreve 'ajuda' para veres os comandos disponíveis e as suas opções)")
             continue
 
-        if getattr(args, "ficheiro", None):
-            ultimo_ficheiro = args.ficheiro
-
         try:
             args.func(args)
         except SystemExit:
             # os comandos usam sys.exit(1) para reportar erro numa
             # invocação única -- aqui isso só deve voltar ao prompt
-            pass
+            continue
         except KeyboardInterrupt:
             print("\n(interrompido)")
+            continue
+
+        if getattr(args, "ficheiro", None):
+            # AL-63/B23: só atualiza 'ultimo_ficheiro' depois de
+            # args.func(args) ter terminado SEM SystemExit -- antes, isto
+            # corria incondicionalmente logo a seguir ao parse_args, mesmo
+            # que o ficheiro indicado não existisse ou tivesse um erro. Um
+            # estudante que escrevesse mal um nome de ficheiro perdia o
+            # contexto do ficheiro anterior (que funcionava) e ficava
+            # preso a repetir o mesmo erro "não encontrado".
+            ultimo_ficheiro = args.ficheiro
 
 
 def main():

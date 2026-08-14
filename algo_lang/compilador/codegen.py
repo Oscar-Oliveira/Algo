@@ -28,6 +28,7 @@ CABECALHO_RUNTIME = '''\
 # ============================================================
 
 import sys
+import copy
 
 sys.setrecursionlimit(10000)
 
@@ -183,6 +184,19 @@ def _algo_registar_erro_runtime(mensagem, linha):
     _ALGO_ERRO_RUNTIME = {"mensagem": mensagem, "linha": linha}
 
 
+def _algo_pot(a, b):
+    """AL-57/B16: ao contrário do Python 2 (de onde a mensagem já
+    traduzida em _algo_traduzir_valueerro parece ter sido portada), o
+    '**' nativo do Python 3 nunca levanta ValueError para base negativa
+    com expoente fracionário -- devolve silenciosamente um número
+    complexo (ex.: (-8.0) ** 0.5). matematica.raiz(-1) já tinha uma
+    mensagem amigável equivalente para esse domínio inválido; este é o
+    caminho gémeo para o operador '^'."""
+    if a < 0 and not float(b).is_integer():
+        raise ValueError("negative number cannot be raised to a fractional power")
+    return a ** b
+
+
 def _algo_verificar_tamanho_array(tam):
     """Um tamanho de array calculado em runtime (nao um literal, ja
     apanhado em compilacao) que de negativo silenciosamente produzia
@@ -198,7 +212,6 @@ def _algo_verificar_tamanho_array(tam):
 
 OPS_BIN = {
     "+": "+", "-": "-", "*": "*", "/": "/",
-    "^": "**",
     "==": "==", "<>": "!=", "<": "<", ">": ">", "<=": "<=", ">=": ">=",
     "e": "and", "ou": "or",
 }
@@ -304,6 +317,16 @@ class GeradorCodigo(GeradorCodigoBase):
         self.emit("print(_algo_msg)", 2)
         self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
+        # AL-68/B28: sem isto, um OverflowError (ex.: 'x:decimal =
+        # 2.0 ^ 2000.0') propagava como traceback Python cru -- não
+        # estava entre as exceções traduzidas, mesmo fora do tracer.
+        self.emit("except OverflowError as _algo_erro:", 1)
+        self.emit(
+            '_algo_msg = f"Erro em tempo de execução: o resultado é grande demais para ser '
+            'representado (overflow numérico).{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
+        self.emit("sys.exit(1)", 2)
         self.emit("except RecursionError as _algo_erro:", 1)
         self.emit(
             '_algo_msg = f"Erro em tempo de execução: recursão infinita '
@@ -383,10 +406,23 @@ class GeradorCodigo(GeradorCodigoBase):
         com o seu próprio caminho de geração para parâmetros 'ref')."""
         args_py = []
         for i, a in enumerate(args):
-            if isinstance(a, A.EstruturaLiteral) and f_def is not None and i < len(f_def.parametros):
-                args_py.append(self._expr_estrutura_literal(a, f_def.parametros[i].tipo, tipos))
-            elif f_def is not None and i < len(f_def.parametros):
-                args_py.append(self._coagir_decimal(self._expr(a, tipos), f_def.parametros[i].tipo, a))
+            param = f_def.parametros[i] if f_def is not None and i < len(f_def.parametros) else None
+            if isinstance(a, A.EstruturaLiteral) and param is not None:
+                args_py.append(self._expr_estrutura_literal(a, param.tipo, tipos))
+            elif param is not None:
+                expr_py = self._coagir_decimal(self._expr(a, tipos), param.tipo, a)
+                if not param.por_referencia and param.tipo in self.estruturas:
+                    # AL-52/B11: um parâmetro de tipo 'estrutura' sem 'ref'
+                    # é por VALOR -- semantics.py já garante todo o
+                    # contrato de 'ref' (778-820), mas o Python gerado
+                    # nunca copiava o objeto, só passava a MESMA
+                    # referência. Uma mutação de campo dentro da função
+                    # (ex.: 'p.x = 99') vazava silenciosamente para quem
+                    # chamou. Um literal de estrutura ({...}, tratado no
+                    # 'if' acima) já é uma instância nova -- não precisa
+                    # de cópia.
+                    expr_py = f"copy.deepcopy({expr_py})"
+                args_py.append(expr_py)
             else:
                 args_py.append(self._expr(a, tipos))
         return ", ".join(args_py)
@@ -404,8 +440,32 @@ class GeradorCodigo(GeradorCodigoBase):
             partes.append(f"{nome}={expr_py}")
         return f"{tipo_nome}({', '.join(partes)})"
 
+    def _expr_array_literal(self, lit: A.ArrayLiteral, tipo_elemento: str, tipos) -> str:
+        """AL-58/B18: coage cada elemento individualmente para o tipo
+        alvo (ex.: inteiro -> decimal), tal como _expr_estrutura_literal
+        já faz para campos de estrutura -- o dispatcher genérico de
+        _expr() para A.ArrayLiteral não sabe o tipo alvo, por isso nunca
+        coagia nada (v:decimal[3] = {1, 2, 3} imprimia '1 2 3', não
+        '1.0 2.0 3.0'). Recursivo para suportar arrays aninhados
+        (multidimensionais)."""
+        partes = []
+        for elem in lit.elementos:
+            if isinstance(elem, A.ArrayLiteral):
+                partes.append(self._expr_array_literal(elem, tipo_elemento, tipos))
+            else:
+                partes.append(self._coagir_decimal(self._expr(elem, tipos), tipo_elemento, elem))
+        return f"[{', '.join(partes)}]"
+
     def _gerar_declaracao(self, d: A.Declaracao, nivel, tipos):
+        if d.inicial is not None and isinstance(d.inicial, A.ArrayLiteral):
+            self.emit(f"{d.nome} = {self._expr_array_literal(d.inicial, d.tipo, tipos)}", nivel)
+            return
         if d.inicial is not None and isinstance(d.inicial, A.EstruturaLiteral):
+            if d.dims is not None:
+                # AL-45/B5: '{}' vazio inicializando um array -- semantics.py
+                # já garantiu que só chega aqui com campos vazios.
+                self.emit(f"{d.nome} = []", nivel)
+                return
             self.emit(f"{d.nome} = {self._expr_estrutura_literal(d.inicial, d.tipo, tipos)}", nivel)
             return
         if d.inicial is not None and isinstance(d.inicial, A.Chamada):
@@ -418,6 +478,12 @@ class GeradorCodigo(GeradorCodigoBase):
                 ]
                 args_str = self._gerar_lista_args(d.inicial.args, f_def, tipos)
                 self.emit(f"{d.nome}, {', '.join(out_vars)} = {d.inicial.nome}({args_str})", nivel)
+                # AL-51/B17: o valor de retorno principal nunca passava por
+                # _coagir_decimal neste caminho -- 'y:decimal = f(x)' com
+                # 'f' a devolver 'inteiro' ficava com o inteiro cru.
+                valor_coagido = self._coagir_decimal(d.nome, d.tipo, d.inicial)
+                if valor_coagido != d.nome:
+                    self.emit(f"{d.nome} = {valor_coagido}", nivel)
                 return
         if d.inicial is not None:
             expr_py = self._coagir_decimal(self._expr(d.inicial, tipos), d.tipo, d.inicial)
@@ -426,6 +492,32 @@ class GeradorCodigo(GeradorCodigoBase):
             self.emit(f"{d.nome} = {self._valor_default(d.tipo)}", nivel)
         else:
             self.emit(f"{d.nome} = {self._construir_array_aninhado(d.tipo, d.dims, tipos)}", nivel)
+
+    def _gerar_atribuicao(self, stmt: A.Atribuicao, nivel, tipos):
+        """AL-51/B17: sobrepõe gerador_base.py só para o caminho de chamada
+        com parâmetros 'ref' -- precisa de _gerar_lista_args (coerção
+        inteiro->decimal nos argumentos, cópia de estruturas por valor --
+        AL-52/B11) e de coagir o valor de retorno principal; nenhum dos
+        dois existe em codegen_minimo.py (fica com o comportamento cru da
+        base partilhada, de propósito -- ver a mesma duplicação já
+        existente em _gerar_chamada_stmt)."""
+        if isinstance(stmt.expr, A.Chamada):
+            f_def = self._encontrar_funcao(stmt.expr.nome)
+            if f_def and any(p.por_referencia for p in f_def.parametros):
+                out_vars = [
+                    self._lvalue_de_expr(a, tipos)
+                    for p, a in zip(f_def.parametros, stmt.expr.args)
+                    if p.por_referencia
+                ]
+                args_str = self._gerar_lista_args(stmt.expr.args, f_def, tipos)
+                alvo = self._lvalue(stmt.alvo, tipos)
+                self.emit(f"{alvo}, {', '.join(out_vars)} = {stmt.expr.nome}({args_str})", nivel)
+                tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
+                valor_coagido = self._coagir_decimal(alvo, tipo_alvo, stmt.expr)
+                if valor_coagido != alvo:
+                    self.emit(f"{alvo} = {valor_coagido}", nivel)
+                return
+        super()._gerar_atribuicao(stmt, nivel, tipos)
 
     def _construir_array_aninhado(self, tipo, dims_exprs, tipos):
         """Constrói recursivamente a expressão Python de um array com N
@@ -549,6 +641,11 @@ class GeradorCodigo(GeradorCodigoBase):
                 # Python -- ver _algo_div/_algo_mod no cabeçalho.
                 funcao = "_algo_div" if expr.op == "div" else "_algo_mod"
                 return f"{funcao}({self._expr(expr.esq, tipos)}, {self._expr(expr.dire, tipos)})"
+            if expr.op == "^":
+                # AL-57/B16: ver _algo_pot no cabeçalho -- '**' nativo do
+                # Python devolve complex silenciosamente para base
+                # negativa com expoente fracionário.
+                return f"_algo_pot({self._expr(expr.esq, tipos)}, {self._expr(expr.dire, tipos)})"
             op = OPS_BIN[expr.op]
             return f"({self._expr(expr.esq, tipos)} {op} {self._expr(expr.dire, tipos)})"
         if isinstance(expr, A.UnOp):

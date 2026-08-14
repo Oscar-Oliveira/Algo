@@ -140,6 +140,15 @@ class VerificadorTipos:
                 if c.inicial is not None:
                     raise ErroSemantico(
                         "os campos de uma estrutura não podem ter valor inicial", c.linha)
+                if c.dims:
+                    # AL-48/B7: _registar_decl já valida tipo/sinal de cada
+                    # dimensão para variáveis normais -- o registo de campos
+                    # de 'estrutura' saltava essa validação por completo,
+                    # limitando-se a contar len(c.dims). Sem escopo próprio
+                    # (um campo de estrutura não vê variáveis nenhumas), só
+                    # expressões resolúveis sem nomes (literais/aritmética
+                    # entre literais) fazem sentido aqui.
+                    self._validar_dims(c.dims, {}, c.linha)
                 dims_n = 0 if c.dims is None else len(c.dims)
                 campos[c.nome] = (c.tipo, dims_n)
                 linhas_dos_campos[(e.nome, c.nome)] = c.linha
@@ -183,9 +192,29 @@ class VerificadorTipos:
 
     def _pre_registar_recursivo(self, stmts, destino):
         for s in stmts:
-            if isinstance(s, A.Declaracao) and s.nome not in destino:
+            if isinstance(s, A.Declaracao):
                 dims_n = 0 if s.dims is None else len(s.dims)
-                destino[s.nome] = (s.tipo, dims_n, s.eh_constante)
+                if s.nome in destino:
+                    # AL-54/B13: antes, uma segunda declaração do mesmo
+                    # nome (ex.: em ramos 'se'/'senao' mutuamente
+                    # exclusivos ao nível de topo) era silenciosamente
+                    # ignorada aqui -- 'self.globais' ficava com o tipo da
+                    # PRIMEIRA declaração encontrada em DFS, mesmo que o
+                    # ramo que executasse de facto em runtime fosse outro,
+                    # com um tipo diferente -- uma função que usasse essa
+                    # global ficava a assumir um tipo estaticamente
+                    # incorreto. Só é erro se o TIPO diferir -- o mesmo
+                    # nome com o mesmo tipo em ramos irmãos é legítimo (o
+                    # tipo estático fica correto seja qual for o ramo).
+                    tipo_existente, dims_existente, _eh_const = destino[s.nome]
+                    if (tipo_existente, dims_existente) != (s.tipo, dims_n):
+                        raise ErroSemantico(
+                            f"a variável '{s.nome}' é declarada com tipos diferentes "
+                            f"em ramos diferentes ('{tipo_existente}' e '{s.tipo}') -- "
+                            f"para ser visível a funções, o compilador precisa de um "
+                            f"único tipo estático para '{s.nome}'", s.linha)
+                else:
+                    destino[s.nome] = (s.tipo, dims_n, s.eh_constante)
             for bloco in A.subblocos(s):
                 self._pre_registar_recursivo(bloco, destino)
 
@@ -195,6 +224,7 @@ class VerificadorTipos:
         for p in f.parametros:
             if p.nome in escopo.locais:
                 raise ErroSemantico(f"parâmetro '{p.nome}' duplicado", f.linha)
+            self._verificar_nome_disponivel(p.nome, f.linha, "o parâmetro")
             self._validar_tipo(p.tipo, f.linha)
             escopo.locais[p.nome] = (p.tipo, 0, False)
         if f.tipo_retorno is not None:
@@ -202,19 +232,52 @@ class VerificadorTipos:
 
         self._verificar_bloco(f.corpo, escopo, ctx_funcao=f)
 
-        if not f.eh_procedimento and not self._contem_devolver(f.corpo):
+        if not f.eh_procedimento and not self._todos_caminhos_devolvem(f.corpo):
             raise ErroSemantico(
-                f"a função '{f.nome}' declara devolver '{f.tipo_retorno}' mas nunca "
-                f"usa 'devolver'", f.linha)
+                f"a função '{f.nome}' declara devolver '{f.tipo_retorno}' mas nem "
+                f"todos os caminhos terminam com 'devolver' (ex.: falta um 'senao', "
+                f"ou um 'escolher' sem 'contrario') -- um caminho que chegue ao fim "
+                f"sem devolver nada crasha em runtime", f.linha)
 
-    def _contem_devolver(self, corpo):
-        for s in corpo:
+    def _todos_caminhos_devolvem(self, stmts):
+        """AL-49/B8: verificação CONSERVADORA de que todos os caminhos de
+        execução do bloco terminam num 'devolver' -- ao contrário do
+        antigo _contem_devolver (que só verificava "existe algum
+        'devolver' em qualquer lugar", mesmo dentro de um único ramo de
+        um 'se' sem 'senao'). Percorre as instruções em ordem; basta UMA
+        garantir sempre 'devolver' para o bloco inteiro garantir (tudo o
+        que vier a seguir é código morto, já assinalado à parte pelo
+        linter) -- por isso não olha só para a última instrução. Um 'se'
+        conta só se tiver 'senao' e TODOS os ramos garantirem devolver
+        (mesma regra para 'escolher'/'contrario'). Um 'faz...enquanto'
+        conta se o corpo garantir (executa sempre pelo menos uma vez,
+        antes de a condição sequer ser vista); um 'enquanto' só conta com
+        condição literalmente 'verdadeiro' (o ALGO não tem instrução para
+        sair de um ciclo a meio, por isso um corpo que garanta devolver
+        aqui garante-o já na primeira iteração). É deliberadamente
+        conservadora: pode recusar um programa correto num caso extremo
+        não coberto aqui, mas nunca aceita um que tenha de facto um
+        caminho sem 'devolver'."""
+        for s in stmts:
             if isinstance(s, A.Devolver):
                 return True
-            for bloco in A.subblocos(s):
-                if self._contem_devolver(bloco):
+            if isinstance(s, A.Se) and s.senao is not None:
+                if (all(self._todos_caminhos_devolvem(corpo) for _cond, corpo in s.ramos)
+                        and self._todos_caminhos_devolvem(s.senao)):
                     return True
+            elif isinstance(s, A.Escolha) and s.contrario is not None:
+                if (all(self._todos_caminhos_devolvem(corpo) for _valores, corpo in s.casos)
+                        and self._todos_caminhos_devolvem(s.contrario)):
+                    return True
+            elif isinstance(s, A.FazEnquanto) and self._todos_caminhos_devolvem(s.corpo):
+                return True
+            elif isinstance(s, A.Enquanto) and self._condicao_literalmente_verdadeira(s.condicao) \
+                    and self._todos_caminhos_devolvem(s.corpo):
+                return True
         return False
+
+    def _condicao_literalmente_verdadeira(self, expr):
+        return isinstance(expr, A.Literal) and expr.tipo == "booleano" and expr.valor is True
 
     # ---------- declarações ----------
     def _nome_ativo(self, escopo, nome):
@@ -233,30 +296,40 @@ class VerificadorTipos:
                 continue
             return False
 
+    def _verificar_nome_disponivel(self, nome, linha, o_que_e):
+        """Rejeita 'nome' se colidir com uma função/procedimento, estrutura,
+        biblioteca importada, nome interno gerado para uma biblioteca, ou
+        tipo primitivo. AL-50/B10: partilhado entre _registar_decl
+        (variáveis) e _verificar_funcao (parâmetros) -- antes, só
+        variáveis passavam por esta verificação; um parâmetro chamado
+        'Ponto' (sombreando uma estrutura) ou 'inteiro' compilava sem
+        aviso e podia gerar Python inválido/incorreto silenciosamente."""
+        if nome in self.funcoes:
+            raise ErroSemantico(
+                f"'{nome}' já é o nome de uma função/procedimento; escolhe "
+                f"outro nome para {o_que_e}", linha)
+        if nome in self.estruturas:
+            raise ErroSemantico(
+                f"'{nome}' já é o nome de uma estrutura; escolhe outro nome "
+                f"para {o_que_e}", linha)
+        if nome in self.bibliotecas_importadas:
+            raise ErroSemantico(
+                f"'{nome}' já é o nome de uma biblioteca importada; escolhe "
+                f"outro nome para {o_que_e}", linha)
+        if nome in self.nomes_internos_bibliotecas:
+            raise ErroSemantico(
+                f"'{nome}' colide com o nome interno gerado para "
+                f"'{self.nomes_internos_bibliotecas[nome]}' (biblioteca "
+                f"importada); escolhe outro nome para {o_que_e}", linha)
+        if nome in PRIMITIVOS:
+            raise ErroSemantico(
+                f"'{nome}' é o nome de um tipo primitivo; escolhe outro nome "
+                f"para {o_que_e}", linha)
+
     def _registar_decl(self, escopo, d: A.Declaracao):
         if self._nome_ativo(escopo, d.nome):
             raise ErroSemantico(f"a variável '{d.nome}' já foi declarada", d.linha)
-        if d.nome in self.funcoes:
-            raise ErroSemantico(
-                f"'{d.nome}' já é o nome de uma função/procedimento; escolhe "
-                f"outro nome para a variável", d.linha)
-        if d.nome in self.estruturas:
-            raise ErroSemantico(
-                f"'{d.nome}' já é o nome de uma estrutura; escolhe outro nome "
-                f"para a variável", d.linha)
-        if d.nome in self.bibliotecas_importadas:
-            raise ErroSemantico(
-                f"'{d.nome}' já é o nome de uma biblioteca importada; escolhe "
-                f"outro nome para a variável", d.linha)
-        if d.nome in self.nomes_internos_bibliotecas:
-            raise ErroSemantico(
-                f"'{d.nome}' colide com o nome interno gerado para "
-                f"'{self.nomes_internos_bibliotecas[d.nome]}' (biblioteca "
-                f"importada); escolhe outro nome para a variável", d.linha)
-        if d.nome in PRIMITIVOS:
-            raise ErroSemantico(
-                f"'{d.nome}' é o nome de um tipo primitivo; escolhe outro nome "
-                f"para a variável", d.linha)
+        self._verificar_nome_disponivel(d.nome, d.linha, "a variável")
         self._validar_tipo(d.tipo, d.linha)
         if d.eh_constante:
             if d.inicial is None:  # pragma: no cover -- o parser já exige '=' em 'constante'
@@ -265,16 +338,7 @@ class VerificadorTipos:
             if d.dims is not None:  # pragma: no cover -- 'constante' não tem sintaxe de array no parser
                 raise ErroSemantico("uma constante não pode ser um array", d.linha)
         if d.dims:
-            for dim_expr in d.dims:
-                tipo, _ = self._tipo_expr(dim_expr, escopo)
-                if tipo != "inteiro":
-                    raise ErroSemantico(
-                        "o tamanho de um array tem de ser uma expressão inteira", d.linha)
-                valor_literal = self._valor_literal_negativo(dim_expr)
-                if valor_literal is not None:
-                    raise ErroSemantico(
-                        f"o tamanho de um array não pode ser negativo (é {valor_literal})",
-                        dim_expr.linha)
+            self._validar_dims(d.dims, escopo, d.linha)
         if d.inicial is not None:
             if isinstance(d.inicial, A.ArrayLiteral):
                 # AL-16: o parser já não sabe se 'd' é um array -- este
@@ -287,10 +351,18 @@ class VerificadorTipos:
                 self._verificar_array_literal(d.inicial, d.tipo, len(d.dims), escopo)
             elif isinstance(d.inicial, A.EstruturaLiteral):
                 if d.dims is not None:
-                    raise ErroSemantico(
-                        f"'{d.nome}' é um array; usa '{{valor, valor, ...}}' para o "
-                        f"inicializar, não '{{campo: valor}}'", d.linha)
-                self._verificar_estrutura_literal(d.inicial, d.tipo, escopo)
+                    if d.inicial.campos:
+                        raise ErroSemantico(
+                            f"'{d.nome}' é um array; usa '{{valor, valor, ...}}' para o "
+                            f"inicializar, não '{{campo: valor}}'", d.linha)
+                    # AL-45/B5: '{}' vazio é sintaticamente ambíguo entre
+                    # "struct vazia" e "array vazio" -- o parser não sabe
+                    # (nem deve saber) as dimensões do alvo neste ponto
+                    # (_proximo_parece_campo_literal). Aqui já sabemos que
+                    # o alvo é um array, por isso um '{}' vazio é aceite
+                    # como um array literal sem elementos (ver codegen.py).
+                else:
+                    self._verificar_estrutura_literal(d.inicial, d.tipo, escopo)
             elif isinstance(d.inicial, A.Chamada) and self._tem_ref(d.inicial):
                 tipo_inicial = self._verificar_chamada(d.inicial, escopo)
                 if tipo_inicial is None:
@@ -300,6 +372,14 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"não é possível inicializar '{d.nome}' (tipo '{d.tipo}') com um "
                         f"valor do tipo '{tipo_inicial}'", d.linha)
+                # AL-51/B17: ao contrário do caminho normal de _tipo_expr,
+                # esta branch (chamada com 'ref' como valor inicial) nunca
+                # marcava _tipo_inferido -- codegen.py:_coagir_decimal
+                # depende dele para saber se tem de gerar float(...) no
+                # valor de retorno; sem isto, 'y:decimal = f(x)' com 'f'
+                # a devolver 'inteiro' ficava com o inteiro cru (5 em vez
+                # de 5.0).
+                d.inicial._tipo_inferido = tipo_inicial
             else:
                 tipo_inicial, _ = self._tipo_expr(d.inicial, escopo)
                 if not self._compativel(d.tipo, tipo_inicial):
@@ -308,6 +388,22 @@ class VerificadorTipos:
                         f"valor do tipo '{tipo_inicial}'", d.linha)
         dims_n = 0 if d.dims is None else len(d.dims)
         escopo[d.nome] = (d.tipo, dims_n, d.eh_constante)
+
+    def _validar_dims(self, dims, escopo, linha):
+        """Valida cada expressão de dimensão de um array: tem de ser
+        inteira e não pode ser um literal negativo. Partilhado entre
+        declarações normais (com escopo real) e campos de 'estrutura'
+        (AL-48/B7, com escopo vazio -- um campo não vê variáveis)."""
+        for dim_expr in dims:
+            tipo, _ = self._tipo_expr(dim_expr, escopo)
+            if tipo != "inteiro":
+                raise ErroSemantico(
+                    "o tamanho de um array tem de ser uma expressão inteira", linha)
+            valor_literal = self._valor_literal_negativo(dim_expr)
+            if valor_literal is not None:
+                raise ErroSemantico(
+                    f"o tamanho de um array não pode ser negativo (é {valor_literal})",
+                    dim_expr.linha)
 
     def _valor_literal_negativo(self, expr):
         """Devolve o valor se 'expr' for um literal negativo -- reconhece
@@ -389,7 +485,16 @@ class VerificadorTipos:
 
         elif isinstance(s, A.Atribuicao):
             self._verificar_nao_constante(s.alvo, escopo, "atribuir a")
-            tipo_alvo, _ = self._tipo_lvalue(s.alvo, escopo)
+            tipo_alvo, dims_alvo = self._tipo_lvalue(s.alvo, escopo)
+            if dims_alvo > 0:
+                # AL-46/B6: só _tipo_expr (lado direito) rejeitava um array
+                # não indexado -- o alvo de uma atribuição nunca era
+                # verificado, por isso 'v = 5' com 'v:inteiro[3]' compilava
+                # e crashava em runtime com um TypeError cru do Python.
+                raise ErroSemantico(
+                    f"'{s.alvo.nome}' é um array; não pode ser atribuído "
+                    f"diretamente (falta indexá-lo, ex: {s.alvo.nome}[i] = ...)",
+                    s.linha)
             if isinstance(s.expr, A.Chamada) and self._tem_ref(s.expr):
                 tipo_retorno = self._verificar_chamada(s.expr, escopo)
                 if tipo_retorno is None:
@@ -400,6 +505,8 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"não é possível atribuir um valor do tipo '{tipo_retorno}' à "
                         f"variável '{s.alvo.nome}' (tipo '{tipo_alvo}')", s.linha)
+                # AL-51/B17: mesma correção que a declaração, acima.
+                s.expr._tipo_inferido = tipo_retorno
             else:
                 tipo_expr, _ = self._tipo_expr(s.expr, escopo)
                 if not self._compativel(tipo_alvo, tipo_expr):
@@ -410,11 +517,41 @@ class VerificadorTipos:
         elif isinstance(s, A.Ler):
             for alvo in s.alvos:
                 self._verificar_nao_constante(alvo, escopo, "ler para")
-                self._tipo_lvalue(alvo, escopo)
+                tipo_alvo, dims_alvo = self._tipo_lvalue(alvo, escopo)
+                if dims_alvo > 0:
+                    # AL-46/B6: mesma verificação que a atribuição, acima.
+                    raise ErroSemantico(
+                        f"'{alvo.nome}' é um array; não pode ser o alvo direto "
+                        f"de 'ler' (falta indexá-lo, ex: ler({alvo.nome}[i]))",
+                        alvo.linha)
+                if tipo_alvo not in PRIMITIVOS:
+                    # AL-47/B9: 'ler' só sabe preencher um valor primitivo --
+                    # sem isto, 'ler(a)' com 'a' de tipo 'estrutura' compilava
+                    # para 'a = _algo_ler_texto()' (o leitor de recurso),
+                    # transformando 'a' silenciosamente numa string; o
+                    # crash real só aparecia mais tarde, num acesso a campo,
+                    # com uma mensagem enganadora (AttributeError traduzido
+                    # como "valor nulo").
+                    raise ErroSemantico(
+                        f"'{alvo.nome}' é do tipo '{tipo_alvo}'; 'ler' só pode "
+                        f"preencher um valor de tipo primitivo (inteiro, decimal, "
+                        f"booleano, cadeia ou caracter) -- lê os campos "
+                        f"individualmente", alvo.linha)
 
         elif isinstance(s, A.Escrever):
             for e in s.exprs:
-                self._tipo_expr(e, escopo)
+                tipo, _ = self._tipo_expr(e, escopo)
+                if tipo in self.estruturas:
+                    # AL-55/B14: arrays já eram implicitamente rejeitados
+                    # (via a verificação dims>0 de _tipo_expr), mas não
+                    # havia equivalente para estruturas -- 'escrever(p)'
+                    # com 'p:Ponto' imprimia algo como
+                    # "<__main__.Ponto object at 0x...>", sem valor
+                    # pedagógico e não determinístico na aparência.
+                    raise ErroSemantico(
+                        f"não é possível escrever um valor do tipo '{tipo}' "
+                        f"diretamente -- escreve os campos individualmente, "
+                        f"ex: '{A.texto_expr(e)}.campo'", s.linha)
 
         elif isinstance(s, A.Se):
             for cond, corpo in s.ramos:
@@ -476,6 +613,7 @@ class VerificadorTipos:
 
         elif isinstance(s, A.Escolha):
             tipo_base, _ = self._tipo_expr(s.expr, escopo)
+            valores_vistos = set()
             for valores, corpo in s.casos:
                 for v in valores:
                     tipo_v, _ = self._tipo_expr(v, escopo)
@@ -483,6 +621,20 @@ class VerificadorTipos:
                         raise ErroSemantico(
                             f"o valor de 'caso' é do tipo '{tipo_v}', incompatível com "
                             f"'{tipo_base}' de 'escolher'", getattr(v, "linha", s.linha))
+                    if isinstance(v, A.Literal):
+                        # AL-56/B15: erro clássico de copy-paste -- um
+                        # valor de 'caso' repetido faz o segundo ramo
+                        # nunca ser alcançado (o primeiro já capturou esse
+                        # valor). O linter já tinha um AVISO equivalente
+                        # (não bloqueia a compilação); isto promove o caso
+                        # comum (literais) a erro de compilação real.
+                        chave = (v.tipo, v.valor)
+                        if chave in valores_vistos:
+                            raise ErroSemantico(
+                                f"o valor '{A.texto_expr(v)}' já apareceu antes neste "
+                                f"'escolher' -- este ramo nunca seria alcançado",
+                                v.linha)
+                        valores_vistos.add(chave)
                 self._verificar_bloco(corpo, Escopo(escopo), ctx_funcao)
             if s.contrario is not None:
                 self._verificar_bloco(s.contrario, Escopo(escopo), ctx_funcao)
@@ -524,21 +676,29 @@ class VerificadorTipos:
         if lv.nome not in escopo:
             raise ErroSemantico(f"a variável '{lv.nome}' não foi declarada", lv.linha)
         tipo, dims = escopo[lv.nome][0], escopo[lv.nome][1]
+        # AL-53/B12: constrói o caminho textual real (ex.: "c.valores")
+        # à medida que percorremos os acessos -- antes, TODAS as mensagens
+        # de erro abaixo usavam sempre lv.nome (a variável base), mesmo
+        # quando o problema estava num campo/índice vários níveis
+        # adiante, dando mensagens factualmente erradas (ex.: "'c' é um
+        # array" quando 'c' é uma estrutura e o array é 'c.valores').
+        caminho = lv.nome
         for tag, valor in lv.acessos:
             if tag == "indice":
                 if dims <= 0:
                     raise ErroSemantico(
-                        f"'{lv.nome}' não é um array; não pode ser indexado", lv.linha)
+                        f"'{caminho}' não é um array; não pode ser indexado", lv.linha)
                 tipo_idx, _ = self._tipo_expr(valor, escopo)
                 if tipo_idx != "inteiro":
                     raise ErroSemantico(
-                        f"o índice de '{lv.nome}' tem de ser inteiro (é '{tipo_idx}')",
+                        f"o índice de '{caminho}' tem de ser inteiro (é '{tipo_idx}')",
                         lv.linha)
                 dims -= 1
+                caminho = f"{caminho}[{A.texto_expr(valor)}]"
             else:  # "campo"
                 if dims > 0:
                     raise ErroSemantico(
-                        f"'{lv.nome}' é um array; falta indexá-lo antes de aceder a "
+                        f"'{caminho}' é um array; falta indexá-lo antes de aceder a "
                         f"'.{valor}'", lv.linha)
                 if tipo not in self.estruturas:
                     raise ErroSemantico(
@@ -550,6 +710,7 @@ class VerificadorTipos:
                         f"a estrutura '{tipo}' não tem nenhum campo '{valor}'. "
                         f"Campos disponíveis: {disponiveis}", lv.linha)
                 tipo, dims = campos[valor]
+                caminho = f"{caminho}.{valor}"
         return tipo, dims
 
     def _tipo_expr(self, expr, escopo):

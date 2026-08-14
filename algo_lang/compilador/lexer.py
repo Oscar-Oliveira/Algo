@@ -61,6 +61,17 @@ def _remover_comentarios_bloco(codigo: str) -> str:
     dentro_char = False
     while i < n:
         c = codigo[i]
+        if (dentro_str or dentro_char) and c == "\\" and i + 1 < n:
+            # AL-42: um '\"'/'\\' escapado dentro de uma string (ou um '\''
+            # escapado dentro de um caracter) não pode alternar dentro_str/
+            # dentro_char -- ao contrário do que este laço fazia antes,
+            # tratando toda aspa como fecho real. Sem isto, uma string como
+            # "say \" then // not a comment" fechava cedo demais no '\"', e
+            # o '//' a seguir apagava o resto da linha como se fosse
+            # comentário.
+            resultado.append(codigo[i:i + 2])
+            i += 2
+            continue
         if not dentro_str and not dentro_char and c == "/" and i + 1 < n and codigo[i + 1] == "/":
             # AL-XX: um '//' de comentário de linha tem de "esconder" o
             # resto da linha desta passagem -- senão um '/*' que apareça
@@ -84,7 +95,14 @@ def _remover_comentarios_bloco(codigo: str) -> str:
                 raise ErroLexico(
                     "comentário de bloco '/*' nunca foi fechado com '*/'", linha_abertura)
             trecho = codigo[i:j + 2]
-            resultado.append("\n" * trecho.count("\n"))
+            n_newlines = trecho.count("\n")
+            # AL-41: um comentário de bloco numa só linha (sem newline
+            # nenhum) tem de deixar um separador -- substituí-lo por ""
+            # fundia os tokens dos dois lados (ex.: "a/*c*/b" virava o
+            # identificador único "ab"). Só quando o comentário TEM
+            # newlines é que os preservamos tal-e-qual, para os números de
+            # linha a seguir continuarem corretos.
+            resultado.append("\n" * n_newlines if n_newlines else " ")
             i += len(trecho)
             continue
         if c == '"' and not dentro_char:
@@ -181,6 +199,11 @@ def _remover_comentario(linha):
     i = 0
     while i < len(linha):
         c = linha[i]
+        if (dentro_str or dentro_char) and c == "\\" and i + 1 < len(linha):
+            # AL-42: mesma correção que _remover_comentarios_bloco -- uma
+            # aspa escapada não fecha a string/caracter.
+            i += 2
+            continue
         if c == '"' and not dentro_char:
             dentro_str = not dentro_str
         elif c == "'" and not dentro_str:
@@ -220,9 +243,16 @@ def _tokenizar_linha(linha, linha_num):
             i = j + 1
             continue
         if c == "'":
+            # AL-43: mesmos escapes que STRING (\' aspa simples literal, \\
+            # barra invertida literal) -- sem isto não havia forma nenhuma
+            # de representar um caracter ''' (apóstrofo).
             j = i + 1
             buf = []
             while j < n and linha[j] != "'":
+                if linha[j] == "\\" and j + 1 < n and linha[j + 1] in ("'", "\\", "n"):
+                    buf.append({"'": "'", "\\": "\\", "n": "\n"}[linha[j + 1]])
+                    j += 2
+                    continue
                 buf.append(linha[j])
                 j += 1
             if j >= n:

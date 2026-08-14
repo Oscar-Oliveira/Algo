@@ -122,8 +122,17 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                              if k in nomes_globais}
                 pilha.append({"nome": "Principal", "variaveis": variaveis})
             elif nome in nomes_funcoes_conhecidas:
+                # AL-67/B27: o lexer permite explicitamente identificadores
+                # ALGO começados por '_' (ex.: 'funcao f(_x:inteiro)') --
+                # filtrar por "começa com '_'" escondia essas variáveis
+                # REAIS do estudante do trace, não só os temporários
+                # internos do compilador (que usam sempre o prefixo
+                # '_algo_'). '_' sozinho é o único outro nome interno
+                # gerado sem esse prefixo (destino descartado do valor de
+                # retorno principal de uma chamada com 'ref' usada como
+                # instrução solta -- ver _gerar_chamada_stmt).
                 variaveis = {k: _valor_serializavel(v) for k, v in f.f_locals.items()
-                             if not k.startswith("_")}
+                             if not k.startswith("_algo_") and k != "_"}
                 pilha.append({"nome": nome, "variaveis": variaveis})
             # frames de funções auxiliares internas (_algo_...) não entram na pilha visível
             f = f.f_back

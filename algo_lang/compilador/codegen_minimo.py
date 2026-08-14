@@ -40,7 +40,10 @@ LEITORES_INLINE_POR_TIPO = {
 # Módulos python que cada entrada precisa (para saber que 'import' emitir).
 BIBLIOTECA_MINIMA = {
     "matematica.raiz": (lambda args: f"math.sqrt({args[0]})", "math"),
-    "matematica.potencia": (lambda args: f"({args[0]} ** {args[1]})", None),
+    # AL-60/B20: bibliotecas/matematica.py embrulha sempre em float(...)
+    # (contrato do modo normal: matematica.potencia(2,3) dá 8.0, não 8) --
+    # sem o float() aqui, --minimo dava 8 (int), divergindo do modo normal.
+    "matematica.potencia": (lambda args: f"float({args[0]} ** {args[1]})", None),
     "matematica.absoluto": (lambda args: f"abs({args[0]})", None),
     "matematica.piso": (lambda args: f"math.floor({args[0]})", "math"),
     "matematica.teto": (lambda args: f"math.ceil({args[0]})", "math"),
@@ -158,6 +161,12 @@ class GeradorCodigo(GeradorCodigoBase):
     # -------- declarações --------
     def _gerar_declaracao(self, d: A.Declaracao, nivel, tipos):
         if d.inicial is not None and isinstance(d.inicial, A.EstruturaLiteral):
+            if d.dims is not None:
+                # AL-45/B5: '{}' vazio inicializando um array -- mesma
+                # correção que codegen.py, para --minimo não divergir do
+                # modo normal num programa ALGO válido.
+                self.emit(f"{d.nome} = []", nivel)
+                return
             kwargs = ", ".join(
                 f"{nome}={self._expr(valor, tipos)}" for nome, valor in d.inicial.campos)
             self.emit(f"{d.nome} = {d.tipo}({kwargs})", nivel)
@@ -288,11 +297,19 @@ class GeradorCodigo(GeradorCodigoBase):
                 # não a floor division nativa do Python -- inline em vez
                 # de função de apoio, para se manter fiel ao espírito
                 # deste modo (Python o mais direto possível).
+                # AL-59/B19: a versão anterior ('int(e / d)') passava por
+                # float, perdendo precisão para inteiros grandes (acima de
+                # ~2^52) -- diverge do modo normal, que usa divmod() exato
+                # (_algo_div). Reescrito com // (floor division exata, sem
+                # float) mais uma correção de +1 quando os sinais diferem
+                # (floor division arredonda para -infinito; div trunca em
+                # direção a zero) -- mesma fórmula, sem função de apoio.
                 e = self._expr(expr.esq, tipos)
                 d = self._expr(expr.dire, tipos)
+                divisao = f"(-(-({e}) // ({d})) if (({e}) < 0) != (({d}) < 0) else ({e}) // ({d}))"
                 if expr.op == "div":
-                    return f"int({e} / {d})"
-                return f"({e} - int({e} / {d}) * {d})"
+                    return divisao
+                return f"(({e}) - {divisao} * ({d}))"
             op = OPS_BIN[expr.op]
             return f"({self._expr(expr.esq, tipos)} {op} {self._expr(expr.dire, tipos)})"
         if isinstance(expr, A.UnOp):

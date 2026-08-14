@@ -2,8 +2,10 @@
 """Testes para o linter (avisos de estilo, não impedem a compilação)."""
 import textwrap
 
+import pytest
+
 from algo_lang.compilador.parser import parse
-from algo_lang.compilador.semantics import verificar
+from algo_lang.compilador.semantics import verificar, ErroSemantico
 from algo_lang.tools.linter import analisar
 
 
@@ -399,18 +401,41 @@ def test_importares_diferentes_nao_dao_aviso():
 
 
 def test_caso_repetido_em_escolha_da_aviso():
+    # AL-56/B15 (algo_lang/AUDITORIA_PROGRESSO.md): um 'caso' repetido com
+    # um LITERAL direto (ex.: 'caso 1' duas vezes) passou a ser um ERRO de
+    # compilação em semantics.py, não só um aviso -- por isso este teste
+    # usa a mesma VARIÁVEL como valor de 'caso' duas vezes (não coberto
+    # pela verificação nova, que só olha para literais diretos), para
+    # continuar a exercitar o aviso do próprio linter.
     avisos = _avisos("""
         algoritmo "T"
         inicio
             x:inteiro = 1
+            y:inteiro = 1
             escolher x
-                caso 1
+                caso y
                     escrever("um")
-                caso 1
+                caso y
                     escrever("também um")
     """)
     relevantes = [a for a in avisos if "já apareceu na linha" in a.mensagem]
     assert len(relevantes) == 1
+
+
+def test_caso_repetido_em_escolha_com_literal_direto_e_erro_de_compilacao():
+    """AL-56/B15: o caso mais comum (literal repetido) passou a ser
+    apanhado em compilação, não só pelo linter."""
+    with pytest.raises(ErroSemantico, match="já apareceu"):
+        _avisos("""
+            algoritmo "T"
+            inicio
+                x:inteiro = 1
+                escolher x
+                    caso 1
+                        escrever("um")
+                    caso 1
+                        escrever("também um")
+        """)
 
 
 def test_casos_diferentes_em_escolha_nao_dao_aviso():

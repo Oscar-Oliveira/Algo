@@ -29,6 +29,7 @@ class ErroSintatico(Exception):
 
 
 LIMITE_PROFUNDIDADE_EXPR = 50
+LIMITE_PROFUNDIDADE_BLOCO = 50
 
 
 class Parser:
@@ -36,6 +37,7 @@ class Parser:
         self.tokens = tokens
         self.pos = 0
         self._profundidade_expr = 0
+        self._profundidade_bloco = 0
 
     # ---------- utilidades ----------
     def atual(self):
@@ -293,16 +295,31 @@ class Parser:
         return self._parse_bloco_stmts()
 
     def _parse_bloco_stmts(self):
-        self.esperar("INDENT")
-        stmts = []
-        while not self.ver("DEDENT"):
-            item = self._parse_stmt()
-            if isinstance(item, list):
-                stmts.extend(item)
-            else:
-                stmts.append(item)
-        self.esperar("DEDENT")
-        return stmts
+        # AL-44: mesmo padrão de _parse_expr/_profundidade_expr (AL-18) --
+        # sem isto, blocos 'se'/'para'/'enquanto'/... aninhados a mais
+        # estouravam a pilha de recursão do próprio Python (RecursionError
+        # não tratado, sem número de linha nem explicação); cli.py só
+        # apanha (ErroLexico, ErroSintatico, ErroSemantico), por isso um
+        # RecursionError propagava como traceback Python cru.
+        self._profundidade_bloco += 1
+        if self._profundidade_bloco > LIMITE_PROFUNDIDADE_BLOCO:
+            raise ErroSintatico(
+                "blocos aninhados a mais ('se'/'para'/'enquanto'/... uns "
+                "dentro dos outros) -- tenta simplificar, ex. extraindo "
+                "parte da lógica para uma função", self.atual().linha)
+        try:
+            self.esperar("INDENT")
+            stmts = []
+            while not self.ver("DEDENT"):
+                item = self._parse_stmt()
+                if isinstance(item, list):
+                    stmts.extend(item)
+                else:
+                    stmts.append(item)
+            self.esperar("DEDENT")
+            return stmts
+        finally:
+            self._profundidade_bloco -= 1
 
     # ---------- statements ----------
     def _parse_stmt(self):

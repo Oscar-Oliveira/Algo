@@ -36,14 +36,16 @@ FUNCOES = {
     ),
     "caracter": (
         ["cadeia", "inteiro"], "caracter",
-        # 0-baseado, tal como os arrays. Um índice fora dos limites dá
-        # IndexError -- reencaminhado como _AlgoIndiceCadeiaInvalido (AL-09,
-        # definida no cabeçalho de codegen.py) para a mensagem amigável
-        # distinguir "posição de texto" de "posição de array".
+        # 0-baseado, tal como os arrays e tal como 'subcadeia' (abaixo).
+        # AL-64/B24: antes, um índice negativo não dava IndexError nenhum
+        # -- s[-1] do Python devolve o último caracter em vez de levantar
+        # erro, ao contrário de 'subcadeia', que já rejeita limites
+        # negativos explicitamente. Guarda explícita, consistente com a
+        # documentação da função ("0-baseado"), em vez de confiar no
+        # comportamento (inconsistente) do índice nativo do Python.
         "def cadeia_caracter(s, i):\n"
-        "    try:\n"
-        "        return s[i]\n"
-        "    except IndexError:\n"
-        "        raise _AlgoIndiceCadeiaInvalido(i) from None\n",
+        "    if i < 0 or i >= len(s):\n"
+        "        raise _AlgoIndiceCadeiaInvalido(i)\n"
+        "    return s[i]\n",
     ),
 }

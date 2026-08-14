@@ -51,7 +51,9 @@ class Linter:
 
         arrays_globais = self._arrays_com_tamanho_literal(self.programa.declaracoes)
 
-        self._verificar_variaveis_nao_usadas(self.programa.corpo, contexto="no programa principal")
+        self._verificar_variaveis_nao_usadas(
+            self.programa.corpo, contexto="no programa principal",
+            tambem_procurar_em=[f.corpo for f in self.programa.funcoes])
         self._verificar_globais_nao_usadas()
         self._verificar_divisoes_e_comparacoes(self.programa.corpo)
         self._verificar_codigo_depois_de_devolver(self.programa.corpo)
@@ -205,21 +207,35 @@ class Linter:
             for _nome, valor in expr.campos:
                 self._extrair_lvalues_e_chamadas(valor, destino_vars, destino_chamadas)
 
-    def _verificar_variaveis_nao_usadas(self, corpo, contexto):
+    def _verificar_variaveis_nao_usadas(self, corpo, contexto, tambem_procurar_em=None):
+        """AL-66/B26: 'tambem_procurar_em' (lista extra de corpos onde
+        procurar USO, não declarações) -- uma variável declarada dentro
+        de 'inicio' é tão global quanto uma declarada antes (ver
+        codegen.py: A.coletar_declaracoes_tipadas percorre
+        'programa.corpo' para a tabela de globais), por isso pode ser
+        usada só dentro de uma função. Sem isto (só usado pela chamada
+        para 'self.programa.corpo', a partir de analisar()), esta
+        verificação só via uso dentro do PRÓPRIO corpo, dando um falso
+        positivo "declarada mas nunca usada" ao mesmo tempo que
+        _verificar_uso_de_globais provava o contrário (a função "acede
+        diretamente" a essa mesma variável) -- a mesma classe de bug que
+        AL-28 já tinha corrigido para _verificar_globais_nao_usadas,
+        deixada por corrigir aqui."""
         declaradas = {}   # nome -> linha (só declarações explícitas, não variáveis de ciclo 'para')
         for s in self._todas_as_stmts(corpo):
             if isinstance(s, A.Declaracao):
                 declaradas[s.nome] = s.linha
 
         usadas = set()
-        for s in self._todas_as_stmts(corpo):
-            for e in self._expressoes_lidas(s):
-                self._extrair_lvalues(e, usadas)
-            if isinstance(s, A.Para):
-                # a variável de controlo tem de estar pré-declarada (ver
-                # semantics.py) -- o próprio ciclo já conta como uso dela,
-                # mesmo que o corpo nunca a leia (idioma comum: repetir N vezes)
-                usadas.add(s.var)
+        for c in [corpo] + list(tambem_procurar_em or []):
+            for s in self._todas_as_stmts(c):
+                for e in self._expressoes_lidas(s):
+                    self._extrair_lvalues(e, usadas)
+                if isinstance(s, A.Para):
+                    # a variável de controlo tem de estar pré-declarada (ver
+                    # semantics.py) -- o próprio ciclo já conta como uso dela,
+                    # mesmo que o corpo nunca a leia (idioma comum: repetir N vezes)
+                    usadas.add(s.var)
 
         for nome, linha in declaradas.items():
             if nome not in usadas:
@@ -435,6 +451,18 @@ class Linter:
                     f"o parâmetro '{s.alvo.nome}' de '{f.nome}' não é 'por referência' -- "
                     f"atribuir-lhe aqui um novo valor não é visto por quem chamou a função",
                     s.linha))
+            elif isinstance(s, A.Ler):
+                # AL-70/B30: só A.Atribuicao era verificado -- 'ler(x)'
+                # sobre um parâmetro por valor 'x' também só escreve na
+                # cópia local, mas só disparava o aviso genérico "nunca é
+                # usado" (x É lido/escrito, só que a escrita não conta
+                # como "uso" para esse aviso), nunca este, mais específico.
+                for alvo in s.alvos:
+                    if not alvo.acessos and alvo.nome in nomes_por_valor:
+                        self.avisos.append(Aviso(
+                            f"o parâmetro '{alvo.nome}' de '{f.nome}' não é 'por referência' "
+                            f"-- 'ler' para ele aqui não é visto por quem chamou a função",
+                            s.linha))
 
     def _verificar_resultado_de_funcao_descartado(self):
         funcoes_por_nome = {f.nome: f for f in self.programa.funcoes}
@@ -522,24 +550,62 @@ class Linter:
             return -expr.operando.valor
         return None
 
+    def _verificar_literal_de_estrutura_campos_em_falta(self, tipo_nome, lit, campos_por_estrutura):
+        campos_da_estrutura = campos_por_estrutura.get(tipo_nome)
+        if campos_da_estrutura is None:
+            return
+        campos_dados = {nome for nome, _expr in lit.campos}
+        em_falta = sorted(campos_da_estrutura - campos_dados)
+        if em_falta:
+            lista = ", ".join(f"'{c}'" for c in em_falta)
+            self.avisos.append(Aviso(
+                f"o literal de '{tipo_nome}' não define o(s) campo(s) {lista} -- ficam "
+                f"com o valor por omissão", lit.linha))
+
+    def _verificar_campos_em_falta_em_chamada(self, expr, funcoes_por_nome, campos_por_estrutura):
+        """AL-69/B29: semantics.py já documenta que um literal de estrutura
+        é válido "como argumento de uma função/procedimento" também --
+        esta verificação só olhava para Declaracao.inicial, deixando
+        'soma({x: 3})' (com 'y' a ficar silenciosamente a 0) sem aviso
+        nenhum. Percorre recursivamente à procura de A.Chamada, para
+        também apanhar literais passados a chamadas aninhadas."""
+        if isinstance(expr, A.Chamada):
+            f_def = funcoes_por_nome.get(expr.nome)
+            if f_def is not None:
+                for arg, p in zip(expr.args, f_def.parametros):
+                    if isinstance(arg, A.EstruturaLiteral):
+                        self._verificar_literal_de_estrutura_campos_em_falta(
+                            p.tipo, arg, campos_por_estrutura)
+            for a in expr.args:
+                self._verificar_campos_em_falta_em_chamada(a, funcoes_por_nome, campos_por_estrutura)
+        elif isinstance(expr, A.BinOp):
+            self._verificar_campos_em_falta_em_chamada(expr.esq, funcoes_por_nome, campos_por_estrutura)
+            self._verificar_campos_em_falta_em_chamada(expr.dire, funcoes_por_nome, campos_por_estrutura)
+        elif isinstance(expr, A.UnOp):
+            self._verificar_campos_em_falta_em_chamada(
+                expr.operando, funcoes_por_nome, campos_por_estrutura)
+        elif isinstance(expr, A.ArrayLiteral):
+            for e in expr.elementos:
+                self._verificar_campos_em_falta_em_chamada(e, funcoes_por_nome, campos_por_estrutura)
+        elif isinstance(expr, A.EstruturaLiteral):
+            for _nome, valor in expr.campos:
+                self._verificar_campos_em_falta_em_chamada(valor, funcoes_por_nome, campos_por_estrutura)
+
     def _verificar_campos_em_falta_em_literal_de_estrutura(self):
         campos_por_estrutura = {e.nome: {c.nome for c in e.campos} for e in self.programa.estruturas}
         declaracoes = list(self.programa.declaracoes)
         for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
             declaracoes.extend(s for s in self._todas_as_stmts(stmts) if isinstance(s, A.Declaracao))
         for d in declaracoes:
-            if not isinstance(d.inicial, A.EstruturaLiteral):
-                continue
-            campos_da_estrutura = campos_por_estrutura.get(d.tipo)
-            if campos_da_estrutura is None:
-                continue
-            campos_dados = {nome for nome, _expr in d.inicial.campos}
-            em_falta = sorted(campos_da_estrutura - campos_dados)
-            if em_falta:
-                lista = ", ".join(f"'{c}'" for c in em_falta)
-                self.avisos.append(Aviso(
-                    f"o literal de '{d.tipo}' não define o(s) campo(s) {lista} -- ficam "
-                    f"com o valor por omissão", d.linha))
+            if isinstance(d.inicial, A.EstruturaLiteral):
+                self._verificar_literal_de_estrutura_campos_em_falta(
+                    d.tipo, d.inicial, campos_por_estrutura)
+
+        funcoes_por_nome = {f.nome: f for f in self.programa.funcoes}
+        for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
+            for s in self._todas_as_stmts(stmts):
+                for e in self._expressoes_lidas(s):
+                    self._verificar_campos_em_falta_em_chamada(e, funcoes_por_nome, campos_por_estrutura)
 
 
 def analisar(programa: A.Programa, codigo_fonte: str = None):

@@ -21,12 +21,25 @@ FUNCOES = {
     "paraInteiro": (
         # bool -> 0/1; decimal -> trunca em direção a zero; cadeia/caracter
         # -> faz parse (ValueError com texto inválido já é traduzido).
+        # AL-65/B25: uma cadeia com ponto decimal (ex.: "3.5") caía direto
+        # no ValueError de int() -- assimetria com um valor 'decimal'
+        # (que já trunca sem erro nenhum). Cai para int(float(x)) só
+        # quando 'x' é texto E o parse direto de int() falhou; se também
+        # não for um número decimal válido, o ValueError original (e a
+        # sua tradução) é preservado tal-e-qual.
         ["primitivo"], "inteiro",
         "def conversao_paraInteiro(x):\n"
         "    try:\n"
         "        return int(x)\n"
         "    except OverflowError as e:\n"
-        "        raise ValueError(str(e)) from None\n",
+        "        raise ValueError(str(e)) from None\n"
+        "    except ValueError as e:\n"
+        "        if isinstance(x, str):\n"
+        "            try:\n"
+        "                return int(float(x))\n"
+        "            except ValueError:\n"
+        "                pass\n"
+        "        raise e\n",
     ),
     "paraDecimal": (
         ["primitivo"], "decimal",

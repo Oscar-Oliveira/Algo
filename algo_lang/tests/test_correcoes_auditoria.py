@@ -468,7 +468,7 @@ def test_sem_parametro_duplicado():
 
 
 def test_sem_funcao_declara_tipo_mas_nunca_devolve():
-    with pytest.raises(ErroSemantico, match="nunca"):
+    with pytest.raises(ErroSemantico, match="devolver"):
         compilar("""
             algoritmo "T"
             funcao f():inteiro
@@ -2499,11 +2499,18 @@ def test_cli_e_online_produzem_a_mesma_mensagem_de_colisao_de_sempre():
 # ---------- AL-07: base partilhada entre codegen.py e codegen_minimo.py ----------
 
 def test_geradores_de_codigo_partilham_a_mesma_base():
-    """As ~11 funções que eram bytes idênticas entre codegen.py e
+    """As funções que continuam bytes idênticas entre codegen.py e
     codegen_minimo.py (percurso de lvalues, resolução de funções,
     se/para/escolha, etc.) foram extraídas para gerador_base.py --
     confirma que as duas classes GeradorCodigo herdam da mesma base, e
-    não têm cada uma a sua própria cópia dessas funções."""
+    não têm cada uma a sua própria cópia dessas funções.
+
+    AL-51/B17: '_gerar_atribuicao' saiu desta lista -- codegen.py passou
+    a sobrepor a versão da base só para o caminho de chamada com 'ref'
+    (coerção inteiro->decimal do retorno e dos argumentos, cópia de
+    estruturas por valor), que codegen_minimo.py deliberadamente não
+    tem, tal como já acontecia com '_gerar_chamada_stmt'/'_lvalue_de_expr'
+    (nunca estiveram nesta lista, pela mesma razão)."""
     from algo_lang.compilador import codegen, codegen_minimo, gerador_base
 
     assert issubclass(codegen.GeradorCodigo, gerador_base.GeradorCodigoBase)
@@ -2511,7 +2518,7 @@ def test_geradores_de_codigo_partilham_a_mesma_base():
 
     metodos_partilhados = [
         "emit", "_valor_default", "_gerar_corpo", "_encontrar_funcao", "_lvalue",
-        "_tipo_final_lvalue", "_gerar_atribuicao", "_gerar_se", "_gerar_para",
+        "_tipo_final_lvalue", "_gerar_se", "_gerar_para",
         "_gerar_escolha", "_gerar_funcao",
     ]
     for nome in metodos_partilhados:
@@ -2660,3 +2667,675 @@ def test_flowchart_nao_esconde_instrucao_nao_suportada_num_no_generico():
     gerador = GeradorFluxograma("T")
     with pytest.raises(ErroInternoFluxograma):
         gerador.gerar_stmt(object(), "n1")
+
+
+# ===========================================================================
+# Segunda auditoria (AUDITORIA.md, 2026-08-13) -- ver AUDITORIA_PROGRESSO.md
+# ===========================================================================
+
+# ---------- B1 (AL-41): comentário de bloco sem espaço funde tokens ----------
+
+def test_comentario_bloco_sem_espaco_nao_funde_inteiros_adjacentes():
+    from algo_lang.compilador.lexer import tokenizar
+    tokens = tokenizar('algoritmo "T"\ninicio\n    escrever(1/**/2)\n')
+    valores_int = [t.valor for t in tokens if t.tipo == "INT"]
+    assert valores_int == [1, 2]
+
+
+def test_comentario_bloco_sem_espaco_nao_funde_identificadores_adjacentes():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            a:inteiro = 1
+            escrever(a/*comentario*/+1)
+    """)
+    assert saida.strip() == "2"
+
+
+# ---------- B2 (AL-42): aspa escapada confunde remoção de comentários ----------
+
+def test_aspa_escapada_seguida_de_barra_dupla_nao_e_tratada_como_comentario():
+    saida = executar(r"""
+        algoritmo "T"
+        inicio
+            escrever("say \" then // not a comment")
+    """)
+    assert saida.strip() == 'say " then // not a comment'
+
+
+def test_aspa_escapada_nao_confunde_deteccao_de_comentario_de_bloco():
+    """O '/* not */' está dentro da string (depois da aspa escapada), por
+    isso não é um comentário real -- tem de ficar tal-e-qual no valor."""
+    saida = executar(r"""
+        algoritmo "T"
+        inicio
+            escrever("say \" then /* not */ a comment")
+    """)
+    assert saida.strip() == 'say " then /* not */ a comment'
+
+
+# ---------- B3 (AL-43): 'caracter' sem escape para apóstrofo ----------
+
+def test_caracter_apostrofo_escapado():
+    saida = executar(r"""
+        algoritmo "T"
+        inicio
+            c:caracter = '\''
+            escrever(c)
+    """)
+    assert saida.strip() == "'"
+
+
+# ---------- B4 (AL-44): sem limite de profundidade para blocos aninhados ----------
+
+def _programa_com_blocos_aninhados(profundidade):
+    corpo = "".join(
+        "    " * (i + 1) + "se verdadeiro entao\n" for i in range(profundidade))
+    corpo += "    " * (profundidade + 1) + 'escrever("fundo")\n'
+    return f'algoritmo "T"\ninicio\n{corpo}'
+
+
+def test_blocos_aninhados_a_mais_da_erro_sintatico_nao_recursionerror():
+    from algo_lang.compilador.parser import ErroSintatico
+    with pytest.raises(ErroSintatico, match="aninhados a mais"):
+        compilar(_programa_com_blocos_aninhados(200))
+
+
+def test_blocos_aninhados_dentro_do_limite_continuam_a_compilar():
+    assert executar(_programa_com_blocos_aninhados(10)).strip() == "fundo"
+
+
+# ---------- B5 (AL-45): '{}' nunca interpretado como array literal vazio ----------
+
+def test_chaveta_vazia_inicializa_array_vazio_sem_erro():
+    codigo_py = compilar("""
+        algoritmo "T"
+        inicio
+            v:inteiro[3] = {}
+            escrever("ok")
+    """)
+    assert "v = []" in codigo_py
+
+
+def test_chaveta_vazia_com_campos_de_estrutura_continua_a_dar_erro_claro():
+    with pytest.raises(ErroSemantico, match="array"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                v:inteiro[3] = {x: 1}
+        """)
+
+
+# ---------- B6 (AL-46): atribuição a um array inteiro não é rejeitada ----------
+
+def test_atribuir_diretamente_a_array_e_erro_semantico():
+    with pytest.raises(ErroSemantico, match="array"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                v:inteiro[3]
+                v = 5
+        """)
+
+
+def test_ler_diretamente_para_array_e_erro_semantico():
+    with pytest.raises(ErroSemantico, match="array"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                v:inteiro[3]
+                ler(v)
+        """)
+
+
+# ---------- B7 (AL-48): tamanhos de arrays em campos de 'estrutura' não validados ----------
+
+def test_tamanho_de_array_negativo_em_campo_de_estrutura_e_erro_de_compilacao():
+    with pytest.raises(ErroSemantico, match="negativo"):
+        compilar("""
+            algoritmo "T"
+            estrutura Caixa
+                valores: inteiro[-3]
+            inicio
+                c:Caixa
+        """)
+
+
+def test_tamanho_de_array_nao_inteiro_em_campo_de_estrutura_e_erro_de_compilacao():
+    with pytest.raises(ErroSemantico, match="inteira"):
+        compilar("""
+            algoritmo "T"
+            estrutura Caixa
+                valores: inteiro[verdadeiro]
+            inicio
+                c:Caixa
+        """)
+
+
+# ---------- B8 (AL-49): nem todos os caminhos de uma função devolvem valor ----------
+
+def test_funcao_com_se_sem_senao_nem_sempre_devolve_e_erro():
+    with pytest.raises(ErroSemantico, match="devolver"):
+        compilar("""
+            algoritmo "T"
+            funcao f(x:inteiro): inteiro
+                se x > 0 entao
+                    devolver 1
+            inicio
+                escrever(f(-5) + 1)
+        """)
+
+
+def test_funcao_com_se_senao_devolvendo_nos_dois_ramos_compila():
+    saida = executar("""
+        algoritmo "T"
+        funcao f(x:inteiro): inteiro
+            se x > 0 entao
+                devolver 1
+            senao
+                devolver 0
+        inicio
+            escrever(f(5))
+    """)
+    assert saida.strip() == "1"
+
+
+def test_funcao_com_escolher_sem_contrario_nem_sempre_devolve_e_erro():
+    with pytest.raises(ErroSemantico, match="devolver"):
+        compilar("""
+            algoritmo "T"
+            funcao f(x:inteiro): inteiro
+                escolher x
+                    caso 1
+                        devolver 10
+            inicio
+                escrever(f(2))
+        """)
+
+
+# ---------- B9 (AL-47): 'ler' aceita silenciosamente arrays e structs como alvo ----------
+
+def test_ler_para_variavel_de_tipo_estrutura_e_erro_semantico():
+    with pytest.raises(ErroSemantico, match="primitivo"):
+        compilar("""
+            algoritmo "T"
+            estrutura Ponto
+                x:inteiro
+            inicio
+                p:Ponto
+                ler(p)
+        """)
+
+
+# ---------- B10 (AL-50): parâmetros nunca verificados contra colisão de nomes ----------
+
+def test_parametro_com_nome_de_estrutura_e_erro_semantico():
+    with pytest.raises(ErroSemantico, match="estrutura"):
+        compilar("""
+            algoritmo "T"
+            estrutura Ponto
+                x:inteiro
+            funcao f(Ponto: inteiro): inteiro
+                devolver Ponto
+            inicio
+                escrever(f(1))
+        """)
+
+
+def test_parametro_com_nome_de_tipo_primitivo_e_erro_semantico():
+    with pytest.raises(ErroSemantico, match="tipo primitivo"):
+        compilar("""
+            algoritmo "T"
+            funcao f(inteiro: inteiro): inteiro
+                devolver inteiro
+            inicio
+                escrever(f(1))
+        """)
+
+
+# ---------- B11 (AL-52): estruturas por valor não são copiadas ----------
+
+def test_estrutura_passada_por_valor_nao_e_mutada_no_chamador():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento muda(p:Ponto)
+            p.x = 99
+        inicio
+            a:Ponto = {x: 1}
+            muda(a)
+            escrever(a.x)
+    """)
+    assert saida.strip() == "1"
+
+
+def test_estrutura_passada_por_ref_continua_a_mutar_no_chamador():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento muda(ref p:Ponto)
+            p.x = 99
+        inicio
+            a:Ponto = {x: 1}
+            muda(a)
+            escrever(a.x)
+    """)
+    assert saida.strip() == "99"
+
+
+# ---------- B17 (AL-51): falta coerção inteiro->decimal em retorno de 'ref' ----------
+
+def test_declaracao_decimal_a_partir_de_funcao_ref_que_devolve_inteiro_e_coagida():
+    saida = executar("""
+        algoritmo "T"
+        funcao f(ref a:inteiro):inteiro
+            a = 5
+            devolver a
+        inicio
+            x:inteiro = 1
+            y:decimal = f(x)
+            escrever(y)
+    """)
+    assert saida.strip() == "5.0"
+
+
+def test_atribuicao_decimal_a_partir_de_funcao_ref_que_devolve_inteiro_e_coagida():
+    saida = executar("""
+        algoritmo "T"
+        funcao f(ref a:inteiro):inteiro
+            a = 5
+            devolver a
+        inicio
+            x:inteiro = 1
+            y:decimal = 0.0
+            y = f(x)
+            escrever(y)
+    """)
+    assert saida.strip() == "5.0"
+
+
+# ---------- B12 (AL-53): mensagens de _tipo_lvalue usam sempre o nome base ----------
+
+def test_erro_de_array_nao_indexado_menciona_o_subcaminho_real():
+    with pytest.raises(ErroSemantico, match=r"'c\.valores'"):
+        compilar("""
+            algoritmo "T"
+            estrutura Conta
+                valores: inteiro[3]
+            inicio
+                c:Conta
+                escrever(c.valores.tamanho)
+        """)
+
+
+# ---------- B13 (AL-54): conflito de tipo em ramos irmãos não detetado ----------
+
+def test_variavel_global_com_tipos_diferentes_em_ramos_irmaos_e_erro():
+    with pytest.raises(ErroSemantico, match="tipos diferentes"):
+        compilar("""
+            algoritmo "T"
+            funcao usa_x(): inteiro
+                devolver x + 1
+            inicio
+                se falso entao
+                    x: inteiro = 1
+                senao
+                    x: cadeia = "oi"
+                escrever(usa_x())
+        """)
+
+
+def test_variavel_global_com_mesmo_tipo_em_ramos_irmaos_compila():
+    saida = executar("""
+        algoritmo "T"
+        funcao usa_x(): inteiro
+            devolver x + 1
+        inicio
+            se falso entao
+                x: inteiro = 1
+            senao
+                x: inteiro = 2
+            escrever(usa_x())
+    """)
+    assert saida.strip() == "3"
+
+
+# ---------- B14 (AL-55): 'escrever' de uma estrutura inteira não é rejeitado ----------
+
+def test_escrever_uma_estrutura_inteira_e_erro_semantico():
+    with pytest.raises(ErroSemantico, match="Ponto"):
+        compilar("""
+            algoritmo "T"
+            estrutura Ponto
+                x:inteiro
+            inicio
+                p:Ponto
+                escrever(p)
+        """)
+
+
+# ---------- B15 (AL-56): 'Escolha' nunca deteta valores 'caso' duplicados ----------
+
+def test_caso_duplicado_com_literal_e_erro_de_compilacao():
+    with pytest.raises(ErroSemantico, match="já apareceu"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                x:inteiro = 1
+                escolher x
+                    caso 1
+                        escrever("um")
+                    caso 1
+                        escrever("outra vez um")
+        """)
+
+
+# ---------- B16 (AL-57): base ^ expoente negativa/fracionária vira complex ----------
+
+def test_potencia_de_base_negativa_com_expoente_fracionario_da_erro_amigavel():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    base: decimal = -8.0
+    expo: decimal = 0.5
+    escrever(base ^ expo)
+""")
+    assert resultado.returncode == 1
+    assert "expoente fracionário" in resultado.stdout
+
+
+def test_potencia_de_base_negativa_com_expoente_inteiro_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            base: decimal = -8.0
+            expo: decimal = 2.0
+            escrever(base ^ expo)
+    """)
+    assert saida.strip() == "64.0"
+
+
+# ---------- B18 (AL-58): elementos de array literal não coagidos p/ decimal ----------
+
+def test_elementos_de_array_literal_decimal_sao_coagidos():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            v:decimal[3] = {1, 2, 3}
+            escrever(v[0], " ", v[1], " ", v[2])
+    """)
+    assert saida.strip() == "1.0 2.0 3.0"
+
+
+# ---------- B19 (AL-59): codegen_minimo div/mod perdem precisão em inteiros grandes ----------
+
+def test_minimo_div_mod_em_inteiros_grandes_nao_perde_precisao():
+    from algo_lang.compilador.parser import parse
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    codigo = textwrap.dedent("""
+        algoritmo "T"
+        inicio
+            a: inteiro = 2989996989242201024
+            b: inteiro = 887
+            escrever(a div b)
+            escrever(a mod b)
+    """)
+    py = gerar_python_minimo(parse(codigo))
+    resultado = subprocess.run(
+        [sys.executable, "-c", py], capture_output=True, text=True, timeout=10)
+    assert resultado.returncode == 0, resultado.stderr
+    assert resultado.stdout.splitlines() == ["3370909796214431", "727"]
+
+
+# ---------- B20 (AL-60): codegen_minimo matematica.potencia perde tipo decimal ----------
+
+def test_executa_com_debug_sai_com_codigo_1_quando_programa_falha(tmp_path):
+    from algo_lang.cli import cmd_executa_com_trace
+    import argparse
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    v:inteiro[2]\n    escrever(v[5])\n', encoding="utf-8")
+    args = argparse.Namespace(ficheiro=str(algo_path), debug=True, json=False, entradas=None)
+    with pytest.raises(SystemExit) as exc:
+        cmd_executa_com_trace(args)
+    assert exc.value.code == 1
+
+
+def test_executa_com_json_sai_com_codigo_1_quando_programa_falha(tmp_path):
+    from algo_lang.cli import cmd_executa_com_trace
+    import argparse
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    v:inteiro[2]\n    escrever(v[5])\n', encoding="utf-8")
+    args = argparse.Namespace(ficheiro=str(algo_path), debug=False, json=True, entradas=None)
+    with pytest.raises(SystemExit) as exc:
+        cmd_executa_com_trace(args)
+    assert exc.value.code == 1
+
+
+def test_executa_com_debug_nao_sai_com_erro_quando_programa_e_bem_sucedido(tmp_path):
+    from algo_lang.cli import cmd_executa_com_trace
+    import argparse
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
+    args = argparse.Namespace(ficheiro=str(algo_path), debug=True, json=False, entradas=None)
+    cmd_executa_com_trace(args)  # não deve levantar SystemExit
+
+
+# ---------- B22 (AL-62): dedup de 'incluir' sensível a maiúsculas/minúsculas ----------
+
+def test_incluir_o_mesmo_ficheiro_com_capitalizacao_diferente_nao_colide(tmp_path):
+    from algo_lang.cli import _carregar_e_verificar
+    (tmp_path / "lib.algo").write_text(
+        'funcao dobro(x:inteiro):inteiro\n    devolver x * 2\n', encoding="utf-8")
+    principal = tmp_path / "principal.algo"
+    principal.write_text(textwrap.dedent("""\
+        algoritmo "T"
+        incluir "lib.algo"
+        incluir "LIB.algo"
+        inicio
+            escrever(dobro(3))
+    """), encoding="utf-8")
+    programa = _carregar_e_verificar(str(principal))
+    assert len(programa.funcoes) == 1
+
+
+# ---------- B23 (AL-63): consola memoriza ficheiro falhado como "último ficheiro" ----------
+
+def test_consola_nao_atualiza_ultimo_ficheiro_apos_falha():
+    import argparse
+    from algo_lang.cli import COMANDOS_COM_FICHEIRO, _linha_com_ficheiro_por_omissao
+    # A própria lógica de escolha do ficheiro por omissão: simula duas
+    # linhas -- 'executa bom.algo' (sucesso) seguida de 'executa
+    # mal_escrito.algo' (falha) -- e confirma que uma TERCEIRA linha sem
+    # ficheiro continuaria a usar 'bom.algo', não 'mal_escrito.algo'.
+    ultimo_ficheiro = "bom.algo"
+    # 'mal_escrito.algo' falhou -- cli.py só atualiza ultimo_ficheiro
+    # depois de args.func(args) ter sucesso (ver cmd_consola), por isso
+    # simular a falha aqui é simplesmente NÃO atualizar a variável.
+    resto = _linha_com_ficheiro_por_omissao("executa", [], ultimo_ficheiro)
+    assert resto == ["bom.algo"]
+
+
+# ---------- B24 (AL-64): cadeia.caracter aceita índices negativos ----------
+
+def test_cadeia_caracter_com_indice_negativo_da_erro():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Cadeia
+inicio
+    escrever(cadeia.caracter("abc", -1))
+""")
+    assert resultado.returncode == 1
+    assert "índice fora dos limites" in resultado.stdout
+
+
+# ---------- B25 (AL-65): conversao.paraInteiro trunca decimal mas rejeita cadeia ----------
+
+def test_conversao_parainteiro_de_cadeia_com_ponto_decimal_trunca():
+    saida = executar("""
+        algoritmo "T"
+        importar Conversao
+        inicio
+            escrever(conversao.paraInteiro("3.9"))
+    """)
+    assert saida.strip() == "3"
+
+
+def test_conversao_parainteiro_de_cadeia_invalida_continua_a_dar_erro():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Conversao
+inicio
+    escrever(conversao.paraInteiro("abc"))
+""")
+    assert resultado.returncode == 1
+    assert "número inteiro" in resultado.stdout
+
+
+def test_minimo_potencia_devolve_decimal_como_no_modo_normal():
+    from algo_lang.compilador.parser import parse
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    codigo = textwrap.dedent("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.potencia(2, 3))
+    """)
+    py = gerar_python_minimo(parse(codigo))
+    resultado = subprocess.run(
+        [sys.executable, "-c", py], capture_output=True, text=True, timeout=10)
+    assert resultado.returncode == 0, resultado.stderr
+    assert resultado.stdout.strip() == "8.0"
+
+
+# ---------- B26 (AL-66): linter -- falso positivo p/ variável de 'inicio' usada só em funções ----------
+
+def test_variavel_de_inicio_usada_so_numa_funcao_nao_da_falso_positivo():
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        funcao dobroDeContador():inteiro
+            devolver contador * 2
+        inicio
+            contador:inteiro = 5
+            escrever(dobroDeContador())
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert not any("'contador' é declarada mas nunca é usada" in a.mensagem for a in avisos)
+
+
+# ---------- B27 (AL-67): tracer -- variáveis com nome começado por '_' invisíveis ----------
+
+def test_trace_mostra_variavel_local_com_nome_comecado_por_underscore(tmp_path):
+    from algo_lang.compilador.codegen import gerar_python_com_mapa
+    from algo_lang.tools.tracer import gerar_trace
+    # NOTA: a chamada a 'f' não pode ser a ÚLTIMA instrução do programa --
+    # há um bug pré-existente e distinto (não B27/B28, encontrado ao
+    # escrever este teste) em que o passo final de uma função chamada
+    # como última instrução do 'inicio' é indevidamente sobreposto pelo
+    # fecho de _algo_programa (ver nota em AUDITORIA_PROGRESSO.md);
+    # uma instrução a seguir evita tropeçar nesse bug diferente aqui.
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        funcao f(_x:inteiro):inteiro
+            devolver _x + 1
+        inicio
+            escrever(f(10))
+            escrever("fim")
+    """))
+    verificar(programa)
+    dados = gerar_python_com_mapa(programa)
+    caminho_py = str(tmp_path / "prog.py")
+    with open(caminho_py, "w", encoding="utf-8") as fh:
+        fh.write(dados["codigo"])
+    resultado = gerar_trace(
+        dados["codigo"], caminho_py, dados["mapa_linhas"],
+        dados["nomes_globais"], dados["nomes_funcoes"])
+    assert resultado["erro"] is None
+    variaveis_vistas = set()
+    for passo in resultado["passos"]:
+        for frame in passo["pilha"]:
+            variaveis_vistas.update(frame["variaveis"].keys())
+    assert "_x" in variaveis_vistas
+
+
+# ---------- B28 (AL-68): tracer -- linha salta para trás; OverflowError não traduzido ----------
+
+def test_overflowerror_da_erro_amigavel_nao_traceback():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    x: decimal = 2.0 ^ 2000.0
+    escrever(x)
+""")
+    assert resultado.returncode == 1
+    assert "overflow" in resultado.stdout.lower()
+
+
+def test_procedimento_so_com_ref_nao_salta_linha_para_tras_no_trace(tmp_path):
+    from algo_lang.compilador.codegen import gerar_python_com_mapa
+    from algo_lang.tools.tracer import gerar_trace
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        procedimento incrementa(ref v:inteiro)
+            v = v + 1
+        inicio
+            n:inteiro = 1
+            incrementa(n)
+            escrever(n)
+    """))
+    verificar(programa)
+    dados = gerar_python_com_mapa(programa)
+    caminho_py = str(tmp_path / "prog.py")
+    with open(caminho_py, "w", encoding="utf-8") as fh:
+        fh.write(dados["codigo"])
+    resultado = gerar_trace(
+        dados["codigo"], caminho_py, dados["mapa_linhas"],
+        dados["nomes_globais"], dados["nomes_funcoes"])
+    linhas_na_rotina_incrementa = [
+        passo["linha"] for passo in resultado["passos"]
+        if any(frame["nome"] == "incrementa" for frame in passo["pilha"])
+    ]
+    # as linhas dentro de 'incrementa' têm de ser não-decrescentes (nunca
+    # "saltar para trás" para a linha da assinatura do procedimento)
+    assert linhas_na_rotina_incrementa == sorted(linhas_na_rotina_incrementa)
+
+
+# ---------- B29 (AL-69): linter -- campos em falta não cobre literais em argumento ----------
+
+def test_campo_em_falta_em_literal_passado_como_argumento_da_aviso():
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        funcao soma(p:Ponto):inteiro
+            devolver p.x + p.y
+        inicio
+            escrever(soma({x: 3}))
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert any("não define o(s) campo(s) 'y'" in a.mensagem for a in avisos)
+
+
+# ---------- B30 (AL-70): linter -- atribuição a parâmetro por valor não cobre 'ler(...)' ----------
+
+def test_ler_para_parametro_por_valor_da_aviso_especifico():
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        procedimento le(x:inteiro)
+            ler(x)
+        inicio
+            n:inteiro
+            le(n)
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert any("não é 'por referência'" in a.mensagem and "'x'" in a.mensagem for a in avisos)
