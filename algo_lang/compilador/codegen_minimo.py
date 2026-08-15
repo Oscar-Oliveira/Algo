@@ -22,10 +22,18 @@ CABECALHO_RUNTIME = ""
 
 OPS_BIN = {
     "+": "+", "-": "-", "*": "*", "/": "/",
-    "div": "//", "mod": "%", "^": "**",
+    "div": "//", "mod": "%",
     "==": "==", "<>": "!=", "<": "<", ">": ">", "<=": "<=", ">=": ">=",
     "e": "and", "ou": "or",
 }
+# AL-87/B14: '^' não está em OPS_BIN -- é tratado à parte em _expr() (como
+# 'div'/'mod'), envolvido em float(...), tal como bibliotecas/matematica.py
+# já faz para matematica.potencia() no MESMO modo (ver BIBLIOTECA_MINIMA
+# abaixo). Sem isto, '**' nativo do Python devolvia silenciosamente um
+# 'complex' para base negativa com expoente fracionário -- SEM erro nenhum
+# -- o único caso em todo --minimo em que um programa com erro de tipos NÃO
+# "falha a correr com o erro nativo do Python" (contrato documentado no
+# topo deste ficheiro), produzindo antes um resultado errado em silêncio.
 
 LEITORES_INLINE_POR_TIPO = {
     "inteiro": "int(input())",
@@ -146,8 +154,10 @@ class GeradorCodigo(GeradorCodigoBase):
             self.emit("pass", 2)
         for c in e.campos:
             if c.dims is not None:
-                valor_default = self._construir_array_aninhado(c.tipo, c.dims, {})
-                self.emit(f"self.{c.nome} = {c.nome} if {c.nome} is not None else {valor_default}", 2)
+                self.emit(f"if {c.nome} is None:", 2)
+                valor_default = self._construir_array_aninhado(c.tipo, c.dims, {}, 3)
+                self.emit(f"{c.nome} = {valor_default}", 3)
+                self.emit(f"self.{c.nome} = {c.nome}", 2)
             elif c.tipo not in DEFAULT_POR_TIPO:
                 # AL-39: campo de tipo (direta ou mutuamente) recursivo --
                 # ver a mesma nota em codegen.py.
@@ -187,16 +197,28 @@ class GeradorCodigo(GeradorCodigoBase):
         elif d.dims is None:
             self.emit(f"{d.nome} = {self._valor_default(d.tipo)}", nivel)
         else:
-            self.emit(f"{d.nome} = {self._construir_array_aninhado(d.tipo, d.dims, tipos)}", nivel)
+            expr = self._construir_array_aninhado(d.tipo, d.dims, tipos, nivel)
+            self.emit(f"{d.nome} = {expr}", nivel)
 
-    def _construir_array_aninhado(self, tipo, dims_exprs, tipos):
-        """Constrói recursivamente a expressão Python de um array com N
-        dimensões, ex: [[0 for _ in range(c)] for _ in range(l)] para 2D."""
+    def _construir_array_aninhado(self, tipo, dims_exprs, tipos, nivel):
+        """Constrói a expressão Python de um array com N dimensões, ex:
+        [[0 for _ in range(c)] for _ in range(l)] para 2D.
+
+        AL-88/B15: cada dimensão é avaliada UMA VEZ, para uma variável
+        temporária emitida antes da expressão -- ver a mesma nota em
+        codegen.py (idêntico aqui, exceto que --minimo não envolve o
+        tamanho em nenhuma verificação de runtime, por desenho)."""
         if not dims_exprs:
             return self._valor_default(tipo)
-        tam = self._expr(dims_exprs[0], tipos)
-        interior = self._construir_array_aninhado(tipo, dims_exprs[1:], tipos)
-        return f"[{interior} for _ in range({tam})]"
+        temps = []
+        for i, dim_expr in enumerate(dims_exprs):
+            nome_temp = f"_algo_dim{i}"
+            self.emit(f"{nome_temp} = {self._expr(dim_expr, tipos)}", nivel)
+            temps.append(nome_temp)
+        expr = self._valor_default(tipo)
+        for nome_temp in reversed(temps):
+            expr = f"[{expr} for _ in range({nome_temp})]"
+        return expr
 
     # -------- statements --------
     def _gerar_stmt(self, stmt, nivel, tipos):
@@ -274,9 +296,16 @@ class GeradorCodigo(GeradorCodigoBase):
     def _lvalue_de_expr(self, expr, tipos):
         if isinstance(expr, A.LValue):
             return self._lvalue(expr, tipos)
-        raise ErroSemantico(  # pragma: no cover -- semantics.py já valida isto antes
-            "argumentos passados por referência têm de ser uma variável, um "
-            "elemento de array ou um campo", 0)
+        # AL-90/B17: ao contrário de codegen.py, --minimo salta
+        # semantics.verificar() de propósito, por isso NÃO pode assumir
+        # que um argumento de um parâmetro 'ref' é sempre uma variável
+        # (essa validação só existe no modo normal) -- levantar
+        # ErroSemantico aqui era um erro de COMPILAÇÃO, contradizendo o
+        # contrato de --minimo ("gera sempre Python, falha só a correr,
+        # com o erro nativo do Python"). Gera a tradução da expressão na
+        # mesma (mesmo não sendo um alvo de atribuição válido) e deixa o
+        # próprio Python falhar nativamente (ex.: SyntaxError) ao correr.
+        return self._expr(expr, tipos)
 
     # -------- lvalue / expressões --------
     def _expr(self, expr, tipos):
@@ -310,6 +339,9 @@ class GeradorCodigo(GeradorCodigoBase):
                 if expr.op == "div":
                     return divisao
                 return f"(({e}) - {divisao} * ({d}))"
+            if expr.op == "^":
+                # AL-87/B14: ver nota em OPS_BIN, acima.
+                return f"float({self._expr(expr.esq, tipos)} ** {self._expr(expr.dire, tipos)})"
             op = OPS_BIN[expr.op]
             return f"({self._expr(expr.esq, tipos)} {op} {self._expr(expr.dire, tipos)})"
         if isinstance(expr, A.UnOp):

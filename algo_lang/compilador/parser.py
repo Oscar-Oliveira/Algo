@@ -88,6 +88,15 @@ class Parser:
             elif self.ver("ID"):
                 declaracoes.extend(self._parse_declaracao_global())
             elif self.ver("INICIO"):
+                if corpo is not None:
+                    # AL-75: sem esta verificacao, um segundo 'inicio' era
+                    # aceite em silencio e SUBSTITUIA o primeiro bloco
+                    # inteiro (corpo = ...), fazendo desaparecer logica sem
+                    # erro nenhum -- em vez de rejeitar como e suposto um
+                    # programa so poder ter um bloco 'inicio'.
+                    raise ErroSintatico(
+                        "o programa já tem um bloco 'inicio' -- só pode haver um",
+                        self.atual().linha)
                 corpo = self._parse_bloco_inicio()
             else:
                 raise ErroSintatico(
@@ -549,17 +558,24 @@ class Parser:
         return A.LValue(nome_tok.valor, acessos, nome_tok.linha)
 
     # ---------- expressões (precedência) ----------
-    def _parse_expr(self):
-        # AL-18: sem isto, uma expressão fortemente aninhada (ex: muitos
-        # parênteses seguidos) estourava a pilha de recursão do próprio
-        # Python (RecursionError não tratado, sem número de linha nem
-        # explicação) em vez de um erro de sintaxe amigável.
+    def _entrar_profundidade_expr(self):
+        # AL-18/AL-76: sem isto, uma expressão fortemente aninhada (ex:
+        # muitos parênteses, ou cadeias de 'nao'/'-'/'^' encadeados)
+        # estourava a pilha de recursão do próprio Python (RecursionError
+        # não tratado, sem número de linha nem explicação) em vez de um
+        # erro de sintaxe amigável. Partilhado por todos os pontos de
+        # recursão direta em expressões -- não só _parse_expr (AL-18), mas
+        # também _parse_nao/_parse_unaria/_parse_potencia (AL-76), que
+        # nunca incrementavam este contador antes.
         self._profundidade_expr += 1
         if self._profundidade_expr > LIMITE_PROFUNDIDADE_EXPR:
             raise ErroSintatico(
                 "expressão demasiado aninhada (parênteses ou operadores a mais) -- "
                 "tenta simplificar, ex. dividindo em variáveis intermédias",
                 self.atual().linha)
+
+    def _parse_expr(self):
+        self._entrar_profundidade_expr()
         try:
             return self._parse_ou()
         finally:
@@ -584,7 +600,11 @@ class Parser:
     def _parse_nao(self):
         if self.ver("NAO"):
             linha = self.avancar().linha
-            operando = self._parse_nao()
+            self._entrar_profundidade_expr()
+            try:
+                operando = self._parse_nao()
+            finally:
+                self._profundidade_expr -= 1
             return A.UnOp("nao", operando, linha)
         return self._parse_relacional()
 
@@ -617,7 +637,11 @@ class Parser:
     def _parse_unaria(self):
         if self.ver("MENOS"):
             linha = self.avancar().linha
-            operando = self._parse_unaria()
+            self._entrar_profundidade_expr()
+            try:
+                operando = self._parse_unaria()
+            finally:
+                self._profundidade_expr -= 1
             return A.UnOp("-", operando, linha)
         return self._parse_potencia()
 
@@ -625,7 +649,11 @@ class Parser:
         base = self._parse_primario()
         if self.ver("POTENCIA"):
             linha = self.avancar().linha
-            expoente = self._parse_unaria()
+            self._entrar_profundidade_expr()
+            try:
+                expoente = self._parse_unaria()
+            finally:
+                self._profundidade_expr -= 1
             return A.BinOp("^", base, expoente, linha)
         return base
 

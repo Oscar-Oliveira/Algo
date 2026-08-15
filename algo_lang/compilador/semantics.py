@@ -159,14 +159,14 @@ class VerificadorTipos:
         # (ex: 'estrutura A' pode ter um campo do tipo 'B', definida a seguir)
         for nome_estrutura, campos in self.estruturas.items():
             for nome_campo, (tipo, _dims) in campos.items():
-                if tipo not in NUMERICOS | TEXTUAIS | {"booleano"} and tipo not in self.estruturas:
+                if tipo not in PRIMITIVOS and tipo not in self.estruturas:
                     linha = linhas_dos_campos[(nome_estrutura, nome_campo)]
                     raise ErroSemantico(
                         f"o campo '{nome_campo}' da estrutura '{nome_estrutura}' tem tipo "
                         f"desconhecido '{tipo}'", linha)
 
     def _validar_tipo(self, tipo, linha):
-        if tipo in NUMERICOS or tipo in TEXTUAIS or tipo == "booleano":
+        if tipo in PRIMITIVOS:
             return
         if tipo in self.estruturas:
             return
@@ -183,18 +183,32 @@ class VerificadorTipos:
         # tabela de globais visível às funções = declarações de topo + as
         # que vierem a ser declaradas dentro do bloco 'inicio'
         self.globais = dict(escopo_topo)
-        self._pre_registar_recursivo(self.programa.corpo, self.globais)
+        self._pre_registar_recursivo(self.programa.corpo, self.globais, set(escopo_topo))
 
         for f in self.programa.funcoes:
             self._verificar_funcao(f)
 
         self._verificar_bloco(self.programa.corpo, escopo_topo, ctx_funcao=None)
 
-    def _pre_registar_recursivo(self, stmts, destino):
+    def _pre_registar_recursivo(self, stmts, destino, globais_previas):
         for s in stmts:
             if isinstance(s, A.Declaracao):
                 dims_n = 0 if s.dims is None else len(s.dims)
                 if s.nome in destino:
+                    if s.nome in globais_previas:
+                        # AL-82/B10: 'destino' já continha este nome ANTES
+                        # de começarmos a percorrer o corpo (é uma global a
+                        # sério, declarada antes de 'inicio') -- não é um
+                        # conflito entre ramos irmãos descobertos agora
+                        # durante esta travessia, é uma redeclaração pura e
+                        # simples, tal como _registar_decl já deteta
+                        # corretamente mais tarde (passo 5) quando o tipo
+                        # repetido é IGUAL. Sem esta distinção, um tipo
+                        # diferente fazia esta função reportar a mensagem
+                        # pensada para ramos irmãos ("tipos diferentes em
+                        # ramos diferentes"), em vez de "já foi declarada".
+                        raise ErroSemantico(
+                            f"a variável '{s.nome}' já foi declarada", s.linha)
                     # AL-54/B13: antes, uma segunda declaração do mesmo
                     # nome (ex.: em ramos 'se'/'senao' mutuamente
                     # exclusivos ao nível de topo) era silenciosamente
@@ -216,7 +230,7 @@ class VerificadorTipos:
                 else:
                     destino[s.nome] = (s.tipo, dims_n, s.eh_constante)
             for bloco in A.subblocos(s):
-                self._pre_registar_recursivo(bloco, destino)
+                self._pre_registar_recursivo(bloco, destino, globais_previas)
 
     # ---------- funções ----------
     def _verificar_funcao(self, f: A.FuncaoDef):
@@ -348,7 +362,7 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"'{d.nome}' não é um array; não pode ser inicializado com {{...}}",
                         d.linha)
-                self._verificar_array_literal(d.inicial, d.tipo, len(d.dims), escopo)
+                self._verificar_array_literal(d.inicial, d.tipo, d.dims, escopo)
             elif isinstance(d.inicial, A.EstruturaLiteral):
                 if d.dims is not None:
                     if d.inicial.campos:
@@ -439,29 +453,64 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"o campo '{nome_campo}' é um array; não pode ser inicializado "
                     f"diretamente num literal de estrutura", lit.linha)
+            if isinstance(expr, A.EstruturaLiteral):
+                # AL-78/B8: um literal '{...}' aninhado dentro doutro literal
+                # de estrutura -- o tipo esperado (tipo_campo) já é
+                # conhecido pelo contexto (o campo declarado), por isso dá
+                # para validar recursivamente em vez de cair em
+                # _tipo_expr(), que rejeita SEMPRE um '{...}' sem tipo
+                # próprio (certo para outras posições, errado aqui).
+                self._verificar_estrutura_literal(expr, tipo_campo, escopo)
+                continue
             tipo_valor, _ = self._tipo_expr(expr, escopo)
             if not self._compativel(tipo_campo, tipo_valor):
                 raise ErroSemantico(
                     f"o campo '{nome_campo}' de '{tipo_esperado}' espera '{tipo_campo}' "
                     f"mas recebeu '{tipo_valor}'", lit.linha)
 
-    def _verificar_array_literal(self, lit: A.ArrayLiteral, tipo_elemento, profundidade, escopo):
+    def _tamanho_estatico(self, dim_expr):
+        """AL-79/B7: devolve o tamanho declarado de uma dimensão se for um
+        literal inteiro estático (o único caso em que dá para validar o
+        número de elementos de um literal '{...}' em compilação); None se
+        for uma expressão dinâmica (variável, chamada, etc.), caso em que
+        não há como validar estaticamente."""
+        if isinstance(dim_expr, A.Literal) and dim_expr.tipo == "inteiro":
+            return dim_expr.valor
+        return None
+
+    def _verificar_array_literal(self, lit: A.ArrayLiteral, tipo_elemento, dims, escopo):
         # AL-16: desde que o parser deixou de saber de antemão quantas
         # dimensões esperar (_parse_literal_chaveta é genérico), estas
         # duas verificações de forma passaram a ser o único sítio que as
         # apanha -- já não são garantidas pelo parser.
+        # AL-79/B7: 'dims' (lista de expressões de dimensão, não só a
+        # contagem) permite validar o TAMANHO de cada nível quando é um
+        # literal estático -- antes só a profundidade de aninhamento era
+        # verificada, nunca o número de elementos contra o tamanho
+        # declarado (ex.: 'v:inteiro[5] = {1,2,3}' compilava sem erro).
+        tam_esperado = self._tamanho_estatico(dims[0])
+        if tam_esperado is not None and len(lit.elementos) != tam_esperado:
+            raise ErroSemantico(
+                f"o array tem tamanho declarado {tam_esperado} mas o literal "
+                f"'{{...}}' tem {len(lit.elementos)} elemento(s)", lit.linha)
         for elem in lit.elementos:
-            if profundidade > 1:
+            if len(dims) > 1:
                 if not isinstance(elem, A.ArrayLiteral):
                     raise ErroSemantico(
                         f"esperava-se uma lista aninhada {{...}} (o array tem "
-                        f"{profundidade} dimensões)", lit.linha)
-                self._verificar_array_literal(elem, tipo_elemento, profundidade - 1, escopo)
+                        f"{len(dims)} dimensões)", lit.linha)
+                self._verificar_array_literal(elem, tipo_elemento, dims[1:], escopo)
             else:
                 if isinstance(elem, A.ArrayLiteral):
                     raise ErroSemantico(
                         "demasiados níveis de aninhamento em {...} para as dimensões "
                         "declaradas", lit.linha)
+                if isinstance(elem, A.EstruturaLiteral):
+                    # AL-78/B8: elemento de array que é ele próprio um
+                    # literal de estrutura (ex.: array de estruturas) --
+                    # mesma lógica do campo aninhado, acima.
+                    self._verificar_estrutura_literal(elem, tipo_elemento, escopo)
+                    continue
                 tipo_elem, _ = self._tipo_expr(elem, escopo)
                 if not self._compativel(tipo_elemento, tipo_elem):
                     raise ErroSemantico(
@@ -628,7 +677,18 @@ class VerificadorTipos:
                         # valor). O linter já tinha um AVISO equivalente
                         # (não bloqueia a compilação); isto promove o caso
                         # comum (literais) a erro de compilação real.
-                        chave = (v.tipo, v.valor)
+                        # AL-83/B11: a chave normaliza por FAMÍLIA de tipo,
+                        # não pelo tipo exato -- 'caso "a"' e 'caso \'a\''
+                        # (cadeia vs caracter) ou 'caso 1' e 'caso 1.0'
+                        # (inteiro vs decimal) são o MESMO valor em
+                        # runtime (Python: "a" == 'a' e 1 == 1.0), por
+                        # isso o segundo ramo é igualmente inalcançável.
+                        if v.tipo in NUMERICOS:
+                            chave = ("numero", v.valor)
+                        elif v.tipo in TEXTUAIS:
+                            chave = ("texto", v.valor)
+                        else:
+                            chave = (v.tipo, v.valor)
                         if chave in valores_vistos:
                             raise ErroSemantico(
                                 f"o valor '{A.texto_expr(v)}' já apareceu antes neste "
@@ -881,6 +941,17 @@ class VerificadorTipos:
         return False
 
     # ---------- chamadas ----------
+    def _chave_ref_estatica(self, arg: A.LValue):
+        """AL-81/B9: devolve uma chave hashable e comparável para detetar
+        aliasing de 'ref' se TODOS os acessos de 'arg' forem campos
+        (estaticamente conhecidos); None se algum acesso for um ÍNDICE
+        (ex.: v[i] vs v[j]), que pode apontar a posições diferentes em
+        runtime e por isso não é comparável em compilação."""
+        for tag, _valor in arg.acessos:
+            if tag == "indice":
+                return None
+        return (arg.nome, tuple(valor for _tag, valor in arg.acessos))
+
     def _verificar_chamada(self, chamada: A.Chamada, escopo):
         if "." in chamada.nome:
             biblioteca, metodo = chamada.nome.split(".", 1)
@@ -951,18 +1022,22 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"'{arg.nome}' é uma constante; não pode ser passada por "
                         f"referência ao parâmetro '{p.nome}'", chamada.linha)
-                # AL-04: só apanha o caso inequívoco -- a mesma variável
-                # simples (sem índice nem campo) passada por referência a
-                # dois parâmetros diferentes na mesma chamada. 'v[i]' e
-                # 'v[j]' partilham o nome base 'v' mas podem apontar a
-                # posições diferentes, por isso não são comparados aqui.
-                if not arg.acessos:
-                    if arg.nome in nomes_ref_simples_usados:
+                # AL-04/AL-81(B9): só apanha os casos estaticamente
+                # inequívocos -- a mesma variável simples, ou o mesmo
+                # CAMPO de estrutura (nome de campo é sempre uma string
+                # conhecida em compilação), passados por referência a dois
+                # parâmetros diferentes na mesma chamada. 'v[i]' e 'v[j]'
+                # partilham o nome base 'v' mas podem apontar a posições
+                # diferentes em runtime, por isso um acesso com ÍNDICE
+                # nunca é comparado (ver _chave_ref_estatica).
+                chave = self._chave_ref_estatica(arg)
+                if chave is not None:
+                    if chave in nomes_ref_simples_usados:
                         raise ErroSemantico(
-                            f"a variável '{arg.nome}' é passada por referência mais do "
+                            f"'{A.texto_expr(arg)}' é passado por referência mais do "
                             f"que uma vez na mesma chamada a '{chamada.nome}'",
                             chamada.linha)
-                    nomes_ref_simples_usados.add(arg.nome)
+                    nomes_ref_simples_usados.add(chave)
             if isinstance(arg, A.EstruturaLiteral):
                 # AL-16: um literal de estrutura não tem tipo próprio --
                 # valida-se diretamente contra o tipo do parâmetro (mesma
@@ -974,7 +1049,25 @@ class VerificadorTipos:
                 tipo = p.tipo
             else:
                 tipo, _ = self._tipo_expr(arg, escopo)
-            if not self._compativel(p.tipo, tipo):
+            if p.por_referencia:
+                # AL-84/B12: um parâmetro 'ref' devolve o seu valor final
+                # à variável do CHAMADOR (ver codegen.py:_gerar_lista_args/
+                # out_vars) -- ao contrário de um parâmetro por valor,
+                # aceitar aqui a mesma compatibilidade "larga" usada para
+                # valor (decimal aceita inteiro, cadeia aceita caracter)
+                # deixava a variável do chamador ficar com um valor de tipo
+                # MAIS LARGO do que o seu tipo declarado (ex.: 'x:inteiro'
+                # passado a 'ref a:decimal' ficava com 5.5 em vez de 5,
+                # corrompendo silenciosamente o tipo de 'x'). 'ref' exige o
+                # tipo exatamente igual, não só compatível.
+                if tipo != p.tipo:
+                    raise ErroSemantico(
+                        f"o parâmetro '{p.nome}' de '{chamada.nome}' é por referência "
+                        f"e espera exatamente '{p.tipo}', mas '{A.texto_expr(arg)}' é "
+                        f"do tipo '{tipo}' -- por referência os tipos têm de ser "
+                        f"exatamente iguais (não só compatíveis), porque o valor final "
+                        f"é escrito de volta na variável do chamador", chamada.linha)
+            elif not self._compativel(p.tipo, tipo):
                 raise ErroSemantico(
                     f"o parâmetro '{p.nome}' de '{chamada.nome}' espera "
                     f"'{p.tipo}' mas recebeu '{tipo}'", chamada.linha)

@@ -352,7 +352,17 @@ class GeradorCodigo(GeradorCodigoBase):
         return "\n".join(self.linhas)
 
     def _gerar_estrutura(self, e: A.EstruturaDef):
-        self._linha_algo_atual = e.linha
+        # AL-89/B16: propositadamente NÃO associado a 'e.linha' (a linha da
+        # definição 'estrutura X') -- ao contrário de uma instrução normal,
+        # o corpo de '__init__'/'__eq__' só corre em RUNTIME, sempre que
+        # uma instância é criada ou comparada, nunca na linha da própria
+        # definição. Mapeá-lo para 'e.linha' fazia o tracer (--debug/--json)
+        # injetar passos espúrios (linha da definição, pilha do chamador)
+        # sempre que uma estrutura era construída/comparada. Deixando
+        # '_linha_algo_atual' em None aqui, 'emit()' não regista nenhuma
+        # entrada em mapa_linhas para estas linhas -- tracer.py já ignora
+        # de propósito qualquer linha sem entrada (ver 'if linha_algo is
+        # None: return tracer').
         recursivas = self._estruturas_recursivas()
         params_kwargs = []
         for c in e.campos:
@@ -374,8 +384,10 @@ class GeradorCodigo(GeradorCodigoBase):
             self.emit("pass", 2)
         for c in e.campos:
             if c.dims is not None:
-                valor_default = self._construir_array_aninhado(c.tipo, c.dims, {})
-                self.emit(f"self.{c.nome} = {c.nome} if {c.nome} is not None else {valor_default}", 2)
+                self.emit(f"if {c.nome} is None:", 2)
+                valor_default = self._construir_array_aninhado(c.tipo, c.dims, {}, 3)
+                self.emit(f"{c.nome} = {valor_default}", 3)
+                self.emit(f"self.{c.nome} = {c.nome}", 2)
             elif c.tipo not in DEFAULT_POR_TIPO:
                 # AL-39: se 'c.tipo' é (direta ou mutuamente) recursivo,
                 # construir a instância por omissão nunca terminaria --
@@ -436,7 +448,15 @@ class GeradorCodigo(GeradorCodigoBase):
         partes = []
         for nome, valor in lit.campos:
             tipo_campo = campos_decl.get(nome, ("", 0))[0]
-            expr_py = self._coagir_decimal(self._expr(valor, tipos), tipo_campo, valor)
+            if isinstance(valor, A.EstruturaLiteral):
+                # AL-78/B8: literal de estrutura aninhado dentro doutro --
+                # 'valor' não tem 'self._expr()' próprio (só faz sentido
+                # com o tipo do campo, já conhecido aqui), por isso
+                # recursão direta em vez de _expr()/_coagir_decimal (que só
+                # tratam valores primitivos).
+                expr_py = self._expr_estrutura_literal(valor, tipo_campo, tipos)
+            else:
+                expr_py = self._coagir_decimal(self._expr(valor, tipos), tipo_campo, valor)
             partes.append(f"{nome}={expr_py}")
         return f"{tipo_nome}({', '.join(partes)})"
 
@@ -452,6 +472,10 @@ class GeradorCodigo(GeradorCodigoBase):
         for elem in lit.elementos:
             if isinstance(elem, A.ArrayLiteral):
                 partes.append(self._expr_array_literal(elem, tipo_elemento, tipos))
+            elif isinstance(elem, A.EstruturaLiteral):
+                # AL-78/B8: elemento de array que é ele próprio um literal
+                # de estrutura (ex.: array de estruturas).
+                partes.append(self._expr_estrutura_literal(elem, tipo_elemento, tipos))
             else:
                 partes.append(self._coagir_decimal(self._expr(elem, tipos), tipo_elemento, elem))
         return f"[{', '.join(partes)}]"
@@ -491,7 +515,8 @@ class GeradorCodigo(GeradorCodigoBase):
         elif d.dims is None:
             self.emit(f"{d.nome} = {self._valor_default(d.tipo)}", nivel)
         else:
-            self.emit(f"{d.nome} = {self._construir_array_aninhado(d.tipo, d.dims, tipos)}", nivel)
+            expr = self._construir_array_aninhado(d.tipo, d.dims, tipos, nivel)
+            self.emit(f"{d.nome} = {expr}", nivel)
 
     def _gerar_atribuicao(self, stmt: A.Atribuicao, nivel, tipos):
         """AL-51/B17: sobrepõe gerador_base.py só para o caminho de chamada
@@ -519,14 +544,31 @@ class GeradorCodigo(GeradorCodigoBase):
                 return
         super()._gerar_atribuicao(stmt, nivel, tipos)
 
-    def _construir_array_aninhado(self, tipo, dims_exprs, tipos):
-        """Constrói recursivamente a expressão Python de um array com N
-        dimensões, ex: [[0 for _ in range(c)] for _ in range(l)] para 2D."""
+    def _construir_array_aninhado(self, tipo, dims_exprs, tipos, nivel):
+        """Constrói a expressão Python de um array com N dimensões, ex:
+        [[0 for _ in range(c)] for _ in range(l)] para 2D.
+
+        AL-88/B15: cada dimensão é avaliada UMA VEZ, para uma variável
+        temporária emitida antes da expressão, em vez de inline -- sem
+        isto, a dimensão INTERIOR de um array multidimensional era
+        reavaliada uma vez por iteração da dimensão exterior (a
+        compreensão de listas aninhada do Python reavalia o 'range()'
+        interior a cada volta), duplicando o efeito de uma expressão de
+        dimensão com efeitos laterais (ex.: uma chamada de função). Mesmo
+        princípio que _gerar_para já aplica a 'passo'. 'nivel' é onde as
+        atribuições temporárias são emitidas -- tem de ser o mesmo nível
+        de indentação de quem usa a expressão devolvida logo a seguir."""
         if not dims_exprs:
             return self._valor_default(tipo)
-        tam = self._expr(dims_exprs[0], tipos)
-        interior = self._construir_array_aninhado(tipo, dims_exprs[1:], tipos)
-        return f"[{interior} for _ in range(_algo_verificar_tamanho_array({tam}))]"
+        temps = []
+        for i, dim_expr in enumerate(dims_exprs):
+            nome_temp = f"_algo_dim{i}"
+            self.emit(f"{nome_temp} = {self._expr(dim_expr, tipos)}", nivel)
+            temps.append(nome_temp)
+        expr = self._valor_default(tipo)
+        for nome_temp in reversed(temps):
+            expr = f"[{expr} for _ in range(_algo_verificar_tamanho_array({nome_temp}))]"
+        return expr
 
     # -------- statements --------
     def _gerar_stmt(self, stmt, nivel, tipos):
@@ -657,7 +699,7 @@ class GeradorCodigo(GeradorCodigoBase):
             args = self._gerar_lista_args(expr.args, self._encontrar_funcao(expr.nome), tipos)
             nome_py = expr.nome.replace(".", "_") if "." in expr.nome else expr.nome
             return f"{nome_py}({args})"
-        if isinstance(expr, A.ArrayLiteral):
+        if isinstance(expr, A.ArrayLiteral):  # pragma: no cover -- semantics.py (_tipo_expr, AL-16) já rejeita um ArrayLiteral fora dos dois contextos tratados por _gerar_declaracao/_expr_array_literal e _expr_estrutura_literal antes de chegar aqui
             elementos = ", ".join(self._expr(e, tipos) for e in expr.elementos)
             return f"[{elementos}]"
         raise ErroInternoCompilador(  # pragma: no cover -- todos os tipos de expressão da AST são tratados acima

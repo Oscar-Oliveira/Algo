@@ -124,7 +124,22 @@ class GeradorCodigoBase:
                 return
         alvo = self._lvalue(stmt.alvo, tipos)
         tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
-        expr = self._coagir_decimal(self._expr(stmt.expr, tipos), tipo_alvo, stmt.expr)
+        if isinstance(stmt.expr, A.EstruturaLiteral):
+            # AL-90/B17: um literal de estrutura como valor de uma
+            # ATRIBUIÇÃO (não só de uma declaração) -- em modo normal isto
+            # é inalcançável (semantics.py já rejeita mais cedo, AL-16:
+            # '{...}' só é aceite a inicializar uma declaração ou como
+            # argumento de chamada), mas codegen_minimo.py (--minimo) salta
+            # essa verificação de propósito. Sem este caso especial,
+            # _expr() não tem nenhum ramo para EstruturaLiteral e o PRÓPRIO
+            # COMPILADOR rebentava ("expressão não suportada"), em vez de
+            # gerar Python válido -- aqui é sempre possível, porque
+            # 'tipo_alvo' já dá o nome do construtor a usar.
+            kwargs = ", ".join(
+                f"{nome}={self._expr(valor, tipos)}" for nome, valor in stmt.expr.campos)
+            expr = f"{tipo_alvo}({kwargs})"
+        else:
+            expr = self._coagir_decimal(self._expr(stmt.expr, tipos), tipo_alvo, stmt.expr)
         self.emit(f"{alvo} = {expr}", nivel)
 
     def _gerar_se(self, stmt: A.Se, nivel, tipos):

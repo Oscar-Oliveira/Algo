@@ -5,6 +5,7 @@ import sys
 import os
 import json
 import shutil
+import shlex
 import subprocess
 import argparse
 
@@ -185,7 +186,14 @@ def cmd_executa(args):
     print("----- Execução -----")
     sys.stdout.flush()
     resultado = subprocess.run([sys.executable, caminho_py])
-    sys.exit(resultado.returncode)
+    if resultado.returncode != 0:
+        # AL-93/B19: só sai com o código de erro em INSUCESSO -- antes,
+        # isto corria incondicionalmente (mesmo com returncode 0), e como
+        # a consola só atualiza 'ultimo_ficheiro' depois de args.func(args)
+        # terminar SEM SystemExit (ver cmd_consola), o comando 'executa'/
+        # 'e' -- o mais usado -- nunca memorizava o último ficheiro, mesmo
+        # depois de correr com sucesso.
+        sys.exit(resultado.returncode)
 
 
 def cmd_executa_com_trace(args):
@@ -217,8 +225,11 @@ def cmd_executa_com_trace(args):
         if not os.path.isfile(args.entradas):
             print(f"❌ Erro: ficheiro de entradas '{args.entradas}' não encontrado")
             sys.exit(1)
-        with open(args.entradas, "r", encoding="utf-8") as f:
-            entradas = [linha.rstrip("\n") for linha in f]
+        # AL-94/B20: reaproveita _ler_ficheiro_algo (mesmo tratamento de
+        # UnicodeDecodeError que já existe para o .algo principal) -- sem
+        # isto, um ficheiro de entradas noutra codificação (ex.: Latin-1)
+        # dava um traceback cru em vez de uma mensagem amigável.
+        entradas = _ler_ficheiro_algo(args.entradas).splitlines()
     # se não houver ficheiro de entradas, gerar_trace() usa o stdin real
     # do processo -- podes escrever os valores interativamente
 
@@ -240,8 +251,11 @@ def cmd_executa_com_trace(args):
               "o programa foi interrompido só para efeitos do trace.")
 
     if args.json:
-        with open(args.ficheiro, "r", encoding="utf-8") as f:
-            codigo_fonte = f.read()
+        # AL-95/B23: reaproveita _ler_ficheiro_algo em vez de reabrir o
+        # ficheiro à mão -- o conteúdo já foi lido e validado como UTF-8
+        # momentos antes (em _carregar_e_verificar), mas sem o mesmo
+        # tratamento de UnicodeDecodeError que essa função já tem.
+        codigo_fonte = _ler_ficheiro_algo(args.ficheiro)
         trace_final = {
             "titulo": programa.nome,
             "ficheiro": os.path.basename(args.ficheiro),
@@ -320,8 +334,8 @@ def cmd_fluxograma(args):
 
 def cmd_lint(args):
     programa = _carregar_e_verificar(args.ficheiro)
-    with open(args.ficheiro, "r", encoding="utf-8") as f:
-        codigo_fonte = f.read()
+    # AL-95/B23: ver a mesma nota em cmd_executa_com_trace.
+    codigo_fonte = _ler_ficheiro_algo(args.ficheiro)
     avisos = linter_modulo.analisar(programa, codigo_fonte)
     if not avisos:
         print("✔ Nenhum aviso — o linter não encontrou nada a assinalar.")
@@ -361,7 +375,21 @@ def _linha_com_ficheiro_por_omissao(comando, resto, ultimo_ficheiro):
     while i < len(resto):
         tok = resto[i]
         if tok.startswith("--"):
-            i += 2 if tok in flags_com_valor else 1
+            if tok in flags_com_valor:
+                if i + 1 >= len(resto):
+                    # AL-96/B24: sem esta verificação, uma flag como
+                    # '--entradas' esquecida sem valor a seguir era tratada
+                    # como se não houvesse ficheiro nenhum na linha, e o
+                    # ÚLTIMO FICHEIRO da sessão era acrescentado como se
+                    # fosse o VALOR de '--entradas' -- o argparse acabava a
+                    # reclamar de um argumento 'ficheiro' em falta, uma
+                    # mensagem que não aponta para a causa real.
+                    raise ValueError(
+                        f"a opção '{tok}' precisa de um valor a seguir "
+                        f"(ex.: '{tok} nome_do_ficheiro')")
+                i += 2
+            else:
+                i += 1
             continue
         tem_ficheiro = True
         break
@@ -518,13 +546,28 @@ def _ler_linha_prompt(prompt):
     return bytes_linha.decode("utf-8", errors="replace")
 
 
+def _shlex_split_sem_escape(linha):
+    """Como shlex.split(linha), mas sem tratar '\\' como caráter de escape.
+
+    AL-92/B18: shlex.split() usa modo POSIX por omissão, em que '\\' é
+    caráter de escape -- um caminho Windows colado sem aspas (ex.:
+    'C:\\Users\\aluno\\prog.algo', típico ao copiar do Explorador) ficava
+    corrompido ('C:UsersalunoProg.algo'), e a consola reportava "ficheiro
+    não encontrado" sem nenhuma pista da causa real. Desativar só o
+    'escape' (deixando aspas simples/duplas a funcionar normalmente, para
+    nomes de ficheiro com espaços) resolve isto sem perder a separação por
+    espaços nem as aspas."""
+    lexer = shlex.shlex(linha, posix=True)
+    lexer.whitespace_split = True
+    lexer.escape = ""
+    return list(lexer)
+
+
 def cmd_consola(parser):
     """Consola interativa: cada linha é um dos comandos normais
     (executa/compila/fluxograma/lint) sem o 'algo' à frente, sem teres de
     reabrir o programa a cada vez. Um comando com erro só mostra o erro e
     volta ao prompt -- não fecha a consola."""
-    import shlex
-
     _mostrar_banner()
     ultimo_ficheiro = None
 
@@ -546,7 +589,7 @@ def cmd_consola(parser):
             continue
 
         try:
-            partes = shlex.split(linha)
+            partes = _shlex_split_sem_escape(linha)
         except ValueError as e:
             print(f"❌ {e}")
             continue

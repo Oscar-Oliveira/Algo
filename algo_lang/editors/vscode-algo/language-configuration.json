@@ -25,6 +25,6 @@
   ],
   "indentationRules": {
     "increaseIndentPattern": "^\\s*(estrutura\\b.*|funcao\\b.*|procedimento\\b.*|inicio|se\\b.*\\bentao|senao(\\s+se\\b.*\\bentao)?|para\\b.*\\bfazer|enquanto\\b.*\\bfazer|fazer|escolher\\b.*|caso\\b.*|contrario)\\s*(//.*|/\\*.*\\*/\\s*)?$",
-    "decreaseIndentPattern": "^\\s*(senao|caso|contrario)\\b"
+    "decreaseIndentPattern": "^\\s*(senao|caso|contrario)\\b|^\\s*enquanto\\b(?!.*\\bfazer\\b)"
   }
 }

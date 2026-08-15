@@ -145,7 +145,7 @@ class LValue(No):
 
 
 class Literal(No):
-    def __init__(self, valor, tipo, linha=0):
+    def __init__(self, valor, tipo, linha):
         self.valor = valor
         self.tipo = tipo   # 'inteiro' | 'decimal' | 'booleano' | 'cadeia' | 'caracter' | 'nulo'
         self.linha = linha
@@ -264,7 +264,9 @@ def coletar_identificadores(programa):
     for e in programa.estruturas:
         nomes.append((e.nome, e.linha))
         for c in e.campos:
-            nomes.append((c.nome, e.linha))
+            # AL-77: usava e.linha (linha da 'estrutura X') em vez da linha
+            # real do campo -- c.linha ja esta disponivel e correta.
+            nomes.append((c.nome, c.linha))
 
     return nomes
 

@@ -175,12 +175,21 @@ def tokenizar(codigo: str):
                     f"e usa-o em todo o ficheiro", linha_num)
 
         if nivel > pilha_indent[-1]:
+            # AL-73: um bloco novo tem de aumentar exatamente 1 unidade em
+            # relacao ao nivel envolvente -- sem isto, um salto de 2+
+            # unidades de uma vez (ex. por engano ao copiar/colar) era
+            # aceite em silencio, mascarando um erro de indentacao comum.
+            if nivel != pilha_indent[-1] + 1:
+                raise ErroLexico(
+                    f"indentação avança {nivel - pilha_indent[-1]} níveis de uma vez "
+                    f"-- cada bloco novo só pode aumentar 1 nível de indentação",
+                    linha_num)
             pilha_indent.append(nivel)
             tokens.append(Token("INDENT", nivel, linha_num))
         while nivel < pilha_indent[-1]:
             pilha_indent.pop()
             tokens.append(Token("DEDENT", nivel, linha_num))
-        if nivel != pilha_indent[-1]:
+        if nivel != pilha_indent[-1]:  # pragma: no cover -- AL-73 garante pilha_indent contigua (0,1,...,profundidade), logo nivel corresponde sempre a um valor da pilha apos o loop de DEDENT acima; mantido como rede de seguranca defensiva.
             raise ErroLexico("indentação inconsistente", linha_num)
 
         tokens.extend(_tokenizar_linha(linha_stripped, linha_num))
@@ -220,7 +229,11 @@ def _tokenizar_linha(linha, linha_num):
     n = len(linha)
     while i < n:
         c = linha[i]
-        if c == " ":
+        if c == " " or c == "\t":
+            # AL-72: um tab a meio de uma linha (fora da indentacao, ex.
+            # colado de um editor com tabs de alinhamento) e whitespace tal
+            # como o espaco -- so a INDENTACAO exige um estilo consistente
+            # (ver _medir_indentacao), nao o resto da linha.
             i += 1
             continue
         if c == '"':
@@ -265,7 +278,9 @@ def _tokenizar_linha(linha, linha_num):
             tokens.append(Token("CARACTER", conteudo, linha_num))
             i = j + 1
             continue
-        if c.isdigit():
+        if c.isdigit() or (c == "." and i + 1 < n and linha[i + 1].isdigit()):
+            # AL-74: um decimal pode comecar por '.' sem digito antes
+            # (ex. '.5'), nao so terminar sem digito depois (ex. '1.').
             j = i
             is_float = False
             while j < n and (linha[j].isdigit() or (linha[j] == "." and not is_float)):

@@ -56,7 +56,7 @@
       "match": "\\b\\d+(\\.\\d+)?\\b"
     },
     "program-header": {
-      "match": "\\b(algoritmo)\\b\\s*(\"[^\"]*\")?",
+      "match": "\\b(algoritmo)\\b\\s*(\"(?:[^\"\\\\]|\\\\.)*\")?",
       "captures": {
         "1": { "name": "keyword.other.algo" },
         "2": { "name": "string.quoted.double.algo" }
@@ -84,7 +84,8 @@
       }
     },
     "library-calls": {
-      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)([A-Za-z_][A-Za-z0-9_]*)\\b",
+      "comment": "biblioteca.metodo( -- exige '(' a seguir (com espaço opcional) para distinguir de um acesso a CAMPO de estrutura (ex.: 'no.valor'), que o parser trata de forma completamente diferente (ver B28 na auditoria)",
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)([A-Za-z_][A-Za-z0-9_]*)\\b(?=[ \\t]*\\()",
       "captures": {
         "1": { "name": "support.class.algo" },
         "2": { "name": "punctuation.accessor.algo" },
@@ -92,8 +93,8 @@
       }
     },
     "declarations": {
-      "comment": "nome:tipo -- realça o nome da variável/parâmetro/campo antes dos dois pontos",
-      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*([A-Za-z_][A-Za-z0-9_]*)\\b",
+      "comment": "nome:tipo -- realça o nome da variável/parâmetro/campo antes dos dois pontos. O lookahead negativo evita disparar dentro de um literal de estrutura '{campo: valor}' quando o valor é 'verdadeiro'/'falso'/'nulo' (ver B29 na auditoria) -- não cobre o caso geral de um valor ser outra variável, que exigiria informação de tipos que esta gramática não tem",
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*(?!(?:verdadeiro|falso|nulo)\\b)([A-Za-z_][A-Za-z0-9_]*)\\b",
       "captures": {
         "1": { "name": "variable.other.algo" },
         "2": { "name": "punctuation.separator.algo" },
@@ -122,7 +123,7 @@
     },
     "constants": {
       "name": "constant.language.algo",
-      "match": "\\b(verdadeiro|falso)\\b"
+      "match": "\\b(verdadeiro|falso|nulo)\\b"
     },
     "operators": {
       "name": "keyword.operator.algo",

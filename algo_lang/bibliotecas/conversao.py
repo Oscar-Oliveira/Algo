@@ -27,6 +27,12 @@ FUNCOES = {
         # quando 'x' é texto E o parse direto de int() falhou; se também
         # não for um número decimal válido, o ValueError original (e a
         # sua tradução) é preservado tal-e-qual.
+        # AL-91/B21: 'x="inf"'/'"Infinity"' é um float válido (float(x) não
+        # falha), mas int(float("inf")) levanta OverflowError -- sem o
+        # apanhar aqui também, escapava deste 'except ValueError' (que só
+        # trata ValueError) e propagava até ao wrapper genérico de
+        # OverflowError em codegen.py, dando "overflow numérico", uma
+        # mensagem enganadora para um texto que não é sequer um número.
         ["primitivo"], "inteiro",
         "def conversao_paraInteiro(x):\n"
         "    try:\n"
@@ -37,7 +43,7 @@ FUNCOES = {
         "        if isinstance(x, str):\n"
         "            try:\n"
         "                return int(float(x))\n"
-        "            except ValueError:\n"
+        "            except (ValueError, OverflowError):\n"
         "                pass\n"
         "        raise e\n",
     ),

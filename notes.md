@@ -7,18 +7,21 @@ docker compose up -d --build
 
 ---
 
-Nova auditoria em compilador
-
-
 Documentacao -> em readme...
 - compilador
     - instalação,
 - liguagem online + readme
+linter
 
-exemplos no manual em anexo
+
+online
+- bd?
+- deixar estudande visivel
+- grupos
+- exemplos no manual em anexo
 - visualizador so no online.
-
-- stand alone online
+- report error
+- increase decrease font
 
 update -> db
 

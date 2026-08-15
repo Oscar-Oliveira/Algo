@@ -9,9 +9,10 @@ import textwrap
 import pytest
 
 from apoio import compilar, executar
-from algo_lang.compilador.parser import parse
+from algo_lang.compilador.parser import parse, ErroSintatico
 from algo_lang.compilador.semantics import verificar, ErroSemantico
 from algo_lang.compilador.lexer import ErroLexico
+from algo_lang.compilador.ast_nodes import coletar_identificadores
 
 
 # ---------- #1 estruturas comparadas por valor ----------
@@ -331,13 +332,29 @@ def test_lexer_espacos_nao_multiplo_de_4():
         compilar('algoritmo "T"\ninicio\n  x:inteiro = 5\n')
 
 
-def test_lexer_indentacao_inconsistente():
-    with pytest.raises(ErroLexico, match="indentação inconsistente"):
+def test_lexer_indentacao_avanca_mais_de_um_nivel_de_uma_vez():
+    # AL-73: um bloco novo so pode aumentar 1 nivel de indentacao de cada
+    # vez -- um salto de 2+ niveis (aqui, de 0 para 3) e apanhado nesta
+    # linha, antes mesmo de chegar a um eventual dedent inconsistente.
+    with pytest.raises(ErroLexico, match="avança 3 níveis"):
         compilar("""algoritmo "T"
 inicio
             x:inteiro = 1
         y:inteiro = 2
 """)
+
+
+def test_lexer_tab_a_meio_de_linha_e_tratado_como_espaco():
+    # AL-72: um tab fora da indentacao (ex. colado de um editor com tabs de
+    # alinhamento) e whitespace, tal como o espaco -- nao um erro lexico.
+    saida = executar("algoritmo \"T\"\ninicio\n\tx:inteiro\t=\t5\n\tescrever(x)\n")
+    assert saida.strip() == "5"
+
+
+def test_lexer_decimal_comecado_por_ponto_e_reconhecido():
+    # AL-74: '.5' e um decimal valido, tal como '1.' ja era.
+    saida = executar("algoritmo \"T\"\ninicio\n\tx:decimal = .5\n\tescrever(x)\n")
+    assert saida.strip() == "0.5"
 
 
 def test_lexer_string_nao_fechada():
@@ -3266,7 +3283,17 @@ def test_trace_nao_corrompe_passo_quando_ultima_instrucao_chama_funcao(tmp_path)
     da própria instrução em _algo_programa. O passo de dentro da função
     ficava com a pilha errada (perdia o frame da função) e a consola
     já avançada demais; o passo real da última instrução nunca era
-    atualizado com o efeito de a ter executado (a saída do escrever)."""
+    atualizado com o efeito de a ter executado (a saída do escrever).
+
+    B25 (segunda auditoria, AL-97): a correção acima ainda sobrescrevia
+    'passos[indice]' EM SILÊNCIO, e nesta situação 'indice' é o PRIMEIRO
+    passo da lista (o único "só Principal" nela) -- sobrescrevê-lo com o
+    estado final corrompia a ORDEM CRONOLÓGICA: o passo 0 passava a
+    mostrar a consola final ('11\n'), antes do passo 1 (dentro de 'f'),
+    que continuava com a consola vazia -- a consola "andava para trás"
+    ao avançar no trace. As asserções abaixo já não usam next() (que só
+    confirma que ALGUM passo tem os valores certos, em qualquer posição)
+    -- verificam explicitamente a ORDEM e a monotonicidade da consola."""
     from algo_lang.compilador.codegen import gerar_python_com_mapa
     from algo_lang.tools.tracer import gerar_trace
     programa = parse(textwrap.dedent("""
@@ -3287,16 +3314,23 @@ def test_trace_nao_corrompe_passo_quando_ultima_instrucao_chama_funcao(tmp_path)
     assert resultado["erro"] is None
     assert resultado["consolaFinal"] == "11\n"
 
+    passos = resultado["passos"]
+    # B25: a consola nunca pode "encolher" de um passo para o seguinte --
+    # cada passo reflete um momento chronologicamente mais tarde (ou igual)
+    # do que o anterior, nunca mais cedo.
+    consolas = [p["consola"] for p in passos]
+    assert all(len(consolas[i]) <= len(consolas[i + 1]) for i in range(len(consolas) - 1))
+
     passo_da_funcao = next(
-        p for p in resultado["passos"]
-        if any(frame["nome"] == "f" for frame in p["pilha"]))
+        p for p in passos if any(frame["nome"] == "f" for frame in p["pilha"]))
     assert passo_da_funcao["pilha"][-1]["variaveis"] == {"x": 10}
     assert passo_da_funcao["consola"] == ""
 
-    passo_principal = next(
-        p for p in resultado["passos"]
-        if len(p["pilha"]) == 1 and p["pilha"][0]["nome"] == "Principal")
-    assert passo_principal["consola"] == "11\n"
+    # B25: o passo com a consola final tem de ser o ÚLTIMO da lista (não
+    # apenas "existir algures") -- é o que garante a monotonicidade acima.
+    assert passos[-1]["consola"] == "11\n"
+    assert len(passos[-1]["pilha"]) == 1
+    assert passos[-1]["pilha"][0]["nome"] == "Principal"
 
 
 # ---------- B28 (AL-68): tracer -- linha salta para trás; OverflowError não traduzido ----------
@@ -3375,3 +3409,592 @@ def test_ler_para_parametro_por_valor_da_aviso_especifico():
     verificar(programa)
     avisos = analisar(programa)
     assert any("não é 'por referência'" in a.mensagem and "'x'" in a.mensagem for a in avisos)
+
+
+# ============================================================
+#  Segunda auditoria (2026-08-14) -- ver algo_lang/AUDITORIA.md
+# ============================================================
+
+# ---------- B4 (AL-75): parser -- um segundo 'inicio' substituia o primeiro em silencio ----------
+
+def test_segundo_bloco_inicio_e_rejeitado():
+    with pytest.raises(ErroSintatico, match="já tem um bloco 'inicio'"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                escrever("primeiro")
+            inicio
+                escrever("segundo")
+        """)
+
+
+# ---------- B5 (AL-76): parser -- cadeias de nao/-/^ nao respeitavam o limite de profundidade ----------
+
+def test_cadeia_de_nao_muito_funda_da_erro_sintatico_amigavel():
+    codigo = 'algoritmo "T"\ninicio\n\tx:booleano = ' + "nao " * 2000 + "verdadeiro\n"
+    with pytest.raises(ErroSintatico, match="demasiado aninhada"):
+        compilar(codigo)
+
+
+def test_cadeia_de_menos_unario_muito_funda_da_erro_sintatico_amigavel():
+    codigo = 'algoritmo "T"\ninicio\n\tx:inteiro = ' + "-" * 2000 + "5\n"
+    with pytest.raises(ErroSintatico, match="demasiado aninhada"):
+        compilar(codigo)
+
+
+def test_cadeia_de_potencia_muito_funda_da_erro_sintatico_amigavel():
+    codigo = 'algoritmo "T"\ninicio\n\tx:inteiro = ' + "2 ^ " * 1000 + "2\n"
+    with pytest.raises(ErroSintatico, match="demasiado aninhada"):
+        compilar(codigo)
+
+
+# ---------- B6 (AL-77): ast_nodes -- colisao de campo de estrutura reportava a linha errada ----------
+
+def test_colisao_de_campo_de_estrutura_reporta_a_linha_do_campo():
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        estrutura Ponto
+            classe:inteiro
+        inicio
+            escrever(1)
+    """))
+    nomes = dict(coletar_identificadores(programa))
+    assert nomes["classe"] == 4
+
+
+# ---------- B7 (AL-79): semantics -- tamanho declarado de array nunca validado contra o literal ----------
+
+def test_array_com_literal_de_tamanho_diferente_do_declarado_da_erro():
+    with pytest.raises(ErroSemantico, match="tamanho declarado 5.*3 elemento"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                v:inteiro[5] = {1, 2, 3}
+                escrever(v[0])
+        """)
+
+
+def test_array_com_literal_de_tamanho_igual_ao_declarado_compila():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            v:inteiro[3] = {1, 2, 3}
+            escrever(v[2])
+    """)
+    assert saida.strip() == "3"
+
+
+# ---------- B8 (AL-78): semantics/codegen -- literais de estrutura aninhados sempre rejeitados ----------
+
+def test_literal_de_estrutura_aninhado_dentro_doutro_literal():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        estrutura Retangulo
+            canto:Ponto
+        inicio
+            r:Retangulo = {canto: {x: 5}}
+            escrever(r.canto.x)
+    """)
+    assert saida.strip() == "5"
+
+
+def test_array_de_literais_de_estrutura():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            v:Ponto[2] = {{x: 1}, {x: 2}}
+            escrever(v[0].x)
+            escrever(v[1].x)
+    """)
+    assert saida.strip() == "1\n2"
+
+
+# ---------- B9 (AL-81): semantics -- mesmo campo de estrutura passado 2x por referência não detetado ----------
+
+def test_mesmo_campo_de_estrutura_por_referencia_duas_vezes_da_erro():
+    with pytest.raises(ErroSemantico, match=r"'p\.x' é passado por referência mais do que uma vez"):
+        compilar("""
+            algoritmo "T"
+            estrutura Ponto
+                x:inteiro
+            procedimento trocar(ref a:inteiro, ref b:inteiro)
+                afirmar verdadeiro
+            inicio
+                p:Ponto = {x: 1}
+                trocar(p.x, p.x)
+        """)
+
+
+def test_indices_diferentes_do_mesmo_array_por_referencia_continua_a_compilar():
+    compilar("""
+        algoritmo "T"
+        procedimento trocar(ref a:inteiro, ref b:inteiro)
+            afirmar verdadeiro
+        inicio
+            v:inteiro[3] = {1, 2, 3}
+            i:inteiro = 0
+            j:inteiro = 1
+            trocar(v[i], v[j])
+    """)
+
+
+# ---------- B10 (AL-82): semantics -- mensagem errada ao redeclarar global com tipo diferente num bloco aninhado ----------
+
+def test_redeclarar_global_com_tipo_diferente_em_bloco_aninhado_da_mensagem_correta():
+    with pytest.raises(ErroSemantico, match="já foi declarada") as excinfo:
+        compilar("""
+            algoritmo "T"
+            x:inteiro
+            inicio
+                se verdadeiro entao
+                    x:cadeia = "a"
+                escrever(x)
+        """)
+    assert "tipos diferentes" not in str(excinfo.value)
+
+
+def test_tipos_diferentes_em_ramos_irmaos_continua_a_dar_a_mensagem_de_ramos():
+    with pytest.raises(ErroSemantico, match="tipos diferentes em ramos diferentes"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                se verdadeiro entao
+                    x:inteiro = 1
+                senao
+                    x:cadeia = "a"
+                escrever(x)
+        """)
+
+
+# ---------- B11 (AL-83): semantics -- 'caso' duplicado não normalizava tipos compatíveis ----------
+
+def test_caso_duplicado_entre_cadeia_e_caracter_e_detetado():
+    with pytest.raises(ErroSemantico, match="já apareceu antes"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                s:cadeia = "a"
+                escolher s
+                    caso "a"
+                        escrever(1)
+                    caso 'a'
+                        escrever(2)
+        """)
+
+
+def test_caso_duplicado_entre_inteiro_e_decimal_e_detetado():
+    with pytest.raises(ErroSemantico, match="já apareceu antes"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                d:decimal = 1.0
+                escolher d
+                    caso 1
+                        escrever(1)
+                    caso 1.0
+                        escrever(2)
+        """)
+
+
+# ---------- B12 (AL-84): semantics -- 'ref' aceitava alargamento de tipo, corrompendo a variável do chamador ----------
+
+def test_ref_decimal_nao_aceita_variavel_inteiro():
+    with pytest.raises(ErroSemantico, match="por referência e espera exatamente 'decimal'"):
+        compilar("""
+            algoritmo "T"
+            procedimento incrementaMeio(ref a:decimal)
+                a = a + 0.5
+            inicio
+                x:inteiro = 5
+                incrementaMeio(x)
+                escrever(x)
+        """)
+
+
+def test_ref_cadeia_nao_aceita_variavel_caracter():
+    with pytest.raises(ErroSemantico, match="por referência e espera exatamente 'cadeia'"):
+        compilar("""
+            algoritmo "T"
+            procedimento repete(ref a:cadeia)
+                a = a + a
+            inicio
+                c:caracter = 'x'
+                repete(c)
+                escrever(c)
+        """)
+
+
+def test_ref_com_tipo_exatamente_igual_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        procedimento incrementaMeio(ref a:decimal)
+            a = a + 0.5
+        inicio
+            x:decimal = 5.0
+            incrementaMeio(x)
+            escrever(x)
+    """)
+    assert saida.strip() == "5.5"
+
+
+# ---------- B13 (AL-85): bibliotecas -- matematica.potencia com base negativa/expoente fracionário dava traceback cru ----------
+
+def test_matematica_potencia_negativa_fracionaria_da_erro_amigavel():
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.potencia(-8.0, 0.5))
+    """)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert "Traceback" not in resultado.stdout
+    assert "Erro em tempo de execução" in resultado.stdout
+    assert resultado.returncode == 1
+
+
+def test_matematica_potencia_normal_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.potencia(2, 3))
+    """)
+    assert saida.strip() == "8.0"
+
+
+# ---------- B22 (AL-86): bibliotecas -- matematica.aleatorio com limites invertidos mostrava texto interno do Python ----------
+
+def test_matematica_aleatorio_com_limites_invertidos_nao_mostra_randrange():
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.aleatorio(10, 1))
+    """)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert "randrange" not in resultado.stdout
+    assert "limite inferior" in resultado.stdout and "limite superior" in resultado.stdout
+
+
+# ---------- B14 (AL-87): codegen_minimo -- '^' devolvia complex silenciosamente, sem erro ----------
+
+def test_minimo_potencia_negativa_fracionaria_falha_nativamente_em_vez_de_devolver_complexo():
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        inicio
+            x:decimal = (-8.0) ^ 0.5
+            escrever(x)
+    """))
+    codigo_py = gerar_python_minimo(programa)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert resultado.returncode != 0
+    assert "complex" in resultado.stderr
+
+
+def test_minimo_potencia_normal_continua_a_funcionar():
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        inicio
+            x:decimal = 2 ^ 3
+            escrever(x)
+    """))
+    codigo_py = gerar_python_minimo(programa)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.returncode == 0
+    assert resultado.stdout.strip() == "8.0"
+
+
+# ---------- B15 (AL-88): codegen/codegen_minimo -- dimensão interior de array multidimensional avaliada 2x ----------
+
+def test_dimensao_interior_de_array_multidimensional_e_avaliada_uma_so_vez():
+    saida = executar("""
+        algoritmo "T"
+        funcao dim():inteiro
+            escrever("chamada")
+            devolver 2
+        inicio
+            v:inteiro[2][dim()]
+            escrever(v[0][0])
+    """)
+    assert saida.count("chamada") == 1
+
+
+def test_minimo_dimensao_interior_de_array_multidimensional_e_avaliada_uma_so_vez():
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        funcao dim():inteiro
+            escrever("chamada")
+            devolver 2
+        inicio
+            v:inteiro[2][dim()]
+            escrever(v[0][0])
+    """))
+    codigo_py = gerar_python_minimo(programa)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.returncode == 0
+    assert resultado.stdout.count("chamada") == 1
+
+
+def test_array_de_estrutura_com_campo_multidimensional_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Turma
+            notas:inteiro[3]
+        inicio
+            t:Turma
+            t.notas[0] = 9
+            escrever(t.notas[0])
+            escrever(t.notas[1])
+    """)
+    assert saida.strip() == "9\n0"
+
+
+# ---------- B16 (AL-89): codegen -- mapa de linhas do tracer errado durante construção/comparação de estruturas ----------
+
+def test_trace_nao_injeta_passo_espurio_na_linha_da_definicao_da_estrutura(tmp_path):
+    from algo_lang.compilador.codegen import gerar_python_com_mapa
+    from algo_lang.tools.tracer import gerar_trace
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            a:Ponto = {x: 1}
+            b:Ponto = {x: 1}
+            se a == b entao
+                escrever("iguais")
+            senao
+                escrever("diferentes")
+    """))
+    verificar(programa)
+    dados = gerar_python_com_mapa(programa)
+    caminho_py = str(tmp_path / "_teste_trace_estrutura.py")
+    with open(caminho_py, "w", encoding="utf-8") as f:
+        f.write(dados["codigo"])
+    resultado = gerar_trace(
+        dados["codigo"], caminho_py, dados["mapa_linhas"],
+        dados["nomes_globais"], dados["nomes_funcoes"])
+    linha_definicao_estrutura = 3
+    linhas_do_trace = [p["linha"] for p in resultado["passos"]]
+    assert linha_definicao_estrutura not in linhas_do_trace
+
+
+# ---------- B17 (AL-90): codegen_minimo -- assumia que semantics.verificar() tinha corrido, mas --minimo salta-o ----------
+
+def test_minimo_reatribuicao_de_literal_de_estrutura_nao_rebenta_o_compilador():
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            p:Ponto = {x: 1}
+            p = {x: 99}
+            escrever(p.x)
+    """))
+    codigo_py = gerar_python_minimo(programa)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.returncode == 0
+    assert resultado.stdout.strip() == "99"
+
+
+def test_minimo_ref_com_argumento_invalido_nao_rebenta_o_compilador():
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        procedimento incr(ref a:inteiro)
+            a = a + 1
+        inicio
+            incr(1 + 2)
+    """))
+    # não deve levantar nenhuma exceção do COMPILADOR -- só o Python
+    # nativo, ao correr o ficheiro gerado, é que pode falhar.
+    codigo_py = gerar_python_minimo(programa)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.returncode != 0
+    assert "SyntaxError" in resultado.stderr
+
+
+# ---------- B21 (AL-91): bibliotecas -- conversao.paraInteiro("inf") escapava ao tratamento de OverflowError ----------
+
+def test_conversao_parainteiro_de_inf_da_mensagem_de_texto_invalido_nao_overflow():
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Conversao
+        inicio
+            escrever(conversao.paraInteiro("inf"))
+    """)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert resultado.returncode == 1
+    assert "overflow" not in resultado.stdout.lower()
+    assert "não pode ser convertido" in resultado.stdout
+
+
+def test_conversao_parainteiro_de_decimal_em_texto_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        importar Conversao
+        inicio
+            escrever(conversao.paraInteiro("3.9"))
+    """)
+    assert saida.strip() == "3"
+
+
+# ---------- B18 (AL-92): cli -- shlex.split() da consola apagava barras invertidas de caminhos Windows ----------
+
+def test_shlex_split_sem_escape_preserva_barras_invertidas():
+    from algo_lang.cli import _shlex_split_sem_escape
+    partes = _shlex_split_sem_escape(r"executa C:\Users\aluno\prog.algo")
+    assert partes == ["executa", r"C:\Users\aluno\prog.algo"]
+
+
+def test_shlex_split_sem_escape_continua_a_suportar_aspas_com_espacos():
+    from algo_lang.cli import _shlex_split_sem_escape
+    partes = _shlex_split_sem_escape(r'executa "C:\pasta com espacos\prog.algo"')
+    assert partes == ["executa", r"C:\pasta com espacos\prog.algo"]
+
+
+# ---------- B19 (AL-93): cli -- cmd_executa saía sempre, mesmo com sucesso, a consola nunca memorizava o ficheiro ----------
+
+def test_cmd_executa_bem_sucedido_nao_levanta_systemexit(tmp_path, capfd):
+    import argparse
+    from algo_lang.cli import cmd_executa
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), debug=False, json=False, mostrar_python=False)
+    cmd_executa(args)  # não deve levantar SystemExit em sucesso
+    assert "ok" in capfd.readouterr().out
+
+
+def test_cmd_executa_com_erro_em_runtime_continua_a_sair_com_codigo_1(tmp_path):
+    import argparse
+    from algo_lang.cli import cmd_executa
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    v:inteiro[1]\n    escrever(v[5])\n', encoding="utf-8")
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), debug=False, json=False, mostrar_python=False)
+    with pytest.raises(SystemExit) as excinfo:
+        cmd_executa(args)
+    assert excinfo.value.code != 0
+
+
+# ---------- B20 (AL-94): cli -- ficheiro de --entradas com codificação inválida dava traceback cru ----------
+
+def test_entradas_com_codificacao_invalida_da_erro_amigavel(tmp_path, capsys):
+    import argparse
+    from algo_lang.cli import cmd_executa_com_trace
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    x:inteiro\n    ler(x)\n    escrever(x)\n', encoding="utf-8")
+    entradas_path = tmp_path / "entradas.txt"
+    entradas_path.write_bytes(b"caf\xe9\n")  # bytes inválidos em UTF-8
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), entradas=str(entradas_path), debug=False, json=False)
+    with pytest.raises(SystemExit) as excinfo:
+        cmd_executa_com_trace(args)
+    assert excinfo.value.code == 1
+    saida = capsys.readouterr().out
+    assert "UnicodeDecodeError" not in saida
+    assert "codificação" in saida
+
+
+# ---------- B24 (AL-96): cli -- '--entradas' sem valor na consola dava um erro que não apontava para a causa real ----------
+
+def test_flag_com_valor_sem_valor_a_seguir_da_mensagem_clara():
+    from algo_lang.cli import _linha_com_ficheiro_por_omissao
+    with pytest.raises(ValueError, match=r"'--entradas' precisa de um valor"):
+        _linha_com_ficheiro_por_omissao("executa", ["--entradas"], "ultimo.algo")
+
+
+def test_flag_com_valor_seguido_de_ficheiro_continua_a_funcionar():
+    from algo_lang.cli import _linha_com_ficheiro_por_omissao
+    resto = _linha_com_ficheiro_por_omissao(
+        "executa", ["--entradas", "in.txt"], "ultimo.algo")
+    assert resto == ["--entradas", "in.txt", "ultimo.algo"]
+
+
+# ---------- B26 (AL-98): linter -- índices fora dos limites não cobria arrays que são campos de estrutura ----------
+
+def test_linter_deteta_indice_fora_dos_limites_em_campo_array_de_estrutura():
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        estrutura Turma
+            notas:inteiro[5]
+        inicio
+            t:Turma
+            t.notas[10] = 99
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert any(
+        "fora dos limites" in a.mensagem and "'t.notas'" in a.mensagem for a in avisos)
+
+
+def test_linter_nao_assinala_indice_valido_em_campo_array_de_estrutura():
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        estrutura Turma
+            notas:inteiro[5]
+        inicio
+            t:Turma
+            t.notas[2] = 99
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert not any("fora dos limites" in a.mensagem for a in avisos)
+
+
+# ---------- B27 (AL-99): editors/vscode-algo -- palavra-chave 'nulo' sem highlighting nenhum ----------
+
+def test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer():
+    """A gramática TextMate da extensão VS Code é mantida à mão (ao
+    contrário de online/modo_codemirror.py, que gera a partir do lexer) --
+    já desalinhou uma vez (a keyword 'nulo' não tinha highlighting
+    nenhum, B27). Este teste não substitui gerar a gramática dinamicamente
+    (melhoria conceptual maior, fora do âmbito de uma correção pontual),
+    mas evita que a mesma classe de bug volte a passar despercebida:
+    verifica que toda palavra-chave do lexer aparece em algum padrão da
+    gramática."""
+    import json
+    import re
+    from algo_lang.compilador.lexer import PALAVRAS_CHAVE
+    caminho_grammar = os.path.join(
+        os.path.dirname(__file__), "..", "editors", "vscode-algo",
+        "syntaxes", "algo.tmLanguage.json")
+    with open(caminho_grammar, "r", encoding="utf-8") as f:
+        grammar = json.load(f)
+    texto_padroes = " ".join(
+        regra.get("match", "") for regra in grammar["repository"].values())
+    faltam = sorted(
+        p for p in PALAVRAS_CHAVE
+        if not re.search(rf"\b{re.escape(p)}\b", texto_padroes))
+    assert not faltam, (
+        f"palavra(s)-chave do lexer sem highlighting na extensão VS Code: {faltam} "
+        f"-- adiciona-a(s) a algo.tmLanguage.json (ver B27 na auditoria)")

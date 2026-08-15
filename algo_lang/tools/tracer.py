@@ -139,23 +139,30 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         pilha.reverse()
         return pilha
 
-    def _indice_do_ultimo_passo_em_principal():
-        """AL-71: encontra o último passo cuja pilha estava diretamente em
-        _algo_programa (só "Principal", sem nenhuma função aninhada) --
-        NÃO presumir que é sempre 'passos[-1]'. Se a ÚLTIMA instrução do
-        'inicio' chamar uma função do utilizador, essa chamada gera mais
-        passos (dentro da função chamada) DEPOIS do passo da própria
-        instrução; sobrescrever sempre passos[-1] corrompia o passo
-        errado -- o último passo de dentro da função ficava com a pilha
-        trocada (perdia o frame da função, sobrava só "Principal") e com
-        a consola já avançada a mais (incluindo saída gerada DEPOIS
-        desse passo). Devolve None se não encontrar nenhum (não deve
-        acontecer -- a própria instrução que levou a esta chamada tem de
-        ter gerado um passo em _algo_programa antes de entrar em
-        qualquer função)."""
+    def _indice_do_ultimo_passo_em_principal(linha_alvo):
+        """AL-71/AL-97(B25): encontra o último passo cuja pilha estava
+        diretamente em _algo_programa (só "Principal", sem nenhuma função
+        aninhada) E cuja linha é a da própria instrução final (linha_alvo)
+        -- NÃO presumir que é sempre 'passos[-1]', nem que basta filtrar
+        pela forma da pilha. Se a ÚLTIMA instrução do 'inicio' for (ou
+        terminar n)a ÚNICA chamada a uma função/procedimento do
+        utilizador em todo o programa, o passo "só Principal" mais
+        recente por FORMA fica na posição 0 (a primeira e única vez que
+        esse padrão apareceu em todo o trace, não perto do fim) -- sem o
+        filtro adicional por linha, sobrescrever esse índice corrompia o
+        PRIMEIRO passo do trace com o estado FINAL do programa, fazendo a
+        consola "andar para trás" ao avançar passo a passo. Filtrar
+        também por linha_alvo (a linha ALGO da própria instrução que está
+        a retornar, não das linhas dentro da função chamada) garante que
+        encontramos sempre o passo certo, mesmo que o mesmo padrão "só
+        Principal" já tenha aparecido antes para outra instrução. Devolve
+        None se não encontrar nenhum (não deve acontecer -- a própria
+        instrução que levou a esta chamada tem de ter gerado um passo em
+        _algo_programa antes de entrar em qualquer função)."""
         for i in range(len(passos) - 1, -1, -1):
-            pilha = passos[i]["pilha"]
-            if len(pilha) == 1 and pilha[0]["nome"] == "Principal":
+            passo = passos[i]
+            pilha = passo["pilha"]
+            if len(pilha) == 1 and pilha[0]["nome"] == "Principal" and passo["linha"] == linha_alvo:
                 return i
         return None  # pragma: no cover -- defensivo, ver docstring
 
@@ -169,14 +176,38 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
             # linha executada".
             if (passos and frame.f_code.co_filename == caminho_py
                     and frame.f_code.co_name == NOME_FUNCAO_PRINCIPAL):
+                linha_alvo = mapa_linhas.get(frame.f_lineno)
                 pilha_final = construir_pilha(frame)
-                indice = _indice_do_ultimo_passo_em_principal()
+                indice = (_indice_do_ultimo_passo_em_principal(linha_alvo)
+                          if linha_alvo is not None else None)
                 if pilha_final and indice is not None:
-                    passos[indice] = {
+                    passo_final = {
                         "linha": passos[indice]["linha"],
                         "consola": buffer_saida.getvalue(),
                         "pilha": pilha_final,
                     }
+                    if indice == len(passos) - 1:
+                        # AL-97/B25: a última instrução não entrou em
+                        # nenhuma função do utilizador -- o seu próprio
+                        # passo já é o último da lista, por isso
+                        # atualizá-lo em vez de acrescentar mantém "um
+                        # passo por linha executada" sem reordenar nada.
+                        passos[indice] = passo_final
+                    else:
+                        # AL-97/B25: a última instrução ENTROU numa
+                        # função do utilizador (ex.: 'escrever(f(10))'),
+                        # que já acrescentou passos a seguir ao seu
+                        # próprio (dentro de 'f'). Sobrescrever esse
+                        # passo mais antigo, como antes, corrompia a
+                        # ORDEM CRONOLÓGICA da lista -- ficava com o
+                        # estado FINAL do programa (consola completa)
+                        # numa posição anterior a passos que na
+                        # realidade aconteceram primeiro, fazendo a
+                        # consola "andar para trás" ao avançar no trace.
+                        # Acrescentar um passo novo no fim preserva a
+                        # ordem; o passo antigo mantém-se tal como
+                        # estava (o estado ANTES de entrar em 'f').
+                        passos.append(passo_final)
             return tracer
         if evento != "line":
             return tracer
