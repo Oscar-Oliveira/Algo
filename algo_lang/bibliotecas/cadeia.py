@@ -28,10 +28,17 @@ FUNCOES = {
         # /'fim' fora de [0, len(s)] dá erro amigável (_AlgoIndiceCadeiaInvalido,
         # a mesma mensagem que cadeia.caracter já usa), em vez de cortar
         # silenciosamente -- consistência entre as duas funções, e não
-        # esconder um índice errado do estudante.
+        # esconder um índice errado do estudante. 'ini > fim' (ambos dentro
+        # dos limites) tem o mesmo cuidado que matematica.aleatorio já tem
+        # para limites invertidos -- sem isto, devolvia "" em silêncio
+        # (fatia do Python com início depois do fim), sem indicar ao
+        # estudante que os dois argumentos estão trocados.
         "def cadeia_subcadeia(s, ini, fim):\n"
         "    if ini < 0 or ini > len(s) or fim < 0 or fim > len(s):\n"
         "        raise _AlgoIndiceCadeiaInvalido(f'{ini}:{fim}')\n"
+        "    if ini > fim:\n"
+        "        raise ValueError(\n"
+        "            f'o início ({ini}) não pode ser maior do que o fim ({fim})')\n"
         "    return s[ini:fim]\n",
     ),
     "caracter": (

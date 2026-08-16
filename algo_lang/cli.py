@@ -87,15 +87,25 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
         try:
             mesclar_biblioteca_no_programa(programa, inc.caminho, declaracoes, funcoes, estruturas)
         except ColisaoDeInclusao as e:
-            if e.tipo == "função":
-                print(f"❌ Erro: '{e.nome}' (incluído de '{e.caminho_origem}') colide com uma "
-                      f"função já definida")
-            elif e.tipo == "variável global":
-                print(f"❌ Erro: variável '{e.nome}' (incluída de '{e.caminho_origem}') colide "
-                      f"com uma variável global já declarada")
+            if e.tipo_existente == e.tipo:
+                if e.tipo == "função":
+                    print(f"❌ Erro: '{e.nome}' (incluído de '{e.caminho_origem}') colide com uma "
+                          f"função já definida")
+                elif e.tipo == "variável global":
+                    print(f"❌ Erro: variável '{e.nome}' (incluída de '{e.caminho_origem}') colide "
+                          f"com uma variável global já declarada")
+                else:
+                    print(f"❌ Erro: estrutura '{e.nome}' (incluída de '{e.caminho_origem}') colide "
+                          f"com uma estrutura já definida")
             else:
-                print(f"❌ Erro: estrutura '{e.nome}' (incluída de '{e.caminho_origem}') colide "
-                      f"com uma estrutura já definida")
+                # Colisão ENTRE categorias diferentes (ex.: uma função
+                # incluída com o mesmo nome de uma estrutura já definida) --
+                # mensagem dedicada que nomeia as duas categorias, em vez de
+                # deixar cair no erro genérico e sem contexto de
+                # semantics.py mais tarde.
+                verbo = "declarada" if e.tipo_existente == "variável global" else "definida"
+                print(f"❌ Erro: {e.tipo} '{e.nome}' (incluída de '{e.caminho_origem}') colide "
+                      f"com uma {e.tipo_existente} já {verbo}")
             sys.exit(1)
 
         # As inclusões desta biblioteca resolvem-se relativas à PRÓPRIA
@@ -155,6 +165,17 @@ def compilar_ficheiro(caminho_algo: str, minimo: bool = False) -> str:
             codigo_py = gerar_python_minimo(programa)
         except (ErroLexico, ErroSintatico, ErroSemantico) as e:
             print(f"❌ {e}")
+            sys.exit(1)
+        except ErroInternoCompilador as e:
+            # Ao contrário do modo normal (onde isto é sempre um bug do
+            # ALGO, porque verificar() já validou o programa antes),
+            # --minimo salta essa verificação de propósito -- por isso
+            # aqui também pode ser uma limitação genuína deste modo (ex.:
+            # um literal de estrutura numa posição em que só a verificação
+            # de tipos normal saberia resolver o tipo pelo contexto), não
+            # necessariamente um bug do compilador.
+            print(f"❌ {e} -- não suportado em --minimo (tenta sem --minimo, ou "
+                  f"usa uma variável intermédia).")
             sys.exit(1)
     else:
         programa = _carregar_e_verificar(caminho_algo)

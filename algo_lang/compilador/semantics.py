@@ -110,6 +110,13 @@ class VerificadorTipos:
                     f.linha)
             self.funcoes[f.nome] = f
 
+        # Nomes de topo do corpo principal (variáveis/constantes globais) --
+        # calculado aqui porque as estruturas são registadas ANTES de
+        # 'self.globais' existir (ver verificar(), mais abaixo), só para
+        # dar uma mensagem dedicada em _validar_dims quando um campo de
+        # array de 'estrutura' referencia um destes nomes.
+        self._nomes_globais_top_level = {d.nome for d in programa.declaracoes}
+
         self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims)}
         linhas_dos_campos = {}   # (nome_estrutura, nome_campo) -> linha (só para mensagens de erro)
         for e in programa.estruturas:
@@ -148,7 +155,7 @@ class VerificadorTipos:
                     # (um campo de estrutura não vê variáveis nenhumas), só
                     # expressões resolúveis sem nomes (literais/aritmética
                     # entre literais) fazem sentido aqui.
-                    self._validar_dims(c.dims, {}, c.linha)
+                    self._validar_dims(c.dims, {}, c.linha, contexto_campo=True)
                 dims_n = 0 if c.dims is None else len(c.dims)
                 campos[c.nome] = (c.tipo, dims_n)
                 linhas_dos_campos[(e.nome, c.nome)] = c.linha
@@ -240,7 +247,7 @@ class VerificadorTipos:
                 raise ErroSemantico(f"parâmetro '{p.nome}' duplicado", f.linha)
             self._verificar_nome_disponivel(p.nome, f.linha, "o parâmetro")
             self._validar_tipo(p.tipo, f.linha)
-            escopo.locais[p.nome] = (p.tipo, 0, False)
+            escopo.locais[p.nome] = (p.tipo, p.dims, False)
         if f.tipo_retorno is not None:
             self._validar_tipo(f.tipo_retorno, f.linha)
 
@@ -377,22 +384,47 @@ class VerificadorTipos:
                     # como um array literal sem elementos (ver codegen.py).
                 else:
                     self._verificar_estrutura_literal(d.inicial, d.tipo, escopo)
-            elif isinstance(d.inicial, A.Chamada) and self._tem_ref(d.inicial):
+            elif isinstance(d.inicial, A.Chamada):
+                # Ramo unificado para QUALQUER chamada (com ou sem 'ref',
+                # incluindo funções de biblioteca) como valor inicial --
+                # chama-se _verificar_chamada diretamente em vez de passar
+                # por _tipo_expr porque uma chamada com 'ref' não pode ser
+                # usada "dentro de uma expressão" (_tipo_expr rejeita-a
+                # explicitamente), mas aqui é a própria instrução de
+                # declaração, não uma subexpressão.
                 tipo_inicial = self._verificar_chamada(d.inicial, escopo)
                 if tipo_inicial is None:
                     raise ErroSemantico(
                         f"'{d.inicial.nome}' é um procedimento e não devolve valor", d.linha)
-                if not self._compativel(d.tipo, tipo_inicial):
+                dims_n = 0 if d.dims is None else len(d.dims)
+                dims_inicial = self._dims_retorno_de_chamada(d.inicial)
+                if dims_inicial != dims_n:
+                    # Mesmo gate "dimensões antes de tipo" usado em
+                    # _verificar_chamada/'devolver' -- sem ele um array
+                    # podia inicializar em silêncio uma variável escalar
+                    # (ou vice-versa), partilhando o mesmo 'tipo' ignorando
+                    # dims.
+                    raise ErroSemantico(
+                        f"não é possível inicializar '{d.nome}' "
+                        f"({self._descricao_dims(dims_n)}) com "
+                        f"{self._descricao_dims(dims_inicial)}", d.linha)
+                if dims_n > 0:
+                    if tipo_inicial != d.tipo:
+                        raise ErroSemantico(
+                            f"'{d.nome}' é um array de '{d.tipo}' mas está a ser "
+                            f"inicializado com um array de '{tipo_inicial}' -- arrays "
+                            f"não são alargados/estreitados automaticamente, o tipo "
+                            f"do elemento tem de ser exatamente igual", d.linha)
+                elif not self._compativel(d.tipo, tipo_inicial):
                     raise ErroSemantico(
                         f"não é possível inicializar '{d.nome}' (tipo '{d.tipo}') com um "
                         f"valor do tipo '{tipo_inicial}'", d.linha)
                 # AL-51/B17: ao contrário do caminho normal de _tipo_expr,
-                # esta branch (chamada com 'ref' como valor inicial) nunca
-                # marcava _tipo_inferido -- codegen.py:_coagir_decimal
-                # depende dele para saber se tem de gerar float(...) no
-                # valor de retorno; sem isto, 'y:decimal = f(x)' com 'f'
-                # a devolver 'inteiro' ficava com o inteiro cru (5 em vez
-                # de 5.0).
+                # este ramo nunca marcava _tipo_inferido --
+                # codegen.py:_coagir_decimal depende dele para saber se tem
+                # de gerar float(...) no valor de retorno; sem isto,
+                # 'y:decimal = f(x)' com 'f' a devolver 'inteiro' ficava com
+                # o inteiro cru (5 em vez de 5.0).
                 d.inicial._tipo_inferido = tipo_inicial
             else:
                 tipo_inicial, _ = self._tipo_expr(d.inicial, escopo)
@@ -403,12 +435,27 @@ class VerificadorTipos:
         dims_n = 0 if d.dims is None else len(d.dims)
         escopo[d.nome] = (d.tipo, dims_n, d.eh_constante)
 
-    def _validar_dims(self, dims, escopo, linha):
+    def _validar_dims(self, dims, escopo, linha, contexto_campo=False):
         """Valida cada expressão de dimensão de um array: tem de ser
         inteira e não pode ser um literal negativo. Partilhado entre
         declarações normais (com escopo real) e campos de 'estrutura'
-        (AL-48/B7, com escopo vazio -- um campo não vê variáveis)."""
+        (AL-48/B7, com escopo vazio -- um campo não vê variáveis).
+
+        'contexto_campo' (só True para o caso de 'estrutura') dá uma
+        mensagem dedicada quando o nome referenciado é uma global do
+        programa principal -- sem isto, a variável do 'escopo' vazio
+        parecia "não declarada" (factualmente errado: está declarada, só
+        não é visível aqui, porque as estruturas são registadas ANTES do
+        resto do programa, incluindo constantes globais)."""
         for dim_expr in dims:
+            if (contexto_campo and isinstance(dim_expr, A.LValue) and not dim_expr.acessos
+                    and dim_expr.nome not in escopo and dim_expr.nome in self._nomes_globais_top_level):
+                raise ErroSemantico(
+                    f"'{dim_expr.nome}' é uma variável/constante do programa principal, "
+                    f"mas o tamanho de um array-campo de 'estrutura' não pode "
+                    f"referenciá-la -- estruturas são registadas antes do resto do "
+                    f"programa, por isso nada aí é visível ainda; usa um valor literal",
+                    dim_expr.linha)
             tipo, _ = self._tipo_expr(dim_expr, escopo)
             if tipo != "inteiro":
                 raise ErroSemantico(
@@ -528,6 +575,21 @@ class VerificadorTipos:
         f_def = self.funcoes.get(chamada.nome)
         return f_def is not None and any(p.por_referencia for p in f_def.parametros)
 
+    def _dims_retorno_de_chamada(self, chamada: A.Chamada):
+        """Nº de dimensões do array devolvido por 'chamada' (0 para valor
+        escalar, procedimento ou chamada de biblioteca -- nenhuma função de
+        biblioteca devolve array hoje)."""
+        if "." in chamada.nome:
+            return 0
+        f_def = self.funcoes.get(chamada.nome)
+        if f_def is None or f_def.eh_procedimento:
+            return 0
+        return f_def.dims_retorno
+
+    @staticmethod
+    def _descricao_dims(dims):
+        return "um valor escalar" if dims == 0 else f"um array de {dims} dimensão(ões)"
+
     def _verificar_stmt(self, s, escopo, ctx_funcao):
         if isinstance(s, A.Declaracao):
             self._registar_decl(escopo, s)
@@ -550,12 +612,31 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"'{s.expr.nome}' é um procedimento e não devolve valor",
                         s.linha)
+                # dims_alvo já é garantidamente 0 aqui (o array acima
+                # rejeita reatribuição direta a um array inteiro) -- falta
+                # só garantir que o LADO DIREITO também não é um array
+                # (partilharia o mesmo 'tipo' que um escalar, ignorando
+                # dims, se não fosse este gate).
+                dims_retorno = self._dims_retorno_de_chamada(s.expr)
+                if dims_retorno > 0:
+                    raise ErroSemantico(
+                        f"'{s.expr.nome}' devolve {self._descricao_dims(dims_retorno)} "
+                        f"mas '{s.alvo.nome}' é {self._descricao_dims(dims_alvo)}",
+                        s.linha)
                 if not self._compativel(tipo_alvo, tipo_retorno):
                     raise ErroSemantico(
                         f"não é possível atribuir um valor do tipo '{tipo_retorno}' à "
                         f"variável '{s.alvo.nome}' (tipo '{tipo_alvo}')", s.linha)
                 # AL-51/B17: mesma correção que a declaração, acima.
                 s.expr._tipo_inferido = tipo_retorno
+            elif isinstance(s.expr, A.EstruturaLiteral):
+                # Mesma ideia que a declaração/argumento de chamada: um
+                # literal de estrutura não tem tipo próprio, mas o tipo
+                # esperado já é conhecido pelo contexto (o tipo já
+                # declarado do alvo) -- sem este ramo, 'p = {x: 9}' falhava
+                # com "não há informação suficiente" mesmo sabendo-se
+                # exatamente que forma esperar.
+                self._verificar_estrutura_literal(s.expr, tipo_alvo, escopo)
             else:
                 tipo_expr, _ = self._tipo_expr(s.expr, escopo)
                 if not self._compativel(tipo_alvo, tipo_expr):
@@ -703,8 +784,35 @@ class VerificadorTipos:
             if ctx_funcao is None or ctx_funcao.eh_procedimento:
                 raise ErroSemantico(
                     "'devolver' só pode ser usado dentro de uma função", s.linha)
-            tipo, _ = self._tipo_expr(s.expr, escopo)
-            if not self._compativel(ctx_funcao.tipo_retorno, tipo):
+            if isinstance(s.expr, A.ArrayLiteral):
+                self._verificar_array_literal(
+                    s.expr, ctx_funcao.tipo_retorno, [None] * ctx_funcao.dims_retorno, escopo)
+                tipo, dims = ctx_funcao.tipo_retorno, ctx_funcao.dims_retorno
+            elif isinstance(s.expr, A.EstruturaLiteral):
+                # Literal de estrutura devolvido diretamente -- o tipo já é
+                # conhecido pelo contexto (o tipo de retorno declarado da
+                # função), mesma ideia do ramo de A.ArrayLiteral acima.
+                self._verificar_estrutura_literal(s.expr, ctx_funcao.tipo_retorno, escopo)
+                tipo, dims = ctx_funcao.tipo_retorno, 0
+            else:
+                tipo, dims = self._tipo_expr(s.expr, escopo, permitir_array=True)
+            if dims != ctx_funcao.dims_retorno:
+                # Mesmo gate "dimensões antes de tipo" de _verificar_chamada --
+                # sem ele um array podia ser devolvido em silêncio onde se
+                # espera um escalar, ou vice-versa.
+                raise ErroSemantico(
+                    f"a função '{ctx_funcao.nome}' devolve "
+                    f"{self._descricao_dims(ctx_funcao.dims_retorno)} mas está a "
+                    f"devolver {self._descricao_dims(dims)}", s.linha)
+            if ctx_funcao.dims_retorno > 0:
+                if tipo != ctx_funcao.tipo_retorno:
+                    raise ErroSemantico(
+                        f"a função '{ctx_funcao.nome}' devolve um array de "
+                        f"'{ctx_funcao.tipo_retorno}' mas está a devolver um array de "
+                        f"'{tipo}' -- arrays não são alargados/estreitados "
+                        f"automaticamente, o tipo do elemento tem de ser exatamente "
+                        f"igual", s.linha)
+            elif not self._compativel(ctx_funcao.tipo_retorno, tipo):
                 raise ErroSemantico(
                     f"a função '{ctx_funcao.nome}' devolve '{ctx_funcao.tipo_retorno}' "
                     f"mas está a devolver um valor do tipo '{tipo}'", s.linha)
@@ -773,23 +881,29 @@ class VerificadorTipos:
                 caminho = f"{caminho}.{valor}"
         return tipo, dims
 
-    def _tipo_expr(self, expr, escopo):
+    def _tipo_expr(self, expr, escopo, permitir_array=False):
         """Cada 'return' de sucesso também guarda o tipo em
         expr._tipo_inferido -- codegen.py reaproveita-o para decidir onde
         inserir coerções 'inteiro' -> 'decimal' (ex.: 'x: decimal = 5' ou
         devolver um inteiro de uma função 'decimal'), sem duplicar aqui
-        toda a lógica de inferência de tipos."""
+        toda a lógica de inferência de tipos.
+
+        'permitir_array' (por omissão False) controla se um array "nu" (não
+        indexado) é aceite como valor -- só os dois sítios legítimos disso
+        (argumento de chamada, expressão de 'devolver') passam True; todos
+        os outros contextos (aritmética, condições, escrever(), etc.)
+        continuam a rejeitar um array nu com o erro de sempre."""
         if isinstance(expr, A.Literal):
             expr._tipo_inferido = expr.tipo
             return expr.tipo, 0
         if isinstance(expr, A.LValue):
             tipo, dims = self._tipo_lvalue(expr, escopo)
-            if dims > 0:
+            if dims > 0 and not permitir_array:
                 raise ErroSemantico(
                     f"'{expr.nome}' é um array; falta indexá-lo (ex: {expr.nome}[i])",
                     expr.linha)
             expr._tipo_inferido = tipo
-            return tipo, 0
+            return tipo, dims
         if isinstance(expr, A.BinOp):
             tipo, dims = self._tipo_binop(expr, escopo)
             expr._tipo_inferido = tipo
@@ -819,8 +933,13 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"'{expr.nome}' é um procedimento e não devolve valor; não pode "
                     f"ser usado dentro de uma expressão", expr.linha)
+            dims_retorno = self._dims_retorno_de_chamada(expr)
+            if dims_retorno > 0 and not permitir_array:
+                raise ErroSemantico(
+                    f"'{expr.nome}' devolve um array; falta indexá-lo (ex: "
+                    f"{expr.nome}(...)[i])", expr.linha)
             expr._tipo_inferido = tipo_retorno
-            return tipo_retorno, 0
+            return tipo_retorno, dims_retorno
         if isinstance(expr, (A.ArrayLiteral, A.EstruturaLiteral)):
             # AL-16: um literal '{...}' não tem um tipo próprio -- só faz
             # sentido onde o tipo/forma esperado já é conhecido pelo
@@ -956,6 +1075,21 @@ class VerificadorTipos:
         if "." in chamada.nome:
             biblioteca, metodo = chamada.nome.split(".", 1)
             if biblioteca not in self.bibliotecas_importadas:
+                # 'p.campo(args)' (campo de estrutura chamado como se fosse
+                # método) é sintaticamente indistinguível de uma chamada de
+                # biblioteca -- o parser não tem informação de tipos para
+                # saber a diferença. Antes de assumir "biblioteca não
+                # importada" (mensagem enganadora quando 'biblioteca' é na
+                # verdade uma variável declarada), verifica se é mesmo esse
+                # caso e dá uma mensagem que aponta para a causa real.
+                if biblioteca in escopo:
+                    tipo_var = escopo[biblioteca][0]
+                    if tipo_var in self.estruturas and metodo in self.estruturas[tipo_var]:
+                        raise ErroSemantico(
+                            f"'{metodo}' é um campo da estrutura '{tipo_var}', não uma "
+                            f"função -- campos não podem ser chamados como "
+                            f"'{biblioteca}.{metodo}(...)', só lidos ou atribuídos "
+                            f"(ex.: '{biblioteca}.{metodo}')", chamada.linha)
                 raise ErroSemantico(
                     f"a biblioteca '{biblioteca}' não foi importada — usa "
                     f"'importar {biblioteca.capitalize()}' no topo do ficheiro",
@@ -1046,10 +1180,40 @@ class VerificadorTipos:
                 # acima (só aceita A.LValue), por isso chegar aqui implica
                 # sempre um parâmetro por valor.
                 self._verificar_estrutura_literal(arg, p.tipo, escopo)
-                tipo = p.tipo
+                tipo, dims = p.tipo, 0
+            elif isinstance(arg, A.ArrayLiteral):
+                # Mesma ideia para um literal de array ('{...}') passado
+                # diretamente como argumento -- valida-se a FORMA contra as
+                # dimensões do parâmetro (sem tamanho estático a verificar,
+                # já que um parâmetro array aceita qualquer tamanho).
+                self._verificar_array_literal(arg, p.tipo, [None] * p.dims, escopo)
+                tipo, dims = p.tipo, p.dims
             else:
-                tipo, _ = self._tipo_expr(arg, escopo)
-            if p.por_referencia:
+                tipo, dims = self._tipo_expr(arg, escopo, permitir_array=True)
+            if dims != p.dims:
+                # Tem de ser verificado ANTES de qualquer compatibilidade de
+                # tipo: um array e um escalar podem partilhar o mesmo 'tipo'
+                # (ex.: ambos "inteiro") ignorando dims -- sem este gate um
+                # array inteiro seria aceite em silêncio onde se espera um
+                # valor escalar, ou vice-versa.
+                raise ErroSemantico(
+                    f"o parâmetro '{p.nome}' de '{chamada.nome}' espera "
+                    f"{self._descricao_dims(p.dims)} mas '{A.texto_expr(arg)}' é "
+                    f"{self._descricao_dims(dims)}", chamada.linha)
+            if p.dims > 0:
+                # Parâmetro array: tipo do elemento exato, tanto por valor
+                # como por referência -- uma só regra para arrays (ver
+                # justificação do caso 'ref' logo abaixo; por valor segue a
+                # mesma regra por simplicidade, para não haver coerção
+                # elemento-a-elemento de um array inteiro).
+                if tipo != p.tipo:
+                    raise ErroSemantico(
+                        f"o parâmetro '{p.nome}' de '{chamada.nome}' é um array de "
+                        f"'{p.tipo}' mas '{A.texto_expr(arg)}' é um array de '{tipo}' "
+                        f"-- arrays não são alargados/estreitados automaticamente, "
+                        f"o tipo do elemento tem de ser exatamente igual",
+                        chamada.linha)
+            elif p.por_referencia:
                 # AL-84/B12: um parâmetro 'ref' devolve o seu valor final
                 # à variável do CHAMADOR (ver codegen.py:_gerar_lista_args/
                 # out_vars) -- ao contrário de um parâmetro por valor,

@@ -37,14 +37,24 @@ code --install-extension algo-language-0.1.0.vsix
 ## Testado com o motor real do VS Code
 
 A gramática foi validada com as bibliotecas `vscode-textmate` e
-`vscode-oniguruma` (as mesmas que o VS Code usa internamente) sobre um
-ficheiro de exemplo cobrindo toda a linguagem — declarações, tipos,
+`vscode-oniguruma` (as mesmas que o VS Code usa internamente) sobre
+ficheiros de exemplo cobrindo boa parte da linguagem — declarações, tipos,
 `estrutura`, `funcao`/`procedimento`, `constante`, comentários de bloco,
-literais de array, `afirmar`, chamadas a bibliotecas, e todos os
-operadores — não é só "parece bem", foi tokenizado a sério e conferido
-token a token. As regras de auto-indentação (`increaseIndentPattern`/
-`decreaseIndentPattern`) foram também testadas linha a linha contra
-todas as construções da linguagem.
+literais de array, `afirmar`, chamadas a bibliotecas, operadores, acesso a
+campo de estrutura, `nulo`. Uma auditoria já encontrou casos reais que uma
+verificação manual anterior tinha deixado passar (ex.: `nulo` sem
+highlighting nenhum, acesso a campo colorido como chamada de biblioteca) —
+por isso esta secção já não afirma cobertura exaustiva "token a token";
+trata-se de validação pontual, não de uma garantia contínua. A única
+garantia reproduzível e automática que existe hoje é
+`test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer` (em
+`algo_lang/tests/test_correcoes_auditoria.py`), que compara a lista de
+palavras-chave do lexer com a gramática a cada corrida da suite de testes
+— cobre só a presença de cada palavra-chave, não a correção do scope
+atribuído. As regras de auto-indentação
+(`increaseIndentPattern`/`decreaseIndentPattern`) foram testadas
+manualmente linha a linha, com o mesmo aviso: sem teste automático
+equivalente ainda.
 
 ## Personalizar cores
 

@@ -171,6 +171,41 @@ def test_minimo_ref_continua_a_funcionar(tmp_path):
     assert r.stdout.strip() == "x=9 y=3"
 
 
+def test_minimo_array_por_ref_muta_no_chamador(tmp_path):
+    """Paridade com o modo normal: array por 'ref' continua a mutar o
+    chamador em '--minimo' (o mecanismo de ref é o mesmo em ambos)."""
+    resultado, caminho_py = _compilar_minimo(tmp_path, """
+        algoritmo "T"
+        procedimento muda(ref v: inteiro[])
+            v[0] = 99
+        inicio
+            a:inteiro[3] = {1, 2, 3}
+            muda(a)
+            escrever(a[0])
+    """)
+    r = _correr(caminho_py)
+    assert r.stdout.strip() == "99"
+
+
+def test_minimo_array_por_valor_e_mutado_no_chamador_divergencia_intencional(tmp_path):
+    """Divergência INTENCIONAL de '--minimo': sem verificar()/sem rede de
+    segurança, um array por valor não é copiado (o mesmo já acontece para
+    estruturas por valor em '--minimo') -- o chamado muta o array do
+    chamador, ao contrário do modo normal. Este teste confirma que é o
+    comportamento esperado, não um bug."""
+    resultado, caminho_py = _compilar_minimo(tmp_path, """
+        algoritmo "T"
+        procedimento muda(v: inteiro[])
+            v[0] = 99
+        inicio
+            a:inteiro[3] = {1, 2, 3}
+            muda(a)
+            escrever(a[0])
+    """)
+    r = _correr(caminho_py)
+    assert r.stdout.strip() == "99"
+
+
 def test_minimo_estrutura_sem_aliasing_entre_instancias(tmp_path):
     """A mesma classe de bug do #11 encontrado no compilador normal --
     tem de continuar corrigida também no gerador mínimo."""

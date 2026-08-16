@@ -23,11 +23,36 @@ def _nome_amigavel(tipo, valor=None):
 
 
 class ErroSintatico(Exception):
-    def __init__(self, mensagem, linha):
-        super().__init__(f"Erro de sintaxe na linha {linha}: {mensagem}")
+    def __init__(self, mensagem, linha, coluna=None):
+        if coluna is not None:
+            super().__init__(f"Erro de sintaxe na linha {linha}, coluna {coluna}: {mensagem}")
+        else:
+            super().__init__(f"Erro de sintaxe na linha {linha}: {mensagem}")
         self.linha = linha
+        self.coluna = coluna
 
 
+# AUDITORIA.md secção 3: este limite não é aplicado automaticamente --
+# cada ponto de recursão DIRETA (uma função que se chama a si própria,
+# não um 'while' que avança para o próximo nível de precedência) tem de
+# chamar self._entrar_profundidade_expr() manualmente antes de recursar.
+# Já foi esquecido 2x no mesmo ficheiro (causa raiz de B5/AL-76).
+# Considerou-se automatizar isto (ex.: apanhar RecursionError uma única
+# vez à volta de parse_programa()), mas perder-se-ia o número de linha
+# ALGO exato onde a expressão fica demasiado aninhada -- RecursionError
+# nativo não carrega essa informação, e reconstruí-la a partir da
+# traceback seria mais frágil do que o contador explícito. Fica manual,
+# de propósito; confirma que TODOS os pontos abaixo continuam a chamar
+# _entrar_profundidade_expr() antes de qualquer novo ponto de recursão
+# direta em expressões:
+#   _parse_expr (parênteses aninhados), _parse_nao ('nao' encadeado),
+#   _parse_unaria ('-' unário encadeado), _parse_potencia (expoente de
+#   '^', que é ele próprio right-associative e recursa via
+#   _parse_unaria). Os níveis de precedência entre estes (_parse_ou,
+#   _parse_e, _parse_relacional, _parse_aditiva, _parse_multiplicativa)
+#   NÃO precisam do guard -- avançam para o próximo nível via 'while',
+#   não se chamam a si próprios, por isso a profundidade da pilha não
+#   cresce com o número de operadores do MESMO nível numa cadeia plana.
 LIMITE_PROFUNDIDADE_EXPR = 50
 LIMITE_PROFUNDIDADE_BLOCO = 50
 
@@ -57,7 +82,7 @@ class Parser:
             raise ErroSintatico(
                 msg or f"esperava-se {_nome_amigavel(tipo)} mas encontrou "
                        f"{_nome_amigavel(atual.tipo, atual.valor)}",
-                atual.linha,
+                atual.linha, atual.coluna,
             )
         return self.avancar()
 
@@ -96,16 +121,17 @@ class Parser:
                     # programa so poder ter um bloco 'inicio'.
                     raise ErroSintatico(
                         "o programa já tem um bloco 'inicio' -- só pode haver um",
-                        self.atual().linha)
+                        self.atual().linha, self.atual().coluna)
                 corpo = self._parse_bloco_inicio()
             else:
                 raise ErroSintatico(
                     f"esperava-se uma declaração de variável, 'constante', 'estrutura', "
                     f"'funcao', 'procedimento' ou 'inicio', encontrou {self.atual().tipo}",
-                    self.atual().linha)
+                    self.atual().linha, self.atual().coluna)
 
         if corpo is None:
-            raise ErroSintatico("o programa tem de ter um bloco 'inicio'", self.atual().linha)
+            raise ErroSintatico(
+                "o programa tem de ter um bloco 'inicio'", self.atual().linha, self.atual().coluna)
 
         return A.Programa(nome_tok.valor, importares, inclusoes, estruturas,
                            declaracoes, funcoes, corpo)
@@ -145,7 +171,7 @@ class Parser:
         semantics.py, quando já sabemos que estruturas foram definidas."""
         tok = self.atual()
         if tok.tipo != "ID":
-            raise ErroSintatico(f"esperava-se um tipo, encontrou {tok.tipo}", tok.linha)
+            raise ErroSintatico(f"esperava-se um tipo, encontrou {tok.tipo}", tok.linha, tok.coluna)
         self.avancar()
         return tok.valor
 
@@ -157,6 +183,7 @@ class Parser:
         """Assume que o token atual é o primeiro ID de uma lista de nomes,
         seguido de ':' e do tipo. Já confirmado pelo chamador via lookahead."""
         linha = self.atual().linha
+        coluna = self.atual().coluna
         nomes = [self.esperar("ID").valor]
         while self.ver("COMMA"):
             self.avancar()
@@ -175,7 +202,7 @@ class Parser:
             self.avancar()
             if len(nomes) > 1:
                 raise ErroSintatico(
-                    "não é possível inicializar várias variáveis na mesma linha", linha)
+                    "não é possível inicializar várias variáveis na mesma linha", linha, coluna)
             # AL-16: '{...}' já não é tratado à parte aqui -- _parse_primario
             # reconhece-o em qualquer posição de expressão (incluindo este
             # valor inicial); se a FORMA não corresponder a 'tipo'/'dims'
@@ -205,10 +232,7 @@ class Parser:
         self.esperar("LBRACE")
         elementos = []
         if not self.ver("RBRACE"):
-            elementos.append(self._parse_expr())
-            while self.ver("COMMA"):
-                self.avancar()
-                elementos.append(self._parse_expr())
+            elementos = self._parse_lista_virgulas(self._parse_expr, "RBRACE")
         self.esperar("RBRACE")
         return A.ArrayLiteral(elementos, linha)
 
@@ -281,12 +305,15 @@ class Parser:
                 params.append(self._parse_param())
         self.esperar("RPAREN")
         tipo_retorno = None
+        dims_retorno = 0
         if not eh_proc:
             self.esperar("COLON")
             tipo_retorno = self._parse_tipo()
+            dims_retorno = self._parse_dims_vazias()
         self.esperar("NEWLINE")
         corpo = self._parse_bloco_stmts()
-        return A.FuncaoDef(nome_tok.valor, tipo_retorno, params, corpo, linha, eh_proc)
+        return A.FuncaoDef(nome_tok.valor, tipo_retorno, params, corpo, linha, eh_proc,
+                            dims_retorno)
 
     def _parse_param(self):
         por_ref = False
@@ -296,7 +323,44 @@ class Parser:
         nome_tok = self.esperar("ID")
         self.esperar("COLON")
         tipo = self._parse_tipo()
-        return A.Parametro(nome_tok.valor, tipo, por_ref)
+        dims = self._parse_dims_vazias()
+        return A.Parametro(nome_tok.valor, tipo, por_ref, dims, nome_tok.linha)
+
+    def _parse_lista_virgulas(self, parse_item, fechar):
+        """'item (',' item)*', com deteção dedicada de vírgula a mais antes
+        do fecho (ex.: 'f(1, 2,)', '{1, 2,}') -- em vez do erro genérico
+        de _parse_primario ('expressão inesperada: RPAREN'), que não
+        explica a causa real. Partilhado por todos os sítios do parser que
+        constroem uma lista separada por vírgulas com esta mesma forma
+        (chamadas, literais de array, valores de 'caso'), para não haver a
+        mesma verificação reimplementada em cada um deles. Não trata a
+        lista vazia -- quem chama decide se '()'/'{}' vazio é aceite antes
+        de invocar isto."""
+        itens = [parse_item()]
+        while self.ver("COMMA"):
+            self.avancar()
+            if self.ver(fechar):
+                raise ErroSintatico(
+                    f"vírgula a mais antes de {_nome_amigavel(fechar)}",
+                    self.atual().linha, self.atual().coluna)
+            itens.append(parse_item())
+        return itens
+
+    def _parse_dims_vazias(self):
+        """Colchetes vazios '[]' (0, 1 ou mais pares), usados na sintaxe de
+        parâmetros e tipos de retorno do tipo array: aceita array de
+        qualquer tamanho, por isso -- ao contrário dos colchetes de uma
+        declaração -- não há expressão de tamanho lá dentro."""
+        dims = 0
+        while self.ver("LBRACKET"):
+            self.avancar()
+            self.esperar(
+                "RBRACKET",
+                msg="um parâmetro ou tipo de retorno do tipo array usa colchetes "
+                    "vazios, ex: 'v:inteiro[]' (sem tamanho -- aceita um array de "
+                    "qualquer tamanho)")
+            dims += 1
+        return dims
 
     def _parse_bloco_inicio(self):
         self.esperar("INICIO")
@@ -355,7 +419,7 @@ class Parser:
             return self._parse_afirmar()
         if tok.tipo == "ID":
             return self._parse_decl_atrib_ou_chamada()
-        raise ErroSintatico(f"instrução inesperada: {tok.tipo}", tok.linha)
+        raise ErroSintatico(f"instrução inesperada: {tok.tipo}", tok.linha, tok.coluna)
 
     def _parse_decl_atrib_ou_chamada(self):
         """Tenta interpretar como declaração (nome[, nome...]:tipo); caso
@@ -387,12 +451,12 @@ class Parser:
 
     def _parse_escrever(self):
         linha = self.atual().linha
+        coluna = self.atual().coluna
         self.esperar("ESCREVER")
         self.esperar("LPAREN")
-        exprs = [self._parse_expr()]
-        while self.ver("COMMA"):
-            self.avancar()
-            exprs.append(self._parse_expr())
+        if self.ver("RPAREN"):
+            raise ErroSintatico("'escrever' precisa de pelo menos 1 argumento", linha, coluna)
+        exprs = self._parse_lista_virgulas(self._parse_expr, "RPAREN")
         self.esperar("RPAREN")
         self.esperar("NEWLINE")
         return A.Escrever(exprs, linha)
@@ -467,10 +531,7 @@ class Parser:
         contrario = None
         while self.ver("CASO"):
             self.avancar()
-            valores = [self._parse_expr()]
-            while self.ver("COMMA"):
-                self.avancar()
-                valores.append(self._parse_expr())
+            valores = self._parse_lista_virgulas(self._parse_expr, "NEWLINE")
             self.esperar("NEWLINE")
             corpo = self._parse_bloco_stmts()
             casos.append((valores, corpo))
@@ -501,10 +562,7 @@ class Parser:
                 self.avancar()
                 args = []
                 if not self.ver("RPAREN"):
-                    args.append(self._parse_expr())
-                    while self.ver("COMMA"):
-                        self.avancar()
-                        args.append(self._parse_expr())
+                    args = self._parse_lista_virgulas(self._parse_expr, "RPAREN")
                 self.esperar("RPAREN")
                 return A.Chamada(nome, args, nome_tok.linha)
         self.pos = pos_salva
@@ -537,10 +595,7 @@ class Parser:
             self.avancar()
             args = []
             if not self.ver("RPAREN"):
-                args.append(self._parse_expr())
-                while self.ver("COMMA"):
-                    self.avancar()
-                    args.append(self._parse_expr())
+                args = self._parse_lista_virgulas(self._parse_expr, "RPAREN")
             self.esperar("RPAREN")
             self.esperar("NEWLINE")
             return A.ChamadaStmt(A.Chamada(nome_tok.valor, args, nome_tok.linha), nome_tok.linha)
@@ -615,6 +670,17 @@ class Parser:
             op_tok = self.avancar()
             dire = self._parse_aditiva()
             esq = A.BinOp(ops[op_tok.tipo], esq, dire, op_tok.linha)
+            if self.atual().tipo in ops:
+                # Deliberadamente proibido (mesma decisão da maioria das
+                # linguagens): 'a < b < c' não significa "a < b e b < c",
+                # significa "(a < b) < c" (comparar um booleano com 'c'),
+                # quase sempre um erro do aluno -- sem esta mensagem
+                # dedicada, o erro só aparecia mais tarde, genérico, no
+                # sítio que esperava o fecho da expressão.
+                raise ErroSintatico(
+                    "operadores relacionais não podem ser encadeados (ex.: "
+                    "'a < b < c') -- usa 'e' para combinar duas comparações, "
+                    "ex.: 'a < b e b < c'", self.atual().linha, self.atual().coluna)
         return esq
 
     def _parse_aditiva(self):
@@ -699,15 +765,13 @@ class Parser:
                 self.avancar()
                 args = []
                 if not self.ver("RPAREN"):
-                    args.append(self._parse_expr())
-                    while self.ver("COMMA"):
-                        self.avancar()
-                        args.append(self._parse_expr())
+                    args = self._parse_lista_virgulas(self._parse_expr, "RPAREN")
                 self.esperar("RPAREN")
                 return A.Chamada(nome_tok.valor, args, nome_tok.linha)
             acessos = self._parse_acessos()
             return A.LValue(nome_tok.valor, acessos, nome_tok.linha)
-        raise ErroSintatico(f"expressão inesperada: {tok.tipo} ({tok.valor!r})", tok.linha)
+        raise ErroSintatico(
+            f"expressão inesperada: {_nome_amigavel(tok.tipo, tok.valor)}", tok.linha, tok.coluna)
 
 
 def parse(codigo: str) -> A.Programa:
@@ -746,5 +810,5 @@ def parse_biblioteca(codigo: str):
                 "um ficheiro incluído só pode conter declarações de variáveis, "
                 f"'constante', 'estrutura', 'funcao', 'procedimento' ou 'incluir' "
                 f"(encontrou {parser.atual().tipo})",
-                parser.atual().linha)
+                parser.atual().linha, parser.atual().coluna)
     return declaracoes, funcoes, estruturas, inclusoes

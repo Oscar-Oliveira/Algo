@@ -31,6 +31,24 @@ DEFAULT_POR_TIPO = {
 }
 
 
+class ErroInternoCompilador(Exception):
+    """ARCH-03: uma falha de invariante do PRÓPRIO gerador de código --
+    partilhada por codegen.py e codegen_minimo.py (antes só existia em
+    codegen.py; codegen_minimo.py reaproveitava ErroSemantico para o
+    mesmo tipo de falha, fazendo um bug do compilador parecer um erro de
+    tipos do estudante). Em codegen.py isto nunca deveria de facto
+    acontecer, porque verificar() (semantics.py) já validou o programa
+    antes de gerar_python() correr -- os sítios que a levantam aí estão
+    marcados '# pragma: no cover' por essa razão. Em codegen_minimo.py
+    (--minimo salta verificar() de propósito) alguns destes pontos SÃO
+    alcançáveis por um programa ALGO sintaticamente válido mas
+    semanticamente inválido; nesses, não está marcada 'no cover'.
+    Distinto de propósito de ErroSemantico, que É esperado (disparado
+    por um erro real no programa do estudante)."""
+    def __init__(self, mensagem):
+        super().__init__(f"Erro interno do compilador: {mensagem}")
+
+
 class GeradorCodigoBase:
     def __init__(self, programa: A.Programa):
         self.programa = programa
@@ -126,11 +144,14 @@ class GeradorCodigoBase:
         tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
         if isinstance(stmt.expr, A.EstruturaLiteral):
             # AL-90/B17: um literal de estrutura como valor de uma
-            # ATRIBUIÇÃO (não só de uma declaração) -- em modo normal isto
-            # é inalcançável (semantics.py já rejeita mais cedo, AL-16:
-            # '{...}' só é aceite a inicializar uma declaração ou como
-            # argumento de chamada), mas codegen_minimo.py (--minimo) salta
-            # essa verificação de propósito. Sem este caso especial,
+            # ATRIBUIÇÃO (não só de uma declaração). semantics.py já
+            # permite este caso também em modo normal (propaga o tipo já
+            # declarado do alvo para o literal), mas codegen.py sobrepõe
+            # este método e trata o caso ali com _expr_estrutura_literal
+            # (coerção decimal, literais aninhados) antes de chegar aqui --
+            # este ramo simplificado só é mesmo alcançado a partir de
+            # codegen_minimo.py (--minimo, que salta verificar() de
+            # propósito e não tem o mesmo cuidado). Sem este caso especial,
             # _expr() não tem nenhum ramo para EstruturaLiteral e o PRÓPRIO
             # COMPILADOR rebentava ("expressão não suportada"), em vez de
             # gerar Python válido -- aqui é sempre possível, porque

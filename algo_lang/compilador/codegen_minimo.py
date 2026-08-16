@@ -14,8 +14,7 @@ gerado aqui simplesmente falha a correr, com o erro nativo do Python --
 é exatamente esse o objetivo: mostrar o Python "cru" por trás do ALGO."""
 
 from . import ast_nodes as A
-from .semantics import ErroSemantico
-from .gerador_base import GeradorCodigoBase, DEFAULT_POR_TIPO
+from .gerador_base import GeradorCodigoBase, DEFAULT_POR_TIPO, ErroInternoCompilador
 
 CABECALHO_RUNTIME = ""
 
@@ -27,13 +26,19 @@ OPS_BIN = {
     "e": "and", "ou": "or",
 }
 # AL-87/B14: '^' não está em OPS_BIN -- é tratado à parte em _expr() (como
-# 'div'/'mod'), envolvido em float(...), tal como bibliotecas/matematica.py
-# já faz para matematica.potencia() no MESMO modo (ver BIBLIOTECA_MINIMA
-# abaixo). Sem isto, '**' nativo do Python devolvia silenciosamente um
-# 'complex' para base negativa com expoente fracionário -- SEM erro nenhum
-# -- o único caso em todo --minimo em que um programa com erro de tipos NÃO
-# "falha a correr com o erro nativo do Python" (contrato documentado no
-# topo deste ficheiro), produzindo antes um resultado errado em silêncio.
+# 'div'/'mod'), só envolvido em float(...) quando o expoente não é
+# provavelmente não-negativo (ver expoente_estaticamente_nao_negativo,
+# importada de semantics.py). Sem essa proteção condicional, '**' nativo do
+# Python devolvia silenciosamente um 'complex' para base negativa com
+# expoente fracionário -- SEM erro nenhum -- o único caso em todo --minimo
+# em que um programa com erro de tipos NÃO "falha a correr com o erro
+# nativo do Python" (contrato documentado no topo deste ficheiro),
+# produzindo antes um resultado errado em silêncio. Ao contrário de
+# matematica.potencia() (BIBLIOTECA_MINIMA, abaixo), que está DECLARADA
+# para devolver sempre 'decimal' e por isso embrulha sempre em float(...),
+# o operador '^' pode ser tipado 'inteiro' por semantics.py (quando o
+# expoente é estaticamente não-negativo) -- envolver sempre divergia do
+# modo normal nesses casos (ex.: '2 ^ 10' dava 1024.0 aqui, 1024 lá).
 
 LEITORES_INLINE_POR_TIPO = {
     "inteiro": "int(input())",
@@ -249,7 +254,17 @@ class GeradorCodigo(GeradorCodigoBase):
         elif isinstance(stmt, A.Escolha):
             self._gerar_escolha(stmt, nivel, tipos)
         elif isinstance(stmt, A.Devolver):
-            valor = self._expr(stmt.expr, tipos)
+            if isinstance(stmt.expr, A.EstruturaLiteral):
+                # Mesmo padrão de _gerar_declaracao, acima -- sem isto, o
+                # PRÓPRIO COMPILADOR rebentava ("expressão não suportada")
+                # em programas --minimo válidos que devolvem um literal de
+                # estrutura diretamente, já que _expr() não tem ramo nenhum
+                # para A.EstruturaLiteral.
+                kwargs = ", ".join(
+                    f"{nome}={self._expr(valor, tipos)}" for nome, valor in stmt.expr.campos)
+                valor = f"{self.tipo_retorno_atual}({kwargs})"
+            else:
+                valor = self._expr(stmt.expr, tipos)
             if self.refs_atuais:
                 self.emit(f"return {valor}, {', '.join(self.refs_atuais)}", nivel)
             else:
@@ -259,7 +274,8 @@ class GeradorCodigo(GeradorCodigoBase):
         elif isinstance(stmt, A.Afirmar):
             self._gerar_afirmar(stmt, nivel, tipos)
         else:  # pragma: no cover -- todos os tipos de instrução da AST são tratados acima
-            raise ErroSemantico(f"instrução não suportada: {type(stmt).__name__}", getattr(stmt, "linha", 0))
+            raise ErroInternoCompilador(
+                f"instrução não suportada: {type(stmt).__name__} (linha {getattr(stmt, 'linha', 0)})")
 
     def _gerar_afirmar(self, stmt: A.Afirmar, nivel, tipos):
         cond_py = self._expr(stmt.condicao, tipos)
@@ -340,8 +356,26 @@ class GeradorCodigo(GeradorCodigoBase):
                     return divisao
                 return f"(({e}) - {divisao} * ({d}))"
             if expr.op == "^":
-                # AL-87/B14: ver nota em OPS_BIN, acima.
-                return f"float({self._expr(expr.esq, tipos)} ** {self._expr(expr.dire, tipos)})"
+                # AL-87/B14: ver nota em OPS_BIN, acima -- mas envolver
+                # SEMPRE em float(...) divergia do modo normal sempre que o
+                # expoente é um inteiro literal não-negativo (ex.: '2 ^ 10'
+                # dava 1024.0 aqui, 1024 no modo normal, porque '**' nativo
+                # já preserva int/float sozinho nesse caso e não há mais
+                # nenhuma coerção decimal a acontecer numa posição solta
+                # como 'escrever(2^10)'). CUIDADO: a condição para saltar o
+                # float(...) tem de exigir um INTEIRO não-negativo, não só
+                # um valor não-negativo -- um expoente fracionário
+                # não-negativo (ex.: 0.5) com base negativa também produz
+                # 'complex' silenciosamente, o mesmo perigo que esta
+                # proteção existe para evitar (confirmado ao reintroduzir
+                # o bug por engano: reaproveitar a verificação de SINAL de
+                # semantics.py aqui, que só é válida no contexto onde é
+                # usada lá, não chega).
+                base = self._expr(expr.esq, tipos)
+                exp = self._expr(expr.dire, tipos)
+                if isinstance(expr.dire, A.Literal) and expr.dire.tipo == "inteiro" and expr.dire.valor >= 0:
+                    return f"({base} ** {exp})"
+                return f"float({base} ** {exp})"
             op = OPS_BIN[expr.op]
             return f"({self._expr(expr.esq, tipos)} {op} {self._expr(expr.dire, tipos)})"
         if isinstance(expr, A.UnOp):
@@ -358,8 +392,24 @@ class GeradorCodigo(GeradorCodigoBase):
         if isinstance(expr, A.ArrayLiteral):
             elementos = ", ".join(self._expr(e, tipos) for e in expr.elementos)
             return f"[{elementos}]"
-        raise ErroSemantico(  # pragma: no cover -- todos os tipos de expressão da AST são tratados acima
-            f"expressão não suportada: {type(expr).__name__}", getattr(expr, "linha", 0))
+        if isinstance(expr, A.EstruturaLiteral):
+            # Ao contrário de ArrayLiteral (que vira uma lista Python sem
+            # precisar de saber o tipo), um literal de estrutura precisa do
+            # NOME do construtor a chamar -- não há como adivinhar qual
+            # 'estrutura' se quer aqui sem o tipo esperado do contexto
+            # (só disponível nos sítios que já têm tratamento dedicado:
+            # declaração, argumento de chamada, devolver, atribuição). Um
+            # literal de estrutura fora desses sítios (ex.: dentro de
+            # escrever(...) ou de uma expressão aritmética) não tem solução
+            # correta possível mesmo em --minimo -- mensagem específica em
+            # vez do genérico "expressão não suportada".
+            raise ErroInternoCompilador(
+                f"um literal de estrutura '{{...}}' só pode aparecer onde o tipo é "
+                f"conhecido pelo contexto (declaração, argumento de chamada, "
+                f"'devolver', atribuição) -- mesmo em --minimo; usa uma variável "
+                f"intermédia (linha {getattr(expr, 'linha', 0)})")
+        raise ErroInternoCompilador(  # pragma: no cover -- todos os outros tipos de expressão da AST são tratados acima
+            f"expressão não suportada: {type(expr).__name__} (linha {getattr(expr, 'linha', 0)})")
 
 
 def gerar_python_minimo(programa: A.Programa) -> str:

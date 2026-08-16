@@ -18,21 +18,31 @@ PALAVRAS_CHAVE = {
 
 
 class Token:
-    __slots__ = ("tipo", "valor", "linha")
+    __slots__ = ("tipo", "valor", "linha", "coluna")
 
-    def __init__(self, tipo, valor, linha):
+    def __init__(self, tipo, valor, linha, coluna=1):
         self.tipo = tipo
         self.valor = valor
         self.linha = linha
+        # 1-baseada, tal como 'linha'; só os tokens produzidos por
+        # _tokenizar_linha (a maioria) têm uma coluna real -- os
+        # estruturais (INDENT/DEDENT/NEWLINE/EOF, construídos em
+        # tokenizar()) ficam com a omissão (1), já que não correspondem a
+        # nenhuma posição concreta no texto fonte.
+        self.coluna = coluna
 
     def __repr__(self):  # pragma: no cover -- só para depuração manual, nunca chamado em produção
-        return f"Token({self.tipo}, {self.valor!r}, linha={self.linha})"
+        return f"Token({self.tipo}, {self.valor!r}, linha={self.linha}, coluna={self.coluna})"
 
 
 class ErroLexico(Exception):
-    def __init__(self, mensagem, linha):
-        super().__init__(f"Erro léxico na linha {linha}: {mensagem}")
+    def __init__(self, mensagem, linha, coluna=None):
+        if coluna is not None:
+            super().__init__(f"Erro léxico na linha {linha}, coluna {coluna}: {mensagem}")
+        else:
+            super().__init__(f"Erro léxico na linha {linha}: {mensagem}")
         self.linha = linha
+        self.coluna = coluna
 
 
 SIMBOLOS_MULTI = [
@@ -192,7 +202,12 @@ def tokenizar(codigo: str):
         if nivel != pilha_indent[-1]:  # pragma: no cover -- AL-73 garante pilha_indent contigua (0,1,...,profundidade), logo nivel corresponde sempre a um valor da pilha apos o loop de DEDENT acima; mantido como rede de seguranca defensiva.
             raise ErroLexico("indentação inconsistente", linha_num)
 
-        tokens.extend(_tokenizar_linha(linha_stripped, linha_num))
+        # coluna_inicial: posição (1-baseada) onde 'linha_stripped' começa
+        # na linha original -- _tokenizar_linha só vê a versão sem
+        # indentação, por isso precisa deste deslocamento para reportar a
+        # coluna real de cada token.
+        coluna_inicial = len(linha_sem_comentario) - len(linha_sem_comentario.lstrip()) + 1
+        tokens.extend(_tokenizar_linha(linha_stripped, linha_num, coluna_inicial))
         tokens.append(Token("NEWLINE", None, linha_num))
 
     while len(pilha_indent) > 1:
@@ -223,12 +238,13 @@ def _remover_comentario(linha):
     return linha
 
 
-def _tokenizar_linha(linha, linha_num):
+def _tokenizar_linha(linha, linha_num, coluna_inicial=1):
     tokens = []
     i = 0
     n = len(linha)
     while i < n:
         c = linha[i]
+        coluna = coluna_inicial + i
         if c == " " or c == "\t":
             # AL-72: um tab a meio de uma linha (fora da indentacao, ex.
             # colado de um editor com tabs de alinhamento) e whitespace tal
@@ -251,8 +267,8 @@ def _tokenizar_linha(linha, linha_num):
                 buf.append(linha[j])
                 j += 1
             if j >= n:
-                raise ErroLexico("cadeia de texto não fechada com aspas duplas", linha_num)
-            tokens.append(Token("STRING", "".join(buf), linha_num))
+                raise ErroLexico("cadeia de texto não fechada com aspas duplas", linha_num, coluna)
+            tokens.append(Token("STRING", "".join(buf), linha_num, coluna))
             i = j + 1
             continue
         if c == "'":
@@ -269,13 +285,13 @@ def _tokenizar_linha(linha, linha_num):
                 buf.append(linha[j])
                 j += 1
             if j >= n:
-                raise ErroLexico("carácter não fechado com aspa simples", linha_num)
+                raise ErroLexico("carácter não fechado com aspa simples", linha_num, coluna)
             conteudo = "".join(buf)
             if len(conteudo) != 1:
                 raise ErroLexico(
                     f"um caracter tem de ter exatamente 1 símbolo entre aspas simples "
-                    f"(encontrado {conteudo!r}); usa aspas duplas para texto", linha_num)
-            tokens.append(Token("CARACTER", conteudo, linha_num))
+                    f"(encontrado {conteudo!r}); usa aspas duplas para texto", linha_num, coluna)
+            tokens.append(Token("CARACTER", conteudo, linha_num, coluna))
             i = j + 1
             continue
         if c.isdigit() or (c == "." and i + 1 < n and linha[i + 1].isdigit()):
@@ -289,9 +305,9 @@ def _tokenizar_linha(linha, linha_num):
                 j += 1
             texto = linha[i:j]
             if is_float:
-                tokens.append(Token("FLOAT", float(texto), linha_num))
+                tokens.append(Token("FLOAT", float(texto), linha_num, coluna))
             else:
-                tokens.append(Token("INT", int(texto), linha_num))
+                tokens.append(Token("INT", int(texto), linha_num, coluna))
             i = j
             continue
         if c.isalpha() or c == "_":
@@ -300,23 +316,23 @@ def _tokenizar_linha(linha, linha_num):
                 j += 1
             palavra = linha[i:j]
             if palavra in PALAVRAS_CHAVE:
-                tokens.append(Token(palavra.upper(), palavra, linha_num))
+                tokens.append(Token(palavra.upper(), palavra, linha_num, coluna))
             else:
-                tokens.append(Token("ID", palavra, linha_num))
+                tokens.append(Token("ID", palavra, linha_num, coluna))
             i = j
             continue
         achou = False
         for simb, tipo in SIMBOLOS_MULTI:
             if linha[i:i + len(simb)] == simb:
-                tokens.append(Token(tipo, simb, linha_num))
+                tokens.append(Token(tipo, simb, linha_num, coluna))
                 i += len(simb)
                 achou = True
                 break
         if achou:
             continue
         if c in SIMBOLOS_SINGLE:
-            tokens.append(Token(SIMBOLOS_SINGLE[c], c, linha_num))
+            tokens.append(Token(SIMBOLOS_SINGLE[c], c, linha_num, coluna))
             i += 1
             continue
-        raise ErroLexico(f"caractere inesperado {c!r}", linha_num)
+        raise ErroLexico(f"caractere inesperado {c!r}", linha_num, coluna)
     return tokens

@@ -4,21 +4,7 @@
 from . import ast_nodes as A
 from .. import bibliotecas
 from .ast_nodes import texto_expr
-from .gerador_base import GeradorCodigoBase, DEFAULT_POR_TIPO
-
-
-class ErroInternoCompilador(Exception):
-    """ARCH-03: uma falha de invariante do PRÓPRIO gerador de código --
-    nunca deveria acontecer, porque verificar() (semantics.py) já
-    validou o programa antes de gerar_python() correr; os sítios que
-    levantam isto estão todos marcados '# pragma: no cover' por essa
-    razão. Distinto de propósito de ErroSemantico (semantics.py), que
-    É esperado (disparado por um erro real no programa do estudante) --
-    antes, reutilizar ErroSemantico aqui fazia um bug do próprio
-    compilador aparecer ao estudante como se fosse um erro de tipos
-    normal no seu programa."""
-    def __init__(self, mensagem):
-        super().__init__(f"Erro interno do compilador: {mensagem}")
+from .gerador_base import GeradorCodigoBase, DEFAULT_POR_TIPO, ErroInternoCompilador
 
 
 CABECALHO_RUNTIME = '''\
@@ -71,6 +57,15 @@ def _algo_ler_decimal(prompt=""):
 
 
 def _algo_ler_booleano(prompt=""):
+    """Deliberadamente mais estrito que conversao.paraBooleano: 'ler' é
+    entrada interativa e pode voltar a pedir até o estudante escrever algo
+    válido, por isso vale a pena recusar texto ambíguo (ex.: um erro de
+    digitação) em vez de o aceitar como 'verdadeiro' por omissão.
+    conversao.paraBooleano é uma função de conversão pura (não pode voltar
+    a pedir nada) sobre um valor já existente, por isso segue a
+    truthiness nativa do Python para qualquer texto não reconhecido --
+    são dois contextos diferentes de propósito, não uma inconsistência a
+    corrigir."""
     while True:
         resp = input(prompt).strip().lower()
         if resp in ("verdadeiro", "v", "true"):
@@ -421,18 +416,26 @@ class GeradorCodigo(GeradorCodigoBase):
             param = f_def.parametros[i] if f_def is not None and i < len(f_def.parametros) else None
             if isinstance(a, A.EstruturaLiteral) and param is not None:
                 args_py.append(self._expr_estrutura_literal(a, param.tipo, tipos))
+            elif isinstance(a, A.ArrayLiteral) and param is not None:
+                # Mesma ideia que A.EstruturaLiteral acima: um literal de
+                # array ({...}) passado diretamente como argumento não tem
+                # tipo próprio, semantics.py já validou a forma contra
+                # 'param.dims' -- é sempre uma instância nova, não precisa
+                # de cópia.
+                args_py.append(self._expr_array_literal(a, param.tipo, tipos))
             elif param is not None:
                 expr_py = self._coagir_decimal(self._expr(a, tipos), param.tipo, a)
-                if not param.por_referencia and param.tipo in self.estruturas:
-                    # AL-52/B11: um parâmetro de tipo 'estrutura' sem 'ref'
-                    # é por VALOR -- semantics.py já garante todo o
-                    # contrato de 'ref' (778-820), mas o Python gerado
-                    # nunca copiava o objeto, só passava a MESMA
-                    # referência. Uma mutação de campo dentro da função
-                    # (ex.: 'p.x = 99') vazava silenciosamente para quem
-                    # chamou. Um literal de estrutura ({...}, tratado no
-                    # 'if' acima) já é uma instância nova -- não precisa
-                    # de cópia.
+                if not param.por_referencia and (param.dims > 0 or param.tipo in self.estruturas):
+                    # AL-52/B11: um parâmetro de tipo 'estrutura' (ou,
+                    # agora, um array) sem 'ref' é por VALOR -- semantics.py
+                    # já garante todo o contrato de 'ref' (778-820), mas o
+                    # Python gerado nunca copiava o objeto/lista, só passava
+                    # a MESMA referência. Uma mutação dentro da função (ex.:
+                    # 'p.x = 99' ou 'v[0] = 99') vazava silenciosamente para
+                    # quem chamou. Um literal ({...}, tratado nos 'if'
+                    # acima) já é uma instância nova -- não precisa de
+                    # cópia. Uma única condição (não duas) para não fazer
+                    # deepcopy em dobro num array de estruturas.
                     expr_py = f"copy.deepcopy({expr_py})"
                 args_py.append(expr_py)
             else:
@@ -542,6 +545,21 @@ class GeradorCodigo(GeradorCodigoBase):
                 if valor_coagido != alvo:
                     self.emit(f"{alvo} = {valor_coagido}", nivel)
                 return
+        if isinstance(stmt.expr, A.EstruturaLiteral):
+            # Literal de estrutura como valor de uma atribuição (não só de
+            # uma declaração ou argumento de chamada) -- agora alcançável
+            # em modo normal (semantics.py passou a propagar o tipo
+            # esperado também aqui). gerador_base.py já tem um caminho
+            # para este caso (construído para dar suporte a --minimo, que
+            # salta verificar()), mas é uma versão simplificada sem
+            # coerção decimal nem suporte a literais aninhados -- usa-se
+            # aqui a mesma _expr_estrutura_literal já usada por
+            # declaração/argumento de chamada, para os três caminhos
+            # terem exatamente o mesmo comportamento.
+            alvo = self._lvalue(stmt.alvo, tipos)
+            tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
+            self.emit(f"{alvo} = {self._expr_estrutura_literal(stmt.expr, tipo_alvo, tipos)}", nivel)
+            return
         super()._gerar_atribuicao(stmt, nivel, tipos)
 
     def _construir_array_aninhado(self, tipo, dims_exprs, tipos, nivel):
@@ -599,7 +617,22 @@ class GeradorCodigo(GeradorCodigoBase):
         elif isinstance(stmt, A.Escolha):
             self._gerar_escolha(stmt, nivel, tipos)
         elif isinstance(stmt, A.Devolver):
-            valor = self._coagir_decimal(self._expr(stmt.expr, tipos), self.tipo_retorno_atual, stmt.expr)
+            if isinstance(stmt.expr, A.EstruturaLiteral):
+                # Literal de estrutura devolvido diretamente -- semantics.py
+                # já validou a forma contra o tipo de retorno da função.
+                # Usa-se _expr_estrutura_literal (coerção decimal + literais
+                # aninhados) em vez do _expr() genérico, que não tem ramo
+                # nenhum para A.EstruturaLiteral (só sabe construir a partir
+                # do tipo esperado, que aqui já se conhece).
+                valor = self._expr_estrutura_literal(stmt.expr, self.tipo_retorno_atual, tipos)
+            elif isinstance(stmt.expr, A.ArrayLiteral):
+                # Mesma ideia para um literal de array -- _expr_array_literal
+                # coage cada elemento (ex.: inteiro -> decimal), ao contrário
+                # do ramo genérico de A.ArrayLiteral em _expr(), que apenas
+                # monta a lista sem coagir nada.
+                valor = self._expr_array_literal(stmt.expr, self.tipo_retorno_atual, tipos)
+            else:
+                valor = self._coagir_decimal(self._expr(stmt.expr, tipos), self.tipo_retorno_atual, stmt.expr)
             if self.refs_atuais:
                 self.emit(f"return {valor}, {', '.join(self.refs_atuais)}", nivel)
             else:

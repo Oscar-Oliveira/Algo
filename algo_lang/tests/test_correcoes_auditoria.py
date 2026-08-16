@@ -3706,6 +3706,15 @@ def test_minimo_potencia_negativa_fracionaria_falha_nativamente_em_vez_de_devolv
 
 
 def test_minimo_potencia_normal_continua_a_funcionar():
+    """AUDITORIA.md secção 3: o valor esperado aqui mudou de '8.0' para
+    '8'. A expectativa original ('8.0') era um efeito colateral de '^'
+    estar SEMPRE embrulhado em float(...) -- o que divergia do modo
+    normal sempre que o expoente é um inteiro literal não-negativo (ex.:
+    'escrever(2^10)' dava 1024.0 aqui, 1024 no modo normal). '--minimo'
+    também não coage nenhuma outra expressão para 'decimal' à entrada de
+    uma declaração (confirmado: 'x:decimal = 5' já dava '5', não '5.0',
+    antes desta correção) -- '8' é o valor consistente com esse
+    comportamento já estabelecido, não uma regressão."""
     from algo_lang.compilador.codegen_minimo import gerar_python_minimo
     programa = parse(textwrap.dedent("""
         algoritmo "T"
@@ -3717,7 +3726,7 @@ def test_minimo_potencia_normal_continua_a_funcionar():
     resultado = subprocess.run(
         [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
     assert resultado.returncode == 0
-    assert resultado.stdout.strip() == "8.0"
+    assert resultado.stdout.strip() == "8"
 
 
 # ---------- B15 (AL-88): codegen/codegen_minimo -- dimensão interior de array multidimensional avaliada 2x ----------
@@ -3998,3 +4007,819 @@ def test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer():
     assert not faltam, (
         f"palavra(s)-chave do lexer sem highlighting na extensão VS Code: {faltam} "
         f"-- adiciona-a(s) a algo.tmLanguage.json (ver B27 na auditoria)")
+
+
+# ---------- Arrays como parâmetros e valores de retorno (AUDITORIA.md secção 3) ----------
+
+def test_parametro_array_1d_parseia_dims_correto():
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        procedimento f(v: inteiro[])
+            escrever(v[0])
+        inicio
+            escrever("ok")
+    """))
+    assert programa.funcoes[0].parametros[0].dims == 1
+
+
+def test_parametro_array_2d_parseia_dims_correto():
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        procedimento f(m: inteiro[][])
+            escrever(m[0][0])
+        inicio
+            escrever("ok")
+    """))
+    assert programa.funcoes[0].parametros[0].dims == 2
+
+
+def test_tipo_retorno_array_parseia_dims_retorno_correto():
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        funcao f(): inteiro[]
+            devolver {1, 2}
+        inicio
+            escrever("ok")
+    """))
+    assert programa.funcoes[0].dims_retorno == 1
+
+
+def test_colchetes_de_parametro_com_tamanho_e_erro_sintatico():
+    with pytest.raises(ErroSintatico, match="colchetes vazios"):
+        compilar("""
+            algoritmo "T"
+            procedimento f(v: inteiro[5])
+                escrever(v[0])
+            inicio
+                escrever("ok")
+        """)
+
+
+def test_colchetes_de_retorno_com_tamanho_e_erro_sintatico():
+    with pytest.raises(ErroSintatico, match="colchetes vazios"):
+        compilar("""
+            algoritmo "T"
+            funcao f(): inteiro[5]
+                devolver {1, 2}
+            inicio
+                escrever("ok")
+        """)
+
+
+def test_parametro_array_pode_ser_indexado_e_mutado_no_corpo():
+    saida = executar("""
+        algoritmo "T"
+        procedimento incrementaPrimeiro(ref v: inteiro[])
+            v[0] = v[0] + 1
+        inicio
+            a:inteiro[3] = {1, 2, 3}
+            incrementaPrimeiro(a)
+            escrever(a[0])
+    """)
+    assert saida.strip() == "2"
+
+
+def test_array_passado_por_valor_nao_e_mutado_no_chamador():
+    saida = executar("""
+        algoritmo "T"
+        procedimento muda(v: inteiro[])
+            v[0] = 99
+        inicio
+            a:inteiro[3] = {1, 2, 3}
+            muda(a)
+            escrever(a[0])
+    """)
+    assert saida.strip() == "1"
+
+
+def test_array_passado_por_ref_muta_no_chamador():
+    saida = executar("""
+        algoritmo "T"
+        procedimento muda(ref v: inteiro[])
+            v[0] = 99
+        inicio
+            a:inteiro[3] = {1, 2, 3}
+            muda(a)
+            escrever(a[0])
+    """)
+    assert saida.strip() == "99"
+
+
+def test_array_por_valor_com_tipo_de_elemento_errado_e_rejeitado():
+    with pytest.raises(ErroSemantico, match="tipo do elemento"):
+        compilar("""
+            algoritmo "T"
+            procedimento f(v: decimal[])
+                escrever(v[0])
+            inicio
+                a:inteiro[2] = {1, 2}
+                f(a)
+        """)
+
+
+def test_array_por_ref_com_tipo_de_elemento_errado_e_rejeitado():
+    with pytest.raises(ErroSemantico, match="tipo do elemento"):
+        compilar("""
+            algoritmo "T"
+            procedimento f(ref v: decimal[])
+                escrever(v[0])
+            inicio
+                a:inteiro[2] = {1, 2}
+                f(a)
+        """)
+
+
+def test_array_1d_passado_a_parametro_2d_e_rejeitado():
+    with pytest.raises(ErroSemantico, match="dimens"):
+        compilar("""
+            algoritmo "T"
+            procedimento f(m: inteiro[][])
+                escrever(m[0][0])
+            inicio
+                a:inteiro[2] = {1, 2}
+                f(a)
+        """)
+
+
+def test_escalar_passado_a_parametro_array_e_rejeitado():
+    with pytest.raises(ErroSemantico, match="dimens"):
+        compilar("""
+            algoritmo "T"
+            procedimento f(v: inteiro[])
+                escrever(v[0])
+            inicio
+                x:inteiro = 5
+                f(x)
+        """)
+
+
+def test_array_passado_a_parametro_escalar_e_rejeitado():
+    with pytest.raises(ErroSemantico, match="dimens"):
+        compilar("""
+            algoritmo "T"
+            procedimento f(x: inteiro)
+                escrever(x)
+            inicio
+                a:inteiro[2] = {1, 2}
+                f(a)
+        """)
+
+
+def test_literal_de_array_como_argumento_funciona():
+    saida = executar("""
+        algoritmo "T"
+        procedimento f(v: inteiro[])
+            escrever(v[0] + v[1])
+        inicio
+            f({10, 20})
+    """)
+    assert saida.strip() == "30"
+
+
+def test_mesmo_array_passado_duas_vezes_por_referencia_da_erro():
+    with pytest.raises(ErroSemantico, match="passado por referência mais do que uma vez"):
+        compilar("""
+            algoritmo "T"
+            procedimento trocar(ref a: inteiro[], ref b: inteiro[])
+                escrever(a[0])
+            inicio
+                v:inteiro[2] = {1, 2}
+                trocar(v, v)
+        """)
+
+
+def test_funcao_pode_devolver_array():
+    saida = executar("""
+        algoritmo "T"
+        funcao dobrar(v: inteiro[]): inteiro[]
+            r:inteiro[2] = {v[0] * 2, v[1] * 2}
+            devolver r
+        inicio
+            a:inteiro[2] = {1, 2}
+            b:inteiro[2] = dobrar(a)
+            escrever(b[0], " ", b[1])
+    """)
+    assert saida.strip() == "2 4"
+
+
+def test_devolver_com_tipo_de_elemento_errado_e_rejeitado():
+    with pytest.raises(ErroSemantico, match="tipo do elemento"):
+        compilar("""
+            algoritmo "T"
+            funcao f(): decimal[]
+                r:inteiro[2] = {1, 2}
+                devolver r
+            inicio
+                escrever("ok")
+        """)
+
+
+def test_devolver_escalar_de_funcao_que_devolve_array_e_rejeitado():
+    with pytest.raises(ErroSemantico, match="dimens"):
+        compilar("""
+            algoritmo "T"
+            funcao f(): inteiro[]
+                devolver 5
+            inicio
+                escrever("ok")
+        """)
+
+
+def test_declaracao_a_partir_de_funcao_ref_que_devolve_array_com_dims_erradas_e_rejeitado():
+    with pytest.raises(ErroSemantico, match="dimens"):
+        compilar("""
+            algoritmo "T"
+            funcao f(ref x: inteiro): inteiro[]
+                x = x + 1
+                devolver {x}
+            inicio
+                y:inteiro = 1
+                z:inteiro = f(y)
+        """)
+
+
+def test_escrever_de_array_continua_rejeitado_regressao():
+    """Regressão: 'permitir_array' só é passado True nos dois sítios
+    legítimos (argumento de chamada, 'devolver') -- escrever() continua a
+    rejeitar um array nu como antes desta funcionalidade existir."""
+    with pytest.raises(ErroSemantico, match="falta indexá-lo"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                v:inteiro[2] = {1, 2}
+                escrever(v)
+        """)
+
+
+def test_parametro_array_2d_indexado_no_corpo():
+    saida = executar("""
+        algoritmo "T"
+        funcao soma(m: inteiro[][]): inteiro
+            devolver m[0][0] + m[1][1]
+        inicio
+            grelha:inteiro[2][2] = {{1, 2}, {3, 4}}
+            escrever(soma(grelha))
+    """)
+    assert saida.strip() == "5"
+
+
+def test_array_de_estruturas_por_valor_faz_deep_copy():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento muda(v: Ponto[])
+            v[0].x = 99
+        inicio
+            a:Ponto[1] = {{x: 1}}
+            muda(a)
+            escrever(a[0].x)
+    """)
+    assert saida.strip() == "1"
+
+
+# ---------- AUDITORIA.md secção 2 -- UX de erros/robustez ----------
+
+def test_constante_global_em_tamanho_de_array_campo_de_estrutura_da_mensagem_dedicada():
+    with pytest.raises(ErroSemantico, match="registadas antes do resto do programa"):
+        compilar("""
+            algoritmo "T"
+            constante N: inteiro = 5
+            estrutura Ponto
+                valores:inteiro[N]
+            inicio
+                escrever("ok")
+        """)
+
+
+def test_expressao_inesperada_usa_nome_amigavel_do_token():
+    with pytest.raises(ErroSintatico, match=r"expressão inesperada: '\)'"):
+        compilar('algoritmo "T"\ninicio\n    escrever(1 + )\n')
+
+
+def test_escrever_sem_argumentos_da_mensagem_dedicada():
+    with pytest.raises(ErroSintatico, match="'escrever' precisa de pelo menos 1 argumento"):
+        compilar('algoritmo "T"\ninicio\n    escrever()\n')
+
+
+def test_erro_sintatico_inclui_coluna_correta():
+    # linha 3 = '    escrever(1 + )' -- ')' está na coluna 18 (1-baseada):
+    # 4 espaços de indentação + 'escrever(1 + ' (14 caracteres).
+    with pytest.raises(ErroSintatico) as exc:
+        compilar('algoritmo "T"\ninicio\n    escrever(1 + )\n')
+    assert exc.value.linha == 3
+    assert exc.value.coluna == 18
+    assert ", coluna 18:" in str(exc.value)
+
+
+def test_erro_lexico_inclui_coluna_correta():
+    from algo_lang.compilador.lexer import tokenizar, ErroLexico
+    # linha 3 = '    x = 1 @ 2' -- '@' está na coluna 11 (1-baseada): 4
+    # espaços + 'x = 1 ' (6 caracteres).
+    with pytest.raises(ErroLexico) as exc:
+        tokenizar('algoritmo "T"\ninicio\n    x = 1 @ 2\n')
+    assert exc.value.linha == 3
+    assert exc.value.coluna == 11
+    assert ", coluna 11:" in str(exc.value)
+
+
+def test_coluna_e_relativa_a_linha_original_incluindo_indentacao_profunda():
+    """A coluna reportada tem de ser relativa à linha ORIGINAL (com
+    indentação), não à versão sem indentação que o lexer usa
+    internamente -- senão a coluna reportada seria sistematicamente
+    menor do que a posição real vista no editor."""
+    # linha 4 = '        escrever(1 + )' -- 8 espaços (2 níveis) + 'escrever(1 + '
+    with pytest.raises(ErroSintatico) as exc:
+        compilar("""
+            algoritmo "T"
+            inicio
+                se verdadeiro entao
+                    escrever(1 + )
+        """)
+    assert exc.value.coluna is not None and exc.value.coluna > 1
+
+
+def test_erro_de_indentacao_sem_coluna_especifica_continua_a_funcionar():
+    """Erros sobre a indentação da linha inteira (não um token
+    específico) continuam sem coluna -- não há uma posição única
+    significativa para "a indentação avançou 2 níveis"."""
+    from algo_lang.compilador.lexer import tokenizar, ErroLexico
+    with pytest.raises(ErroLexico, match="avança 2 níveis") as exc:
+        tokenizar('algoritmo "T"\ninicio\n        x:inteiro = 1\n')
+    assert exc.value.coluna is None
+    assert ", coluna" not in str(exc.value)
+
+
+def test_virgula_a_mais_em_chamada_da_mensagem_dedicada():
+    with pytest.raises(ErroSintatico, match="vírgula a mais"):
+        compilar("""
+            algoritmo "T"
+            procedimento p(x: inteiro)
+                escrever(x)
+            inicio
+                p(1,)
+        """)
+
+
+def test_virgula_a_mais_em_literal_de_array_da_mensagem_dedicada():
+    with pytest.raises(ErroSintatico, match="vírgula a mais"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                v:inteiro[2] = {1, 2,}
+        """)
+
+
+def test_virgula_a_mais_em_caso_de_escolher_da_mensagem_dedicada():
+    with pytest.raises(ErroSintatico, match="vírgula a mais"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                x:inteiro = 1
+                escolher x
+                    caso 1, 2,
+                        escrever(1)
+                    contrario
+                        escrever(0)
+        """)
+
+
+def test_operadores_relacionais_encadeados_da_mensagem_dedicada():
+    with pytest.raises(ErroSintatico, match="não podem ser encadeados"):
+        compilar('algoritmo "T"\ninicio\n    escrever(1 < 2 < 3)\n')
+
+
+def test_subcadeia_com_limites_invertidos_da_erro_amigavel():
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Cadeia
+        inicio
+            escrever(cadeia.subcadeia("algoritmo", 4, 1))
+    """)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert "Erro em tempo de execução" in resultado.stdout
+    assert "início" in resultado.stdout and "fim" in resultado.stdout
+
+
+def test_subcadeia_com_limites_normais_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        importar Cadeia
+        inicio
+            escrever(cadeia.subcadeia("algoritmo", 0, 4))
+    """)
+    assert saida.strip() == "algo"
+
+
+def test_inclusao_com_colisao_entre_categorias_diferentes_e_detetada():
+    """Uma função incluída com o mesmo nome de uma estrutura já definida
+    no programa principal (categorias diferentes) tem de ser apanhada
+    aqui, com o contexto do ficheiro incluído -- antes só a mesma
+    categoria era verificada, e isto só era apanhado mais tarde, de forma
+    genérica, em semantics.py."""
+    from algo_lang.compilador.parser import parse_biblioteca
+    from algo_lang.compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            escrever(1)
+    """))
+    declaracoes, funcoes, estruturas, _inclusoes = parse_biblioteca(
+        "funcao Ponto():inteiro\n    devolver 1\n")
+    with pytest.raises(ColisaoDeInclusao) as exc:
+        mesclar_biblioteca_no_programa(programa, "lib.algo", declaracoes, funcoes, estruturas)
+    assert exc.value.tipo == "função"
+    assert exc.value.tipo_existente == "estrutura"
+
+
+def test_inclusao_com_colisao_na_mesma_categoria_continua_igual():
+    """Regressão: o caso já existente (mesma categoria) não pode mudar de
+    comportamento com a deteção de colisão entre categorias."""
+    from algo_lang.compilador.parser import parse_biblioteca
+    from algo_lang.compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        funcao f(): inteiro
+            devolver 1
+        inicio
+            escrever(f())
+    """))
+    declaracoes, funcoes, estruturas, _inclusoes = parse_biblioteca(
+        "funcao f():inteiro\n    devolver 2\n")
+    with pytest.raises(ColisaoDeInclusao) as exc:
+        mesclar_biblioteca_no_programa(programa, "lib.algo", declaracoes, funcoes, estruturas)
+    assert exc.value.tipo == "função"
+    assert exc.value.tipo_existente == "função"
+
+
+# ---------- AUDITORIA.md secção 3 -- propagação do tipo esperado para literais {...} ----------
+
+def test_devolver_literal_de_estrutura_diretamente_funciona():
+    """B8 (secção 3): o tipo esperado (o tipo de retorno declarado da
+    função) já é conhecido pelo contexto -- 'devolver {...}' não precisa
+    de indexação/declaração intermédia para saber que forma esperar."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        funcao criar():Ponto
+            devolver {x: 5}
+        inicio
+            p:Ponto = criar()
+            escrever(p.x)
+    """)
+    assert saida.strip() == "5"
+
+
+def test_devolver_literal_de_estrutura_coage_campo_decimal():
+    saida = executar("""
+        algoritmo "T"
+        estrutura P
+            x:decimal
+        funcao criar():P
+            devolver {x: 5}
+        inicio
+            p:P = criar()
+            escrever(p.x)
+    """)
+    assert saida.strip() == "5.0"
+
+
+def test_devolver_literal_de_array_decimal_coage_elementos():
+    """Antes desta correção, 'devolver {1,2,3}' já compilava (via o ramo
+    genérico de A.ArrayLiteral em _expr()), mas sem coerção de tipo --
+    um array 'decimal[]' devolvido assim ficava com inteiros crus."""
+    saida = executar("""
+        algoritmo "T"
+        funcao criar():decimal[]
+            devolver {1, 2, 3}
+        inicio
+            v:decimal[3] = criar()
+            escrever(v[0])
+    """)
+    assert saida.strip() == "1.0"
+
+
+def test_devolver_literal_de_estrutura_com_dims_erradas_continua_rejeitado():
+    """Regressão: uma função que devolve um ARRAY de estruturas não pode
+    devolver diretamente um literal de estrutura escalar (dims erradas) --
+    o gate 'dimensões antes de tipo' continua a aplicar-se aqui."""
+    with pytest.raises(ErroSemantico, match="dimens"):
+        compilar("""
+            algoritmo "T"
+            estrutura Ponto
+                x:inteiro
+            funcao criar():Ponto[]
+                devolver {x: 5}
+            inicio
+                escrever("nunca")
+        """)
+
+
+def test_atribuicao_de_literal_de_estrutura_a_variavel_existente_funciona():
+    """B8 (secção 3): o tipo esperado (o tipo já declarado da variável
+    alvo) já é conhecido pelo contexto -- 'p = {...}' não é só permitido
+    numa declaração, também numa atribuição a uma variável já existente."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            p:Ponto = {x: 1}
+            p = {x: 9}
+            escrever(p.x)
+    """)
+    assert saida.strip() == "9"
+
+
+def test_atribuicao_de_literal_de_estrutura_aninhado_funciona():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Interno
+            v:inteiro
+        estrutura Externo
+            i:Interno
+        inicio
+            ext:Externo = {i: {v: 1}}
+            ext = {i: {v: 99}}
+            escrever(ext.i.v)
+    """)
+    assert saida.strip() == "99"
+
+
+def test_atribuicao_de_literal_de_estrutura_com_tipo_errado_continua_rejeitado():
+    with pytest.raises(ErroSemantico):
+        compilar("""
+            algoritmo "T"
+            estrutura Ponto
+                x:inteiro
+            estrutura Outra
+                y:inteiro
+            inicio
+                p:Ponto = {x: 1}
+                p = {y: 9}
+        """)
+
+
+def test_minimo_devolver_literal_de_estrutura_diretamente_funciona():
+    """Mesmo caso que test_devolver_literal_de_estrutura_diretamente_funciona,
+    mas em '--minimo' -- antes desta correção, o PRÓPRIO COMPILADOR
+    rebentava ('expressão não suportada: EstruturaLiteral'), não só o
+    programa gerado."""
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        funcao criar():Ponto
+            devolver {x: 5}
+        inicio
+            p:Ponto = criar()
+            escrever(p.x)
+    """))
+    codigo_py = gerar_python_minimo(programa)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.returncode == 0, resultado.stderr
+    assert resultado.stdout.strip() == "5"
+
+
+# ---------- AUDITORIA.md secção 3 -- assimetria ErroInternoCompilador vs ErroSemantico ----------
+
+def test_erro_interno_compilador_e_a_mesma_classe_em_codegen_e_codegen_minimo():
+    """A classe deixou de estar duplicada/só em codegen.py -- ambos os
+    geradores importam a mesma classe de gerador_base.py (partilhada),
+    em vez de codegen_minimo.py reutilizar ErroSemantico para o mesmo
+    tipo de falha (um bug do compilador, não um erro do programa do
+    estudante)."""
+    from algo_lang.compilador.codegen import ErroInternoCompilador as DoCodegen
+    from algo_lang.compilador.codegen_minimo import ErroInternoCompilador as DoCodegenMinimo
+    from algo_lang.compilador.gerador_base import ErroInternoCompilador as DaBase
+    assert DoCodegen is DaBase
+    assert DoCodegenMinimo is DaBase
+
+
+def test_minimo_literal_de_estrutura_em_posicao_ambigua_da_erro_interno_com_mensagem_clara():
+    """'escrever({x:1})' não tem tipo conhecido pelo contexto -- nem em
+    --minimo há como adivinhar qual 'estrutura' se quer. Antes desta
+    correção, isto levantava ErroSemantico (rotulado como se fosse um
+    erro de tipos do estudante) em vez de ErroInternoCompilador (uma
+    limitação real do próprio --minimo)."""
+    from algo_lang.compilador.gerador_base import ErroInternoCompilador
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            escrever({x: 1})
+    """))
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    with pytest.raises(ErroInternoCompilador, match="mesmo em --minimo"):
+        gerar_python_minimo(programa)
+
+
+def test_cli_minimo_erro_interno_da_mensagem_amigavel_nao_traceback(tmp_path, capsys):
+    """Verificação direta (sem subprocess) de que 'algo compila --minimo'
+    já não deixa um ErroInternoCompilador propagar como traceback cru --
+    cli.py passou a apanhá-lo tal como já apanhava no modo normal."""
+    from algo_lang.cli import compilar_ficheiro
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\nestrutura Ponto\n    x:inteiro\ninicio\n    escrever({x: 1})\n',
+        encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        compilar_ficheiro(str(algo_path), minimo=True)
+    assert exc.value.code == 1
+    saida = capsys.readouterr().out
+    assert "não suportado em --minimo" in saida
+    assert "Traceback" not in saida
+
+
+# ---------- AUDITORIA.md secção 3 -- mensagem enganadora em p.campo(args) ----------
+
+def test_campo_de_estrutura_chamado_como_metodo_da_mensagem_dedicada():
+    """'n.valor(3)' é sintaticamente indistinguível de uma chamada de
+    biblioteca (o parser não tem informação de tipos) -- antes desta
+    correção, dava sempre "a biblioteca 'n' não foi importada", enganador
+    quando 'n' é claramente uma variável declarada, não uma biblioteca."""
+    with pytest.raises(ErroSemantico, match="'valor' é um campo da estrutura 'No', não uma função"):
+        compilar("""
+            algoritmo "T"
+            estrutura No
+                valor:inteiro
+            inicio
+                n:No = {valor: 5}
+                escrever(n.valor(3))
+        """)
+
+
+def test_biblioteca_genuinamente_nao_importada_continua_com_mensagem_de_sempre():
+    """Regressão: o caso original (nome que não é variável nem campo de
+    estrutura conhecido) continua com a mensagem "biblioteca não
+    importada" de sempre."""
+    with pytest.raises(ErroSemantico, match="a biblioteca 'matematica' não foi importada"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                escrever(matematica.raiz(4))
+        """)
+
+
+def test_variavel_escalar_com_chamada_tipo_biblioteca_continua_com_mensagem_de_sempre():
+    """Regressão: uma variável que não é estrutura (ou é estrutura mas sem
+    esse campo) continua com a mensagem genérica -- só o caso
+    inequivocamente identificável (variável de tipo estrutura com esse
+    campo) ganha a mensagem dedicada."""
+    with pytest.raises(ErroSemantico, match="a biblioteca 'x' não foi importada"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                x:inteiro = 5
+                escrever(x.qualquer(1))
+        """)
+
+
+def test_parametro_ast_tem_campo_linha():
+    """Consistência com o resto dos nós da AST (secção 3) -- Parametro
+    era o único sem 'linha'."""
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        procedimento f(x: inteiro)
+            escrever(x)
+        inicio
+            f(1)
+    """))
+    assert programa.funcoes[0].parametros[0].linha == 3
+
+
+# ---------- AUDITORIA.md secção 3 -- paridade comportamental codegen.py/codegen_minimo.py ----------
+
+def _executar_minimo(codigo_algo, entrada=""):
+    """Compila com o gerador --minimo E COM verificar() a correr primeiro
+    (ao contrário do uso normal de --minimo) -- aqui o objetivo é
+    comparar comportamento em programas bem tipados, não testar o
+    caminho 'sem rede de segurança' em si."""
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(textwrap.dedent(codigo_algo))
+    verificar(programa)
+    codigo_py = gerar_python_minimo(programa)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], input=entrada,
+        capture_output=True, text=True, timeout=10)
+    if resultado.returncode != 0:
+        raise RuntimeError(
+            f"O programa --minimo gerado falhou (código {resultado.returncode}):\n"
+            f"{resultado.stderr}\n----- código gerado -----\n{codigo_py}"
+        )
+    return resultado.stdout
+
+
+PROGRAMAS_PARIDADE_NORMAL_VS_MINIMO = [
+    ("aritmetica_com_parenteses",
+     'algoritmo "T"\ninicio\n    escrever(2 + 3 * 4, " ", (2 + 3) * 4)\n'),
+    ("div_mod_truncado_com_negativos",
+     'algoritmo "T"\ninicio\n    escrever(-7 div 2, " ", -7 mod 2)\n'),
+    ("potencia_expoente_inteiro_literal_nao_negativo",
+     'algoritmo "T"\ninicio\n    escrever(2 ^ 10, " ", 2.0 ^ 0.5)\n'),
+    ("biblioteca_cadeia",
+     'algoritmo "T"\nimportar Cadeia\ninicio\n'
+     '    escrever(cadeia.maiusculas("ola"), " ", cadeia.subcadeia("algoritmo", 0, 4))\n'),
+    ("biblioteca_matematica",
+     'algoritmo "T"\nimportar Matematica\ninicio\n'
+     '    escrever(matematica.raiz(16.0), " ", matematica.absoluto(-5))\n'),
+    ("condicional_se_senao",
+     'algoritmo "T"\ninicio\n    x:inteiro = 7\n    se x mod 2 == 0 entao\n'
+     '        escrever("par")\n    senao\n        escrever("impar")\n'),
+    ("loop_enquanto_com_acumulador",
+     'algoritmo "T"\ninicio\n    i:inteiro = 0\n    soma:inteiro = 0\n'
+     '    enquanto i < 5 fazer\n        soma = soma + i\n        i = i + 1\n    escrever(soma)\n'),
+    ("recursao",
+     'algoritmo "T"\nfuncao fat(n:inteiro):inteiro\n    se n <= 1 entao\n        devolver 1\n'
+     '    senao\n        devolver n * fat(n - 1)\ninicio\n    escrever(fat(5))\n'),
+    ("array_multidimensional",
+     'algoritmo "T"\ninicio\n    m:inteiro[2][2] = {{1,2},{3,4}}\n    escrever(m[0][0] + m[1][1])\n'),
+    ("afirmar_verdadeiro",
+     'algoritmo "T"\ninicio\n    x:inteiro = 5\n    afirmar(x > 0)\n    escrever("ok")\n'),
+    ("escolher_caso",
+     'algoritmo "T"\ninicio\n    x:inteiro = 2\n    escolher x\n        caso 1\n'
+     '            escrever("um")\n        caso 2\n            escrever("dois")\n'
+     '        contrario\n            escrever("outro")\n'),
+    ("ref_escalar",
+     'algoritmo "T"\nprocedimento trocar(ref a:inteiro, ref b:inteiro)\n    temp:inteiro = a\n'
+     '    a = b\n    b = temp\ninicio\n    x:inteiro = 3\n    y:inteiro = 9\n'
+     '    trocar(x, y)\n    escrever(x, " ", y)\n'),
+]
+
+
+@pytest.mark.parametrize("nome,codigo", PROGRAMAS_PARIDADE_NORMAL_VS_MINIMO, ids=[c[0] for c in PROGRAMAS_PARIDADE_NORMAL_VS_MINIMO])
+def test_paridade_comportamental_normal_vs_minimo(nome, codigo):
+    """AUDITORIA.md secção 3: 'testes de paridade codegen.py/
+    codegen_minimo.py só verificam paridade estrutural, não
+    comportamental -- daí bugs como B13/B14 (mesma construção,
+    comportamento runtime diferente) escaparem.' Corre o MESMO programa
+    bem tipado pelos dois geradores e compara stdout diretamente, em vez
+    de manter duas listas de resultados esperados escritas à mão (que
+    podiam divergir do mesmo jeito que os próprios geradores). Já apanhou
+    2 divergências reais ao escrever este teste (ver o resto desta
+    secção): '^' com expoente inteiro literal não-negativo numa posição
+    solta (ex.: 'escrever(2^10)') dava 1024.0 em --minimo, 1024 no modo
+    normal.
+
+    Excluído de propósito (divergências já conhecidas/intencionais, não
+    bugs): comparação de estruturas/booleanos (--minimo mostra
+    True/False nativo do Python, nunca traduzido -- já coberto por
+    test_minimo_booleano_e_python_puro_nao_traduzido); '^' com expoente
+    que só é conhecido em tempo de execução (ex.: '2 ^ n') dentro de uma
+    declaração 'decimal' -- --minimo não coage NENHUMA expressão para
+    decimal à entrada de uma declaração (confirmado independentemente do
+    '^': 'x:decimal = 5' já dá '5', não '5.0'), gap mais geral, fora do
+    âmbito desta correção pontual."""
+    saida_normal = executar(codigo)
+    saida_minimo = _executar_minimo(codigo)
+    assert saida_normal == saida_minimo
+
+
+def test_minimo_potencia_com_expoente_inteiro_literal_nao_negativo_nao_embrulha_em_float():
+    """B14 (secção 3), divergência encontrada pelo teste de paridade
+    acima: 'escrever(2^10)' (posição solta, sem tipo-alvo nenhum a
+    coagir para) dava '1024.0' em --minimo (sempre embrulhado em
+    float(...)), '1024' no modo normal -- porque semantics.py tipa esse
+    caso concreto como 'inteiro' (expoente literal inteiro não-negativo),
+    e o '**' nativo do Python já preserva int/float sozinho aí, sem
+    precisar de nenhuma coerção."""
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        inicio
+            escrever(2 ^ 10)
+    """))
+    codigo_py = gerar_python_minimo(programa)
+    assert "float(" not in codigo_py
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.returncode == 0, resultado.stderr
+    assert resultado.stdout.strip() == "1024"
+
+
+def test_minimo_potencia_com_expoente_fracionario_nao_negativo_continua_protegida():
+    """Regressão crítica: um expoente NÃO-NEGATIVO mas FRACIONÁRIO (ex.:
+    0.5) com base negativa também produz 'complex' silenciosamente --
+    não basta olhar para o sinal do expoente (como semantics.py faz, em
+    contexto onde já sabe que o tipo é 'inteiro' antes de chegar aqui);
+    tem de ser um inteiro literal não-negativo especificamente, senão
+    esta proteção reintroduz exatamente o bug que B14 corrigiu."""
+    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
+    programa = parse(textwrap.dedent("""
+        algoritmo "T"
+        inicio
+            x:decimal = (-8.0) ^ 0.5
+            escrever(x)
+    """))
+    codigo_py = gerar_python_minimo(programa)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+    assert resultado.returncode != 0
+    assert "complex" in resultado.stderr

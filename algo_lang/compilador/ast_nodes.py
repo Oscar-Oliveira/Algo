@@ -40,27 +40,31 @@ class Declaracao(No):
     def __init__(self, tipo, nome, dims, linha, inicial=None, eh_constante=False):
         self.tipo = tipo
         self.nome = nome
-        self.dims = dims          # lista de expressões (0, 1 ou 2 dimensões) ou None
+        self.dims = dims          # lista de expressões (0, 1 ou N dimensões) ou None
         self.linha = linha
         self.inicial = inicial    # expressão de inicialização, ou None
         self.eh_constante = eh_constante
 
 
 class Parametro(No):
-    def __init__(self, nome, tipo, por_referencia):
+    def __init__(self, nome, tipo, por_referencia, dims=0, linha=0):
         self.nome = nome
         self.tipo = tipo
         self.por_referencia = por_referencia
+        self.dims = dims          # nº de dimensões do array (0 = escalar)
+        self.linha = linha        # consistente com o resto dos nós da AST
 
 
 class FuncaoDef(No):
-    def __init__(self, nome, tipo_retorno, parametros, corpo, linha, eh_procedimento):
+    def __init__(self, nome, tipo_retorno, parametros, corpo, linha, eh_procedimento,
+                 dims_retorno=0):
         self.nome = nome
         self.tipo_retorno = tipo_retorno   # None se for procedimento
         self.parametros = parametros
         self.corpo = corpo
         self.linha = linha
         self.eh_procedimento = eh_procedimento
+        self.dims_retorno = dims_retorno   # nº de dimensões do array devolvido (0 = escalar)
 
 
 # ---- statements ----
