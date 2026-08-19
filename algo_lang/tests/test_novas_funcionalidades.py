@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Testes para as funcionalidades adicionadas na última revisão: constante,
-comentários multi-linha, literais de array, afirmar e erros de execução
+comentários multi-linha, literais de vetor, afirmar e erros de execução
 amigáveis (traduzidos para português em vez do traceback Python cru)."""
 import subprocess
 import sys
@@ -79,7 +79,7 @@ def test_constante_tem_de_ter_valor_inicial():
         """)
 
 
-def test_constante_nao_pode_ser_array():
+def test_constante_nao_pode_ser_vetor():
     with pytest.raises(ErroSintatico):
         compilar("""
             algoritmo "T"
@@ -164,9 +164,9 @@ def test_comentario_linha_com_barra_asterisco_nao_e_lido_como_bloco():
     assert saida.strip() == "5"
 
 
-# ---------- literais de array ----------
+# ---------- literais de vetor ----------
 
-def test_array_literal_1d():
+def test_vetor_literal_1d():
     saida = executar("""
         algoritmo "T"
         inicio
@@ -176,7 +176,7 @@ def test_array_literal_1d():
     assert saida.strip() == "10,20,30"
 
 
-def test_array_literal_2d():
+def test_vetor_literal_2d():
     saida = executar("""
         algoritmo "T"
         inicio
@@ -186,7 +186,7 @@ def test_array_literal_2d():
     assert saida.strip() == "1,2,3,4"
 
 
-def test_array_literal_tipo_incompativel_da_erro():
+def test_vetor_literal_tipo_incompativel_da_erro():
     with pytest.raises(ErroSemantico):
         compilar("""
             algoritmo "T"
@@ -195,7 +195,7 @@ def test_array_literal_tipo_incompativel_da_erro():
         """)
 
 
-def test_array_literal_aninhamento_errado_da_erro():
+def test_vetor_literal_aninhamento_errado_da_erro():
     """AL-16: esta verificação de forma passou do parser (ErroSintatico)
     para semantics.py (ErroSemantico) -- o parser deixou de saber de
     antemão quantas dimensões esperar, para poder aceitar '{...}' como
@@ -209,8 +209,8 @@ def test_array_literal_aninhamento_errado_da_erro():
         """)
 
 
-def test_array_literal_em_variavel_nao_array_da_erro():
-    with pytest.raises(ErroSemantico, match="array"):
+def test_vetor_literal_em_variavel_nao_vetor_da_erro():
+    with pytest.raises(ErroSemantico, match="vetor"):
         compilar("""
             algoritmo "T"
             inicio
@@ -332,9 +332,9 @@ def test_variavel_global_continua_visivel_apos_wrapper_de_erros():
 # test_debug_mostra_globais_e_locais_dentro_de_funcao nesse ficheiro.
 
 
-# ---------- arrays com mais de 2 dimensões ----------
+# ---------- vetores com mais de 2 dimensões ----------
 
-def test_array_3d():
+def test_vetor_3d():
     saida = executar("""
         algoritmo "T"
         inicio
@@ -346,7 +346,7 @@ def test_array_3d():
     assert saida.strip() == "111,222,0"
 
 
-def test_array_literal_3d():
+def test_vetor_literal_3d():
     saida = executar("""
         algoritmo "T"
         inicio

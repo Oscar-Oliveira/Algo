@@ -114,7 +114,7 @@ class VerificadorTipos:
         # calculado aqui porque as estruturas são registadas ANTES de
         # 'self.globais' existir (ver verificar(), mais abaixo), só para
         # dar uma mensagem dedicada em _validar_dims quando um campo de
-        # array de 'estrutura' referencia um destes nomes.
+        # vetor de 'estrutura' referencia um destes nomes.
         self._nomes_globais_top_level = {d.nome for d in programa.declaracoes}
 
         self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims)}
@@ -356,32 +356,32 @@ class VerificadorTipos:
             if d.inicial is None:  # pragma: no cover -- o parser já exige '=' em 'constante'
                 raise ErroSemantico(
                     f"a constante '{d.nome}' tem de ser inicializada com um valor", d.linha)
-            if d.dims is not None:  # pragma: no cover -- 'constante' não tem sintaxe de array no parser
-                raise ErroSemantico("uma constante não pode ser um array", d.linha)
+            if d.dims is not None:  # pragma: no cover -- 'constante' não tem sintaxe de vetor no parser
+                raise ErroSemantico("uma constante não pode ser um vetor", d.linha)
         if d.dims:
             self._validar_dims(d.dims, escopo, d.linha)
         if d.inicial is not None:
-            if isinstance(d.inicial, A.ArrayLiteral):
-                # AL-16: o parser já não sabe se 'd' é um array -- este
+            if isinstance(d.inicial, A.VetorLiteral):
+                # AL-16: o parser já não sabe se 'd' é um vetor -- este
                 # caso (ex.: "x:inteiro = {1,2,3}") é agora genuinamente
                 # possível e tem de ser apanhado aqui.
                 if d.dims is None:
                     raise ErroSemantico(
-                        f"'{d.nome}' não é um array; não pode ser inicializado com {{...}}",
+                        f"'{d.nome}' não é um vetor; não pode ser inicializado com {{...}}",
                         d.linha)
-                self._verificar_array_literal(d.inicial, d.tipo, d.dims, escopo)
+                self._verificar_vetor_literal(d.inicial, d.tipo, d.dims, escopo)
             elif isinstance(d.inicial, A.EstruturaLiteral):
                 if d.dims is not None:
                     if d.inicial.campos:
                         raise ErroSemantico(
-                            f"'{d.nome}' é um array; usa '{{valor, valor, ...}}' para o "
+                            f"'{d.nome}' é um vetor; usa '{{valor, valor, ...}}' para o "
                             f"inicializar, não '{{campo: valor}}'", d.linha)
                     # AL-45/B5: '{}' vazio é sintaticamente ambíguo entre
-                    # "struct vazia" e "array vazio" -- o parser não sabe
+                    # "struct vazia" e "vetor vazio" -- o parser não sabe
                     # (nem deve saber) as dimensões do alvo neste ponto
                     # (_proximo_parece_campo_literal). Aqui já sabemos que
-                    # o alvo é um array, por isso um '{}' vazio é aceite
-                    # como um array literal sem elementos (ver codegen.py).
+                    # o alvo é um vetor, por isso um '{}' vazio é aceite
+                    # como um vetor literal sem elementos (ver codegen.py).
                 else:
                     self._verificar_estrutura_literal(d.inicial, d.tipo, escopo)
             elif isinstance(d.inicial, A.Chamada):
@@ -400,7 +400,7 @@ class VerificadorTipos:
                 dims_inicial = self._dims_retorno_de_chamada(d.inicial)
                 if dims_inicial != dims_n:
                     # Mesmo gate "dimensões antes de tipo" usado em
-                    # _verificar_chamada/'devolver' -- sem ele um array
+                    # _verificar_chamada/'devolver' -- sem ele um vetor
                     # podia inicializar em silêncio uma variável escalar
                     # (ou vice-versa), partilhando o mesmo 'tipo' ignorando
                     # dims.
@@ -411,8 +411,8 @@ class VerificadorTipos:
                 if dims_n > 0:
                     if tipo_inicial != d.tipo:
                         raise ErroSemantico(
-                            f"'{d.nome}' é um array de '{d.tipo}' mas está a ser "
-                            f"inicializado com um array de '{tipo_inicial}' -- arrays "
+                            f"'{d.nome}' é um vetor de '{d.tipo}' mas está a ser "
+                            f"inicializado com um vetor de '{tipo_inicial}' -- vetores "
                             f"não são alargados/estreitados automaticamente, o tipo "
                             f"do elemento tem de ser exatamente igual", d.linha)
                 elif not self._compativel(d.tipo, tipo_inicial):
@@ -436,7 +436,7 @@ class VerificadorTipos:
         escopo[d.nome] = (d.tipo, dims_n, d.eh_constante)
 
     def _validar_dims(self, dims, escopo, linha, contexto_campo=False):
-        """Valida cada expressão de dimensão de um array: tem de ser
+        """Valida cada expressão de dimensão de um vetor: tem de ser
         inteira e não pode ser um literal negativo. Partilhado entre
         declarações normais (com escopo real) e campos de 'estrutura'
         (AL-48/B7, com escopo vazio -- um campo não vê variáveis).
@@ -452,18 +452,18 @@ class VerificadorTipos:
                     and dim_expr.nome not in escopo and dim_expr.nome in self._nomes_globais_top_level):
                 raise ErroSemantico(
                     f"'{dim_expr.nome}' é uma variável/constante do programa principal, "
-                    f"mas o tamanho de um array-campo de 'estrutura' não pode "
+                    f"mas o tamanho de um vetor-campo de 'estrutura' não pode "
                     f"referenciá-la -- estruturas são registadas antes do resto do "
                     f"programa, por isso nada aí é visível ainda; usa um valor literal",
                     dim_expr.linha)
             tipo, _ = self._tipo_expr(dim_expr, escopo)
             if tipo != "inteiro":
                 raise ErroSemantico(
-                    "o tamanho de um array tem de ser uma expressão inteira", linha)
+                    "o tamanho de um vetor tem de ser uma expressão inteira", linha)
             valor_literal = self._valor_literal_negativo(dim_expr)
             if valor_literal is not None:
                 raise ErroSemantico(
-                    f"o tamanho de um array não pode ser negativo (é {valor_literal})",
+                    f"o tamanho de um vetor não pode ser negativo (é {valor_literal})",
                     dim_expr.linha)
 
     def _valor_literal_negativo(self, expr):
@@ -498,7 +498,7 @@ class VerificadorTipos:
             tipo_campo, dims_campo = campos_da_estrutura[nome_campo]
             if dims_campo > 0:
                 raise ErroSemantico(
-                    f"o campo '{nome_campo}' é um array; não pode ser inicializado "
+                    f"o campo '{nome_campo}' é um vetor; não pode ser inicializado "
                     f"diretamente num literal de estrutura", lit.linha)
             if isinstance(expr, A.EstruturaLiteral):
                 # AL-78/B8: um literal '{...}' aninhado dentro doutro literal
@@ -525,7 +525,7 @@ class VerificadorTipos:
             return dim_expr.valor
         return None
 
-    def _verificar_array_literal(self, lit: A.ArrayLiteral, tipo_elemento, dims, escopo):
+    def _verificar_vetor_literal(self, lit: A.VetorLiteral, tipo_elemento, dims, escopo):
         # AL-16: desde que o parser deixou de saber de antemão quantas
         # dimensões esperar (_parse_literal_chaveta é genérico), estas
         # duas verificações de forma passaram a ser o único sítio que as
@@ -538,30 +538,30 @@ class VerificadorTipos:
         tam_esperado = self._tamanho_estatico(dims[0])
         if tam_esperado is not None and len(lit.elementos) != tam_esperado:
             raise ErroSemantico(
-                f"o array tem tamanho declarado {tam_esperado} mas o literal "
+                f"o vetor tem tamanho declarado {tam_esperado} mas o literal "
                 f"'{{...}}' tem {len(lit.elementos)} elemento(s)", lit.linha)
         for elem in lit.elementos:
             if len(dims) > 1:
-                if not isinstance(elem, A.ArrayLiteral):
+                if not isinstance(elem, A.VetorLiteral):
                     raise ErroSemantico(
-                        f"esperava-se uma lista aninhada {{...}} (o array tem "
+                        f"esperava-se uma lista aninhada {{...}} (o vetor tem "
                         f"{len(dims)} dimensões)", lit.linha)
-                self._verificar_array_literal(elem, tipo_elemento, dims[1:], escopo)
+                self._verificar_vetor_literal(elem, tipo_elemento, dims[1:], escopo)
             else:
-                if isinstance(elem, A.ArrayLiteral):
+                if isinstance(elem, A.VetorLiteral):
                     raise ErroSemantico(
                         "demasiados níveis de aninhamento em {...} para as dimensões "
                         "declaradas", lit.linha)
                 if isinstance(elem, A.EstruturaLiteral):
-                    # AL-78/B8: elemento de array que é ele próprio um
-                    # literal de estrutura (ex.: array de estruturas) --
+                    # AL-78/B8: elemento de vetor que é ele próprio um
+                    # literal de estrutura (ex.: vetor de estruturas) --
                     # mesma lógica do campo aninhado, acima.
                     self._verificar_estrutura_literal(elem, tipo_elemento, escopo)
                     continue
                 tipo_elem, _ = self._tipo_expr(elem, escopo)
                 if not self._compativel(tipo_elemento, tipo_elem):
                     raise ErroSemantico(
-                        f"elemento do array é do tipo '{tipo_elem}', esperava-se "
+                        f"elemento do vetor é do tipo '{tipo_elem}', esperava-se "
                         f"'{tipo_elemento}'", lit.linha)
 
     # ---------- blocos / instruções ----------
@@ -576,9 +576,9 @@ class VerificadorTipos:
         return f_def is not None and any(p.por_referencia for p in f_def.parametros)
 
     def _dims_retorno_de_chamada(self, chamada: A.Chamada):
-        """Nº de dimensões do array devolvido por 'chamada' (0 para valor
+        """Nº de dimensões do vetor devolvido por 'chamada' (0 para valor
         escalar, procedimento ou chamada de biblioteca -- nenhuma função de
-        biblioteca devolve array hoje)."""
+        biblioteca devolve vetor hoje)."""
         if "." in chamada.nome:
             return 0
         f_def = self.funcoes.get(chamada.nome)
@@ -588,7 +588,7 @@ class VerificadorTipos:
 
     @staticmethod
     def _descricao_dims(dims):
-        return "um valor escalar" if dims == 0 else f"um array de {dims} dimensão(ões)"
+        return "um valor escalar" if dims == 0 else f"um vetor de {dims} dimensão(ões)"
 
     def _verificar_stmt(self, s, escopo, ctx_funcao):
         if isinstance(s, A.Declaracao):
@@ -598,12 +598,12 @@ class VerificadorTipos:
             self._verificar_nao_constante(s.alvo, escopo, "atribuir a")
             tipo_alvo, dims_alvo = self._tipo_lvalue(s.alvo, escopo)
             if dims_alvo > 0:
-                # AL-46/B6: só _tipo_expr (lado direito) rejeitava um array
+                # AL-46/B6: só _tipo_expr (lado direito) rejeitava um vetor
                 # não indexado -- o alvo de uma atribuição nunca era
                 # verificado, por isso 'v = 5' com 'v:inteiro[3]' compilava
                 # e crashava em runtime com um TypeError cru do Python.
                 raise ErroSemantico(
-                    f"'{s.alvo.nome}' é um array; não pode ser atribuído "
+                    f"'{s.alvo.nome}' é um vetor; não pode ser atribuído "
                     f"diretamente (falta indexá-lo, ex: {s.alvo.nome}[i] = ...)",
                     s.linha)
             if isinstance(s.expr, A.Chamada) and self._tem_ref(s.expr):
@@ -612,9 +612,9 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"'{s.expr.nome}' é um procedimento e não devolve valor",
                         s.linha)
-                # dims_alvo já é garantidamente 0 aqui (o array acima
-                # rejeita reatribuição direta a um array inteiro) -- falta
-                # só garantir que o LADO DIREITO também não é um array
+                # dims_alvo já é garantidamente 0 aqui (o vetor acima
+                # rejeita reatribuição direta a um vetor inteiro) -- falta
+                # só garantir que o LADO DIREITO também não é um vetor
                 # (partilharia o mesmo 'tipo' que um escalar, ignorando
                 # dims, se não fosse este gate).
                 dims_retorno = self._dims_retorno_de_chamada(s.expr)
@@ -651,7 +651,7 @@ class VerificadorTipos:
                 if dims_alvo > 0:
                     # AL-46/B6: mesma verificação que a atribuição, acima.
                     raise ErroSemantico(
-                        f"'{alvo.nome}' é um array; não pode ser o alvo direto "
+                        f"'{alvo.nome}' é um vetor; não pode ser o alvo direto "
                         f"de 'ler' (falta indexá-lo, ex: ler({alvo.nome}[i]))",
                         alvo.linha)
                 if tipo_alvo not in PRIMITIVOS:
@@ -672,7 +672,7 @@ class VerificadorTipos:
             for e in s.exprs:
                 tipo, _ = self._tipo_expr(e, escopo)
                 if tipo in self.estruturas:
-                    # AL-55/B14: arrays já eram implicitamente rejeitados
+                    # AL-55/B14: vetores já eram implicitamente rejeitados
                     # (via a verificação dims>0 de _tipo_expr), mas não
                     # havia equivalente para estruturas -- 'escrever(p)'
                     # com 'p:Ponto' imprimia algo como
@@ -784,21 +784,21 @@ class VerificadorTipos:
             if ctx_funcao is None or ctx_funcao.eh_procedimento:
                 raise ErroSemantico(
                     "'devolver' só pode ser usado dentro de uma função", s.linha)
-            if isinstance(s.expr, A.ArrayLiteral):
-                self._verificar_array_literal(
+            if isinstance(s.expr, A.VetorLiteral):
+                self._verificar_vetor_literal(
                     s.expr, ctx_funcao.tipo_retorno, [None] * ctx_funcao.dims_retorno, escopo)
                 tipo, dims = ctx_funcao.tipo_retorno, ctx_funcao.dims_retorno
             elif isinstance(s.expr, A.EstruturaLiteral):
                 # Literal de estrutura devolvido diretamente -- o tipo já é
                 # conhecido pelo contexto (o tipo de retorno declarado da
-                # função), mesma ideia do ramo de A.ArrayLiteral acima.
+                # função), mesma ideia do ramo de A.VetorLiteral acima.
                 self._verificar_estrutura_literal(s.expr, ctx_funcao.tipo_retorno, escopo)
                 tipo, dims = ctx_funcao.tipo_retorno, 0
             else:
-                tipo, dims = self._tipo_expr(s.expr, escopo, permitir_array=True)
+                tipo, dims = self._tipo_expr(s.expr, escopo, permitir_vetor=True)
             if dims != ctx_funcao.dims_retorno:
                 # Mesmo gate "dimensões antes de tipo" de _verificar_chamada --
-                # sem ele um array podia ser devolvido em silêncio onde se
+                # sem ele um vetor podia ser devolvido em silêncio onde se
                 # espera um escalar, ou vice-versa.
                 raise ErroSemantico(
                     f"a função '{ctx_funcao.nome}' devolve "
@@ -807,9 +807,9 @@ class VerificadorTipos:
             if ctx_funcao.dims_retorno > 0:
                 if tipo != ctx_funcao.tipo_retorno:
                     raise ErroSemantico(
-                        f"a função '{ctx_funcao.nome}' devolve um array de "
-                        f"'{ctx_funcao.tipo_retorno}' mas está a devolver um array de "
-                        f"'{tipo}' -- arrays não são alargados/estreitados "
+                        f"a função '{ctx_funcao.nome}' devolve um vetor de "
+                        f"'{ctx_funcao.tipo_retorno}' mas está a devolver um vetor de "
+                        f"'{tipo}' -- vetores não são alargados/estreitados "
                         f"automaticamente, o tipo do elemento tem de ser exatamente "
                         f"igual", s.linha)
             elif not self._compativel(ctx_funcao.tipo_retorno, tipo):
@@ -849,13 +849,13 @@ class VerificadorTipos:
         # de erro abaixo usavam sempre lv.nome (a variável base), mesmo
         # quando o problema estava num campo/índice vários níveis
         # adiante, dando mensagens factualmente erradas (ex.: "'c' é um
-        # array" quando 'c' é uma estrutura e o array é 'c.valores').
+        # vetor" quando 'c' é uma estrutura e o vetor é 'c.valores').
         caminho = lv.nome
         for tag, valor in lv.acessos:
             if tag == "indice":
                 if dims <= 0:
                     raise ErroSemantico(
-                        f"'{caminho}' não é um array; não pode ser indexado", lv.linha)
+                        f"'{caminho}' não é um vetor; não pode ser indexado", lv.linha)
                 tipo_idx, _ = self._tipo_expr(valor, escopo)
                 if tipo_idx != "inteiro":
                     raise ErroSemantico(
@@ -866,7 +866,7 @@ class VerificadorTipos:
             else:  # "campo"
                 if dims > 0:
                     raise ErroSemantico(
-                        f"'{caminho}' é um array; falta indexá-lo antes de aceder a "
+                        f"'{caminho}' é um vetor; falta indexá-lo antes de aceder a "
                         f"'.{valor}'", lv.linha)
                 if tipo not in self.estruturas:
                     raise ErroSemantico(
@@ -881,26 +881,26 @@ class VerificadorTipos:
                 caminho = f"{caminho}.{valor}"
         return tipo, dims
 
-    def _tipo_expr(self, expr, escopo, permitir_array=False):
+    def _tipo_expr(self, expr, escopo, permitir_vetor=False):
         """Cada 'return' de sucesso também guarda o tipo em
         expr._tipo_inferido -- codegen.py reaproveita-o para decidir onde
         inserir coerções 'inteiro' -> 'decimal' (ex.: 'x: decimal = 5' ou
         devolver um inteiro de uma função 'decimal'), sem duplicar aqui
         toda a lógica de inferência de tipos.
 
-        'permitir_array' (por omissão False) controla se um array "nu" (não
+        'permitir_vetor' (por omissão False) controla se um vetor "nu" (não
         indexado) é aceite como valor -- só os dois sítios legítimos disso
         (argumento de chamada, expressão de 'devolver') passam True; todos
         os outros contextos (aritmética, condições, escrever(), etc.)
-        continuam a rejeitar um array nu com o erro de sempre."""
+        continuam a rejeitar um vetor nu com o erro de sempre."""
         if isinstance(expr, A.Literal):
             expr._tipo_inferido = expr.tipo
             return expr.tipo, 0
         if isinstance(expr, A.LValue):
             tipo, dims = self._tipo_lvalue(expr, escopo)
-            if dims > 0 and not permitir_array:
+            if dims > 0 and not permitir_vetor:
                 raise ErroSemantico(
-                    f"'{expr.nome}' é um array; falta indexá-lo (ex: {expr.nome}[i])",
+                    f"'{expr.nome}' é um vetor; falta indexá-lo (ex: {expr.nome}[i])",
                     expr.linha)
             expr._tipo_inferido = tipo
             return tipo, dims
@@ -934,13 +934,13 @@ class VerificadorTipos:
                     f"'{expr.nome}' é um procedimento e não devolve valor; não pode "
                     f"ser usado dentro de uma expressão", expr.linha)
             dims_retorno = self._dims_retorno_de_chamada(expr)
-            if dims_retorno > 0 and not permitir_array:
+            if dims_retorno > 0 and not permitir_vetor:
                 raise ErroSemantico(
-                    f"'{expr.nome}' devolve um array; falta indexá-lo (ex: "
+                    f"'{expr.nome}' devolve um vetor; falta indexá-lo (ex: "
                     f"{expr.nome}(...)[i])", expr.linha)
             expr._tipo_inferido = tipo_retorno
             return tipo_retorno, dims_retorno
-        if isinstance(expr, (A.ArrayLiteral, A.EstruturaLiteral)):
+        if isinstance(expr, (A.VetorLiteral, A.EstruturaLiteral)):
             # AL-16: um literal '{...}' não tem um tipo próprio -- só faz
             # sentido onde o tipo/forma esperado já é conhecido pelo
             # contexto (valor inicial de uma declaração, ou argumento de
@@ -1147,7 +1147,7 @@ class VerificadorTipos:
                 if not isinstance(arg, A.LValue):
                     raise ErroSemantico(
                         f"o argumento para o parâmetro por referência '{p.nome}' tem "
-                        f"de ser uma variável, um elemento de array ou um campo, não "
+                        f"de ser uma variável, um elemento de vetor ou um campo, não "
                         f"uma expressão calculada", chamada.linha)
                 if arg.nome not in escopo:
                     raise ErroSemantico(
@@ -1181,36 +1181,36 @@ class VerificadorTipos:
                 # sempre um parâmetro por valor.
                 self._verificar_estrutura_literal(arg, p.tipo, escopo)
                 tipo, dims = p.tipo, 0
-            elif isinstance(arg, A.ArrayLiteral):
-                # Mesma ideia para um literal de array ('{...}') passado
+            elif isinstance(arg, A.VetorLiteral):
+                # Mesma ideia para um literal de vetor ('{...}') passado
                 # diretamente como argumento -- valida-se a FORMA contra as
                 # dimensões do parâmetro (sem tamanho estático a verificar,
-                # já que um parâmetro array aceita qualquer tamanho).
-                self._verificar_array_literal(arg, p.tipo, [None] * p.dims, escopo)
+                # já que um parâmetro vetor aceita qualquer tamanho).
+                self._verificar_vetor_literal(arg, p.tipo, [None] * p.dims, escopo)
                 tipo, dims = p.tipo, p.dims
             else:
-                tipo, dims = self._tipo_expr(arg, escopo, permitir_array=True)
+                tipo, dims = self._tipo_expr(arg, escopo, permitir_vetor=True)
             if dims != p.dims:
                 # Tem de ser verificado ANTES de qualquer compatibilidade de
-                # tipo: um array e um escalar podem partilhar o mesmo 'tipo'
+                # tipo: um vetor e um escalar podem partilhar o mesmo 'tipo'
                 # (ex.: ambos "inteiro") ignorando dims -- sem este gate um
-                # array inteiro seria aceite em silêncio onde se espera um
+                # vetor inteiro seria aceite em silêncio onde se espera um
                 # valor escalar, ou vice-versa.
                 raise ErroSemantico(
                     f"o parâmetro '{p.nome}' de '{chamada.nome}' espera "
                     f"{self._descricao_dims(p.dims)} mas '{A.texto_expr(arg)}' é "
                     f"{self._descricao_dims(dims)}", chamada.linha)
             if p.dims > 0:
-                # Parâmetro array: tipo do elemento exato, tanto por valor
-                # como por referência -- uma só regra para arrays (ver
+                # Parâmetro vetor: tipo do elemento exato, tanto por valor
+                # como por referência -- uma só regra para vetores (ver
                 # justificação do caso 'ref' logo abaixo; por valor segue a
                 # mesma regra por simplicidade, para não haver coerção
-                # elemento-a-elemento de um array inteiro).
+                # elemento-a-elemento de um vetor inteiro).
                 if tipo != p.tipo:
                     raise ErroSemantico(
-                        f"o parâmetro '{p.nome}' de '{chamada.nome}' é um array de "
-                        f"'{p.tipo}' mas '{A.texto_expr(arg)}' é um array de '{tipo}' "
-                        f"-- arrays não são alargados/estreitados automaticamente, "
+                        f"o parâmetro '{p.nome}' de '{chamada.nome}' é um vetor de "
+                        f"'{p.tipo}' mas '{A.texto_expr(arg)}' é um vetor de '{tipo}' "
+                        f"-- vetores não são alargados/estreitados automaticamente, "
                         f"o tipo do elemento tem de ser exatamente igual",
                         chamada.linha)
             elif p.por_referencia:

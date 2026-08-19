@@ -22,7 +22,7 @@ sys.setrecursionlimit(10000)
 class _AlgoIndiceCadeiaInvalido(IndexError):
     """AL-09: subclasse de IndexError, para as bibliotecas de texto
     (ex. cadeia.caracter) distinguirem um índice fora dos limites de
-    TEXTO de um índice fora dos limites de ARRAY -- apanhada antes do
+    TEXTO de um índice fora dos limites de VETOR -- apanhada antes do
     'except IndexError' genérico, mais abaixo neste ficheiro."""
     pass
 
@@ -192,15 +192,15 @@ def _algo_pot(a, b):
     return a ** b
 
 
-def _algo_verificar_tamanho_array(tam):
-    """Um tamanho de array calculado em runtime (nao um literal, ja
+def _algo_verificar_tamanho_vetor(tam):
+    """Um tamanho de vetor calculado em runtime (nao um literal, ja
     apanhado em compilacao) que de negativo silenciosamente produzia
-    um array vazio -- range(negativo) do Python nao levanta erro
+    um vetor vazio -- range(negativo) do Python nao levanta erro
     nenhum. ValueError e reaproveitado de propósito: ja ha um
     'except ValueError' no programa gerado que traduz para a mensagem
     amigavel de 'Erro em tempo de execucao: valor invalido (...)'."""
     if tam < 0:
-        raise ValueError(f"tamanho de array não pode ser negativo (é {tam})")
+        raise ValueError(f"tamanho de vetor não pode ser negativo (é {tam})")
     return tam
 
 '''
@@ -302,7 +302,7 @@ class GeradorCodigo(GeradorCodigoBase):
         self.emit("except IndexError as _algo_erro:", 1)
         self.emit(
             '_algo_msg = f"Erro em tempo de execução: tentaste aceder a uma posição de '
-            'array que não existe (índice fora dos limites).{_algo_sufixo_linha(_algo_erro)}"', 2)
+            'vetor que não existe (índice fora dos limites).{_algo_sufixo_linha(_algo_erro)}"', 2)
         self.emit("print(_algo_msg)", 2)
         self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
@@ -362,7 +362,7 @@ class GeradorCodigo(GeradorCodigoBase):
         params_kwargs = []
         for c in e.campos:
             if c.dims is not None or c.tipo not in DEFAULT_POR_TIPO:
-                # array OU campo de tipo estrutura: o valor por omissão tem
+                # vetor OU campo de tipo estrutura: o valor por omissão tem
                 # de ser construído dentro do __init__, nunca como valor
                 # por omissão direto do parâmetro -- um valor por omissão
                 # de parâmetro só é avaliado UMA VEZ (quando a classe é
@@ -380,7 +380,7 @@ class GeradorCodigo(GeradorCodigoBase):
         for c in e.campos:
             if c.dims is not None:
                 self.emit(f"if {c.nome} is None:", 2)
-                valor_default = self._construir_array_aninhado(c.tipo, c.dims, {}, 3)
+                valor_default = self._construir_vetor_aninhado(c.tipo, c.dims, {}, 3)
                 self.emit(f"{c.nome} = {valor_default}", 3)
                 self.emit(f"self.{c.nome} = {c.nome}", 2)
             elif c.tipo not in DEFAULT_POR_TIPO:
@@ -416,18 +416,18 @@ class GeradorCodigo(GeradorCodigoBase):
             param = f_def.parametros[i] if f_def is not None and i < len(f_def.parametros) else None
             if isinstance(a, A.EstruturaLiteral) and param is not None:
                 args_py.append(self._expr_estrutura_literal(a, param.tipo, tipos))
-            elif isinstance(a, A.ArrayLiteral) and param is not None:
+            elif isinstance(a, A.VetorLiteral) and param is not None:
                 # Mesma ideia que A.EstruturaLiteral acima: um literal de
-                # array ({...}) passado diretamente como argumento não tem
+                # vetor ({...}) passado diretamente como argumento não tem
                 # tipo próprio, semantics.py já validou a forma contra
                 # 'param.dims' -- é sempre uma instância nova, não precisa
                 # de cópia.
-                args_py.append(self._expr_array_literal(a, param.tipo, tipos))
+                args_py.append(self._expr_vetor_literal(a, param.tipo, tipos))
             elif param is not None:
                 expr_py = self._coagir_decimal(self._expr(a, tipos), param.tipo, a)
                 if not param.por_referencia and (param.dims > 0 or param.tipo in self.estruturas):
                     # AL-52/B11: um parâmetro de tipo 'estrutura' (ou,
-                    # agora, um array) sem 'ref' é por VALOR -- semantics.py
+                    # agora, um vetor) sem 'ref' é por VALOR -- semantics.py
                     # já garante todo o contrato de 'ref' (778-820), mas o
                     # Python gerado nunca copiava o objeto/lista, só passava
                     # a MESMA referência. Uma mutação dentro da função (ex.:
@@ -435,7 +435,7 @@ class GeradorCodigo(GeradorCodigoBase):
                     # quem chamou. Um literal ({...}, tratado nos 'if'
                     # acima) já é uma instância nova -- não precisa de
                     # cópia. Uma única condição (não duas) para não fazer
-                    # deepcopy em dobro num array de estruturas.
+                    # deepcopy em dobro num vetor de estruturas.
                     expr_py = f"copy.deepcopy({expr_py})"
                 args_py.append(expr_py)
             else:
@@ -463,33 +463,33 @@ class GeradorCodigo(GeradorCodigoBase):
             partes.append(f"{nome}={expr_py}")
         return f"{tipo_nome}({', '.join(partes)})"
 
-    def _expr_array_literal(self, lit: A.ArrayLiteral, tipo_elemento: str, tipos) -> str:
+    def _expr_vetor_literal(self, lit: A.VetorLiteral, tipo_elemento: str, tipos) -> str:
         """AL-58/B18: coage cada elemento individualmente para o tipo
         alvo (ex.: inteiro -> decimal), tal como _expr_estrutura_literal
         já faz para campos de estrutura -- o dispatcher genérico de
-        _expr() para A.ArrayLiteral não sabe o tipo alvo, por isso nunca
+        _expr() para A.VetorLiteral não sabe o tipo alvo, por isso nunca
         coagia nada (v:decimal[3] = {1, 2, 3} imprimia '1 2 3', não
-        '1.0 2.0 3.0'). Recursivo para suportar arrays aninhados
+        '1.0 2.0 3.0'). Recursivo para suportar vetores aninhados
         (multidimensionais)."""
         partes = []
         for elem in lit.elementos:
-            if isinstance(elem, A.ArrayLiteral):
-                partes.append(self._expr_array_literal(elem, tipo_elemento, tipos))
+            if isinstance(elem, A.VetorLiteral):
+                partes.append(self._expr_vetor_literal(elem, tipo_elemento, tipos))
             elif isinstance(elem, A.EstruturaLiteral):
-                # AL-78/B8: elemento de array que é ele próprio um literal
-                # de estrutura (ex.: array de estruturas).
+                # AL-78/B8: elemento de vetor que é ele próprio um literal
+                # de estrutura (ex.: vetor de estruturas).
                 partes.append(self._expr_estrutura_literal(elem, tipo_elemento, tipos))
             else:
                 partes.append(self._coagir_decimal(self._expr(elem, tipos), tipo_elemento, elem))
         return f"[{', '.join(partes)}]"
 
     def _gerar_declaracao(self, d: A.Declaracao, nivel, tipos):
-        if d.inicial is not None and isinstance(d.inicial, A.ArrayLiteral):
-            self.emit(f"{d.nome} = {self._expr_array_literal(d.inicial, d.tipo, tipos)}", nivel)
+        if d.inicial is not None and isinstance(d.inicial, A.VetorLiteral):
+            self.emit(f"{d.nome} = {self._expr_vetor_literal(d.inicial, d.tipo, tipos)}", nivel)
             return
         if d.inicial is not None and isinstance(d.inicial, A.EstruturaLiteral):
             if d.dims is not None:
-                # AL-45/B5: '{}' vazio inicializando um array -- semantics.py
+                # AL-45/B5: '{}' vazio inicializando um vetor -- semantics.py
                 # já garantiu que só chega aqui com campos vazios.
                 self.emit(f"{d.nome} = []", nivel)
                 return
@@ -518,7 +518,7 @@ class GeradorCodigo(GeradorCodigoBase):
         elif d.dims is None:
             self.emit(f"{d.nome} = {self._valor_default(d.tipo)}", nivel)
         else:
-            expr = self._construir_array_aninhado(d.tipo, d.dims, tipos, nivel)
+            expr = self._construir_vetor_aninhado(d.tipo, d.dims, tipos, nivel)
             self.emit(f"{d.nome} = {expr}", nivel)
 
     def _gerar_atribuicao(self, stmt: A.Atribuicao, nivel, tipos):
@@ -562,13 +562,13 @@ class GeradorCodigo(GeradorCodigoBase):
             return
         super()._gerar_atribuicao(stmt, nivel, tipos)
 
-    def _construir_array_aninhado(self, tipo, dims_exprs, tipos, nivel):
-        """Constrói a expressão Python de um array com N dimensões, ex:
+    def _construir_vetor_aninhado(self, tipo, dims_exprs, tipos, nivel):
+        """Constrói a expressão Python de um vetor com N dimensões, ex:
         [[0 for _ in range(c)] for _ in range(l)] para 2D.
 
         AL-88/B15: cada dimensão é avaliada UMA VEZ, para uma variável
         temporária emitida antes da expressão, em vez de inline -- sem
-        isto, a dimensão INTERIOR de um array multidimensional era
+        isto, a dimensão INTERIOR de um vetor multidimensional era
         reavaliada uma vez por iteração da dimensão exterior (a
         compreensão de listas aninhada do Python reavalia o 'range()'
         interior a cada volta), duplicando o efeito de uma expressão de
@@ -585,7 +585,7 @@ class GeradorCodigo(GeradorCodigoBase):
             temps.append(nome_temp)
         expr = self._valor_default(tipo)
         for nome_temp in reversed(temps):
-            expr = f"[{expr} for _ in range(_algo_verificar_tamanho_array({nome_temp}))]"
+            expr = f"[{expr} for _ in range(_algo_verificar_tamanho_vetor({nome_temp}))]"
         return expr
 
     # -------- statements --------
@@ -625,12 +625,12 @@ class GeradorCodigo(GeradorCodigoBase):
                 # nenhum para A.EstruturaLiteral (só sabe construir a partir
                 # do tipo esperado, que aqui já se conhece).
                 valor = self._expr_estrutura_literal(stmt.expr, self.tipo_retorno_atual, tipos)
-            elif isinstance(stmt.expr, A.ArrayLiteral):
-                # Mesma ideia para um literal de array -- _expr_array_literal
+            elif isinstance(stmt.expr, A.VetorLiteral):
+                # Mesma ideia para um literal de vetor -- _expr_vetor_literal
                 # coage cada elemento (ex.: inteiro -> decimal), ao contrário
-                # do ramo genérico de A.ArrayLiteral em _expr(), que apenas
+                # do ramo genérico de A.VetorLiteral em _expr(), que apenas
                 # monta a lista sem coagir nada.
-                valor = self._expr_array_literal(stmt.expr, self.tipo_retorno_atual, tipos)
+                valor = self._expr_vetor_literal(stmt.expr, self.tipo_retorno_atual, tipos)
             else:
                 valor = self._coagir_decimal(self._expr(stmt.expr, tipos), self.tipo_retorno_atual, stmt.expr)
             if self.refs_atuais:
@@ -691,7 +691,7 @@ class GeradorCodigo(GeradorCodigoBase):
             return self._lvalue(expr, tipos)
         raise ErroInternoCompilador(  # pragma: no cover -- semantics.py já valida isto antes
             "argumentos passados por referência têm de ser uma variável, um "
-            "elemento de array ou um campo")
+            "elemento de vetor ou um campo")
 
     # -------- lvalue / expressões --------
     def _expr(self, expr, tipos):
@@ -747,7 +747,7 @@ class GeradorCodigo(GeradorCodigoBase):
             args = self._gerar_lista_args(expr.args, self._encontrar_funcao(expr.nome), tipos)
             nome_py = expr.nome.replace(".", "_") if "." in expr.nome else expr.nome
             return f"{nome_py}({args})"
-        if isinstance(expr, A.ArrayLiteral):  # pragma: no cover -- semantics.py (_tipo_expr, AL-16) já rejeita um ArrayLiteral fora dos dois contextos tratados por _gerar_declaracao/_expr_array_literal e _expr_estrutura_literal antes de chegar aqui
+        if isinstance(expr, A.VetorLiteral):  # pragma: no cover -- semantics.py (_tipo_expr, AL-16) já rejeita um VetorLiteral fora dos dois contextos tratados por _gerar_declaracao/_expr_vetor_literal e _expr_estrutura_literal antes de chegar aqui
             elementos = ", ".join(self._expr(e, tipos) for e in expr.elementos)
             return f"[{elementos}]"
         raise ErroInternoCompilador(  # pragma: no cover -- todos os tipos de expressão da AST são tratados acima

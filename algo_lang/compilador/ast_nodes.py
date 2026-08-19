@@ -51,7 +51,7 @@ class Parametro(No):
         self.nome = nome
         self.tipo = tipo
         self.por_referencia = por_referencia
-        self.dims = dims          # nº de dimensões do array (0 = escalar)
+        self.dims = dims          # nº de dimensões do vetor (0 = escalar)
         self.linha = linha        # consistente com o resto dos nós da AST
 
 
@@ -64,7 +64,7 @@ class FuncaoDef(No):
         self.corpo = corpo
         self.linha = linha
         self.eh_procedimento = eh_procedimento
-        self.dims_retorno = dims_retorno   # nº de dimensões do array devolvido (0 = escalar)
+        self.dims_retorno = dims_retorno   # nº de dimensões do vetor devolvido (0 = escalar)
 
 
 # ---- statements ----
@@ -177,9 +177,9 @@ class Chamada(No):
         self.linha = linha
 
 
-class ArrayLiteral(No):
+class VetorLiteral(No):
     def __init__(self, elementos, linha):
-        self.elementos = elementos   # lista de expressões (podem ser outros ArrayLiteral, para 2D)
+        self.elementos = elementos   # lista de expressões (podem ser outros VetorLiteral, para 2D)
         self.linha = linha
 
 
@@ -310,7 +310,7 @@ def texto_expr(expr):
     if isinstance(expr, Chamada):
         args = ", ".join(texto_expr(a) for a in expr.args)
         return f"{expr.nome}({args})"
-    if isinstance(expr, ArrayLiteral):
+    if isinstance(expr, VetorLiteral):
         return "{" + ", ".join(texto_expr(e) for e in expr.elementos) + "}"
     if isinstance(expr, EstruturaLiteral):
         campos = ", ".join(f"{nome}: {texto_expr(valor)}" for nome, valor in expr.campos)

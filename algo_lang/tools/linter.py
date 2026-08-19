@@ -50,13 +50,13 @@ class Linter:
         nomes_constantes |= self._nomes_constantes_declaradas(self.programa.corpo)
         nomes_globais_mutaveis = nomes_globais - nomes_constantes
 
-        arrays_globais = self._arrays_com_tamanho_literal(self.programa.declaracoes)
-        # AL-98/B26: nome_campo -> tamanho, para campos-array de QUALQUER
+        vetores_globais = self._vetores_com_tamanho_literal(self.programa.declaracoes)
+        # AL-98/B26: nome_campo -> tamanho, para campos-vetor de QUALQUER
         # 'estrutura' -- sem isto, um índice fora dos limites só era
-        # verificado para arrays declarados diretamente como variável
-        # (ex.: 'v[10]'), nunca para um campo-array de estrutura (ex.:
+        # verificado para vetores declarados diretamente como variável
+        # (ex.: 'v[10]'), nunca para um campo-vetor de estrutura (ex.:
         # 't.notas[10]'), que tem exatamente a mesma restrição estática.
-        campos_array = self._campos_array_por_nome()
+        campos_vetor = self._campos_vetor_por_nome()
 
         self._verificar_variaveis_nao_usadas(
             self.programa.corpo, contexto="no programa principal",
@@ -65,7 +65,7 @@ class Linter:
         self._verificar_divisoes_e_comparacoes(self.programa.corpo)
         self._verificar_codigo_depois_de_devolver(self.programa.corpo)
         self._verificar_ciclo_verdadeiro_sem_saida(self.programa.corpo)
-        self._verificar_indices_fora_dos_limites(self.programa.corpo, arrays_globais, campos_array)
+        self._verificar_indices_fora_dos_limites(self.programa.corpo, vetores_globais, campos_vetor)
 
         for f in self.programa.funcoes:
             self._verificar_parametros_nao_usados(f)
@@ -79,7 +79,7 @@ class Linter:
             self._verificar_atribuicao_a_parametro_por_valor(f)
             self._verificar_codigo_depois_de_devolver(f.corpo)
             self._verificar_ciclo_verdadeiro_sem_saida(f.corpo)
-            self._verificar_indices_fora_dos_limites(f.corpo, arrays_globais, campos_array)
+            self._verificar_indices_fora_dos_limites(f.corpo, vetores_globais, campos_vetor)
 
         self.avisos.sort(key=lambda a: a.linha)
         return self.avisos
@@ -237,7 +237,7 @@ class Linter:
                 destino_chamadas.add(expr.nome)
             for a in expr.args:
                 self._extrair_lvalues_e_chamadas(a, destino_vars, destino_chamadas)
-        elif isinstance(expr, A.ArrayLiteral):
+        elif isinstance(expr, A.VetorLiteral):
             for e in expr.elementos:
                 self._extrair_lvalues_e_chamadas(e, destino_vars, destino_chamadas)
         elif isinstance(expr, A.EstruturaLiteral):
@@ -397,7 +397,7 @@ class Linter:
         elif isinstance(expr, A.Chamada):
             for a in expr.args:
                 self._verificar_expr_recursiva(a)
-        elif isinstance(expr, A.ArrayLiteral):
+        elif isinstance(expr, A.VetorLiteral):
             for e in expr.elementos:
                 self._verificar_expr_recursiva(e)
         elif isinstance(expr, A.EstruturaLiteral):
@@ -594,14 +594,14 @@ class Linter:
                 or self._chamada_com_argumento_nu(expr.dire, nome)
         if isinstance(expr, A.UnOp):
             return self._chamada_com_argumento_nu(expr.operando, nome)
-        if isinstance(expr, A.ArrayLiteral):
+        if isinstance(expr, A.VetorLiteral):
             return any(self._chamada_com_argumento_nu(e, nome) for e in expr.elementos)
         if isinstance(expr, A.EstruturaLiteral):
             return any(self._chamada_com_argumento_nu(v, nome) for _n, v in expr.campos)
         return False
 
-    def _arrays_com_tamanho_literal(self, declaracoes):
-        """nome -> tamanho, só para arrays de 1 dimensão declarados com um
+    def _vetores_com_tamanho_literal(self, declaracoes):
+        """nome -> tamanho, só para vetores de 1 dimensão declarados com um
         tamanho literal (ex: 'v:inteiro[5]') -- os únicos casos em que dá
         para verificar limites estaticamente."""
         tamanhos = {}
@@ -611,9 +611,9 @@ class Linter:
                 tamanhos[d.nome] = d.dims[0].valor
         return tamanhos
 
-    def _campos_array_por_nome(self):
+    def _campos_vetor_por_nome(self):
         """AL-98/B26: nome_campo -> tamanho, para campos de QUALQUER
-        'estrutura' que sejam arrays de 1 dimensão com tamanho literal --
+        'estrutura' que sejam vetores de 1 dimensão com tamanho literal --
         aproximação por NOME de campo (não pelo tipo da variável, que o
         linter não infere de forma completa como semantics.py). Se o
         mesmo nome de campo aparecer em mais do que uma 'estrutura' com
@@ -634,29 +634,29 @@ class Linter:
             del tamanhos[nome]
         return tamanhos
 
-    def _verificar_indices_fora_dos_limites(self, corpo, arrays_globais, campos_array):
-        arrays = dict(arrays_globais)
+    def _verificar_indices_fora_dos_limites(self, corpo, vetores_globais, campos_vetor):
+        vetores = dict(vetores_globais)
         locais = [s for s in self._todas_as_stmts(corpo) if isinstance(s, A.Declaracao)]
-        arrays.update(self._arrays_com_tamanho_literal(locais))
+        vetores.update(self._vetores_com_tamanho_literal(locais))
         for s in self._todas_as_stmts(corpo):
             for e in self._expressoes_lidas(s):
-                self._verificar_indices_expr(e, arrays, campos_array)
+                self._verificar_indices_expr(e, vetores, campos_vetor)
             if isinstance(s, A.Atribuicao):
-                self._verificar_indices_expr(s.alvo, arrays, campos_array)
+                self._verificar_indices_expr(s.alvo, vetores, campos_vetor)
 
-    def _verificar_indices_expr(self, expr, arrays, campos_array):
+    def _verificar_indices_expr(self, expr, vetores, campos_vetor):
         if expr is None:  # pragma: no cover -- mesmo raciocínio de _extrair_lvalues_e_chamadas
             return
         if isinstance(expr, A.LValue):
-            tamanho = arrays.get(expr.nome)
+            tamanho = vetores.get(expr.nome)
             caminho = expr.nome
             for tag, valor in expr.acessos:
                 if tag == "campo":
                     # AL-98/B26: muda para o tamanho (se algum) do CAMPO
-                    # agora acedido -- sem isto, só o tamanho do array de
+                    # agora acedido -- sem isto, só o tamanho do vetor de
                     # TOPO (a variável base) era considerado; um índice
-                    # num campo-array de estrutura nunca era verificado.
-                    tamanho = campos_array.get(valor)
+                    # num campo-vetor de estrutura nunca era verificado.
+                    tamanho = campos_vetor.get(valor)
                     caminho = f"{caminho}.{valor}"
                     continue
                 indice = self._valor_literal_inteiro(valor)
@@ -664,22 +664,22 @@ class Linter:
                     self.avisos.append(Aviso(
                         f"índice {indice} está fora dos limites de '{caminho}' (tamanho "
                         f"{tamanho}, índices válidos: 0 a {tamanho - 1})", expr.linha))
-                self._verificar_indices_expr(valor, arrays, campos_array)
+                self._verificar_indices_expr(valor, vetores, campos_vetor)
                 caminho = f"{caminho}[{A.texto_expr(valor)}]"
         elif isinstance(expr, A.BinOp):
-            self._verificar_indices_expr(expr.esq, arrays, campos_array)
-            self._verificar_indices_expr(expr.dire, arrays, campos_array)
+            self._verificar_indices_expr(expr.esq, vetores, campos_vetor)
+            self._verificar_indices_expr(expr.dire, vetores, campos_vetor)
         elif isinstance(expr, A.UnOp):
-            self._verificar_indices_expr(expr.operando, arrays, campos_array)
+            self._verificar_indices_expr(expr.operando, vetores, campos_vetor)
         elif isinstance(expr, A.Chamada):
             for a in expr.args:
-                self._verificar_indices_expr(a, arrays, campos_array)
-        elif isinstance(expr, A.ArrayLiteral):
+                self._verificar_indices_expr(a, vetores, campos_vetor)
+        elif isinstance(expr, A.VetorLiteral):
             for e in expr.elementos:
-                self._verificar_indices_expr(e, arrays, campos_array)
+                self._verificar_indices_expr(e, vetores, campos_vetor)
         elif isinstance(expr, A.EstruturaLiteral):
             for _nome, valor in expr.campos:
-                self._verificar_indices_expr(valor, arrays, campos_array)
+                self._verificar_indices_expr(valor, vetores, campos_vetor)
 
     def _valor_literal_inteiro(self, expr):
         if isinstance(expr, A.Literal) and expr.tipo == "inteiro":
@@ -723,7 +723,7 @@ class Linter:
         elif isinstance(expr, A.UnOp):
             self._verificar_campos_em_falta_em_chamada(
                 expr.operando, funcoes_por_nome, campos_por_estrutura)
-        elif isinstance(expr, A.ArrayLiteral):
+        elif isinstance(expr, A.VetorLiteral):
             for e in expr.elementos:
                 self._verificar_campos_em_falta_em_chamada(e, funcoes_por_nome, campos_por_estrutura)
         elif isinstance(expr, A.EstruturaLiteral):

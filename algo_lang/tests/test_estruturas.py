@@ -75,7 +75,7 @@ def test_ref_com_estrutura_altera_o_original():
     assert saida.strip() == "105"
 
 
-def test_array_de_estruturas_tem_instancias_independentes():
+def test_vetor_de_estruturas_tem_instancias_independentes():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto

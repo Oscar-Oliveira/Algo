@@ -7,11 +7,18 @@ docker compose up -d --build
 
 ---
 
+
 Documentacao -> em readme...
 - compilador
     - instalação,
 - liguagem online + readme
 - linter improve
+
+
+criar pacote local
+-compilador
+-exemplos
+-docs
 
 
 online

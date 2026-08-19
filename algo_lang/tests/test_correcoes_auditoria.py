@@ -282,7 +282,7 @@ def test_erro_de_tipo_desconhecido_nao_menciona_dois_pontos():
     assert "TipoQueNaoExiste:" not in str(exc.value)
 
 
-# ---------- #9 tamanho de array negativo ----------
+# ---------- #9 tamanho de vetor negativo ----------
 
 # ---------- #11 (encontrado ao testar o #1): campos de tipo estrutura
 # não podiam partilhar objeto por omissão entre instâncias ----------
@@ -307,7 +307,7 @@ def test_campo_de_tipo_estrutura_nao_e_partilhado_entre_instancias():
     assert saida.strip() == "a=999 c=0"
 
 
-def test_array_com_tamanho_negativo_literal_da_erro():
+def test_vetor_com_tamanho_negativo_literal_da_erro():
     with pytest.raises(ErroSemantico, match="negativo"):
         compilar("""
             algoritmo "T"
@@ -506,8 +506,8 @@ def test_sem_campo_repetido_no_literal_de_estrutura():
         """)
 
 
-def test_sem_campo_array_nao_pode_ser_inicializado_em_literal_de_estrutura():
-    with pytest.raises(ErroSemantico, match="é um array"):
+def test_sem_campo_vetor_nao_pode_ser_inicializado_em_literal_de_estrutura():
+    with pytest.raises(ErroSemantico, match="é um vetor"):
         compilar("""
             algoritmo "T"
             estrutura P
@@ -622,7 +622,7 @@ def test_sem_devolver_tipo_incompativel():
 
 
 def test_sem_indexar_variavel_escalar():
-    with pytest.raises(ErroSemantico, match="não é um array"):
+    with pytest.raises(ErroSemantico, match="não é um vetor"):
         compilar("""
             algoritmo "T"
             inicio
@@ -641,7 +641,7 @@ def test_sem_indice_nao_inteiro():
         """)
 
 
-def test_sem_campo_sem_indexar_array_primeiro():
+def test_sem_campo_sem_indexar_vetor_primeiro():
     with pytest.raises(ErroSemantico, match="falta indexá-lo"):
         compilar("""
             algoritmo "T"
@@ -663,7 +663,7 @@ def test_sem_campo_em_algo_que_nao_e_estrutura():
         """)
 
 
-def test_sem_array_sem_indexar_em_expressao():
+def test_sem_vetor_sem_indexar_em_expressao():
     with pytest.raises(ErroSemantico, match="falta indexá-lo"):
         compilar("""
             algoritmo "T"
@@ -783,7 +783,7 @@ def test_variaveis_diferentes_por_referencia_continua_a_funcionar():
     assert saida.strip() == "2 1"
 
 
-def test_elementos_diferentes_do_mesmo_array_por_referencia_nao_da_falso_positivo():
+def test_elementos_diferentes_do_mesmo_vetor_por_referencia_nao_da_falso_positivo():
     """v[0] e v[1] partilham o nome base 'v' mas são posições diferentes
     -- não deve ser assinalado como a mesma variável repetida."""
     saida = executar("""
@@ -824,13 +824,13 @@ def test_div_mod_com_ambos_negativos():
     assert saida.strip() == "3 -1"
 
 
-# ---------- AUDIT_PLAN Fase 2: AL-06 -- tamanho de array negativo em runtime ----------
+# ---------- AUDIT_PLAN Fase 2: AL-06 -- tamanho de vetor negativo em runtime ----------
 
-def test_array_com_tamanho_negativo_calculado_em_runtime_da_erro_amigavel():
+def test_vetor_com_tamanho_negativo_calculado_em_runtime_da_erro_amigavel():
     """Ao contrário do literal (já apanhado em compilação, ver
-    test_array_com_tamanho_negativo_literal_da_erro), um tamanho só
+    test_vetor_com_tamanho_negativo_literal_da_erro), um tamanho só
     conhecido em runtime (variável) que dê negativo produzia
-    silenciosamente um array vazio -- range(negativo) não levanta
+    silenciosamente um vetor vazio -- range(negativo) não levanta
     erro nenhum no Python."""
     import os
     codigo_py = compilar("""
@@ -849,7 +849,7 @@ def test_array_com_tamanho_negativo_calculado_em_runtime_da_erro_amigavel():
     assert "não pode ser negativo" in resultado.stdout
 
 
-def test_array_com_tamanho_positivo_calculado_em_runtime_continua_a_funcionar():
+def test_vetor_com_tamanho_positivo_calculado_em_runtime_continua_a_funcionar():
     saida = executar("""
         algoritmo "T"
         inicio
@@ -861,9 +861,9 @@ def test_array_com_tamanho_positivo_calculado_em_runtime_continua_a_funcionar():
     assert saida.strip() == "9 0 0"
 
 
-# ---------- AUDIT_PLAN Fase 2: AL-09 -- IndexError distingue array de texto ----------
+# ---------- AUDIT_PLAN Fase 2: AL-09 -- IndexError distingue vetor de texto ----------
 
-def test_indice_fora_dos_limites_em_cadeia_caracter_menciona_texto_nao_array():
+def test_indice_fora_dos_limites_em_cadeia_caracter_menciona_texto_nao_vetor():
     import os
     codigo_py = compilar("""
         algoritmo "T"
@@ -877,10 +877,10 @@ def test_indice_fora_dos_limites_em_cadeia_caracter_menciona_texto_nao_array():
         timeout=10, env=env)
     assert resultado.returncode == 1
     assert "posição de texto" in resultado.stdout
-    assert "posição de array" not in resultado.stdout
+    assert "posição de vetor" not in resultado.stdout
 
 
-def test_indice_fora_dos_limites_em_array_continua_a_mencionar_array():
+def test_indice_fora_dos_limites_em_vetor_continua_a_mencionar_vetor():
     import os
     codigo_py = compilar("""
         algoritmo "T"
@@ -893,7 +893,7 @@ def test_indice_fora_dos_limites_em_array_continua_a_mencionar_array():
         [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
         timeout=10, env=env)
     assert resultado.returncode == 1
-    assert "posição de array" in resultado.stdout
+    assert "posição de vetor" in resultado.stdout
     assert "posição de texto" not in resultado.stdout
 
 
@@ -1222,7 +1222,7 @@ def test_sem_variavel_ja_declarada():
         """)
 
 
-def test_sem_tamanho_de_array_nao_inteiro():
+def test_sem_tamanho_de_vetor_nao_inteiro():
     with pytest.raises(ErroSemantico, match="tem de ser uma expressão inteira"):
         compilar("""
             algoritmo "T"
@@ -1443,10 +1443,10 @@ def test_codegen_chamada_a_biblioteca_nao_e_confundida_com_funcao_do_utilizador(
     assert saida.strip() == "2.0"
 
 
-def test_codegen_campo_de_estrutura_que_e_array_nao_e_partilhado():
+def test_codegen_campo_de_estrutura_que_e_vetor_nao_e_partilhado():
     """Mesma classe do bug #11 (campo de tipo estrutura partilhado entre
-    instâncias), mas para um campo que é um ARRAY -- confirma que também
-    está bem, cada instância com o seu próprio array independente."""
+    instâncias), mas para um campo que é um VETOR -- confirma que também
+    está bem, cada instância com o seu próprio vetor independente."""
     saida = executar("""
         algoritmo "T"
         estrutura Turma
@@ -1619,11 +1619,11 @@ def test_parser_literal_de_estrutura_vazio():
     assert saida.strip() == "0 0"
 
 
-# ---------- bug real do linter: falso positivo em array indexado ----------
+# ---------- bug real do linter: falso positivo em vetor indexado ----------
 
-def test_linter_nao_assinala_falso_positivo_array_so_escrito_por_indice():
+def test_linter_nao_assinala_falso_positivo_vetor_so_escrito_por_indice():
     """Bug encontrado na auditoria: 'ler(v[i])' e 'v[i] = ...' só
-    registavam o índice (i) como usado, nunca a base (v) -- um array só
+    registavam o índice (i) como usado, nunca a base (v) -- um vetor só
     alguma vez escrito/lido por índice era incorretamente assinalado como
     'nunca usado'."""
     from algo_lang.tools.linter import analisar
@@ -1657,8 +1657,8 @@ def test_linter_ainda_assinala_atribuicao_simples_nunca_lida():
     assert any("'x'" in a.mensagem and "nunca é usada" in a.mensagem for a in avisos)
 
 
-def test_linter_sem_falsos_positivos_com_estrutura_array_e_nao():
-    """Programa que exercita UnOp (nao), EstruturaLiteral e ArrayLiteral
+def test_linter_sem_falsos_positivos_com_estrutura_vetor_e_nao():
+    """Programa que exercita UnOp (nao), EstruturaLiteral e VetorLiteral
     dentro do linter -- nenhuma destas variáveis deve ser assinalada."""
     from algo_lang.tools.linter import analisar
     programa = parse(textwrap.dedent("""
@@ -2037,9 +2037,9 @@ def test_literal_de_estrutura_como_segundo_argumento_junto_de_ref():
     assert saida.strip() == "15"
 
 
-def test_literal_de_array_multidimensional_continua_a_funcionar():
+def test_literal_de_vetor_multidimensional_continua_a_funcionar():
     """Regressão: a generalização do parser (deixou de precisar de
-    saber a profundidade de antemão) não pode partir arrays
+    saber a profundidade de antemão) não pode partir vetores
     multidimensionais existentes."""
     saida = executar("""
         algoritmo "T"
@@ -2074,7 +2074,7 @@ def test_indentacao_mista_entre_linhas_diferentes_da_erro_de_compilacao():
 
 # ---------- lacunas de cobertura: flowchart.py ----------
 
-def test_flowchart_com_caracter_array_estrutura_e_nao():
+def test_flowchart_com_caracter_vetor_estrutura_e_nao():
     from algo_lang.tools.flowchart import gerar_dot
     programa = parse(textwrap.dedent("""
         algoritmo "T"
@@ -2233,7 +2233,7 @@ inicio
 def test_valueerror_sem_causa_mapeada_mantem_o_generico():
     """Uma causa não mapeada continua a mostrar a mensagem original do
     Python entre parênteses, como recurso -- nunca deve ficar muda. O
-    tamanho de array negativo (_algo_verificar_tamanho_array) tem a sua
+    tamanho de vetor negativo (_algo_verificar_tamanho_vetor) tem a sua
     própria mensagem em português mas não está na lista de causas
     mapeadas do tradutor, por isso passa pelo fallback genérico "valor
     inválido (...)" -- só é detetável em runtime quando o tamanho vem
@@ -2251,7 +2251,7 @@ inicio
 
 # ---------- UX-04: número de linha ALGO nas mensagens de erro em runtime ----------
 
-def test_erro_de_indice_de_array_mostra_a_linha_algo():
+def test_erro_de_indice_de_vetor_mostra_a_linha_algo():
     resultado = _correr_esperando_erro("""\
 algoritmo "T"
 v:inteiro[3]
@@ -2462,7 +2462,7 @@ _TIPOS_STMT_DA_AST = {
     "FazEnquanto", "Escolha", "Devolver", "ChamadaStmt", "Afirmar",
 }
 _TIPOS_EXPR_DA_AST = {
-    "LValue", "Literal", "BinOp", "UnOp", "Chamada", "ArrayLiteral", "EstruturaLiteral",
+    "LValue", "Literal", "BinOp", "UnOp", "Chamada", "VetorLiteral", "EstruturaLiteral",
 }
 
 
@@ -2618,9 +2618,9 @@ def test_blocos_aninhados_dentro_do_limite_continuam_a_compilar():
     assert executar(_programa_com_blocos_aninhados(10)).strip() == "fundo"
 
 
-# ---------- B5 (AL-45): '{}' nunca interpretado como array literal vazio ----------
+# ---------- B5 (AL-45): '{}' nunca interpretado como vetor literal vazio ----------
 
-def test_chaveta_vazia_inicializa_array_vazio_sem_erro():
+def test_chaveta_vazia_inicializa_vetor_vazio_sem_erro():
     codigo_py = compilar("""
         algoritmo "T"
         inicio
@@ -2631,7 +2631,7 @@ def test_chaveta_vazia_inicializa_array_vazio_sem_erro():
 
 
 def test_chaveta_vazia_com_campos_de_estrutura_continua_a_dar_erro_claro():
-    with pytest.raises(ErroSemantico, match="array"):
+    with pytest.raises(ErroSemantico, match="vetor"):
         compilar("""
             algoritmo "T"
             inicio
@@ -2639,10 +2639,10 @@ def test_chaveta_vazia_com_campos_de_estrutura_continua_a_dar_erro_claro():
         """)
 
 
-# ---------- B6 (AL-46): atribuição a um array inteiro não é rejeitada ----------
+# ---------- B6 (AL-46): atribuição a um vetor inteiro não é rejeitada ----------
 
-def test_atribuir_diretamente_a_array_e_erro_semantico():
-    with pytest.raises(ErroSemantico, match="array"):
+def test_atribuir_diretamente_a_vetor_e_erro_semantico():
+    with pytest.raises(ErroSemantico, match="vetor"):
         compilar("""
             algoritmo "T"
             inicio
@@ -2651,8 +2651,8 @@ def test_atribuir_diretamente_a_array_e_erro_semantico():
         """)
 
 
-def test_ler_diretamente_para_array_e_erro_semantico():
-    with pytest.raises(ErroSemantico, match="array"):
+def test_ler_diretamente_para_vetor_e_erro_semantico():
+    with pytest.raises(ErroSemantico, match="vetor"):
         compilar("""
             algoritmo "T"
             inicio
@@ -2661,9 +2661,9 @@ def test_ler_diretamente_para_array_e_erro_semantico():
         """)
 
 
-# ---------- B7 (AL-48): tamanhos de arrays em campos de 'estrutura' não validados ----------
+# ---------- B7 (AL-48): tamanhos de vetores em campos de 'estrutura' não validados ----------
 
-def test_tamanho_de_array_negativo_em_campo_de_estrutura_e_erro_de_compilacao():
+def test_tamanho_de_vetor_negativo_em_campo_de_estrutura_e_erro_de_compilacao():
     with pytest.raises(ErroSemantico, match="negativo"):
         compilar("""
             algoritmo "T"
@@ -2674,7 +2674,7 @@ def test_tamanho_de_array_negativo_em_campo_de_estrutura_e_erro_de_compilacao():
         """)
 
 
-def test_tamanho_de_array_nao_inteiro_em_campo_de_estrutura_e_erro_de_compilacao():
+def test_tamanho_de_vetor_nao_inteiro_em_campo_de_estrutura_e_erro_de_compilacao():
     with pytest.raises(ErroSemantico, match="inteira"):
         compilar("""
             algoritmo "T"
@@ -2726,7 +2726,7 @@ def test_funcao_com_escolher_sem_contrario_nem_sempre_devolve_e_erro():
         """)
 
 
-# ---------- B9 (AL-47): 'ler' aceita silenciosamente arrays e structs como alvo ----------
+# ---------- B9 (AL-47): 'ler' aceita silenciosamente vetores e structs como alvo ----------
 
 def test_ler_para_variavel_de_tipo_estrutura_e_erro_semantico():
     with pytest.raises(ErroSemantico, match="primitivo"):
@@ -2831,7 +2831,7 @@ def test_atribuicao_decimal_a_partir_de_funcao_ref_que_devolve_inteiro_e_coagida
 
 # ---------- B12 (AL-53): mensagens de _tipo_lvalue usam sempre o nome base ----------
 
-def test_erro_de_array_nao_indexado_menciona_o_subcaminho_real():
+def test_erro_de_vetor_nao_indexado_menciona_o_subcaminho_real():
     with pytest.raises(ErroSemantico, match=r"'c\.valores'"):
         compilar("""
             algoritmo "T"
@@ -2930,9 +2930,9 @@ def test_potencia_de_base_negativa_com_expoente_inteiro_continua_a_funcionar():
     assert saida.strip() == "64.0"
 
 
-# ---------- B18 (AL-58): elementos de array literal não coagidos p/ decimal ----------
+# ---------- B18 (AL-58): elementos de vetor literal não coagidos p/ decimal ----------
 
-def test_elementos_de_array_literal_decimal_sao_coagidos():
+def test_elementos_de_vetor_literal_decimal_sao_coagidos():
     saida = executar("""
         algoritmo "T"
         inicio
@@ -3280,9 +3280,9 @@ def test_colisao_de_campo_de_estrutura_reporta_a_linha_do_campo():
     assert nomes["classe"] == 4
 
 
-# ---------- B7 (AL-79): semantics -- tamanho declarado de array nunca validado contra o literal ----------
+# ---------- B7 (AL-79): semantics -- tamanho declarado de vetor nunca validado contra o literal ----------
 
-def test_array_com_literal_de_tamanho_diferente_do_declarado_da_erro():
+def test_vetor_com_literal_de_tamanho_diferente_do_declarado_da_erro():
     with pytest.raises(ErroSemantico, match="tamanho declarado 5.*3 elemento"):
         compilar("""
             algoritmo "T"
@@ -3292,7 +3292,7 @@ def test_array_com_literal_de_tamanho_diferente_do_declarado_da_erro():
         """)
 
 
-def test_array_com_literal_de_tamanho_igual_ao_declarado_compila():
+def test_vetor_com_literal_de_tamanho_igual_ao_declarado_compila():
     saida = executar("""
         algoritmo "T"
         inicio
@@ -3318,7 +3318,7 @@ def test_literal_de_estrutura_aninhado_dentro_doutro_literal():
     assert saida.strip() == "5"
 
 
-def test_array_de_literais_de_estrutura():
+def test_vetor_de_literais_de_estrutura():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -3347,7 +3347,7 @@ def test_mesmo_campo_de_estrutura_por_referencia_duas_vezes_da_erro():
         """)
 
 
-def test_indices_diferentes_do_mesmo_array_por_referencia_continua_a_compilar():
+def test_indices_diferentes_do_mesmo_vetor_por_referencia_continua_a_compilar():
     compilar("""
         algoritmo "T"
         procedimento trocar(ref a:inteiro, ref b:inteiro)
@@ -3504,9 +3504,9 @@ def test_matematica_aleatorio_com_limites_invertidos_nao_mostra_randrange():
     assert "limite inferior" in resultado.stdout and "limite superior" in resultado.stdout
 
 
-# ---------- B15 (AL-88): codegen -- dimensão interior de array multidimensional avaliada 2x ----------
+# ---------- B15 (AL-88): codegen -- dimensão interior de vetor multidimensional avaliada 2x ----------
 
-def test_dimensao_interior_de_array_multidimensional_e_avaliada_uma_so_vez():
+def test_dimensao_interior_de_vetor_multidimensional_e_avaliada_uma_so_vez():
     saida = executar("""
         algoritmo "T"
         funcao dim():inteiro
@@ -3519,7 +3519,7 @@ def test_dimensao_interior_de_array_multidimensional_e_avaliada_uma_so_vez():
     assert saida.count("chamada") == 1
 
 
-def test_array_de_estrutura_com_campo_multidimensional_continua_a_funcionar():
+def test_vetor_de_estrutura_com_campo_multidimensional_continua_a_funcionar():
     saida = executar("""
         algoritmo "T"
         estrutura Turma
@@ -3666,9 +3666,9 @@ def test_flag_com_valor_seguido_de_ficheiro_continua_a_funcionar():
     assert resto == ["--entradas", "in.txt", "ultimo.algo"]
 
 
-# ---------- B26 (AL-98): linter -- índices fora dos limites não cobria arrays que são campos de estrutura ----------
+# ---------- B26 (AL-98): linter -- índices fora dos limites não cobria vetores que são campos de estrutura ----------
 
-def test_linter_deteta_indice_fora_dos_limites_em_campo_array_de_estrutura():
+def test_linter_deteta_indice_fora_dos_limites_em_campo_vetor_de_estrutura():
     from algo_lang.tools.linter import analisar
     programa = parse(textwrap.dedent("""
         algoritmo "T"
@@ -3684,7 +3684,7 @@ def test_linter_deteta_indice_fora_dos_limites_em_campo_array_de_estrutura():
         "fora dos limites" in a.mensagem and "'t.notas'" in a.mensagem for a in avisos)
 
 
-def test_linter_nao_assinala_indice_valido_em_campo_array_de_estrutura():
+def test_linter_nao_assinala_indice_valido_em_campo_vetor_de_estrutura():
     from algo_lang.tools.linter import analisar
     programa = parse(textwrap.dedent("""
         algoritmo "T"
@@ -3807,9 +3807,9 @@ def test_vscode_grammar_declarations_ignora_campo_de_literal_de_estrutura_com_va
         assert re.search(padrao, campo) is None, campo
 
 
-# ---------- Arrays como parâmetros e valores de retorno (AUDITORIA.md secção 3) ----------
+# ---------- Vetores como parâmetros e valores de retorno (AUDITORIA.md secção 3) ----------
 
-def test_parametro_array_1d_parseia_dims_correto():
+def test_parametro_vetor_1d_parseia_dims_correto():
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         procedimento f(v: inteiro[])
@@ -3820,7 +3820,7 @@ def test_parametro_array_1d_parseia_dims_correto():
     assert programa.funcoes[0].parametros[0].dims == 1
 
 
-def test_parametro_array_2d_parseia_dims_correto():
+def test_parametro_vetor_2d_parseia_dims_correto():
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         procedimento f(m: inteiro[][])
@@ -3831,7 +3831,7 @@ def test_parametro_array_2d_parseia_dims_correto():
     assert programa.funcoes[0].parametros[0].dims == 2
 
 
-def test_tipo_retorno_array_parseia_dims_retorno_correto():
+def test_tipo_retorno_vetor_parseia_dims_retorno_correto():
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         funcao f(): inteiro[]
@@ -3864,7 +3864,7 @@ def test_colchetes_de_retorno_com_tamanho_e_erro_sintatico():
         """)
 
 
-def test_parametro_array_pode_ser_indexado_e_mutado_no_corpo():
+def test_parametro_vetor_pode_ser_indexado_e_mutado_no_corpo():
     saida = executar("""
         algoritmo "T"
         procedimento incrementaPrimeiro(ref v: inteiro[])
@@ -3877,7 +3877,7 @@ def test_parametro_array_pode_ser_indexado_e_mutado_no_corpo():
     assert saida.strip() == "2"
 
 
-def test_array_passado_por_valor_nao_e_mutado_no_chamador():
+def test_vetor_passado_por_valor_nao_e_mutado_no_chamador():
     saida = executar("""
         algoritmo "T"
         procedimento muda(v: inteiro[])
@@ -3890,7 +3890,7 @@ def test_array_passado_por_valor_nao_e_mutado_no_chamador():
     assert saida.strip() == "1"
 
 
-def test_array_passado_por_ref_muta_no_chamador():
+def test_vetor_passado_por_ref_muta_no_chamador():
     saida = executar("""
         algoritmo "T"
         procedimento muda(ref v: inteiro[])
@@ -3903,7 +3903,7 @@ def test_array_passado_por_ref_muta_no_chamador():
     assert saida.strip() == "99"
 
 
-def test_array_por_valor_com_tipo_de_elemento_errado_e_rejeitado():
+def test_vetor_por_valor_com_tipo_de_elemento_errado_e_rejeitado():
     with pytest.raises(ErroSemantico, match="tipo do elemento"):
         compilar("""
             algoritmo "T"
@@ -3915,7 +3915,7 @@ def test_array_por_valor_com_tipo_de_elemento_errado_e_rejeitado():
         """)
 
 
-def test_array_por_ref_com_tipo_de_elemento_errado_e_rejeitado():
+def test_vetor_por_ref_com_tipo_de_elemento_errado_e_rejeitado():
     with pytest.raises(ErroSemantico, match="tipo do elemento"):
         compilar("""
             algoritmo "T"
@@ -3927,7 +3927,7 @@ def test_array_por_ref_com_tipo_de_elemento_errado_e_rejeitado():
         """)
 
 
-def test_array_1d_passado_a_parametro_2d_e_rejeitado():
+def test_vetor_1d_passado_a_parametro_2d_e_rejeitado():
     with pytest.raises(ErroSemantico, match="dimens"):
         compilar("""
             algoritmo "T"
@@ -3939,7 +3939,7 @@ def test_array_1d_passado_a_parametro_2d_e_rejeitado():
         """)
 
 
-def test_escalar_passado_a_parametro_array_e_rejeitado():
+def test_escalar_passado_a_parametro_vetor_e_rejeitado():
     with pytest.raises(ErroSemantico, match="dimens"):
         compilar("""
             algoritmo "T"
@@ -3951,7 +3951,7 @@ def test_escalar_passado_a_parametro_array_e_rejeitado():
         """)
 
 
-def test_array_passado_a_parametro_escalar_e_rejeitado():
+def test_vetor_passado_a_parametro_escalar_e_rejeitado():
     with pytest.raises(ErroSemantico, match="dimens"):
         compilar("""
             algoritmo "T"
@@ -3963,7 +3963,7 @@ def test_array_passado_a_parametro_escalar_e_rejeitado():
         """)
 
 
-def test_literal_de_array_como_argumento_funciona():
+def test_literal_de_vetor_como_argumento_funciona():
     saida = executar("""
         algoritmo "T"
         procedimento f(v: inteiro[])
@@ -3974,7 +3974,7 @@ def test_literal_de_array_como_argumento_funciona():
     assert saida.strip() == "30"
 
 
-def test_mesmo_array_passado_duas_vezes_por_referencia_da_erro():
+def test_mesmo_vetor_passado_duas_vezes_por_referencia_da_erro():
     with pytest.raises(ErroSemantico, match="passado por referência mais do que uma vez"):
         compilar("""
             algoritmo "T"
@@ -3986,7 +3986,7 @@ def test_mesmo_array_passado_duas_vezes_por_referencia_da_erro():
         """)
 
 
-def test_funcao_pode_devolver_array():
+def test_funcao_pode_devolver_vetor():
     saida = executar("""
         algoritmo "T"
         funcao dobrar(v: inteiro[]): inteiro[]
@@ -4012,7 +4012,7 @@ def test_devolver_com_tipo_de_elemento_errado_e_rejeitado():
         """)
 
 
-def test_devolver_escalar_de_funcao_que_devolve_array_e_rejeitado():
+def test_devolver_escalar_de_funcao_que_devolve_vetor_e_rejeitado():
     with pytest.raises(ErroSemantico, match="dimens"):
         compilar("""
             algoritmo "T"
@@ -4023,7 +4023,7 @@ def test_devolver_escalar_de_funcao_que_devolve_array_e_rejeitado():
         """)
 
 
-def test_declaracao_a_partir_de_funcao_ref_que_devolve_array_com_dims_erradas_e_rejeitado():
+def test_declaracao_a_partir_de_funcao_ref_que_devolve_vetor_com_dims_erradas_e_rejeitado():
     with pytest.raises(ErroSemantico, match="dimens"):
         compilar("""
             algoritmo "T"
@@ -4036,10 +4036,10 @@ def test_declaracao_a_partir_de_funcao_ref_que_devolve_array_com_dims_erradas_e_
         """)
 
 
-def test_escrever_de_array_continua_rejeitado_regressao():
-    """Regressão: 'permitir_array' só é passado True nos dois sítios
+def test_escrever_de_vetor_continua_rejeitado_regressao():
+    """Regressão: 'permitir_vetor' só é passado True nos dois sítios
     legítimos (argumento de chamada, 'devolver') -- escrever() continua a
-    rejeitar um array nu como antes desta funcionalidade existir."""
+    rejeitar um vetor nu como antes desta funcionalidade existir."""
     with pytest.raises(ErroSemantico, match="falta indexá-lo"):
         compilar("""
             algoritmo "T"
@@ -4049,7 +4049,7 @@ def test_escrever_de_array_continua_rejeitado_regressao():
         """)
 
 
-def test_parametro_array_2d_indexado_no_corpo():
+def test_parametro_vetor_2d_indexado_no_corpo():
     saida = executar("""
         algoritmo "T"
         funcao soma(m: inteiro[][]): inteiro
@@ -4061,7 +4061,7 @@ def test_parametro_array_2d_indexado_no_corpo():
     assert saida.strip() == "5"
 
 
-def test_array_de_estruturas_por_valor_faz_deep_copy():
+def test_vetor_de_estruturas_por_valor_faz_deep_copy():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -4078,7 +4078,7 @@ def test_array_de_estruturas_por_valor_faz_deep_copy():
 
 # ---------- AUDITORIA.md secção 2 -- UX de erros/robustez ----------
 
-def test_constante_global_em_tamanho_de_array_campo_de_estrutura_da_mensagem_dedicada():
+def test_constante_global_em_tamanho_de_vetor_campo_de_estrutura_da_mensagem_dedicada():
     with pytest.raises(ErroSemantico, match="registadas antes do resto do programa"):
         compilar("""
             algoritmo "T"
@@ -4159,7 +4159,7 @@ def test_virgula_a_mais_em_chamada_da_mensagem_dedicada():
         """)
 
 
-def test_virgula_a_mais_em_literal_de_array_da_mensagem_dedicada():
+def test_virgula_a_mais_em_literal_de_vetor_da_mensagem_dedicada():
     with pytest.raises(ErroSintatico, match="vírgula a mais"):
         compilar("""
             algoritmo "T"
@@ -4286,10 +4286,10 @@ def test_devolver_literal_de_estrutura_coage_campo_decimal():
     assert saida.strip() == "5.0"
 
 
-def test_devolver_literal_de_array_decimal_coage_elementos():
+def test_devolver_literal_de_vetor_decimal_coage_elementos():
     """Antes desta correção, 'devolver {1,2,3}' já compilava (via o ramo
-    genérico de A.ArrayLiteral em _expr()), mas sem coerção de tipo --
-    um array 'decimal[]' devolvido assim ficava com inteiros crus."""
+    genérico de A.VetorLiteral em _expr()), mas sem coerção de tipo --
+    um vetor 'decimal[]' devolvido assim ficava com inteiros crus."""
     saida = executar("""
         algoritmo "T"
         funcao criar():decimal[]
@@ -4302,7 +4302,7 @@ def test_devolver_literal_de_array_decimal_coage_elementos():
 
 
 def test_devolver_literal_de_estrutura_com_dims_erradas_continua_rejeitado():
-    """Regressão: uma função que devolve um ARRAY de estruturas não pode
+    """Regressão: uma função que devolve um VETOR de estruturas não pode
     devolver diretamente um literal de estrutura escalar (dims erradas) --
     o gate 'dimensões antes de tipo' continua a aplicar-se aqui."""
     with pytest.raises(ErroSemantico, match="dimens"):
@@ -4649,23 +4649,23 @@ def test_sem_comparacao_de_igualdade_entre_booleano_e_outro_tipo():
 
 
 # ---------- Auditoria (4ª ronda), Etapa 4 -- semântica: estruturas,
-# arrays e matrizes N-d. Confirmado por grep antes de escrever (lição
+# vetores e matrizes N-d. Confirmado por grep antes de escrever (lição
 # da Etapa 2): a preocupação do plano "B8 só cobria 2 de ≥4 pontos de
 # propagação de tipo esperado para literais {...}" já não se aplica --
 # os 4 pontos de entrada (declaração, atribuição, argumento de chamada,
 # 'devolver') já têm teste para AMBOS os tipos de literal onde
-# sintaticamente possível (array/estrutura), incluindo o caso mais
-# específico "array de literais de estrutura"
-# (test_array_de_literais_de_estrutura, ~linha 3503) e tamanho literal
-# vs. declarado (test_array_com_literal_de_tamanho_diferente_do_
+# sintaticamente possível (vetor/estrutura), incluindo o caso mais
+# específico "vetor de literais de estrutura"
+# (test_vetor_de_literais_de_estrutura, ~linha 3503) e tamanho literal
+# vs. declarado (test_vetor_com_literal_de_tamanho_diferente_do_
 # declarado_da_erro, ~linha 3467). A única lacuna real confirmada:
-# nenhum teste ia além de 3 dimensões (`test_array_3d`/
-# `test_array_literal_3d`, ~linha 337 de test_novas_funcionalidades.py)
+# nenhum teste ia além de 3 dimensões (`test_vetor_3d`/
+# `test_vetor_literal_3d`, ~linha 337 de test_novas_funcionalidades.py)
 # -- nada no código impõe um limite de dimensões (confirmado por
 # leitura de semantics.py/codegen.py), mas a Etapa 4 do plano pedia
 # confirmação explícita de N>3. ----------
 
-def test_array_4d_indexacao_e_atribuicao():
+def test_vetor_4d_indexacao_e_atribuicao():
     saida = executar("""
         algoritmo "T"
         inicio
@@ -4677,7 +4677,7 @@ def test_array_4d_indexacao_e_atribuicao():
     assert saida.strip() == "111,222,0"
 
 
-def test_array_literal_4d():
+def test_vetor_literal_4d():
     saida = executar("""
         algoritmo "T"
         inicio
@@ -4740,7 +4740,7 @@ def test_incluir_funcao_duplicada_da_erro_em_processo(tmp_path, capsys):
     assert "colide" in capsys.readouterr().out
 
 
-def test_campo_de_estrutura_dentro_de_array_por_referencia_duas_vezes_nao_e_detetado():
+def test_campo_de_estrutura_dentro_de_vetor_por_referencia_duas_vezes_nao_e_detetado():
     # Limitação CONHECIDA e deliberada de _chave_ref_estatica
     # (semantics.py:1063-1072, comentário AL-04/AL-81/B9): um acesso com
     # ÍNDICE (ex.: 'pontos[0].x') nunca é comparável estaticamente,

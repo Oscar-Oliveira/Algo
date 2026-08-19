@@ -206,40 +206,40 @@ class Parser:
             # AL-16: '{...}' já não é tratado à parte aqui -- _parse_primario
             # reconhece-o em qualquer posição de expressão (incluindo este
             # valor inicial); se a FORMA não corresponder a 'tipo'/'dims'
-            # (ex.: '{...}' para inicializar algo que não é array nem
+            # (ex.: '{...}' para inicializar algo que não é vetor nem
             # estrutura), semantics.py é que dá o erro claro.
             inicial = self._parse_expr()
         self.esperar("NEWLINE")
         return [A.Declaracao(tipo, nome, dims, linha, inicial) for nome in nomes]
 
     def _parse_literal_chaveta(self):
-        """Um literal '{...}' -- array ('{v1, v2, ...}', possivelmente
-        aninhado para arrays multidimensionais) ou estrutura
+        """Um literal '{...}' -- vetor ('{v1, v2, ...}', possivelmente
+        aninhado para vetores multidimensionais) ou estrutura
         ('{campo: valor, ...}'), disambiguado pela forma do conteúdo
         logo a seguir a '{'. AL-16: usado tanto no valor inicial de uma
         declaração como em qualquer posição de expressão (ex.:
         argumento de uma chamada, via _parse_primario) -- a verificação
-        de que a FORMA (nº de dimensões do array / tipo dos campos)
+        de que a FORMA (nº de dimensões do vetor / tipo dos campos)
         corresponde ao que é esperado no contexto é feita inteiramente
         em semantics.py, não aqui; o parser só reconhece a sintaxe,
         sem precisar de saber de antemão quantas dimensões esperar."""
         if self._proximo_parece_campo_literal():
             return self._parse_estrutura_literal()
-        return self._parse_array_literal_generico()
+        return self._parse_vetor_literal_generico()
 
-    def _parse_array_literal_generico(self):
+    def _parse_vetor_literal_generico(self):
         linha = self.atual().linha
         self.esperar("LBRACE")
         elementos = []
         if not self.ver("RBRACE"):
             elementos = self._parse_lista_virgulas(self._parse_expr, "RBRACE")
         self.esperar("RBRACE")
-        return A.ArrayLiteral(elementos, linha)
+        return A.VetorLiteral(elementos, linha)
 
     def _proximo_parece_campo_literal(self):
         """Olha para os tokens a seguir a '{' (sem consumir) para decidir se
         parece um literal de estrutura ('{campo: valor, ...}' ou '{}') em
-        vez de uma lista de valores de array mal colocada."""
+        vez de uma lista de valores de vetor mal colocada."""
         prox1 = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
         prox2 = self.tokens[self.pos + 2] if self.pos + 2 < len(self.tokens) else None
         if prox1 is not None and prox1.tipo == "RBRACE":
@@ -332,7 +332,7 @@ class Parser:
         de _parse_primario ('expressão inesperada: RPAREN'), que não
         explica a causa real. Partilhado por todos os sítios do parser que
         constroem uma lista separada por vírgulas com esta mesma forma
-        (chamadas, literais de array, valores de 'caso'), para não haver a
+        (chamadas, literais de vetor, valores de 'caso'), para não haver a
         mesma verificação reimplementada em cada um deles. Não trata a
         lista vazia -- quem chama decide se '()'/'{}' vazio é aceite antes
         de invocar isto."""
@@ -348,7 +348,7 @@ class Parser:
 
     def _parse_dims_vazias(self):
         """Colchetes vazios '[]' (0, 1 ou mais pares), usados na sintaxe de
-        parâmetros e tipos de retorno do tipo array: aceita array de
+        parâmetros e tipos de retorno do tipo vetor: aceita vetor de
         qualquer tamanho, por isso -- ao contrário dos colchetes de uma
         declaração -- não há expressão de tamanho lá dentro."""
         dims = 0
@@ -356,8 +356,8 @@ class Parser:
             self.avancar()
             self.esperar(
                 "RBRACKET",
-                msg="um parâmetro ou tipo de retorno do tipo array usa colchetes "
-                    "vazios, ex: 'v:inteiro[]' (sem tamanho -- aceita um array de "
+                msg="um parâmetro ou tipo de retorno do tipo vetor usa colchetes "
+                    "vazios, ex: 'v:inteiro[]' (sem tamanho -- aceita um vetor de "
                     "qualquer tamanho)")
             dims += 1
         return dims
@@ -752,7 +752,7 @@ class Parser:
             self.esperar("RPAREN")
             return expr
         if tok.tipo == "LBRACE":
-            # AL-16: literal de array/estrutura como expressão geral, não
+            # AL-16: literal de vetor/estrutura como expressão geral, não
             # só como valor inicial de uma declaração (ex.: argumento de
             # uma chamada com um parâmetro do tipo certo).
             return self._parse_literal_chaveta()

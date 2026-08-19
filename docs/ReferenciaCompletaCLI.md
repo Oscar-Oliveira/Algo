@@ -246,19 +246,19 @@ tabs.
 ```
 idade:inteiro                  // declaração, valor por omissão (0)
 nome:cadeia = "Rita"           // declaração com valor inicial
-notas:decimal[30]              // array (1 dimensão)
+notas:decimal[30]              // vetor (1 dimensão)
 tabuleiro:inteiro[8][8]        // matriz (2 dimensões, índices começam em 0)
 cubo:inteiro[3][3][3]          // 3 dimensões -- ou mais, se precisares
 
 idade = 20                     // atribuição usa '='
 ```
 
-> Os índices de um array vão de `0` a `tamanho - 1`, tal como em Python,
-> Java, C# e na generalidade das linguagens de programação — um array
+> Os índices de um vetor vão de `0` a `tamanho - 1`, tal como em Python,
+> Java, C# e na generalidade das linguagens de programação — um vetor
 > `inteiro[5]` tem posições válidas `v[0]` a `v[4]`. Um ciclo típico para
-> percorrer um array é `para i de 0 ate tamanho - 1 fazer`.
+> percorrer um vetor é `para i de 0 ate tamanho - 1 fazer`.
 
-Um array também pode ser inicializado com uma lista de valores entre
+Um vetor também pode ser inicializado com uma lista de valores entre
 `{ }`, com o mesmo número de níveis de aninhamento que dimensões:
 
 ```
@@ -271,7 +271,7 @@ cubo:inteiro[2][2][2] = {{{1,2},{3,4}}, {{5,6},{7,8}}}
 
 `constante` declara um valor que não pode ser alterado depois — nem por
 atribuição, nem por `ler()`, nem passado por `ref`. Tem sempre de ter um
-valor inicial, e não pode ser um array. Pode ser global (fora de qualquer
+valor inicial, e não pode ser um vetor. Pode ser global (fora de qualquer
 função) ou local a uma função:
 
 ```
@@ -447,7 +447,7 @@ inicio
 | `cadeia.minusculas(s)` | converte para minúsculas |
 | `cadeia.inverter(s)` | inverte a cadeia |
 | `cadeia.subcadeia(s, ini, fim)` | sub-cadeia entre índices (0-baseado; `fim` exclusivo, tal como as fatias do Python) |
-| `cadeia.caracter(s, i)` | o caracter na posição `i` (0-baseado, tal como os arrays) |
+| `cadeia.caracter(s, i)` | o caracter na posição `i` (0-baseado, tal como os vetores) |
 
 **Conversao** (`importar Conversao`) — converte entre os 5 tipos primitivos:
 
@@ -534,16 +534,16 @@ programa continua normalmente. A mensagem (depois da vírgula) é opcional.
 ## Erros de execução
 
 Alguns erros só podem ser detetados quando o programa está a correr (não
-na compilação) — por exemplo aceder a uma posição de array que não
+na compilação) — por exemplo aceder a uma posição de vetor que não
 existe, ou dividir por zero. Nesses casos, o compilador ALGO mostra uma
 mensagem em português em vez do traceback do Python:
 
 ```
-Erro em tempo de execução: tentaste aceder a uma posição de array que
+Erro em tempo de execução: tentaste aceder a uma posição de vetor que
 não existe (índice fora dos limites).
 ```
 
-São reconhecidos assim: índice de texto ou de array fora dos limites,
+São reconhecidos assim: índice de texto ou de vetor fora dos limites,
 divisão por zero, overflow numérico, recursão infinita (função que
 nunca chega ao caso base), aceder a um campo de um valor nulo, e
 valores fora do domínio válido de uma operação (ex.: raiz quadrada de
@@ -577,7 +577,7 @@ inicio
     p1.y = 4
     deslocar(p1, 10, 20)
 
-    pontos:Ponto[10]      // array de estruturas: cada posição é independente
+    pontos:Ponto[10]      // vetor de estruturas: cada posição é independente
     pontos[0].x = 100
 ```
 
@@ -589,7 +589,7 @@ p1:Ponto = {x: 3, y: 4}
 p2:Ponto = {x: 10}          // y fica 0 (valor por omissão de inteiro)
 ```
 
-> Nota: em Python (o alvo principal), tal como os arrays, uma estrutura
+> Nota: em Python (o alvo principal), tal como os vetores, uma estrutura
 > passada por valor a uma função partilha os mesmos dados do original —
 > só `ref` garante que as alterações se propagam de volta de forma
 > explícita e visível no código. Evita alterar campos de um parâmetro que
@@ -668,7 +668,7 @@ compilação — por isso são avisos, não erros:
 
 Há uma suite de testes (pytest) na pasta `algo_lang/tests/`, com 792 testes
 cobrindo a linguagem base, `estrutura` (incluindo literais), `constante`,
-comentários de bloco, literais de array (com N dimensões), `afirmar`,
+comentários de bloco, literais de vetor (com N dimensões), `afirmar`,
 erros de execução amigáveis, o modo `--debug`, o linter e fluxogramas.
 
 ```bash
@@ -692,19 +692,19 @@ com o número da linha:
 
 Também deteta: condições não booleanas, limites de `para` não inteiros,
 chamadas com argumentos errados, funções sem `devolver`, índices de
-array não inteiros, bibliotecas não importadas, e variáveis não
+vetor não inteiros, bibliotecas não importadas, e variáveis não
 declaradas.
 
 ## Exemplos incluídos
 
 Na pasta `exemplos/` (na raiz do projeto, ao lado de `algo_lang/`):
-- `soma.algo` — declarações inline, array, ciclo `para`
+- `soma.algo` — declarações inline, vetor, ciclo `para`
 - `troca.algo` — `ref` em procedimentos e em funções
 - `matriz_escolha.algo` — matriz 2D, `escolher/caso`, `enquanto`, `fazer...enquanto`, variável global
 - `leitura.algo` — `ler()`, `caracter`, concatenação com `+`
-- `estruturas.algo` — `estrutura`, aninhamento, `ref` com estruturas, array de estruturas
-- `novas_funcionalidades.algo` — `constante`, comentários de bloco, literais de array, `afirmar`
-- `avancado.algo` — literais de estrutura `{campo: valor}`, arrays de 3 dimensões
+- `estruturas.algo` — `estrutura`, aninhamento, `ref` com estruturas, vetor de estruturas
+- `novas_funcionalidades.algo` — `constante`, comentários de bloco, literais de vetor, `afirmar`
+- `avancado.algo` — literais de estrutura `{campo: valor}`, vetores de 3 dimensões
 - `bibliotecas_demo.algo` + `geometria.algo` — `importar` e `incluir`
 
 ```bash

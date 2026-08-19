@@ -266,7 +266,7 @@ def test_comparacao_diferente_variavel_consigo_mesma():
     assert any("sempre falsa" in a.mensagem for a in avisos)
 
 
-def test_comparacao_de_elementos_diferentes_de_array_nao_e_assinalada():
+def test_comparacao_de_elementos_diferentes_de_vetor_nao_e_assinalada():
     avisos = _avisos("""
         algoritmo "T"
         inicio

@@ -107,7 +107,7 @@ def test_trace_estrutura_serializa_como_objeto(tmp_path):
     assert ultimo["pilha"][0]["variaveis"]["p"] == {"x": 3, "y": 4}
 
 
-def test_trace_array_serializa_como_lista(tmp_path):
+def test_trace_vetor_serializa_como_lista(tmp_path):
     resultado = _trace("""
         algoritmo "T"
         inicio
@@ -334,7 +334,7 @@ def test_cli_debug_mostra_trace_na_consola(tmp_path):
     assert not (tmp_path / "prog" / "prog_trace.json").exists()  # --debug sozinho não gera json
 
 
-def test_debug_formata_arrays_e_estruturas_e_intercala_saida_real(tmp_path):
+def test_debug_formata_vetores_e_estruturas_e_intercala_saida_real(tmp_path):
     """Fecha os últimos pontos de cobertura de formatar_consola_com_debug:
     _fmt_debug com uma lista e com um dicionário (estrutura), e o texto
     real produzido por escrever() intercalado entre as anotações de

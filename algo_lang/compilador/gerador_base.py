@@ -80,7 +80,7 @@ class GeradorCodigoBase:
         próprio tipo, ad infinitum) -- por isso os SEUS campos desse
         tipo têm de ficar 'None' (nulo) em vez de construídos eagerly;
         ver o uso em _gerar_estrutura (codegen.py / codegen_minimo.py).
-        Percorre só campos escalares (dims_n == 0); um campo array
+        Percorre só campos escalares (dims_n == 0); um campo vetor
         nunca recursa porque começa vazio (o elemento nunca chega a ser
         construído em compilação nem em runtime)."""
         grafo = {
@@ -163,10 +163,10 @@ class GeradorCodigoBase:
             # rebentar o compilador mesmo depois de o caso simples ser
             # tratado.
             expr = self._expr_estrutura_literal(stmt.expr, tipo_alvo, tipos)
-        elif isinstance(stmt.expr, A.ArrayLiteral):
-            # Mesma lacuna, lado array -- 'v = {{nome: "Ana"}}' com 'v' já
-            # declarado como array de estruturas.
-            expr = self._expr_array_literal(stmt.expr, tipo_alvo, tipos)
+        elif isinstance(stmt.expr, A.VetorLiteral):
+            # Mesma lacuna, lado vetor -- 'v = {{nome: "Ana"}}' com 'v' já
+            # declarado como vetor de estruturas.
+            expr = self._expr_vetor_literal(stmt.expr, tipo_alvo, tipos)
         else:
             expr = self._coagir_decimal(self._expr(stmt.expr, tipos), tipo_alvo, stmt.expr)
         self.emit(f"{alvo} = {expr}", nivel)

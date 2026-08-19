@@ -43,7 +43,7 @@ FUNCOES = {
     ),
     "caracter": (
         ["cadeia", "inteiro"], "caracter",
-        # 0-baseado, tal como os arrays e tal como 'subcadeia' (abaixo).
+        # 0-baseado, tal como os vetores e tal como 'subcadeia' (abaixo).
         # AL-64/B24: antes, um índice negativo não dava IndexError nenhum
         # -- s[-1] do Python devolve o último caracter em vez de levantar
         # erro, ao contrário de 'subcadeia', que já rejeita limites
