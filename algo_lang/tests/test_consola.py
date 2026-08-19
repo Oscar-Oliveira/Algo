@@ -359,3 +359,19 @@ def test_consola_interrogacao_nao_e_atalho_de_ajuda():
     assert resultado.returncode == 0
     assert "atalho: e" not in resultado.stdout
     assert "escreve 'ajuda'" in resultado.stdout
+
+
+# ---------- Auditoria (4ª ronda), Etapa 8 -- aplicação de consola.
+# Lacuna prevista pelo plano: nome de ficheiro com Unicode/acentuação
+# nunca tinha teste dedicado (confirmado por grep antes de escrever,
+# nenhum ficheiro do repositório usava um nome de ficheiro acentuado
+# em nenhum teste). Confirmado por execução direta antes de escrever o
+# teste: já funciona corretamente (nenhum bug encontrado). ----------
+
+def test_consola_executa_ficheiro_com_nome_acentuado(tmp_path):
+    algo_path = tmp_path / "cálculo_média.algo"
+    algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
+    resultado = _correr_consola(f"executa {algo_path}\nsair\n")
+    assert resultado.returncode == 0
+    assert "ok" in resultado.stdout
+    assert (tmp_path / "cálculo_média" / "cálculo_média.py").exists()

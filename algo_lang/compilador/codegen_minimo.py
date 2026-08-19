@@ -173,8 +173,55 @@ class GeradorCodigo(GeradorCodigoBase):
         self._linha_algo_atual = None
         self.linhas.append("")
 
+    # -------- literais {...} com tipo conhecido pelo contexto --------
+    def _expr_estrutura_literal(self, lit: A.EstruturaLiteral, tipo_nome, tipos) -> str:
+        """Achado da Etapa 6 da 4ª auditoria: ao contrário de codegen.py
+        (que tem este par de métodos desde AL-78/B8), codegen_minimo.py
+        nunca teve equivalente -- cada sítio que conhece o tipo esperado
+        de um literal '{...}' (declaração, atribuição, argumento,
+        'devolver') construía os kwargs chamando _expr() genericamente em
+        cada campo, que não tem NENHUM ramo para A.EstruturaLiteral (só
+        faz sentido com o tipo do campo, não disponível ali) -- por isso
+        um literal aninhado (struct-em-struct) ou um literal de estrutura
+        como elemento de array ou argumento de chamada fazia o PRÓPRIO
+        COMPILADOR rebentar com ErroInternoCompilador, nalguns dos 4
+        sítios até para o caso mais simples, não só aninhado (ver
+        AUDITORIA_PROGRESSO.md, achado da Etapa 6). Recursivo, tal como
+        o equivalente em codegen.py -- mas sem _coagir_decimal: --minimo
+        não coage tipos em nenhum outro sítio (salta verificar() de
+        propósito), por isso não introduzir aqui a única exceção."""
+        partes = []
+        campos_decl = self.estruturas.get(tipo_nome, {})
+        for nome, valor in lit.campos:
+            tipo_campo = campos_decl.get(nome, ("", 0))[0]
+            if isinstance(valor, A.EstruturaLiteral):
+                expr_py = self._expr_estrutura_literal(valor, tipo_campo, tipos)
+            elif isinstance(valor, A.ArrayLiteral):
+                expr_py = self._expr_array_literal(valor, tipo_campo, tipos)
+            else:
+                expr_py = self._expr(valor, tipos)
+            partes.append(f"{nome}={expr_py}")
+        return f"{tipo_nome}({', '.join(partes)})"
+
+    def _expr_array_literal(self, lit: A.ArrayLiteral, tipo_elemento, tipos) -> str:
+        """Par de _expr_estrutura_literal, acima -- mesma lacuna (array de
+        literais de estrutura, ou array aninhado com um literal de
+        estrutura algures lá dentro, rebentava o compilador)."""
+        partes = []
+        for elem in lit.elementos:
+            if isinstance(elem, A.ArrayLiteral):
+                partes.append(self._expr_array_literal(elem, tipo_elemento, tipos))
+            elif isinstance(elem, A.EstruturaLiteral):
+                partes.append(self._expr_estrutura_literal(elem, tipo_elemento, tipos))
+            else:
+                partes.append(self._expr(elem, tipos))
+        return f"[{', '.join(partes)}]"
+
     # -------- declarações --------
     def _gerar_declaracao(self, d: A.Declaracao, nivel, tipos):
+        if d.inicial is not None and isinstance(d.inicial, A.ArrayLiteral):
+            self.emit(f"{d.nome} = {self._expr_array_literal(d.inicial, d.tipo, tipos)}", nivel)
+            return
         if d.inicial is not None and isinstance(d.inicial, A.EstruturaLiteral):
             if d.dims is not None:
                 # AL-45/B5: '{}' vazio inicializando um array -- mesma
@@ -182,9 +229,7 @@ class GeradorCodigo(GeradorCodigoBase):
                 # modo normal num programa ALGO válido.
                 self.emit(f"{d.nome} = []", nivel)
                 return
-            kwargs = ", ".join(
-                f"{nome}={self._expr(valor, tipos)}" for nome, valor in d.inicial.campos)
-            self.emit(f"{d.nome} = {d.tipo}({kwargs})", nivel)
+            self.emit(f"{d.nome} = {self._expr_estrutura_literal(d.inicial, d.tipo, tipos)}", nivel)
             return
         if d.inicial is not None and isinstance(d.inicial, A.Chamada):
             f_def = self._encontrar_funcao(d.inicial.nome)
@@ -260,9 +305,13 @@ class GeradorCodigo(GeradorCodigoBase):
                 # em programas --minimo válidos que devolvem um literal de
                 # estrutura diretamente, já que _expr() não tem ramo nenhum
                 # para A.EstruturaLiteral.
-                kwargs = ", ".join(
-                    f"{nome}={self._expr(valor, tipos)}" for nome, valor in stmt.expr.campos)
-                valor = f"{self.tipo_retorno_atual}({kwargs})"
+                valor = self._expr_estrutura_literal(stmt.expr, self.tipo_retorno_atual, tipos)
+            elif isinstance(stmt.expr, A.ArrayLiteral):
+                # Mesma ideia para um array devolvido diretamente cujos
+                # elementos são eles próprios literais de estrutura (ex.:
+                # 'devolver {{nome: "Ana"}}') -- _expr() genérico também
+                # não sabia lidar com isto.
+                valor = self._expr_array_literal(stmt.expr, self.tipo_retorno_atual, tipos)
             else:
                 valor = self._expr(stmt.expr, tipos)
             if self.refs_atuais:
@@ -384,7 +433,27 @@ class GeradorCodigo(GeradorCodigoBase):
             if expr.op == "-":
                 return f"(-{self._expr(expr.operando, tipos)})"
         if isinstance(expr, A.Chamada):
-            args = [self._expr(a, tipos) for a in expr.args]
+            # AL-16/Etapa 6 da 4ª auditoria: um argumento pode ser um
+            # literal '{...}' -- precisa do tipo do PARÂMETRO
+            # correspondente (o literal não sabe o seu próprio tipo).
+            # Nenhuma função de BIBLIOTECA_MINIMA aceita struct/array, por
+            # isso só funções/procedimentos do próprio programa (sem '.'
+            # no nome) têm parâmetros para consultar aqui; f_def é None
+            # para chamadas de biblioteca, e param fica sempre None nesse
+            # caso, caindo no ramo genérico de sempre. Antes desta
+            # correção, um literal de estrutura como argumento (mesmo sem
+            # nenhum aninhamento) rebentava o compilador -- não havia
+            # ramo nenhum para A.EstruturaLiteral/A.ArrayLiteral aqui.
+            f_def = self._encontrar_funcao(expr.nome)
+            args = []
+            for i, a in enumerate(expr.args):
+                param = f_def.parametros[i] if f_def is not None and i < len(f_def.parametros) else None
+                if isinstance(a, A.EstruturaLiteral) and param is not None:
+                    args.append(self._expr_estrutura_literal(a, param.tipo, tipos))
+                elif isinstance(a, A.ArrayLiteral) and param is not None:
+                    args.append(self._expr_array_literal(a, param.tipo, tipos))
+                else:
+                    args.append(self._expr(a, tipos))
             if expr.nome in BIBLIOTECA_MINIMA:
                 construtor, _modulo = BIBLIOTECA_MINIMA[expr.nome]
                 return construtor(args)

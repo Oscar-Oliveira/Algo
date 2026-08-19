@@ -7,11 +7,17 @@ docker compose up -d --build
 
 ---
 
+- logo consola
+- tirar
+    --min
+    - compila
+    - add verifica em vez de lint
+
 Documentacao -> em readme...
 - compilador
     - instalação,
 - liguagem online + readme
-linter
+- linter improve
 
 
 online
@@ -19,9 +25,14 @@ online
 - deixar estudande visivel
 - grupos
 - exemplos no manual em anexo
-- visualizador so no online.
+- visualizador so no online. + link
 - report error
+- trace de pois de executar doawload?
+
 - increase decrease font
+- theme
+
+- admin atica deeactiva alguem
 
 update -> db
 

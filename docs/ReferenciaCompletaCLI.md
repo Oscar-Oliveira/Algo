@@ -544,8 +544,11 @@ Erro em tempo de execução: tentaste aceder a uma posição de array que
 não existe (índice fora dos limites).
 ```
 
-São reconhecidos assim: índice de array fora dos limites, divisão por
-zero, e recursão infinita (função que nunca chega ao caso base).
+São reconhecidos assim: índice de texto ou de array fora dos limites,
+divisão por zero, overflow numérico, recursão infinita (função que
+nunca chega ao caso base), aceder a um campo de um valor nulo, e
+valores fora do domínio válido de uma operação (ex.: raiz quadrada de
+um número negativo, ou converter um texto inválido para número).
 
 ## Estruturas (registos)
 
@@ -656,7 +659,7 @@ compilação — por isso são avisos, não erros:
 
 ## Testes automatizados
 
-Há uma suite de testes (pytest) na pasta `algo_lang/tests/`, com 334 testes
+Há uma suite de testes (pytest) na pasta `algo_lang/tests/`, com 792 testes
 cobrindo a linguagem base, `estrutura` (incluindo literais), `constante`,
 comentários de bloco, literais de array (com N dimensões), `afirmar`,
 erros de execução amigáveis, o modo `--debug`, o linter e fluxogramas.

@@ -11,7 +11,7 @@ import pytest
 from apoio import compilar, executar
 from algo_lang.compilador.parser import parse, ErroSintatico
 from algo_lang.compilador.semantics import verificar, ErroSemantico
-from algo_lang.compilador.lexer import ErroLexico
+from algo_lang.compilador.lexer import ErroLexico, tokenizar
 from algo_lang.compilador.ast_nodes import coletar_identificadores
 
 
@@ -4009,6 +4009,85 @@ def test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer():
         f"-- adiciona-a(s) a algo.tmLanguage.json (ver B27 na auditoria)")
 
 
+# ---------- Auditoria (4ª ronda), Etapa 10 -- extensão VS Code. A
+# suite ad-hoc Node/JS referida pela 3ª auditoria NÃO está neste
+# repositório (confirmado: só package.json, language-configuration.json,
+# syntaxes/algo.tmLanguage.json, README.md em editors/vscode-algo/,
+# nenhum ficheiro de teste). O teste de paridade lexer↔gramática
+# (acima, test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer)
+# já satisfaz o pedido do plano de um "teste de paridade lexer↔gramática
+# automatizado" -- não escrito de novo. O que faltava mesmo: nenhum
+# teste exercitava os PADRÕES regex em si (só a lista de palavras-chave
+# nos comentários) -- 'library-calls' (campo vs. chamada de biblioteca,
+# o requisito central desta etapa) e 'declarations' (o lookahead
+# negativo referido no comentário da própria gramática, nunca testado)
+# nunca tiveram o seu COMPORTAMENTO confirmado, só a intenção
+# documentada em comentário. Sintaxe Oniguruma (TextMate) e o módulo
+# 're' do Python coincidem nas construções usadas aqui (\\b, lookahead
+# positivo/negativo, classes de caracteres) -- corrido diretamente com
+# 're', sem precisar de um motor Oniguruma real. ----------
+
+def _padrao_grammar(nome_regra):
+    import json
+    caminho_grammar = os.path.join(
+        os.path.dirname(__file__), "..", "editors", "vscode-algo",
+        "syntaxes", "algo.tmLanguage.json")
+    with open(caminho_grammar, "r", encoding="utf-8") as f:
+        grammar = json.load(f)
+    return grammar["repository"][nome_regra]["match"]
+
+
+def test_vscode_grammar_library_calls_reconhece_chamada_de_biblioteca():
+    import re
+    padrao = _padrao_grammar("library-calls")
+    m = re.search(padrao, "escrever(matematica.raiz(4.0))")
+    assert m is not None
+    assert m.groups() == ("matematica", ".", "raiz")
+
+
+def test_vscode_grammar_library_calls_aceita_espaco_antes_do_parentese():
+    import re
+    padrao = _padrao_grammar("library-calls")
+    assert re.search(padrao, "matematica.raiz (4.0)") is not None
+
+
+def test_vscode_grammar_library_calls_nao_confunde_campo_de_estrutura_com_chamada():
+    """O requisito central da Etapa 10: 'no.valor' (acesso a campo, sem
+    parêntesis a seguir) não pode disparar a mesma regra de highlighting
+    que 'biblioteca.metodo(' -- são construções sintaticamente distintas
+    no parser real (A.LValue vs A.Chamada, ver test_consistencia_
+    ferramentas.py), e a gramática (que não tem parser, só regex) tem de
+    replicar essa distinção só pela presença/ausência do '('."""
+    import re
+    padrao = _padrao_grammar("library-calls")
+    assert re.search(padrao, "escrever(no.valor)") is None
+    assert re.search(padrao, "no.valor = 5") is None
+    assert re.search(padrao, "n.seguinte.valor") is None
+
+
+def test_vscode_grammar_declarations_reconhece_declaracao_de_tipo():
+    import re
+    padrao = _padrao_grammar("declarations")
+    m = re.search(padrao, "x:inteiro")
+    assert m.groups() == ("x", ":", "inteiro")
+    m2 = re.search(padrao, "p:Ponto")
+    assert m2.groups() == ("p", ":", "Ponto")
+
+
+def test_vscode_grammar_declarations_ignora_campo_de_literal_de_estrutura_com_valor_reservado():
+    """Comentário da própria gramática (B29 da 3ª auditoria): o
+    lookahead negativo evita que '{ativo: verdadeiro}' (um CAMPO de
+    literal de estrutura com valor booleano/nulo) seja mal interpretado
+    como 'nome:tipo' (uma declaração), já que 'verdadeiro' não é um tipo
+    válido -- nunca tinha sido confirmado que o lookahead reconhece
+    mesmo os 3 valores (verdadeiro/falso/nulo), só o comentário
+    afirmava."""
+    import re
+    padrao = _padrao_grammar("declarations")
+    for campo in ("{ativo: verdadeiro}", "{ativo: falso}", "{proximo: nulo}"):
+        assert re.search(padrao, campo) is None, campo
+
+
 # ---------- Arrays como parâmetros e valores de retorno (AUDITORIA.md secção 3) ----------
 
 def test_parametro_array_1d_parseia_dims_correto():
@@ -4823,3 +4902,468 @@ def test_minimo_potencia_com_expoente_fracionario_nao_negativo_continua_protegid
         [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
     assert resultado.returncode != 0
     assert "complex" in resultado.stderr
+
+
+# ---------- Auditoria (4ª ronda), Etapa 1 -- análise léxica: lacunas
+# identificadas na matriz de rastreabilidade (AUDITORIA_MATRIZ_RASTREABILIDADE.md
+# secção 1): nenhum teste enumerava as 33 palavras-chave uma a uma, nem
+# confirmava acentuação portuguesa em identificadores, nem a
+# desambiguação de símbolos que são prefixo uns dos outros (=/==,
+# </<=/<>, >/>=) ao nível do lexer. ----------
+
+PALAVRAS_CHAVE_ESPERADAS = {
+    "algoritmo", "inicio", "estrutura",
+    "escrever", "ler",
+    "se", "entao", "senao",
+    "para", "de", "ate", "passo", "fazer",
+    "enquanto",
+    "escolher", "caso", "contrario",
+    "funcao", "procedimento", "devolver", "ref",
+    "importar", "incluir",
+    "verdadeiro", "falso", "nulo",
+    "e", "ou", "nao",
+    "div", "mod",
+    "constante", "afirmar",
+}
+
+
+def test_lexer_conjunto_de_palavras_chave_tem_exatamente_33():
+    from algo_lang.compilador.lexer import PALAVRAS_CHAVE
+    # Se este teste falhar por o conjunto real ter mudado, a matriz de
+    # rastreabilidade (secção 1) e este PALAVRAS_CHAVE_ESPERADAS têm de
+    # ser atualizados a par -- não é só um número mágico.
+    assert PALAVRAS_CHAVE == PALAVRAS_CHAVE_ESPERADAS
+    assert len(PALAVRAS_CHAVE) == 33
+
+
+@pytest.mark.parametrize("palavra", sorted(PALAVRAS_CHAVE_ESPERADAS))
+def test_lexer_cada_palavra_chave_produz_token_dedicado(palavra):
+    # Cada palavra-chave, sozinha numa linha, tem de produzir um único
+    # token cujo tipo é a própria palavra em maiúsculas -- nunca "ID"
+    # (o que aconteceria se a palavra caísse fora de PALAVRAS_CHAVE por
+    # engano, ex. erro de dedo ao editar o conjunto).
+    tokens = tokenizar(palavra)
+    tipos = [t.tipo for t in tokens if t.tipo not in ("NEWLINE", "EOF")]
+    assert tipos == [palavra.upper()]
+    assert tokens[0].valor == palavra
+
+
+def test_lexer_identificador_parecido_com_palavra_chave_nao_e_confundido():
+    # "de" e "devolver" são ambos palavras-chave distintas: o lexer lê o
+    # identificador completo (isalnum/'_') antes de comparar com
+    # PALAVRAS_CHAVE, por isso não há correspondência por prefixo.
+    # "paragem" (contém "para" como prefixo mas não é palavra-chave) tem
+    # de ficar ID.
+    tokens = [t for t in tokenizar("paragem") if t.tipo not in ("NEWLINE", "EOF")]
+    assert [t.tipo for t in tokens] == ["ID"]
+    assert tokens[0].valor == "paragem"
+
+
+def test_lexer_identificador_com_acentuacao_portuguesa_e_reconhecido():
+    tokens = [t for t in tokenizar("número") if t.tipo not in ("NEWLINE", "EOF")]
+    assert [t.tipo for t in tokens] == ["ID"]
+    assert tokens[0].valor == "número"
+
+
+def test_lexer_programa_com_identificador_acentuado_compila_e_executa():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            número:inteiro = 42
+            escrever(número)
+    """)
+    assert saida.strip() == "42"
+
+
+def test_lexer_string_com_acentuacao_portuguesa_preserva_carateres():
+    tokens = tokenizar('"maçã, café, ação"')
+    strings = [t for t in tokens if t.tipo == "STRING"]
+    assert strings[0].valor == "maçã, café, ação"
+
+
+@pytest.mark.parametrize("origem,tipo_esperado", [
+    ("=", "ATRIB"),
+    ("==", "IGUAL"),
+    ("<", "MENOR"),
+    ("<=", "LE"),
+    ("<>", "DIFERENTE"),
+    (">", "MAIOR"),
+    (">=", "GE"),
+])
+def test_lexer_simbolos_prefixo_de_outros_nao_se_confundem(origem, tipo_esperado):
+    # '=' é prefixo de '==', '<' é prefixo de '<=' e '<>', '>' é prefixo
+    # de '>=' -- SIMBOLOS_MULTI tem de ser verificado antes de
+    # SIMBOLOS_SINGLE para cada um destes produzir o token correto.
+    tokens = [t for t in tokenizar(origem) if t.tipo not in ("NEWLINE", "EOF")]
+    assert [t.tipo for t in tokens] == [tipo_esperado]
+
+
+def test_lexer_menor_seguido_de_maior_sem_espaco_nao_vira_diferente():
+    # "a<b" onde o que se segue a '<' não é '=' nem '>' continua a
+    # produzir MENOR isolado -- só "<>" junto e sem espaço é DIFERENTE.
+    tokens = [t.tipo for t in tokenizar("a<b") if t.tipo not in ("NEWLINE", "EOF")]
+    assert tokens == ["ID", "MENOR", "ID"]
+
+
+# ---------- Auditoria (4ª ronda), Etapa 2 -- análise sintática. A matriz
+# de rastreabilidade (secção 2) previa como lacuna "auditoria exaustiva
+# de todo ponto de recursão descendente (nao/-/^ mencionados em B5)" --
+# **essa previsão estava errada**: test_cadeia_de_nao_muito_funda_...,
+# test_cadeia_de_menos_unario_muito_funda_... e
+# test_cadeia_de_potencia_muito_funda_... (linhas ~3433-3448, achados só
+# agora ao escrever testes que se revelaram duplicados) já cobrem os 3
+# pontos de recursão em falta, tal como test_blocos_aninhados_a_mais_...
+# (linha ~2755) já cobre LIMITE_PROFUNDIDADE_BLOCO. O que essas versões
+# "muito funda" NÃO cobriam é o lado oposto -- confirmar que uma cadeia
+# moderada e legítima não dispara o limite em falso positivo (o mesmo
+# padrão que já existe para parênteses,
+# test_expressao_moderadamente_aninhada_continua_a_funcionar, e para
+# blocos, test_blocos_aninhados_dentro_do_limite_continuam_a_compilar,
+# mas faltava para 'nao'/'-'/'^'). Também confirma 'ler()' sem
+# argumentos (mencionado no plano como sem teste dedicado, ao contrário
+# de 'escrever()' que já tinha um -- este, ao contrário dos anteriores,
+# era mesmo uma lacuna real). ----------
+
+def test_cadeia_de_nao_moderada_continua_a_funcionar():
+    # 5 'nao' encadeados (ímpar) invertem verdadeiro -> falso.
+    saida = executar('algoritmo "T"\ninicio\n    escrever(' + "nao " * 5 + "verdadeiro)\n")
+    assert saida.strip() == "falso"
+
+
+def test_cadeia_de_menos_unario_moderada_continua_a_funcionar():
+    # 5 '-' encadeados (ímpar) mantêm o valor negativo.
+    saida = executar('algoritmo "T"\ninicio\n    escrever(' + "-" * 5 + "1)\n")
+    assert saida.strip() == "-1"
+
+
+def test_cadeia_de_potencia_moderada_continua_a_funcionar():
+    # 2^(2^2) = 2^4 = 16 (right-associative). O expoente do '^' exterior
+    # não é um literal (é a sub-expressão '2^2'), por isso
+    # _expoente_estaticamente_nao_negativo (semantics.py) não o
+    # consegue provar não-negativo em compilação e tipa a expressão
+    # inteira como 'decimal' -- consistente com '--minimo', que já
+    # aplicava a mesma regra (só salta o float(...) quando o expoente é
+    # um literal inteiro não-negativo, ver codegen_minimo.py) e sempre
+    # produziu 16.0 aqui. Corrigido na Etapa 12 da 4ª auditoria (achado
+    # da segunda passagem independente): o modo normal produzia "16"
+    # (int), divergindo de '--minimo' e do próprio tipo 'decimal' que
+    # semantics.py atribui a esta expressão -- ver _algo_pot em
+    # codegen.py.
+    saida = executar('algoritmo "T"\ninicio\n    escrever(2^2^2)\n')
+    assert saida.strip() == "16.0"
+
+
+def test_ler_sem_argumentos_e_erro_sintatico_nao_traceback_cru():
+    # Ao contrário de 'escrever()', 'ler()' não tem uma verificação
+    # dedicada -- mas tem de continuar a dar um ErroSintatico claro
+    # (via _parse_lvalue -> esperar("ID")), nunca um traceback Python
+    # cru ou um IndexError por ler além do fim dos tokens.
+    with pytest.raises(ErroSintatico):
+        compilar('algoritmo "T"\ninicio\n    x:inteiro\n    ler()\n')
+
+
+# ---------- Auditoria (4ª ronda), Etapa 3 -- semântica: tipos/
+# declarações/âmbito/constantes. `semantics.py` já tem cobertura
+# negativa extensa (~50 testes `test_sem_*` em `test_correcoes_
+# auditoria.py`, um por operador que rejeita um par de tipos errado --
+# confirmado por grep antes de escrever nada aqui, lição da Etapa 2).
+# O que não existia era o LADO POSITIVO como tabela única: cada
+# operador × par de tipos válido, com o TIPO DE RESULTADO inferido
+# confirmado (não só "não dá erro"). Isto é literalmente o "Critério de
+# sucesso" da Etapa 2 do plano ("toda célula da matriz tem resultado
+# documentado e testado") -- constrói-se aqui como uma única tabela
+# parametrizada, fonte única de verdade, em vez de espalhada por
+# dezenas de testes ad-hoc como os `test_sem_*` (que só cobrem o lado
+# "erro"). Regras extraídas de `semantics.py::_tipo_binop`/`_compativel`/
+# `_tipos_comparaveis` -- não são novas invenções, só a primeira vez
+# que ficam como tabela testável. ----------
+
+@pytest.mark.parametrize("expr,saida_esperada", [
+    # '+': numéricos somam (decimal contamina); texto concatena (cadeia
+    # contamina -- caracter+caracter também larga para cadeia, não fica
+    # caracter, porque '+' devolve sempre "cadeia" para o par TEXTUAIS).
+    ("2 + 3", "5"),
+    ("2 + 3.5", "5.5"),
+    ("3.5 + 2", "5.5"),
+    ("2.5 + 3.5", "6.0"),
+    pytest.param('"a" + "b"', "ab", id="cadeia_mais_cadeia"),
+    pytest.param("'a' + 'b'", "ab", id="caracter_mais_caracter_larga_para_cadeia"),
+    pytest.param('"a" + ' + "'b'", "ab", id="cadeia_mais_caracter"),
+    # '-'/'*': só numéricos, mesma regra de contaminação por decimal que '+'.
+    ("5 - 3", "2"),
+    ("5.0 - 3", "2.0"),
+    ("5 - 3.0", "2.0"),
+    ("3 * 4", "12"),
+    ("3.0 * 4", "12.0"),
+    # '/': sempre decimal, mesmo inteiro/inteiro exato.
+    ("4 / 2", "2.0"),
+    ("7 / 2", "3.5"),
+    # 'div'/'mod': só inteiro/inteiro -> inteiro (nunca contaminam para decimal).
+    ("7 div 2", "3"),
+    ("7 mod 2", "1"),
+    # '==': cross numérico (inteiro==decimal) e cross textual (cadeia==caracter)
+    # são aceites -- comparam por VALOR, não por tipo exato.
+    ("1 == 1.0", "verdadeiro"),
+    ('"a" == ' + "'a'", "verdadeiro"),
+    ("verdadeiro == verdadeiro", "verdadeiro"),
+    # relacionais: aceitam numérico-numérico ou texto-texto (cross
+    # incluído); booleano é sempre rejeitado nestes (ver teste negativo
+    # dedicado test_sem_relacional_com_tipos_errados, que já cobre isto).
+    ("1 < 1.5", "verdadeiro"),
+    ('"a" < "b"', "verdadeiro"),
+    ("'a' < 'b'", "verdadeiro"),
+    ('"ab" < ' + "'b'", "verdadeiro"),
+    # 'e'/'ou': só booleano-booleano.
+    ("verdadeiro e falso", "falso"),
+    ("verdadeiro ou falso", "verdadeiro"),
+])
+def test_matriz_de_compatibilidade_operador_tipo(expr, saida_esperada):
+    saida = executar(f'algoritmo "T"\ninicio\n    escrever({expr})\n')
+    assert saida.strip() == saida_esperada
+
+
+def test_sem_comparacao_de_igualdade_entre_booleano_e_outro_tipo():
+    # '==' entre booleano e qualquer outro tipo não passa por nenhuma das
+    # exceções cross-tipo de _tipos_comparaveis (nem NUMERICOS nem
+    # TEXTUAIS nem nulo/estrutura) -- cai na regra genérica 'a == b', que
+    # falha para tipos diferentes. Nunca tinha sido testado com
+    # 'booleano' especificamente (só inteiro-vs-cadeia, em
+    # test_sem_comparacao_incomparavel).
+    with pytest.raises(ErroSemantico, match="não é possível comparar"):
+        compilar('algoritmo "T"\ninicio\n    escrever(verdadeiro == 1)\n')
+
+
+# ---------- Auditoria (4ª ronda), Etapa 4 -- semântica: estruturas,
+# arrays e matrizes N-d. Confirmado por grep antes de escrever (lição
+# da Etapa 2): a preocupação do plano "B8 só cobria 2 de ≥4 pontos de
+# propagação de tipo esperado para literais {...}" já não se aplica --
+# os 4 pontos de entrada (declaração, atribuição, argumento de chamada,
+# 'devolver') já têm teste para AMBOS os tipos de literal onde
+# sintaticamente possível (array/estrutura), incluindo o caso mais
+# específico "array de literais de estrutura"
+# (test_array_de_literais_de_estrutura, ~linha 3503) e tamanho literal
+# vs. declarado (test_array_com_literal_de_tamanho_diferente_do_
+# declarado_da_erro, ~linha 3467). A única lacuna real confirmada:
+# nenhum teste ia além de 3 dimensões (`test_array_3d`/
+# `test_array_literal_3d`, ~linha 337 de test_novas_funcionalidades.py)
+# -- nada no código impõe um limite de dimensões (confirmado por
+# leitura de semantics.py/codegen.py), mas a Etapa 4 do plano pedia
+# confirmação explícita de N>3. ----------
+
+def test_array_4d_indexacao_e_atribuicao():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            h:inteiro[2][2][2][2]
+            h[0][0][0][0] = 111
+            h[1][1][1][1] = 222
+            escrever(h[0][0][0][0], ",", h[1][1][1][1], ",", h[0][1][0][1])
+    """)
+    assert saida.strip() == "111,222,0"
+
+
+def test_array_literal_4d():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            c:inteiro[2][2][2][2] = {{{{1,2},{3,4}},{{5,6},{7,8}}},{{{9,10},{11,12}},{{13,14},{15,16}}}}
+            escrever(c[0][0][0][0], ",", c[1][1][1][1])
+    """)
+    assert saida.strip() == "1,16"
+
+
+# ---------- Auditoria (4ª ronda), Etapa 5 -- funções/'ref'/controlo de
+# fluxo/'incluir'. Achado: os 3 testes de colisão de categoria em
+# 'incluir' (test_incluir_estrutura_duplicada_da_erro,
+# ::test_incluir_funcao_duplicada_da_erro,
+# ::test_incluir_variavel_global_duplicada_da_erro, ~linha 1551) estão
+# na lista de falhas da baseline -- confirmado empiricamente (não
+# assumido) ao correr só estes 4 isolados: falham todos com o mesmo
+# 'FileNotFoundError: [WinError 2]' de _winapi.CreateProcess ao tentar
+# arrancar o executável 'algo' via subprocess.run(["algo", ...]), a
+# MESMA causa (ambiente sem 'algo' no PATH desta sessão) documentada
+# para as outras 78 falhas da baseline -- não é uma regressão nem um
+# bug real na deteção de colisão em si. Para confirmar que a LÓGICA de
+# deteção de colisão (não só o wrapper de CLI) está mesmo correta,
+# repetem-se os mesmos 3 cenários em processo, via
+# `_carregar_e_resolver_inclusoes` diretamente (mesmo padrão de
+# `test_incluir_transitivo_*`, acima) -- sem subprocess, portanto
+# imunes ao problema de ambiente, e prova positiva independente da
+# suposição "é só ambiente". ----------
+
+def test_incluir_estrutura_duplicada_da_erro_em_processo(tmp_path, capsys):
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+    (tmp_path / "lib.algo").write_text(
+        "estrutura Ponto\n    x:inteiro\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo"\n'
+        "estrutura Ponto\n    y:inteiro\n"
+        "inicio\n"
+        "    escrever(1)\n",
+        encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
+    assert exc.value.code == 1
+    assert "colide" in capsys.readouterr().out
+
+
+def test_incluir_funcao_duplicada_da_erro_em_processo(tmp_path, capsys):
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+    (tmp_path / "lib.algo").write_text(
+        "funcao f():inteiro\n    devolver 1\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo"\n'
+        "funcao f():inteiro\n    devolver 2\n"
+        "inicio\n"
+        "    escrever(1)\n",
+        encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
+    assert exc.value.code == 1
+    assert "colide" in capsys.readouterr().out
+
+
+def test_campo_de_estrutura_dentro_de_array_por_referencia_duas_vezes_nao_e_detetado():
+    # Limitação CONHECIDA e deliberada de _chave_ref_estatica
+    # (semantics.py:1063-1072, comentário AL-04/AL-81/B9): um acesso com
+    # ÍNDICE (ex.: 'pontos[0].x') nunca é comparável estaticamente,
+    # mesmo quando o índice é o mesmo literal nas duas chamadas -- só
+    # variáveis simples ('x') e campos sem índice ('p.x') são
+    # detetados (test_mesma_variavel_simples_passada_duas_vezes_por_
+    # referencia_da_erro, test_mesmo_campo_de_estrutura_por_referencia_
+    # duas_vezes_da_erro). Este teste fixa o comportamento ATUAL (sem
+    # erro, com o aliasing real a manifestar-se em runtime) como
+    # regressão -- não é uma correção, é documentar o limite conhecido
+    # para que não seja "corrigido" por acidente para um falso positivo
+    # (ou silenciosamente quebrado ao ponto de deixar de detetar os
+    # casos que já apanha).
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento somar(ref a:inteiro, ref b:inteiro)
+            a = a + 1
+            b = b + 1
+        inicio
+            pontos:Ponto[2]
+            pontos[0].x = 5
+            somar(pontos[0].x, pontos[0].x)
+            escrever(pontos[0].x)
+    """)
+    assert saida.strip() == "6"
+
+
+def test_incluir_variavel_global_duplicada_da_erro_em_processo(tmp_path, capsys):
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+    (tmp_path / "lib.algo").write_text(
+        "total:inteiro = 0\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo"\n'
+        "total:inteiro = 1\n"
+        "inicio\n"
+        "    escrever(1)\n",
+        encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
+    assert exc.value.code == 1
+    assert "colide" in capsys.readouterr().out
+
+
+# ---------- Auditoria (4ª ronda), Etapa 7 -- execução e erros em tempo
+# de execução. Estratégia do plano: tabela função×input-adversarial
+# construída a partir da assinatura de cada função em
+# bibliotecas/*.py, confirmando "traduzida: sim" (nunca traceback cru)
+# para cada célula. A maior parte das células já estava coberta por
+# rondas anteriores de auditoria (ver comentários AL-08/AL-09/AL-19/
+# AL-21/AL-64/AL-65/AL-68/AL-85/AL-86/AL-91 em bibliotecas/*.py e
+# codegen.py) -- confirmado por grep antes de escrever, lição da Etapa
+# 2. Dois achados: (1) `test_recursao_infinita_da_mensagem_amigavel_
+# via_cli` (test_correcoes_auditoria.py:194) e `test_aceder_a_campo_de_
+# nulo_da_erro_amigavel_nao_traceback` (test_estruturas.py:207) usam
+# `subprocess.run(["algo", "executa", ...])` -- mesma armadilha de
+# ambiente da Etapa 5/6, inoperáveis nesta sessão (estão na lista de
+# falhas da baseline); reescritos aqui em processo, mesmo padrão dos
+# testes '_em_processo' já usado nas Etapas 5/6. (2) célula nova,
+# nunca exercitada: `matematica.piso`/`matematica.teto` com um valor
+# NÃO FINITO (infinito/NaN) -- inatingível diretamente por um literal
+# (sem notação científica na linguagem), mas alcançável através de
+# `conversao.paraDecimal("inf"/"nan")` (que aceita essas strings, tal
+# como o `float()` nativo do Python) alimentado a `matematica.piso`/
+# `teto` (`math.floor`/`math.ceil` não estão preparados para
+# infinito/NaN); e `matematica.potencia` com expoente suficientemente
+# grande para o resultado não caber num `float` (`OverflowError` na
+# conversão final, não no próprio `**`, já que inteiros Python não têm
+# limite de tamanho). Confirmado por execução direta antes de escrever
+# o teste: ambos os casos já são traduzidos corretamente (nenhum bug
+# encontrado aqui, ao contrário da Etapa 6) -- só a cobertura estava em
+# falta. ----------
+
+def test_recursao_infinita_da_mensagem_amigavel_em_processo():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+funcao semFim(n:inteiro):inteiro
+    devolver semFim(n + 1)
+inicio
+    escrever(semFim(1))
+""")
+    assert resultado.returncode == 1
+    assert "recursão infinita" in resultado.stdout
+    assert "Traceback" not in resultado.stdout
+
+
+def test_aceder_a_campo_de_nulo_da_erro_amigavel_em_processo():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+estrutura No
+    valor:inteiro
+    seguinte:No
+inicio
+    n:No
+    escrever(n.seguinte.valor)
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "campo 'valor' de um valor nulo" in resultado.stdout
+
+
+def test_matematica_piso_de_infinito_da_overflow_amigavel():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Matematica
+importar Conversao
+inicio
+    x:decimal = conversao.paraDecimal("inf")
+    escrever(matematica.piso(x))
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "overflow" in resultado.stdout.lower()
+
+
+def test_matematica_teto_de_nan_da_erro_amigavel():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Matematica
+importar Conversao
+inicio
+    x:decimal = conversao.paraDecimal("nan")
+    escrever(matematica.teto(x))
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "valor inválido" in resultado.stdout
+
+
+def test_matematica_potencia_com_expoente_gigante_da_overflow_amigavel():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Matematica
+inicio
+    escrever(matematica.potencia(10, 1000))
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "overflow" in resultado.stdout.lower()

@@ -720,7 +720,22 @@ class GeradorCodigo(GeradorCodigoBase):
                 # AL-57/B16: ver _algo_pot no cabeçalho -- '**' nativo do
                 # Python devolve complex silenciosamente para base
                 # negativa com expoente fracionário.
-                return f"_algo_pot({self._expr(expr.esq, tipos)}, {self._expr(expr.dire, tipos)})"
+                chamada = f"_algo_pot({self._expr(expr.esq, tipos)}, {self._expr(expr.dire, tipos)})"
+                # Etapa 12 da 4ª auditoria (achado da segunda passagem
+                # independente): semantics.py tipa 'inteiro ^ inteiro'
+                # como 'decimal' sempre que não consegue provar em
+                # compilação que o expoente nunca é negativo (ver
+                # _expoente_estaticamente_nao_negativo) -- mas se o
+                # expoente calculado em runtime acabar não-negativo, o
+                # '**' nativo do Python devolve int, não float, porque
+                # os dois operandos são int. Sem isto, uma variável
+                # 'decimal' ficava silenciosamente com um int (ex.:
+                # 'y:decimal = 2^n' imprimia '8' em vez de '8.0').
+                if (expr._tipo_inferido == "decimal"
+                        and expr.esq._tipo_inferido == "inteiro"
+                        and expr.dire._tipo_inferido == "inteiro"):
+                    return f"float({chamada})"
+                return chamada
             op = OPS_BIN[expr.op]
             return f"({self._expr(expr.esq, tipos)} {op} {self._expr(expr.dire, tipos)})"
         if isinstance(expr, A.UnOp):

@@ -655,6 +655,22 @@ def cmd_consola(parser):
 
 
 def main():
+    # AL-35 (achado da Etapa 8 da 4ª auditoria, alargando a correção
+    # original): algo.bat/algo.sh mitigam isto só para quem invoca
+    # SEMPRE através do script de arranque (chcp 65001 + PYTHONIOENCODING
+    # no .bat) -- mas o próprio ficheiro deste módulo já documentava
+    # 'python -m algo_lang.cli' como forma alternativa de invocação
+    # (ver docstring de main(), abaixo, e o comando 'algo' instalado por
+    # pip, que chama esta função diretamente, sem passar pelo .bat, se o
+    # venv for ativado manualmente). Sem isto, qualquer um desses
+    # caminhos crasha com UnicodeEncodeError na consola do Windows
+    # (code page 1252/850 por omissão, não UTF-8) ao tentar imprimir
+    # '✔'/'❌'. Reconfigura aqui, uma única vez, para todos os caminhos
+    # de invocação ficarem protegidos por igual -- não só o .bat.
+    for fluxo in (sys.stdout, sys.stderr):
+        if hasattr(fluxo, "reconfigure"):
+            fluxo.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(
         prog="algo",
         description="Compilador da linguagem algorítmica ALGO -> Python",

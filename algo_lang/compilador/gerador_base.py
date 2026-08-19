@@ -156,9 +156,17 @@ class GeradorCodigoBase:
             # COMPILADOR rebentava ("expressão não suportada"), em vez de
             # gerar Python válido -- aqui é sempre possível, porque
             # 'tipo_alvo' já dá o nome do construtor a usar.
-            kwargs = ", ".join(
-                f"{nome}={self._expr(valor, tipos)}" for nome, valor in stmt.expr.campos)
-            expr = f"{tipo_alvo}({kwargs})"
+            # Etapa 6 da 4ª auditoria: '_expr_estrutura_literal' (definido
+            # só em codegen_minimo.py, já que codegen.py sobrepõe este
+            # método inteiro) em vez de kwargs construídos à mão -- sem
+            # isto, um literal ANINHADO (struct-em-struct) continuava a
+            # rebentar o compilador mesmo depois de o caso simples ser
+            # tratado.
+            expr = self._expr_estrutura_literal(stmt.expr, tipo_alvo, tipos)
+        elif isinstance(stmt.expr, A.ArrayLiteral):
+            # Mesma lacuna, lado array -- 'v = {{nome: "Ana"}}' com 'v' já
+            # declarado como array de estruturas.
+            expr = self._expr_array_literal(stmt.expr, tipo_alvo, tipos)
         else:
             expr = self._coagir_decimal(self._expr(stmt.expr, tipos), tipo_alvo, stmt.expr)
         self.emit(f"{alvo} = {expr}", nivel)

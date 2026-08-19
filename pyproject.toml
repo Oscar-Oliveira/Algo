@@ -22,3 +22,44 @@ testpaths = ["algo_lang/tests"]
 markers = [
     "slow: testes que criam um venv a sério (algo.sh) -- mais lentos, mas corretos",
 ]
+
+[tool.mutmut]
+# Etapa 11 da 4ª auditoria (algo_lang/AUDITORIA_PLANO.md): mutation
+# testing como linha de base para auditorias futuras, não um alvo a
+# atingir. Âmbito restrito de propósito a semantics.py/codegen.py (o
+# núcleo do verificador de tipos e do gerador de código "normal") --
+# alargar a todo o compilador multiplicaria o tempo de execução sem
+# mudar a conclusão qualitativa. Corre com `mutmut run` num venv com
+# pytest+mutmut instalados (mutmut não corre nativamente em Windows,
+# só via WSL/Linux/macOS -- ver https://github.com/boxed/mutmut/issues/397).
+source_paths = ["algo_lang/compilador/semantics.py", "algo_lang/compilador/codegen.py"]
+also_copy = ["algo_lang/", "visualizador/"]
+pytest_add_cli_args_test_selection = [
+    "algo_lang/tests/test_correcoes_auditoria.py",
+    "algo_lang/tests/test_novas_funcionalidades.py",
+    "algo_lang/tests/test_regressao_base.py",
+    "algo_lang/tests/test_estruturas.py",
+    "-m", "not slow",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_raiz_de_negativo_da_erro_amigavel_nao_traceback",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_aleatorio_com_limites_invertidos_da_erro_amigavel",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_recursao_infinita_da_mensagem_amigavel_via_cli",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_cadeia_caracter_indice_fora_dos_limites_da_erro_amigavel",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_incluir_funciona_de_ponta_a_ponta",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_incluir_ficheiro_inexistente_da_erro",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_incluir_estrutura_duplicada_da_erro",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_incluir_funcao_duplicada_da_erro",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_incluir_variavel_global_duplicada_da_erro",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_incluir_constante",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_linter_variavel_de_ciclo_global_dentro_de_funcao_nao_e_assinalada",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_incluir_o_mesmo_ficheiro_duas_vezes_nao_da_erro",
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_incluir_o_mesmo_ficheiro_com_capitalizacao_diferente_nao_colide",
+    "--deselect", "algo_lang/tests/test_estruturas.py::test_aceder_a_campo_de_nulo_da_erro_amigavel_nao_traceback",
+    # mutmut instrumenta cada função com um "trampoline" (decide em
+    # runtime se corre o original ou o mutante) -- isto aprofunda a
+    # pilha de chamadas por nível lógico de recursão o suficiente para
+    # os testes de profundidade máxima (pensados para o limite real do
+    # parser, não para uma pilha já mais funda por instrumentação)
+    # estourarem o RecursionError do Python antes de chegarem ao ponto
+    # que o teste pretende exercitar. Não é uma falha real do código.
+    "--deselect", "algo_lang/tests/test_correcoes_auditoria.py::test_cadeia_longa_de_operadores_sem_parenteses_nao_e_afetada",
+]
