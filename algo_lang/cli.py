@@ -610,20 +610,24 @@ def cmd_consola(parser):
             args.func(args)
         except SystemExit:
             # os comandos usam sys.exit(1) para reportar erro numa
-            # invocação única -- aqui isso só deve voltar ao prompt
+            # invocação única -- aqui isso só deve voltar ao prompt.
+            # AL-63/B23: um ficheiro que NÃO existe (erro de escrita no
+            # nome) não deve substituir o 'ultimo_ficheiro' -- senão o
+            # estudante perde o contexto do ficheiro anterior (que
+            # funcionava) e fica preso a repetir o mesmo erro "não
+            # encontrado". Mas um ficheiro que EXISTE e falhou por outra
+            # razão (erro léxico/sintático/semântico) fica na mesma como
+            # 'ultimo_ficheiro': o fluxo normal é corrigir o erro no
+            # editor e voltar a correr só com 'e', sem repetir o nome.
+            ficheiro = getattr(args, "ficheiro", None)
+            if ficheiro and os.path.isfile(ficheiro):
+                ultimo_ficheiro = ficheiro
             continue
         except KeyboardInterrupt:
             print("\n(interrompido)")
             continue
 
         if getattr(args, "ficheiro", None):
-            # AL-63/B23: só atualiza 'ultimo_ficheiro' depois de
-            # args.func(args) ter terminado SEM SystemExit -- antes, isto
-            # corria incondicionalmente logo a seguir ao parse_args, mesmo
-            # que o ficheiro indicado não existisse ou tivesse um erro. Um
-            # estudante que escrevesse mal um nome de ficheiro perdia o
-            # contexto do ficheiro anterior (que funcionava) e ficava
-            # preso a repetir o mesmo erro "não encontrado".
             ultimo_ficheiro = args.ficheiro
 
 

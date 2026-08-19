@@ -100,6 +100,19 @@ def test_consola_erro_de_compilacao_nao_fecha_a_consola(tmp_path):
     assert resultado.stdout.count("Erro semântico") == 2
 
 
+def test_consola_lembra_ficheiro_mesmo_apos_erro_semantico(tmp_path):
+    """Um ficheiro que EXISTE mas falha (erro semântico) tem de ficar
+    como 'ultimo_ficheiro' na mesma -- só um ficheiro que não existe (typo
+    no nome) é que não deve substituir o último ficheiro que funcionou."""
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    x:inteiro = "nao e um inteiro"\n', encoding="utf-8")
+    resultado = _correr_consola(f"executa {algo_path}\nexecuta\nsair\n")
+    assert resultado.returncode == 0
+    assert "ainda não usaste nenhum ficheiro" not in resultado.stdout
+    assert resultado.stdout.count("Erro semântico") == 2
+
+
 def test_consola_comando_desconhecido_nao_fecha_a_consola(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")

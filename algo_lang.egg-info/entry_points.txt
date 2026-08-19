@@ -1,2 +1,0 @@
-[console_scripts]
-algo = algo_lang.cli:main

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Alguem -- tutor de algoritmia baseado em LLM, integrado com a
 linguagem ALGO. Vive inteiramente aqui: algo_lang/compilador/ nunca é
-alterado nem depende de nada daqui. O único ponto de contacto é o
-'?' da consola do ALGO (algo_lang/cli.py), que importa este pacote
-para chamar o Alguem -- essa dependência é só nessa direção."""
+alterado nem depende de nada daqui. Não tem cli.py próprio nem está
+ligado à consola do ALGO -- a única forma de o invocar é através do
+serviço web (online/alguem_ponte.py:construir_alguem)."""
 from .config import criar_alguem, carregar_config, ErroConfiguracao
 from .nucleo import (
     Alguem, PoliticaPedagogica, GuardiaoPedagogico, Classificacao,

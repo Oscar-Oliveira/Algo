@@ -121,8 +121,8 @@ credenciais) entre reinícios do contentor.
 
 > **Nota de honestidade**: `docker build`, `docker run` e um smoke
 > test real (arranque do servidor, resposta HTTP 200, confirmação de
-> que corre como utilizador não-root) foram validados nesta sessão de
-> trabalho (ver `AUDIT_DONE.md`, ON-27). `docker compose up` em si
+> que corre como utilizador não-root, ON-27) foram validados nesta
+> sessão de trabalho. `docker compose up` em si
 > ainda não foi corrido a sério -- a sintaxe YAML foi revista à mão.
 
 ## Como arrancar (sem Docker)
@@ -212,8 +212,5 @@ escreve na base de dados real nem na pasta `alguem/logs/` real.
 - **Rasto (tracer) só com entradas antecipadas** — decisão explícita
   de âmbito: `ler()` interativo a meio de um rasto (ao contrário da
   execução normal, que já é interativa) fica para uma versão seguinte.
-- **Fluxograma só do programa principal** — não gera ainda um
-  fluxograma por função/procedimento à parte, ao contrário da
-  ferramenta de linha de comandos.
 - **Isolamento por processo, não por contentor** — suficiente para uma
   turma confiável numa VM só, não para um serviço público hostil.

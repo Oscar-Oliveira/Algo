@@ -6,28 +6,11 @@ resolve exercícios nem escreve código — dá a quantidade mínima de
 ajuda que permita ao estudante avançar sozinho.
 
 Vive nesta pasta, ao lado de `algo_lang/`. **`algo_lang/compilador/`
-nunca é alterado nem depende de nada daqui.** O único ponto de
-contacto é a consola do ALGO (`algo_lang/cli.py`), que importa este
-pacote só para o `?` funcionar — essa dependência é só nessa direção.
+nunca é alterado nem depende de nada daqui.**
 
-**O Alguem só se chama de dentro da consola do ALGO, com `?` — não
-tem script de arranque próprio.**
-
-```
-$ algo
-algo> ?
---------------------------------------------------------------
-A chamar o Alguem...
-Olá! Sou o Alguem, o teu tutor de algoritmia.
-(tenho visibilidade de: exercicio.algo, biblioteca.algo)
-(escreve 'sair' para voltares à consola do ALGO, 'ficheiros' para
-veres o que tenho visível, ou 'ficheiro nome.algo' para trocares)
---------------------------------------------------------------
-
-tu> não sei como calcular a média de vários números
-Alguem> Antes disso -- achas que precisas de guardar todos os
-        números, ou há uma forma de ires somando à medida que os lês?
-```
+**O Alguem não tem `cli.py` próprio nem está ligado à consola do
+ALGO — a única forma de o invocar é através do serviço web
+(`online/alguem_ponte.py:construir_alguem`).**
 
 ## Visibilidade de ficheiros
 
@@ -338,10 +321,9 @@ Anthropic, que separam a instrução de sistema do resto da conversa),
 herda diretamente de `AgenteLLM` e implementa `responder()` de raiz.
 Nada mais precisa de mudar.
 
-O ponto de entrada real é `algo_lang/cli.py` (a função `_chamar_alguem`,
-acionada pelo `?` da consola) — este pacote não tem `cli.py` próprio de
-propósito, para não haver uma segunda forma de chamar o Alguem por
-fora da consola.
+O ponto de entrada real é `online/alguem_ponte.py:construir_alguem` —
+este pacote não tem `cli.py` próprio de propósito, para não haver uma
+segunda forma de chamar o Alguem por fora do serviço web.
 
 ## Sobre os testes
 
