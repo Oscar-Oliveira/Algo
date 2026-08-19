@@ -7,12 +7,6 @@ docker compose up -d --build
 
 ---
 
-- logo consola
-- tirar
-    --min
-    - compila
-    - add verifica em vez de lint
-
 Documentacao -> em readme...
 - compilador
     - instalação,

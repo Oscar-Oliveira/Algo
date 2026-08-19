@@ -2,7 +2,6 @@
 """Testes para a validação de nomes contra palavras reservadas do PYTHON
 (não do ALGO) -- bug real encontrado na auditoria: um identificador como
 'class' é válido em ALGO mas gera Python sintaticamente inválido."""
-import subprocess
 import textwrap
 import pytest
 
@@ -48,14 +47,3 @@ def test_soft_keyword_e_permitido_como_identificador():
     assert "match = 5" in codigo_py
 
 
-def test_colisao_e_apanhada_tambem_no_modo_minimo(tmp_path):
-    algo_path = tmp_path / "prog.algo"
-    algo_path.write_text(
-        'algoritmo "T"\ninicio\n    class:inteiro = 5\n    escrever(class)\n',
-        encoding="utf-8")
-    resultado = subprocess.run(
-        ["algo", "compila", "--minimo", str(algo_path)],
-        capture_output=True, text=True)
-    assert resultado.returncode != 0
-    assert "palavra reservada do Python" in resultado.stdout
-    assert not (tmp_path / "prog" / "prog_min.py").exists()

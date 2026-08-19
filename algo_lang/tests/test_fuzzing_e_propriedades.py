@@ -17,9 +17,9 @@ corrigido). Aqui cobre-se o caso mais amplo: entrada arbitrariamente
 corrompida.
 
 Exploração feita antes de fixar os parâmetros abaixo (não incluída
-como teste, só para calibrar): 8000 iterações de mutação em cada
-caminho (`gerar_python`/`gerar_python_minimo`), 1-5 mutações
-compostas por iteração, zero exceções não classificadas encontradas --
+como teste, só para calibrar): 8000 iterações de mutação com
+`gerar_python`, 1-5 mutações compostas por iteração, zero exceções não
+classificadas encontradas --
 os parâmetros do teste real ficam propositadamente mais baixos (custo
 de CI), sem perder o `seed` fixo (reprodutibilidade: uma falha aqui
 tem de ser reproduzível determinísticamente, não intermitente)."""
@@ -31,7 +31,6 @@ from algo_lang.compilador.lexer import ErroLexico, tokenizar
 from algo_lang.compilador.parser import parse, ErroSintatico
 from algo_lang.compilador.semantics import verificar, ErroSemantico
 from algo_lang.compilador.codegen import gerar_python
-from algo_lang.compilador.codegen_minimo import gerar_python_minimo
 from algo_lang.compilador.gerador_base import ErroInternoCompilador
 
 from apoio import executar
@@ -123,28 +122,6 @@ def test_fuzz_mutacao_modo_normal_nunca_escapa_excecao_nao_classificada():
         f"{len(nao_classificadas)} entrada(s) corrompida(s) escaparam com exceção "
         f"não classificada (não Erro{{Lexico,Sintatico,Semantico}}): "
         f"{nao_classificadas[:3]}")
-
-
-def test_fuzz_mutacao_modo_minimo_nunca_escapa_excecao_nao_classificada():
-    """parse -> gerar_python_minimo (SEM verificar()) sobre 1000
-    variações corrompidas -- --minimo salta a verificação de tipos de
-    propósito, por isso o conjunto de exceções aceitáveis é mais
-    estreito (não há ErroSemantico aqui), mas continua a ter de ser só
-    ErroLexico/ErroSintatico/ErroInternoCompilador, nunca um bug do
-    próprio compilador a escapar cru -- exatamente a categoria de bug
-    que a Etapa 6 desta auditoria encontrou e corrigiu."""
-    nao_classificadas = []
-    for codigo in _programas_mutados(seed=99182026, n=1000):
-        try:
-            programa = parse(codigo)
-            gerar_python_minimo(programa)
-        except (ErroLexico, ErroSintatico, ErroInternoCompilador, RecursionError):
-            pass
-        except Exception as e:  # noqa: BLE001
-            nao_classificadas.append((codigo, type(e).__name__, str(e)))
-    assert not nao_classificadas, (
-        f"{len(nao_classificadas)} entrada(s) corrompida(s) escaparam com exceção "
-        f"não classificada em --minimo: {nao_classificadas[:3]}")
 
 
 def test_fuzz_aleatorio_de_baixo_volume_no_lexer_nunca_crasha_cru():

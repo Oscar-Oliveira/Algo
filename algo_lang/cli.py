@@ -11,7 +11,7 @@ import argparse
 
 from .compilador.lexer import ErroLexico
 from .compilador.parser import parse, parse_biblioteca, ErroSintatico
-from .compilador.semantics import verificar, verificar_nomes_python, ErroSemantico
+from .compilador.semantics import verificar, ErroSemantico
 from .compilador.codegen import gerar_python, ErroInternoCompilador
 from .compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
 from .tools.flowchart import gerar_dot
@@ -30,8 +30,10 @@ def _pasta_saida(caminho_algo: str):
         # AL-33: os.makedirs(..., exist_ok=True) só tolera a pasta já
         # existir -- se já houver um FICHEIRO com este nome, levanta
         # FileExistsError/NotADirectoryError não tratado.
-        print(f"❌ Erro: não é possível criar a pasta '{pasta}' -- já existe um "
-              f"ficheiro com esse nome. Renomeia ou remove esse ficheiro e tenta outra vez.")
+        print(
+            f"❌ Erro: não é possível criar a pasta '{pasta}' -- já existe um "
+            f"ficheiro com esse nome. Renomeia ou remove esse ficheiro e tenta outra vez."
+        )
         sys.exit(1)
     os.makedirs(pasta, exist_ok=True)
     return pasta, nome_base
@@ -46,8 +48,10 @@ def _ler_ficheiro_algo(caminho: str) -> str:
         with open(caminho, "r", encoding="utf-8") as f:
             return f.read()
     except UnicodeDecodeError as e:
-        print(f"❌ Erro: não consegui ler '{caminho}' como texto UTF-8 ({e}) -- "
-              f"confirma a codificação do ficheiro (grava-o como UTF-8 no teu editor).")
+        print(
+            f"❌ Erro: não consegui ler '{caminho}' como texto UTF-8 ({e}) -- "
+            f"confirma a codificação do ficheiro (grava-o como UTF-8 no teu editor)."
+        )
         sys.exit(1)
 
 
@@ -79,33 +83,47 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
             continue
         ja_incluidos.add(caminho)
         if not os.path.isfile(caminho):
-            print(f"❌ Erro na linha {inc.linha}: ficheiro incluído '{inc.caminho}' não encontrado")
+            print(
+                f"❌ Erro na linha {inc.linha}: ficheiro incluído '{inc.caminho}' não encontrado"
+            )
             sys.exit(1)
         codigo = _ler_ficheiro_algo(caminho)
         declaracoes, funcoes, estruturas, inclusoes_aninhadas = parse_biblioteca(codigo)
 
         try:
-            mesclar_biblioteca_no_programa(programa, inc.caminho, declaracoes, funcoes, estruturas)
+            mesclar_biblioteca_no_programa(
+                programa, inc.caminho, declaracoes, funcoes, estruturas
+            )
         except ColisaoDeInclusao as e:
             if e.tipo_existente == e.tipo:
                 if e.tipo == "função":
-                    print(f"❌ Erro: '{e.nome}' (incluído de '{e.caminho_origem}') colide com uma "
-                          f"função já definida")
+                    print(
+                        f"❌ Erro: '{e.nome}' (incluído de '{e.caminho_origem}') colide com uma "
+                        f"função já definida"
+                    )
                 elif e.tipo == "variável global":
-                    print(f"❌ Erro: variável '{e.nome}' (incluída de '{e.caminho_origem}') colide "
-                          f"com uma variável global já declarada")
+                    print(
+                        f"❌ Erro: variável '{e.nome}' (incluída de '{e.caminho_origem}') colide "
+                        f"com uma variável global já declarada"
+                    )
                 else:
-                    print(f"❌ Erro: estrutura '{e.nome}' (incluída de '{e.caminho_origem}') colide "
-                          f"com uma estrutura já definida")
+                    print(
+                        f"❌ Erro: estrutura '{e.nome}' (incluída de '{e.caminho_origem}') colide "
+                        f"com uma estrutura já definida"
+                    )
             else:
                 # Colisão ENTRE categorias diferentes (ex.: uma função
                 # incluída com o mesmo nome de uma estrutura já definida) --
                 # mensagem dedicada que nomeia as duas categorias, em vez de
                 # deixar cair no erro genérico e sem contexto de
                 # semantics.py mais tarde.
-                verbo = "declarada" if e.tipo_existente == "variável global" else "definida"
-                print(f"❌ Erro: {e.tipo} '{e.nome}' (incluída de '{e.caminho_origem}') colide "
-                      f"com uma {e.tipo_existente} já {verbo}")
+                verbo = (
+                    "declarada" if e.tipo_existente == "variável global" else "definida"
+                )
+                print(
+                    f"❌ Erro: {e.tipo} '{e.nome}' (incluída de '{e.caminho_origem}') colide "
+                    f"com uma {e.tipo_existente} já {verbo}"
+                )
             sys.exit(1)
 
         # As inclusões desta biblioteca resolvem-se relativas à PRÓPRIA
@@ -113,14 +131,14 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
         # dentro de lib/a.algo procura lib/x.algo, não a pasta do
         # ficheiro principal.
         _resolver_lista_de_inclusoes(
-            programa, inclusoes_aninhadas, os.path.dirname(caminho), ja_incluidos)
+            programa, inclusoes_aninhadas, os.path.dirname(caminho), ja_incluidos
+        )
 
 
 def _carregar_e_resolver_inclusoes(caminho_algo: str):
     """Lê e faz parsing de um .algo, resolve 'incluir', devolve a AST --
-    sem verificar tipos. Usado por ambos os modos de compilação; o modo
-    normal chama verificar() a seguir, o modo --minimo propositadamente
-    não chama."""
+    sem verificar tipos (ver _carregar_e_verificar, que chama verificar()
+    a seguir)."""
     if not os.path.isfile(caminho_algo):
         print(f"❌ Erro: ficheiro '{caminho_algo}' não encontrado.")
         sys.exit(1)
@@ -146,47 +164,20 @@ def _carregar_e_verificar(caminho_algo: str):
     return programa
 
 
-def compilar_ficheiro(caminho_algo: str, minimo: bool = False) -> str:
-    """Compila um .algo e devolve o caminho do .py gerado.
-
-    Modo normal (minimo=False): compilação pura, com verificação de
-    tipos -- sem qualquer noção de debug/trace (ver cmd_executa_com_trace
-    e algo_lang.tools.tracer para isso).
-
-    Modo --minimo: SALTA a verificação de tipos e gera o Python mais
-    direto possível (ver compilador/codegen_minimo.py). Um programa com
-    um erro de tipos ainda compila neste modo -- só falha ao correr, com
-    o erro nativo do Python."""
-    if minimo:
-        programa = _carregar_e_resolver_inclusoes(caminho_algo)
-        from .compilador.codegen_minimo import gerar_python_minimo
-        try:
-            verificar_nomes_python(programa)
-            codigo_py = gerar_python_minimo(programa)
-        except (ErroLexico, ErroSintatico, ErroSemantico) as e:
-            print(f"❌ {e}")
-            sys.exit(1)
-        except ErroInternoCompilador as e:
-            # Ao contrário do modo normal (onde isto é sempre um bug do
-            # ALGO, porque verificar() já validou o programa antes),
-            # --minimo salta essa verificação de propósito -- por isso
-            # aqui também pode ser uma limitação genuína deste modo (ex.:
-            # um literal de estrutura numa posição em que só a verificação
-            # de tipos normal saberia resolver o tipo pelo contexto), não
-            # necessariamente um bug do compilador.
-            print(f"❌ {e} -- não suportado em --minimo (tenta sem --minimo, ou "
-                  f"usa uma variável intermédia).")
-            sys.exit(1)
-    else:
-        programa = _carregar_e_verificar(caminho_algo)
-        try:
-            codigo_py = gerar_python(programa)
-        except ErroInternoCompilador as e:  # pragma: no cover -- verificar() já garantiu que o programa é válido antes disto
-            print(f"❌ {e} -- isto é um bug do próprio ALGO, não do teu programa. Por favor reporta-o.")
-            sys.exit(1)
+def compilar_ficheiro(caminho_algo: str) -> str:
+    """Compila um .algo (com verificação de tipos) e devolve o caminho do
+    .py gerado -- sem qualquer noção de debug/trace (ver
+    cmd_executa_com_trace e algo_lang.tools.tracer para isso)."""
+    programa = _carregar_e_verificar(caminho_algo)
+    try:
+        codigo_py = gerar_python(programa)
+    except ErroInternoCompilador as e:  # pragma: no cover -- verificar() já garantiu que o programa é válido antes disto
+        print(
+            f"❌ {e} -- isto é um bug do próprio ALGO, não do teu programa. Por favor reporta-o."
+        )
+        sys.exit(1)
     pasta, nome_base = _pasta_saida(caminho_algo)
-    sufixo = "_min" if minimo else ""
-    caminho_py = os.path.join(pasta, nome_base + sufixo + ".py")
+    caminho_py = os.path.join(pasta, nome_base + ".py")
     with open(caminho_py, "w", encoding="utf-8") as f:
         f.write(codigo_py)
     return caminho_py
@@ -232,7 +223,9 @@ def cmd_executa_com_trace(args):
     try:
         dados = gerar_python_com_mapa(programa)
     except ErroInternoCompilador as e:  # pragma: no cover -- verificar() já garantiu que o programa é válido antes disto
-        print(f"❌ {e} -- isto é um bug do próprio ALGO, não do teu programa. Por favor reporta-o.")
+        print(
+            f"❌ {e} -- isto é um bug do próprio ALGO, não do teu programa. Por favor reporta-o."
+        )
         sys.exit(1)
 
     pasta, nome_base = _pasta_saida(args.ficheiro)
@@ -256,8 +249,12 @@ def cmd_executa_com_trace(args):
 
     print("----- A gerar o trace -----")
     resultado = gerar_trace(
-        dados["codigo"], caminho_py, dados["mapa_linhas"],
-        dados["nomes_globais"], dados["nomes_funcoes"], entradas=entradas,
+        dados["codigo"],
+        caminho_py,
+        dados["mapa_linhas"],
+        dados["nomes_globais"],
+        dados["nomes_funcoes"],
+        entradas=entradas,
     )
 
     print("\n----- Execução -----")
@@ -268,8 +265,10 @@ def cmd_executa_com_trace(args):
     if resultado["erro"]:
         print(f"❌ {resultado['erro']['mensagem']}")
     if resultado["limiteExcedido"]:
-        print("⚠ Limite de passos do trace atingido (possível ciclo infinito) — "
-              "o programa foi interrompido só para efeitos do trace.")
+        print(
+            "⚠ Limite de passos do trace atingido (possível ciclo infinito) — "
+            "o programa foi interrompido só para efeitos do trace."
+        )
 
     if args.json:
         # AL-95/B23: reaproveita _ler_ficheiro_algo em vez de reabrir o
@@ -289,7 +288,9 @@ def cmd_executa_com_trace(args):
         with open(caminho_json, "w", encoding="utf-8") as f:
             json.dump(trace_final, f, ensure_ascii=False, indent=1)
         print(f"\n✔ Trace gerado: {caminho_json} ({len(resultado['passos'])} passo(s))")
-        print("  Abre o visualizador web e carrega este ficheiro para navegar passo a passo.")
+        print(
+            "  Abre o visualizador web e carrega este ficheiro para navegar passo a passo."
+        )
 
     if resultado["erro"] or resultado["limiteExcedido"]:
         # AL-61/B21: cmd_executa (sem --debug/--json) propaga o código de
@@ -299,15 +300,6 @@ def cmd_executa_com_trace(args):
         # automático que confie no código de saída via um programa
         # ALGO com erro como bem-sucedido.
         sys.exit(1)
-
-
-def cmd_compila(args):
-    caminho_py = compilar_ficheiro(args.ficheiro, minimo=args.minimo)
-    print(f"✔ Compilado para: {caminho_py}")
-    if args.minimo:
-        print("  (modo --minimo: sem verificação de tipos prévia nem rede de "
-              "segurança em runtime -- qualquer erro, de tipos ou em tempo de "
-              "execução, só aparece ao correr o .py, como erro nativo do Python)")
 
 
 def cmd_fluxograma(args):
@@ -320,7 +312,9 @@ def cmd_fluxograma(args):
         if alvo is None:
             print(f"❌ Erro: não existe nenhuma função/procedimento '{args.funcao}'")
             sys.exit(1)
-        alvos = [(alvo.corpo, f"{programa.nome} — {alvo.nome}", f"{nome_base}_{alvo.nome}")]
+        alvos = [
+            (alvo.corpo, f"{programa.nome} — {alvo.nome}", f"{nome_base}_{alvo.nome}")
+        ]
     else:
         # por omissão: o fluxograma principal MAIS um fluxograma para cada
         # função/procedimento -- as chamadas a rotinas no principal (e nas
@@ -329,7 +323,9 @@ def cmd_fluxograma(args):
         # diagrama (o que ficaria ilegível, sobretudo com recursividade)
         alvos = [(programa.corpo, programa.nome, nome_base)]
         for f in programa.funcoes:
-            alvos.append((f.corpo, f"{programa.nome} — {f.nome}", f"{nome_base}_{f.nome}"))
+            alvos.append(
+                (f.corpo, f"{programa.nome} — {f.nome}", f"{nome_base}_{f.nome}")
+            )
 
     graphviz_disponivel = shutil.which("dot") is not None
     for corpo, titulo, nome_ficheiro in alvos:
@@ -343,17 +339,19 @@ def cmd_fluxograma(args):
             caminho_img = os.path.join(pasta, nome_ficheiro + "." + args.formato)
             sys.stdout.flush()
             resultado = subprocess.run(
-                ["dot", f"-T{args.formato}", caminho_dot, "-o", caminho_img])
+                ["dot", f"-T{args.formato}", caminho_dot, "-o", caminho_img]
+            )
             if resultado.returncode == 0:
                 print(f"✔ Imagem gerada: {caminho_img}")
 
     if not graphviz_disponivel:
-        print("  (Graphviz 'dot' não encontrado no sistema — instala-o para gerar "
-              "automaticamente as imagens, ou abre os .dot num visualizador online)")
+        print(
+            "  (Graphviz 'dot' não encontrado no sistema — instala-o para gerar "
+            "automaticamente as imagens, ou abre os .dot num visualizador online)"
+        )
 
 
-
-def cmd_lint(args):
+def cmd_verifica(args):
     programa = _carregar_e_verificar(args.ficheiro)
     # AL-95/B23: ver a mesma nota em cmd_executa_com_trace.
     codigo_fonte = _ler_ficheiro_algo(args.ficheiro)
@@ -371,16 +369,14 @@ def cmd_lint(args):
 # nome de ficheiro solto, ao decidir se falta um ficheiro na linha).
 COMANDOS_COM_FICHEIRO = {
     "executa": {"--entradas"},
-    "compila": set(),
     "fluxograma": {"--funcao", "--formato"},
-    "lint": set(),
+    "verifica": set(),
 }
 
 # Atalhos de uma letra para os comandos mais usados na consola.
 ATALHOS_CONSOLA = {
     "e": "executa",
-    "c": "compila",
-    "l": "lint",
+    "v": "verifica",
     "f": "fluxograma",
 }
 
@@ -407,7 +403,8 @@ def _linha_com_ficheiro_por_omissao(comando, resto, ultimo_ficheiro):
                     # mensagem que não aponta para a causa real.
                     raise ValueError(
                         f"a opção '{tok}' precisa de um valor a seguir "
-                        f"(ex.: '{tok} nome_do_ficheiro')")
+                        f"(ex.: '{tok} nome_do_ficheiro')"
+                    )
                 i += 2
             else:
                 i += 1
@@ -419,42 +416,36 @@ def _linha_com_ficheiro_por_omissao(comando, resto, ultimo_ficheiro):
     if ultimo_ficheiro is None:
         raise ValueError(
             "ainda não usaste nenhum ficheiro nesta sessão -- indica um "
-            f"nome, ex: '{comando} programa.algo'")
+            f"nome, ex: '{comando} programa.algo'"
+        )
     return resto + [ultimo_ficheiro]
 
 
 LINHA = "-" * 62
 
 
-# FEAT-03: só ASCII puro (sem emojis/Unicode), pelo mesmo motivo da
-# AL-35 -- a consola do Windows sem code page UTF-8 (algo.bat não
-# configura chcp 65001) mostraria caracteres partidos logo na primeira
-# coisa que o estudante vê.
 _LOGO_ASCII = r"""
-    _    _     ____   ___
-   / \  | |   / ___| / _ \
-  / _ \ | |  | |  _ | | | |
- / ___ \| |__| |_| || |_| |
-/_/   \_\_____\____| \___/
+                        _    _     ____   ___
+       ####            / \  | |   / ___| / _ \
+     ########         / _ \ | |  | |  _ | | | |
+   ############      / ___ \| |__| |_| || |_| |
+ ################   /_/   \_\_____\____| \___/
 """
 
 
 def _mostrar_banner():
     print(_LOGO_ASCII)
     print(LINHA)
-    print("  Consola ALGO")
-    print(LINHA)
     print()
-    print("  Escreve um comando e prime Enter -- sem escrever \"algo\" à frente.")
+    print('  Escreve um comando e prime Enter -- sem escrever "algo" à frente.')
     print("  Cada um tem também um atalho de uma letra (entre parêntesis).")
     print()
     print("    executa <ficheiro.algo>  (e)   compila e corre o programa")
-    print("    compila <ficheiro.algo>  (c)   só compila (gera o ficheiro .py)")
-    print("    lint <ficheiro.algo>     (l)   avisos de possíveis enganos")
+    print("    verifica <ficheiro.algo> (v)   avisos de possíveis enganos")
     print("    fluxograma <ficheiro.algo> (f) gera um diagrama do programa")
     print()
     print("    ajuda  (a)                     esta lista, com mais detalhe e exemplos")
-    print("    sair                           termina a consola")
+    print("    sair   (s)                     termina a consola")
     print()
     print("  Depois de usares um ficheiro uma vez, os comandos seguintes")
     print("  reutilizam-no -- não precisas de repetir o nome.")
@@ -481,28 +472,6 @@ def _mostrar_ajuda(ultimo_ficheiro):
     print()
 
     print(LINHA)
-    print("  compila <ficheiro.algo> [opções]   (atalho: c)")
-    print(LINHA)
-    print("  Só compila -- gera o ficheiro .py ao lado do .algo, não o corre.")
-    print()
-    print("    --minimo   gera Python mínimo: sem verificação de tipos prévia e")
-    print("               sem funções de apoio (afirmar vira assert, matematica.raiz")
-    print("               vira math.sqrt, etc.) -- útil para veres o Python \"a")
-    print("               seco\" por trás do ALGO. Por ser Python nativo, mostra")
-    print("               'True'/'False' em vez de 'verdadeiro'/'falso' -- é")
-    print("               esperado, não é um bug")
-    print("               ATENÇÃO (UX-02): --minimo não tem nenhuma rede de")
-    print("               segurança para erros em tempo de execução -- um erro")
-    print("               (índice inválido, divisão por zero, etc.) aparece como")
-    print("               um traceback Python cru, com nomes internos, não a")
-    print("               mensagem amigável em português do modo normal")
-    print()
-    print("  Exemplos:")
-    print("    compila soma.algo")
-    print("    c soma.algo --minimo")
-    print()
-
-    print(LINHA)
     print("  fluxograma <ficheiro.algo> [opções]   (atalho: f)")
     print(LINHA)
     print("  Gera um diagrama (.dot + imagem) do programa.")
@@ -518,20 +487,22 @@ def _mostrar_ajuda(ultimo_ficheiro):
     print()
 
     print(LINHA)
-    print("  lint <ficheiro.algo>   (atalho: l)")
+    print("  verifica <ficheiro.algo>   (atalho: v)")
     print(LINHA)
     print("  Avisa sobre enganos comuns (variáveis nunca usadas, comparações")
     print("  sempre verdadeiras, etc.) sem impedir a compilação.")
     print()
     print("  Exemplo:")
-    print("    l soma.algo")
+    print("    v soma.algo")
     print()
 
     print(LINHA)
     print("  outros comandos")
     print(LINHA)
     print("    ajuda    (atalho: a)   mostra esta mensagem")
-    print("    sair     termina a consola (também funcionam: exit, quit, Ctrl+D)")
+    print(
+        "    sair     (atalho: s)   termina a consola (também funcionam: exit, quit, Ctrl+D)"
+    )
     print()
     if ultimo_ficheiro:
         print(f"  Ficheiro atual desta sessão: {ultimo_ficheiro}")
@@ -586,7 +557,7 @@ def _shlex_split_sem_escape(linha):
 
 def cmd_consola(parser):
     """Consola interativa: cada linha é um dos comandos normais
-    (executa/compila/fluxograma/lint) sem o 'algo' à frente, sem teres de
+    (executa/fluxograma/verifica) sem o 'algo' à frente, sem teres de
     reabrir o programa a cada vez. Um comando com erro só mostra o erro e
     volta ao prompt -- não fecha a consola."""
     _mostrar_banner()
@@ -602,7 +573,7 @@ def cmd_consola(parser):
         linha = linha.strip()
         if not linha:
             continue
-        if linha in ("sair", "exit", "quit"):
+        if linha in ("sair", "exit", "quit", "s"):
             print("Até à próxima!")
             break
         if linha in ("ajuda", "help", "a"):
@@ -630,7 +601,9 @@ def cmd_consola(parser):
             # o argparse já escreveu a mensagem de erro/ajuda -- só não
             # deixamos que feche a consola
             if comando not in ("-h", "--help"):
-                print("(escreve 'ajuda' para veres os comandos disponíveis e as suas opções)")
+                print(
+                    "(escreve 'ajuda' para veres os comandos disponíveis e as suas opções)"
+                )
             continue
 
         try:
@@ -677,55 +650,59 @@ def main():
     )
     subparsers = parser.add_subparsers(dest="comando", required=True)
 
-    p_executa = subparsers.add_parser("executa", help="compila e executa um ficheiro .algo")
+    p_executa = subparsers.add_parser(
+        "executa", help="compila e executa um ficheiro .algo"
+    )
     p_executa.add_argument("ficheiro", help="caminho para o ficheiro .algo")
     p_executa.add_argument(
-        "--mostrar-python", action="store_true",
+        "--mostrar-python",
+        action="store_true",
         help="mostra o código Python gerado antes de o executar",
     )
     p_executa.add_argument(
-        "--debug", action="store_true",
+        "--debug",
+        action="store_true",
         help="mostra na consola o valor das variáveis a cada passo da execução",
     )
     p_executa.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="gera um ficheiro .json com o trace completo (linha a linha, pilha de "
-             "chamadas, consola), para abrir no visualizador web",
+        "chamadas, consola), para abrir no visualizador web",
     )
     p_executa.add_argument(
-        "--entradas", default=None, metavar="FICHEIRO",
+        "--entradas",
+        default=None,
+        metavar="FICHEIRO",
         help="ficheiro de texto com os valores para ler() (um por linha), usado com "
-             "--debug/--json; sem isto, usa o stdin normal (podes escrever à mão)",
+        "--debug/--json; sem isto, usa o stdin normal (podes escrever à mão)",
     )
     p_executa.set_defaults(func=cmd_executa)
 
-    p_compila = subparsers.add_parser("compila", help="apenas compila (não executa)")
-    p_compila.add_argument("ficheiro", help="caminho para o ficheiro .algo")
-    p_compila.add_argument(
-        "--minimo", action="store_true",
-        help="gera o Python mais direto possível (sem funções de apoio, sem "
-             "verificação de tipos prévia) -- matematica./cadeia. viram chamadas "
-             "nativas do Python, afirmar vira assert",
+    p_fluxo = subparsers.add_parser(
+        "fluxograma", help="gera um fluxograma (.dot) do programa"
     )
-    p_compila.set_defaults(func=cmd_compila)
-
-    p_fluxo = subparsers.add_parser("fluxograma", help="gera um fluxograma (.dot) do programa")
     p_fluxo.add_argument("ficheiro", help="caminho para o ficheiro .algo")
     p_fluxo.add_argument(
-        "--funcao", default=None,
+        "--funcao",
+        default=None,
         help="gera só o fluxograma desta função/procedimento (por omissão, gera o "
-             "principal MAIS um para cada função/procedimento do programa)",
+        "principal MAIS um para cada função/procedimento do programa)",
     )
     p_fluxo.add_argument(
-        "--formato", default="png", choices=["png", "svg", "pdf"],
+        "--formato",
+        default="png",
+        choices=["png", "svg", "pdf"],
         help="formato da imagem gerada, se o Graphviz estiver instalado (por omissão: png)",
     )
     p_fluxo.set_defaults(func=cmd_fluxograma)
 
-    p_lint = subparsers.add_parser(
-        "lint", help="analisa o programa em busca de possíveis enganos (avisos de estilo)")
-    p_lint.add_argument("ficheiro", help="caminho para o ficheiro .algo")
-    p_lint.set_defaults(func=cmd_lint)
+    p_verifica = subparsers.add_parser(
+        "verifica",
+        help="analisa o programa em busca de possíveis enganos (avisos de estilo)",
+    )
+    p_verifica.add_argument("ficheiro", help="caminho para o ficheiro .algo")
+    p_verifica.set_defaults(func=cmd_verifica)
 
     if len(sys.argv) == 1:
         cmd_consola(parser)

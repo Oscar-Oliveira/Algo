@@ -279,21 +279,21 @@ def test_comparacao_de_elementos_diferentes_de_array_nao_e_assinalada():
     assert not any("sempre verdadeira" in a.mensagem for a in avisos)
 
 
-def test_cli_lint_sem_avisos(tmp_path):
+def test_cli_verifica_sem_avisos(tmp_path):
     import subprocess
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
-    resultado = subprocess.run(["algo", "lint", str(algo_path)], capture_output=True, text=True)
+    resultado = subprocess.run(["algo", "verifica", str(algo_path)], capture_output=True, text=True)
     assert resultado.returncode == 0
     assert "Nenhum aviso" in resultado.stdout
 
 
-def test_cli_lint_com_avisos(tmp_path):
+def test_cli_verifica_com_avisos(tmp_path):
     import subprocess
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
         'algoritmo "T"\ninicio\n    x:inteiro = 5\n    escrever("ok")\n', encoding="utf-8")
-    resultado = subprocess.run(["algo", "lint", str(algo_path)], capture_output=True, text=True)
+    resultado = subprocess.run(["algo", "verifica", str(algo_path)], capture_output=True, text=True)
     assert resultado.returncode == 0
     assert "aviso" in resultado.stdout
     assert "x" in resultado.stdout
@@ -639,3 +639,162 @@ def test_comparacao_com_literal_nao_e_assinalada():
                 escrever("cinco")
     """)
     assert not any("sempre" in a.mensagem for a in avisos)
+
+
+def test_ciclo_enquanto_bandeira_nunca_alterada_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            continuar:booleano = verdadeiro
+            enquanto continuar fazer
+                escrever("ola")
+    """)
+    relevantes = [a for a in avisos if "nunca termina" in a.mensagem]
+    assert len(relevantes) == 1
+    assert "continuar" in relevantes[0].mensagem
+
+
+def test_ciclo_faz_enquanto_bandeira_nunca_alterada_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            continuar:booleano = verdadeiro
+            fazer
+                escrever("ola")
+            enquanto continuar
+    """)
+    assert any("nunca termina" in a.mensagem and "continuar" in a.mensagem for a in avisos)
+
+
+def test_ciclo_enquanto_bandeira_alterada_no_corpo_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            continuar:booleano = verdadeiro
+            x:inteiro = 0
+            enquanto continuar fazer
+                x = x + 1
+                se x > 10 entao
+                    continuar = falso
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_ciclo_enquanto_bandeira_alterada_por_ler_no_corpo_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            continuar:booleano = verdadeiro
+            enquanto continuar fazer
+                ler(continuar)
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_ciclo_enquanto_bandeira_passada_a_chamada_nao_da_aviso():
+    """A bandeira pode ser alterada dentro de uma chamada com um
+    parâmetro 'ref' -- o linter não sabe se é 'ref' ou não, por isso
+    prefere não avisar (falso negativo) a arriscar um falso positivo."""
+    avisos = _avisos("""
+        algoritmo "T"
+        procedimento atualizar(ref c:booleano)
+            c = falso
+        inicio
+            continuar:booleano = verdadeiro
+            enquanto continuar fazer
+                atualizar(continuar)
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_ciclo_enquanto_dentro_de_funcao_com_devolver_nao_da_aviso_de_bandeira():
+    """Um 'devolver' algures no corpo já é uma forma válida de sair,
+    mesmo sem a bandeira ser alterada -- não deve empilhar os dois
+    avisos."""
+    avisos = _avisos("""
+        algoritmo "T"
+        funcao f():inteiro
+            continuar:booleano = verdadeiro
+            enquanto continuar fazer
+                devolver 1
+            devolver 0
+        inicio
+            escrever(f())
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_recursao_sem_condicao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        funcao f(n:inteiro):inteiro
+            devolver f(n - 1)
+        inicio
+            escrever(f(5))
+    """)
+    relevantes = [a for a in avisos if "nunca termina" in a.mensagem]
+    assert len(relevantes) == 1
+    assert "'f'" in relevantes[0].mensagem
+
+
+def test_recursao_com_caso_base_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        funcao fatorial(n:inteiro):inteiro
+            se n <= 1 entao
+                devolver 1
+            devolver n * fatorial(n - 1)
+        inicio
+            escrever(fatorial(5))
+    """)
+    assert not any("controlo de fluxo" in a.mensagem for a in avisos)
+
+
+def test_procedimento_recursivo_sem_condicao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        procedimento contar(n:inteiro)
+            escrever(n)
+            contar(n + 1)
+        inicio
+            contar(0)
+    """)
+    assert any("'contar'" in a.mensagem and "controlo de fluxo" in a.mensagem for a in avisos)
+
+
+def test_comparacao_de_decimais_com_igualdade_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            a:decimal = 0.1 + 0.2
+            b:decimal = 0.3
+            se a == b entao
+                escrever("iguais")
+    """)
+    assert any("vírgula flutuante" in a.mensagem for a in avisos)
+
+
+def test_comparacao_de_decimal_com_inteiro_nao_da_aviso_de_flutuante():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            a:inteiro = 3
+            b:inteiro = 3
+            se a == b entao
+                escrever("iguais")
+    """)
+    assert not any("vírgula flutuante" in a.mensagem for a in avisos)
+
+
+def test_comparacao_da_mesma_variavel_decimal_nao_da_aviso_de_flutuante():
+    """x == x já tem o aviso mais específico (comparação sempre
+    verdadeira) -- não deve duplicar com o aviso de vírgula flutuante."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            a:decimal = 0.1
+            se a == a entao
+                escrever("iguais")
+    """)
+    assert not any("vírgula flutuante" in a.mensagem for a in avisos)
+    assert any("sempre verdadeira" in a.mensagem for a in avisos)

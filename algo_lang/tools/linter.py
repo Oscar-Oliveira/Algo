@@ -41,6 +41,7 @@ class Linter:
         self._verificar_casos_duplicados_em_escolha()
         self._verificar_resultado_de_funcao_descartado()
         self._verificar_campos_em_falta_em_literal_de_estrutura()
+        self._verificar_recursao_sem_condicao()
 
         nomes_globais = {d.nome for d in self.programa.declaracoes}
         nomes_globais |= self._nomes_declarados(self.programa.corpo)
@@ -187,6 +188,36 @@ class Linter:
                     self.avisos.append(Aviso(
                         f"a função '{f.nome}' nunca é chamada em lado nenhum do programa",
                         f.linha))
+
+    def _verificar_recursao_sem_condicao(self):
+        """Uma função/procedimento que se chama a si própria sem ter
+        NENHUMA instrução de controlo de fluxo (se/escolher/para/
+        enquanto/faz...enquanto) em lado nenhum do corpo não tem onde
+        esconder um caso base -- é sempre o mesmo caminho, sempre
+        executado, sempre com a mesma chamada recursiva -- por isso nunca
+        termina. Deliberadamente conservador: uma função com QUALQUER
+        estrutura de controlo já pode estar a usá-la como caso base (ex.:
+        'se n <= 1 entao devolver 1' seguido, sem aninhamento, de
+        'devolver n * f(n - 1)') -- não tenta perceber se esse controlo é
+        mesmo o caso base; só apanha o caso mais claro de todos, um corpo
+        inteiramente em linha reta que ainda assim se chama a si próprio."""
+        for f in self.programa.funcoes:
+            stmts = self._todas_as_stmts(f.corpo)
+            if any(isinstance(s, (A.Se, A.Escolha, A.Para, A.Enquanto, A.FazEnquanto))
+                   for s in stmts):
+                continue
+            for s in f.corpo:
+                chamadas = set()
+                for e in self._expressoes_lidas(s):
+                    self._extrair_lvalues_e_chamadas(e, set(), chamadas)
+                if isinstance(s, A.ChamadaStmt):
+                    self._extrair_lvalues_e_chamadas(s.chamada, set(), chamadas)
+                if f.nome in chamadas:
+                    self.avisos.append(Aviso(
+                        f"'{f.nome}' chama-se a si própria sem nenhuma instrução de "
+                        f"controlo de fluxo no corpo -- não há onde estar um caso "
+                        f"base, isto nunca termina", s.linha))
+                    break
 
     def _extrair_lvalues_e_chamadas(self, expr, destino_vars, destino_chamadas):
         if expr is None:  # pragma: no cover -- nenhum chamador passa None (_expressoes_lidas nunca inclui None nas suas listas)
@@ -348,6 +379,17 @@ class Linter:
                 self.avisos.append(Aviso(
                     f"comparação sempre {resultado}: os dois lados de '{expr.op}' são "
                     f"a mesma variável", expr.linha))
+            elif expr.op in ("==", "<>") \
+                    and getattr(expr.esq, "_tipo_inferido", None) == "decimal" \
+                    and getattr(expr.dire, "_tipo_inferido", None) == "decimal":
+                # 'decimal' é 'float' em Python -- comparar com '==='/'<>'
+                # é frágil (imprecisão de vírgula flutuante), mesmo quando
+                # os dois lados "deviam" dar o mesmo valor matemático.
+                self.avisos.append(Aviso(
+                    f"comparar 'decimal' com '{expr.op}' pode falhar por imprecisão "
+                    f"de vírgula flutuante -- considera "
+                    f"'matematica.absoluto(a - b) < 0.0001' em vez de igualdade exata",
+                    expr.linha))
             self._verificar_expr_recursiva(expr.esq)
             self._verificar_expr_recursiva(expr.dire)
         elif isinstance(expr, A.UnOp):
@@ -486,17 +528,77 @@ class Linter:
     def _verificar_ciclo_verdadeiro_sem_saida(self, corpo):
         """O ALGO não tem instrução para sair de um ciclo a meio -- um
         'enquanto verdadeiro'/'faz...enquanto verdadeiro' só pode terminar
-        através de um 'devolver' algures no corpo."""
+        através de um 'devolver' algures no corpo. O mesmo problema
+        aparece, de forma menos óbvia, quando a condição é uma única
+        variável 'booleano' usada como bandeira de controlo (ex.:
+        'continuar') que nunca é alterada dentro do próprio corpo do
+        ciclo -- é o padrão idiomático mais comum no ALGO para sair de um
+        ciclo dentro do 'inicio', onde 'devolver' não é permitido (ver
+        _verificar_recursao_sem_condicao para o equivalente em funções),
+        e por isso também o erro mais comum: esquecer de mudar a
+        bandeira."""
         for s in self._todas_as_stmts(corpo):
-            if isinstance(s, (A.Enquanto, A.FazEnquanto)) and self._eh_literal_verdadeiro(s.condicao):
-                if not any(isinstance(sub, A.Devolver) for sub in self._todas_as_stmts(s.corpo)):
-                    self.avisos.append(Aviso(
-                        "ciclo com condição sempre verdadeira e sem nenhum 'devolver' no "
-                        "corpo -- como o ALGO não tem instrução para sair de um ciclo, "
-                        "isto nunca termina", s.linha))
+            if not isinstance(s, (A.Enquanto, A.FazEnquanto)):
+                continue
+            tem_devolver = any(isinstance(sub, A.Devolver) for sub in self._todas_as_stmts(s.corpo))
+            if tem_devolver:
+                continue
+            if self._eh_literal_verdadeiro(s.condicao):
+                self.avisos.append(Aviso(
+                    "ciclo com condição sempre verdadeira e sem nenhum 'devolver' no "
+                    "corpo -- como o ALGO não tem instrução para sair de um ciclo, "
+                    "isto nunca termina", s.linha))
+            elif isinstance(s.condicao, A.LValue) and not s.condicao.acessos \
+                    and getattr(s.condicao, "_tipo_inferido", None) == "booleano" \
+                    and not self._variavel_e_alterada_no_corpo(s.condicao.nome, s.corpo):
+                self.avisos.append(Aviso(
+                    f"o ciclo depende da variável '{s.condicao.nome}' para terminar, "
+                    f"mas ela nunca é alterada dentro do corpo -- isto nunca termina",
+                    s.linha))
 
     def _eh_literal_verdadeiro(self, expr):
         return isinstance(expr, A.Literal) and expr.tipo == "booleano" and expr.valor is True
+
+    def _variavel_e_alterada_no_corpo(self, nome, corpo):
+        """Verdade se 'nome' pode deixar de ter o valor que tinha à
+        entrada do ciclo: atribuição direta, 'ler' direto, ou passada
+        como argumento (nu, sem acessos) a qualquer chamada -- nesse
+        último caso não se sabe se o parâmetro correspondente é 'ref',
+        por isso assume-se que sim (mais vale não avisar do que avisar
+        com um falso positivo)."""
+        for s in self._todas_as_stmts(corpo):
+            if isinstance(s, A.Atribuicao) and not s.alvo.acessos and s.alvo.nome == nome:
+                return True
+            if isinstance(s, A.Ler) and any(
+                    not alvo.acessos and alvo.nome == nome for alvo in s.alvos):
+                return True
+            for e in self._expressoes_lidas(s):
+                if self._chamada_com_argumento_nu(e, nome):
+                    return True
+            if isinstance(s, A.ChamadaStmt) and self._chamada_com_argumento_nu(s.chamada, nome):
+                return True
+        return False
+
+    def _chamada_com_argumento_nu(self, expr, nome):
+        if expr is None:  # pragma: no cover -- mesmo raciocínio de _extrair_lvalues_e_chamadas
+            return False
+        if isinstance(expr, A.Chamada):
+            for a in expr.args:
+                if isinstance(a, A.LValue) and not a.acessos and a.nome == nome:
+                    return True
+                if self._chamada_com_argumento_nu(a, nome):
+                    return True
+            return False
+        if isinstance(expr, A.BinOp):
+            return self._chamada_com_argumento_nu(expr.esq, nome) \
+                or self._chamada_com_argumento_nu(expr.dire, nome)
+        if isinstance(expr, A.UnOp):
+            return self._chamada_com_argumento_nu(expr.operando, nome)
+        if isinstance(expr, A.ArrayLiteral):
+            return any(self._chamada_com_argumento_nu(e, nome) for e in expr.elementos)
+        if isinstance(expr, A.EstruturaLiteral):
+            return any(self._chamada_com_argumento_nu(v, nome) for _n, v in expr.campos)
+        return False
 
     def _arrays_com_tamanho_literal(self, declaracoes):
         """nome -> tamanho, só para arrays de 1 dimensão declarados com um

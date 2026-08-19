@@ -250,18 +250,3 @@ def test_para_inteiro_nao_aceita_estrutura():
                 p:Ponto
                 escrever(conversao.paraInteiro(p))
         """)
-
-
-# ---------- --minimo ----------
-
-def test_minimo_conversao_mapeia_para_python_nativo(tmp_path):
-    from test_compila_minimo import _compilar_minimo, _correr
-    resultado, caminho_py = _compilar_minimo(tmp_path, """
-        algoritmo "T"
-        importar Conversao
-        inicio
-            escrever(conversao.paraInteiro("42"))
-            escrever(conversao.paraTexto(7))
-    """)
-    r = _correr(caminho_py)
-    assert r.stdout.strip() == "42\n7"

@@ -64,11 +64,10 @@ algo-lang-pacote/
 │   │   ├── parser.py
 │   │   ├── ast_nodes.py
 │   │   ├── semantics.py
-│   │   ├── codegen.py
-│   │   └── codegen_minimo.py     algo compila --minimo
+│   │   └── codegen.py
 │   ├── tools/                    ferramentas à volta do compilador
 │   │   ├── flowchart.py           algo fluxograma
-│   │   ├── linter.py              algo lint
+│   │   ├── linter.py              algo verifica
 │   │   └── tracer.py              algo executa --debug/--json
 │   ├── bibliotecas/               matematica., cadeia., conversao. (importar Matematica / Cadeia / Conversao)
 │   ├── tests/                     suite de testes automatizados (pytest)
@@ -150,8 +149,7 @@ não `meuprograma.py` solto ao lado do código-fonte.
 algo executa meuprograma.algo --mostrar-python   # mostra o Python gerado
 algo executa meuprograma.algo --debug            # mostra o valor das variáveis a cada passo, na consola
 algo executa meuprograma.algo --json             # gera um trace completo em .json (para o visualizador web)
-algo compila meuprograma.algo                    # só compila, não executa
-algo lint meuprograma.algo                       # avisos de estilo (variáveis não usadas, etc.)
+algo verifica meuprograma.algo                   # avisos de estilo (variáveis não usadas, etc.)
 algo fluxograma meuprograma.algo                 # fluxograma do principal + 1 por cada função/procedimento
 ```
 
@@ -159,38 +157,12 @@ O ficheiro `..._trace.json` gerado por `--json` abre-se no **visualizador
 web**, que está em `visualizador/algo-trace-viewer.html` (duplo-clique
 para abrir — não precisa de instalação nenhuma).
 
-## Python mínimo (`--minimo`)
-
-```bash
-algo compila --minimo meuprograma.algo
-```
-
-Gera o Python mais direto possível a partir do `.algo` — sem nenhuma das
-funções de apoio do modo normal, e **sem verificar tipos antes**: um
-programa com um erro de tipos ainda compila neste modo, só falha a
-correr, com o erro nativo do Python (`TypeError`, etc.), como aconteceria
-com qualquer programa Python escrito à mão. Serve para ver "o Python a
-seco" por trás do ALGO, não para produção nem para ensino de erros.
-
-| ALGO | Modo normal | `--minimo` |
-|---|---|---|
-| `escrever(x)` | `_algo_escrever(x)` | `print(x, sep="")` |
-| `ler(x)` (inteiro) | `_algo_ler_inteiro()` (repete até ser válido) | `int(input())` |
-| `x:booleano = verdadeiro` | idem | idem (`True`, à Python — não "verdadeiro") |
-| `afirmar cond, "msg"` | mensagem + `sys.exit(1)` | `assert cond, "msg"` |
-| `matematica.raiz(x)` | função própria | `math.sqrt(x)` (o módulo `math` real) |
-| `cadeia.inverter(s)` | função própria | `s[::-1]` |
-| recursão/índices fora dos limites/etc. | mensagens de erro amigáveis | traceback nativo do Python |
-
-Fica gerado `meuprograma_min.py`, ao lado do `meuprograma.py` normal (se
-também o tiveres gerado), na mesma subpasta.
-
 ## Consola interativa
 
 Escrever só `algo` (sem nenhum comando a seguir) abre uma consola: cada
 linha é um dos comandos acima, sem teres de repetir `algo` nem reabrir o
 programa a cada vez. Cada comando tem também um atalho de uma letra —
-`e` (executa), `c` (compila), `l` (lint), `f` (fluxograma), `a` (ajuda).
+`e` (executa), `v` (verifica), `f` (fluxograma), `a` (ajuda), `s` (sair).
 
 ```
 $ algo
@@ -203,12 +175,12 @@ algo> e soma.algo
 ✔ Compilado para: soma/soma.py
 ----- Execução -----
 ...
-algo> l
+algo> v
 ✔ Nenhum aviso — o linter não encontrou nada a assinalar.
 algo> sair
 ```
 
-Repara que o segundo comando (`l`) não precisou de indicar o
+Repara que o segundo comando (`v`) não precisou de indicar o
 ficheiro outra vez — a consola lembra sempre o último ficheiro usado na
 sessão, e só o pedes de volta se indicares um nome diferente. Um
 comando com erro (de compilação, ou um nome de comando que não existe)
@@ -359,6 +331,33 @@ fazer
     x = x + 1
 enquanto x < 10
 ```
+
+### Sair de um ciclo a meio
+
+O ALGO não tem `parar`/`break`: a única forma de terminar uma
+função/procedimento a meio de um ciclo é `devolver`, e `devolver` só é
+permitido dentro de `funcao`/`procedimento` (nunca no `inicio`). Para um
+ciclo dentro do `inicio` que precise de terminar antes da condição
+"natural" (menu com opção de sair, procurar um valor e parar assim que
+o encontrar, ler até um valor-sentinela), usa uma variável `booleano`
+como bandeira de controlo, alterada algures dentro do próprio corpo do
+ciclo:
+
+```
+continuar:booleano = verdadeiro
+opcao:inteiro
+enquanto continuar fazer
+    escrever("1-Somar  2-Sair")
+    ler(opcao)
+    se opcao == 1 entao
+        escrever("resultado: ", 2 + 2)
+    senao se opcao == 2 entao
+        continuar = falso
+```
+
+`algo verifica` avisa se a bandeira nunca chega a ser alterada dentro
+do corpo do ciclo -- normalmente sinal de que falta o `continuar =
+falso` (ou equivalente) nalgum ramo.
 
 ## escolher / caso
 
@@ -635,7 +634,7 @@ o editor. Instruções completas e detalhes técnicos em
 ## Linter
 
 ```bash
-algo lint meuprograma.algo
+algo verifica meuprograma.algo
 ```
 
 Analisa o programa em busca de possíveis enganos que não impedem a
@@ -656,6 +655,14 @@ compilação — por isso são avisos, não erros:
   difícil de perceber e reutilizar isoladamente. Aceder a uma
   `constante` global não conta para este aviso, porque um valor fixo
   não tem o mesmo problema (é o equivalente a usar `math.PI`)
+- Ciclo `enquanto`/`faz...enquanto` controlado por uma variável
+  `booleano` (bandeira) que nunca é alterada dentro do próprio corpo do
+  ciclo — nunca termina (ver [Sair de um ciclo a meio](#sair-de-um-ciclo-a-meio))
+- Função/procedimento que se chama a si próprio sem nenhuma estrutura
+  de controlo (`se`/`escolher`/`para`/`enquanto`/`faz...enquanto`) em
+  lado nenhum do corpo — nunca atinge um caso base
+- Comparação de igualdade (`==`/`<>`) entre dois valores `decimal` —
+  arriscada por imprecisão de vírgula flutuante
 
 ## Testes automatizados
 

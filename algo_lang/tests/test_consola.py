@@ -78,13 +78,13 @@ def test_consola_executa_um_ficheiro(tmp_path):
 def test_consola_lembra_o_ultimo_ficheiro(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ola")\n', encoding="utf-8")
-    resultado = _correr_consola(f"executa {algo_path}\nlint\nsair\n")
+    resultado = _correr_consola(f"executa {algo_path}\nverifica\nsair\n")
     assert resultado.returncode == 0
     assert "Nenhum aviso" in resultado.stdout
 
 
 def test_consola_sem_ficheiro_nenhum_da_erro_amigavel(tmp_path):
-    resultado = _correr_consola("lint\nsair\n")
+    resultado = _correr_consola("verifica\nsair\n")
     assert resultado.returncode == 0
     assert "ainda não usaste nenhum ficheiro" in resultado.stdout
 
@@ -128,7 +128,7 @@ def test_consola_ajuda_detalhada_lista_as_flags_de_cada_comando():
     resultado = _correr_consola("ajuda\nsair\n")
     assert resultado.returncode == 0
     for flag in ("--mostrar-python", "--debug", "--json", "--entradas",
-                 "--minimo", "--funcao", "--formato"):
+                 "--funcao", "--formato"):
         assert flag in resultado.stdout, f"'{flag}' devia aparecer na ajuda detalhada"
 
 
@@ -319,19 +319,19 @@ def test_consola_atalho_e_para_executa(tmp_path):
     assert "ok" in resultado.stdout
 
 
-def test_consola_atalho_c_para_compila(tmp_path):
+def test_consola_compila_nao_existe(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
-    resultado = _correr_consola(f"c {algo_path}\nsair\n")
+    resultado = _correr_consola(f"compila {algo_path}\nsair\n")
     assert resultado.returncode == 0
-    assert "Compilado para" in resultado.stdout
-    assert (tmp_path / "prog" / "prog.py").exists()
+    assert "escreve 'ajuda'" in resultado.stdout
+    assert not (tmp_path / "prog" / "prog.py").exists()
 
 
-def test_consola_atalho_l_para_lint(tmp_path):
+def test_consola_atalho_v_para_verifica(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
-    resultado = _correr_consola(f"e {algo_path}\nl\nsair\n")
+    resultado = _correr_consola(f"e {algo_path}\nv\nsair\n")
     assert resultado.returncode == 0
     assert "Nenhum aviso" in resultado.stdout
 
@@ -348,6 +348,12 @@ def test_consola_atalho_a_para_ajuda():
     resultado = _correr_consola("a\nsair\n")
     assert resultado.returncode == 0
     assert "atalho: e" in resultado.stdout
+
+
+def test_consola_atalho_s_para_sair():
+    resultado = _correr_consola("s\n")
+    assert resultado.returncode == 0
+    assert "Até à próxima!" in resultado.stdout
 
 
 def test_consola_interrogacao_nao_e_atalho_de_ajuda():

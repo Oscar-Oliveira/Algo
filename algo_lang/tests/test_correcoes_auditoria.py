@@ -824,19 +824,6 @@ def test_div_mod_com_ambos_negativos():
     assert saida.strip() == "3 -1"
 
 
-def test_minimo_div_mod_tambem_e_truncado_e_sem_funcoes_de_apoio():
-    """O modo --minimo tem de refletir a MESMA semântica da linguagem
-    (não pode divergir do modo normal), mas continua sem funções de
-    apoio -- ver test_minimo_nao_tem_funcoes_de_apoio."""
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse('algoritmo "T"\ninicio\n    escrever(-7 div 2, -7 mod 2)\n')
-    codigo_py = gerar_python_minimo(programa)
-    assert "_algo_" not in codigo_py
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.stdout.strip() == "-3-1"
-
-
 # ---------- AUDIT_PLAN Fase 2: AL-06 -- tamanho de array negativo em runtime ----------
 
 def test_array_com_tamanho_negativo_calculado_em_runtime_da_erro_amigavel():
@@ -944,18 +931,6 @@ inicio
     escrever("a\tb")
 ''')
     assert saida.strip() == r"a\tb"
-
-
-def test_minimo_tambem_suporta_escapes_de_string():
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(r'''algoritmo "T"
-inicio
-    escrever("ele disse \"ola\"")
-''')
-    codigo_py = gerar_python_minimo(programa)
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.stdout.strip() == 'ele disse "ola"'
 
 
 # ---------- AUDIT_PLAN Fase 2: AL-18 -- limite de profundidade no parser ----------
@@ -1353,26 +1328,6 @@ def test_matematica_potencia_devolve_sempre_decimal():
     assert saida.strip() == "8.0"
 
 
-def test_modo_minimo_nao_coage_decimal_por_desenho():
-    """--minimo salta verificar() de propósito (sem rede de segurança
-    nenhuma) -- por isso não tem a informação (_tipo_inferido) para
-    coagir 'inteiro' -> 'decimal', ao contrário do modo normal."""
-    from algo_lang.compilador.parser import parse
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        inicio
-            media:decimal
-            media = 5
-            escrever(media)
-    """))
-    codigo_py = gerar_python_minimo(programa)
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.stdout.strip() == "5"
-
-
 # ---------- colisão com o nome interno gerado de uma biblioteca ----------
 
 def test_funcao_com_nome_interno_de_biblioteca_da_erro():
@@ -1764,7 +1719,7 @@ def test_linter_variavel_de_ciclo_global_dentro_de_funcao_nao_e_assinalada(tmp_p
         inicio
             f()
     """), encoding="utf-8")
-    resultado = subprocess.run(["algo", "lint", str(algo_path)], capture_output=True, text=True)
+    resultado = subprocess.run(["algo", "verifica", str(algo_path)], capture_output=True, text=True)
     assert "acede diretamente" not in resultado.stdout
 
 
@@ -2346,31 +2301,6 @@ inicio
     assert "(linha 3)" in resultado.stdout
 
 
-# ---------- UX-02: aviso reforçado sobre --minimo não ter rede de segurança em runtime ----------
-
-def test_ajuda_do_minimo_avisa_sobre_erros_de_runtime_crus(capsys):
-    # substrings sem acentos de propósito -- capsys em consola Windows sem
-    # code page UTF-8 mistura carateres acentuados (mesma causa da AL-35,
-    # aqui a afetar a captura do teste, não o comportamento em si)
-    from algo_lang.cli import _mostrar_ajuda
-    _mostrar_ajuda(ultimo_ficheiro=None)
-    saida = capsys.readouterr().out
-    assert "UX-02" in saida
-    assert "traceback Python cru" in saida
-
-
-def test_compilar_com_minimo_avisa_na_consola_sobre_erros_de_runtime(tmp_path, capsys):
-    from algo_lang.cli import cmd_compila
-    import argparse
-    algo_path = tmp_path / "prog.algo"
-    algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
-    args = argparse.Namespace(ficheiro=str(algo_path), minimo=True)
-    cmd_compila(args)
-    saida = capsys.readouterr().out
-    assert "rede de" in saida
-    assert "runtime" in saida
-
-
 # ---------- UX-06: consistência do prefixo ❌ nas mensagens de erro da consola ----------
 
 def test_ficheiro_nao_encontrado_usa_o_prefixo_de_erro_padrao(tmp_path, capsys):
@@ -2513,80 +2443,9 @@ def test_cli_e_online_produzem_a_mesma_mensagem_de_colisao_de_sempre():
     assert exc_info.value.code == 1
 
 
-# ---------- AL-07: base partilhada entre codegen.py e codegen_minimo.py ----------
-
-def test_geradores_de_codigo_partilham_a_mesma_base():
-    """As funções que continuam bytes idênticas entre codegen.py e
-    codegen_minimo.py (percurso de lvalues, resolução de funções,
-    se/para/escolha, etc.) foram extraídas para gerador_base.py --
-    confirma que as duas classes GeradorCodigo herdam da mesma base, e
-    não têm cada uma a sua própria cópia dessas funções.
-
-    AL-51/B17: '_gerar_atribuicao' saiu desta lista -- codegen.py passou
-    a sobrepor a versão da base só para o caminho de chamada com 'ref'
-    (coerção inteiro->decimal do retorno e dos argumentos, cópia de
-    estruturas por valor), que codegen_minimo.py deliberadamente não
-    tem, tal como já acontecia com '_gerar_chamada_stmt'/'_lvalue_de_expr'
-    (nunca estiveram nesta lista, pela mesma razão)."""
-    from algo_lang.compilador import codegen, codegen_minimo, gerador_base
-
-    assert issubclass(codegen.GeradorCodigo, gerador_base.GeradorCodigoBase)
-    assert issubclass(codegen_minimo.GeradorCodigo, gerador_base.GeradorCodigoBase)
-
-    metodos_partilhados = [
-        "emit", "_valor_default", "_gerar_corpo", "_encontrar_funcao", "_lvalue",
-        "_tipo_final_lvalue", "_gerar_se", "_gerar_para",
-        "_gerar_escolha", "_gerar_funcao",
-    ]
-    for nome in metodos_partilhados:
-        metodo_base = getattr(gerador_base.GeradorCodigoBase, nome)
-        assert getattr(codegen.GeradorCodigo, nome) is metodo_base, nome
-        assert getattr(codegen_minimo.GeradorCodigo, nome) is metodo_base, nome
-
-
-def test_gerador_completo_e_minimo_continuam_a_produzir_codigo_correto(capsys):
-    """Verificação de ponta a ponta (sem subprocess, em processo) de
-    que a extração da base partilhada não alterou o comportamento
-    observável de nenhum dos dois geradores -- exercita função
-    recursiva, se/senão, para, e atribuição, que passam agora pela
-    base partilhada."""
-    from algo_lang.compilador.codegen import gerar_python
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-
-    codigo_algo = """\
-        algoritmo "T"
-        funcao fatorial(n:inteiro):inteiro
-            se n <= 1 entao
-                devolver 1
-            senao
-                devolver n * fatorial(n - 1)
-        inicio
-            x:inteiro = 5
-            total:inteiro = 0
-            i:inteiro
-            para i de 1 ate 3 fazer
-                total = total + i
-            escrever("fatorial: ", fatorial(x))
-            escrever("total: ", total)
-    """
-    programa1 = parse(textwrap.dedent(codigo_algo))
-    verificar(programa1)
-    py_completo = gerar_python(programa1)
-    exec(compile(py_completo, "<completo>", "exec"), {"__name__": "__main__"})
-    saida_completo = capsys.readouterr().out
-
-    programa2 = parse(textwrap.dedent(codigo_algo))
-    py_minimo = gerar_python_minimo(programa2)
-    exec(compile(py_minimo, "<minimo>", "exec"), {})
-    saida_minimo = capsys.readouterr().out
-
-    assert saida_completo == "fatorial: 120\ntotal: 6\n"
-    assert saida_minimo == "fatorial: 120\ntotal: 6\n"
-
-
 # ---------- ARCH-01: dispatch centralizado / exaustividade dos tipos de AST ----------
 # Adicionar um novo tipo de instrução/expressão à AST exige atualizar ~9
-# isinstance/elif espalhados por codegen.py, codegen_minimo.py, semantics.py
+# isinstance/elif espalhados por codegen.py, semantics.py
 # e tools/flowchart.py, sem nenhuma verificação de exaustividade em tempo
 # de compilação -- um branch esquecido falhava silenciosamente. Em vez de
 # um redesenho completo do dispatch (visitor pattern), a abordagem aqui
@@ -2629,12 +2488,11 @@ def _tipos_ast_referenciados_via_isinstance(funcao):
 
 
 def test_dispatchers_de_instrucoes_cobrem_todos_os_tipos_de_stmt_da_ast():
-    from algo_lang.compilador import codegen, codegen_minimo, semantics
+    from algo_lang.compilador import codegen, semantics
     from algo_lang.tools import flowchart
 
     dispatchers = {
         "codegen.GeradorCodigo._gerar_stmt": codegen.GeradorCodigo._gerar_stmt,
-        "codegen_minimo.GeradorCodigo._gerar_stmt": codegen_minimo.GeradorCodigo._gerar_stmt,
         "semantics.VerificadorTipos._verificar_stmt": semantics.VerificadorTipos._verificar_stmt,
         "flowchart.GeradorFluxograma.gerar_stmt": flowchart.GeradorFluxograma.gerar_stmt,
     }
@@ -2647,22 +2505,20 @@ def test_dispatchers_de_instrucoes_cobrem_todos_os_tipos_de_stmt_da_ast():
 
 
 def test_dispatchers_de_expressoes_cobrem_todos_os_tipos_de_expr_da_ast():
-    from algo_lang.compilador import codegen, codegen_minimo, semantics
+    from algo_lang.compilador import codegen, semantics
 
     # AL-16: um EstruturaLiteral não sabe o seu próprio tipo -- só faz
     # sentido onde o tipo esperado já vem do contexto (declaração,
     # argumento), tratado explicitamente ANTES de chamar o dispatcher
-    # genérico nesses dois ficheiros (semantics.py já rejeita todos os
-    # outros contextos antes disto correr). Cair no fallback genérico de
-    # _expr() para um EstruturaLiteral é por isso intencional, não uma
-    # lacuna -- exceção documentada, não uma falha deste teste.
+    # genérico (semantics.py já rejeita todos os outros contextos antes
+    # disto correr). Cair no fallback genérico de _expr() para um
+    # EstruturaLiteral é por isso intencional, não uma lacuna -- exceção
+    # documentada, não uma falha deste teste.
     excecoes = {
         "codegen.GeradorCodigo._expr": {"EstruturaLiteral"},
-        "codegen_minimo.GeradorCodigo._expr": {"EstruturaLiteral"},
     }
     dispatchers = {
         "codegen.GeradorCodigo._expr": codegen.GeradorCodigo._expr,
-        "codegen_minimo.GeradorCodigo._expr": codegen_minimo.GeradorCodigo._expr,
         "semantics.VerificadorTipos._tipo_expr": semantics.VerificadorTipos._tipo_expr,
     }
     problemas = {}
@@ -3086,28 +2942,6 @@ def test_elementos_de_array_literal_decimal_sao_coagidos():
     assert saida.strip() == "1.0 2.0 3.0"
 
 
-# ---------- B19 (AL-59): codegen_minimo div/mod perdem precisão em inteiros grandes ----------
-
-def test_minimo_div_mod_em_inteiros_grandes_nao_perde_precisao():
-    from algo_lang.compilador.parser import parse
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    codigo = textwrap.dedent("""
-        algoritmo "T"
-        inicio
-            a: inteiro = 2989996989242201024
-            b: inteiro = 887
-            escrever(a div b)
-            escrever(a mod b)
-    """)
-    py = gerar_python_minimo(parse(codigo))
-    resultado = subprocess.run(
-        [sys.executable, "-c", py], capture_output=True, text=True, timeout=10)
-    assert resultado.returncode == 0, resultado.stderr
-    assert resultado.stdout.splitlines() == ["3370909796214431", "727"]
-
-
-# ---------- B20 (AL-60): codegen_minimo matematica.potencia perde tipo decimal ----------
-
 def test_executa_com_debug_sai_com_codigo_1_quando_programa_falha(tmp_path):
     from algo_lang.cli import cmd_executa_com_trace
     import argparse
@@ -3210,22 +3044,6 @@ inicio
 """)
     assert resultado.returncode == 1
     assert "número inteiro" in resultado.stdout
-
-
-def test_minimo_potencia_devolve_decimal_como_no_modo_normal():
-    from algo_lang.compilador.parser import parse
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    codigo = textwrap.dedent("""
-        algoritmo "T"
-        importar Matematica
-        inicio
-            escrever(matematica.potencia(2, 3))
-    """)
-    py = gerar_python_minimo(parse(codigo))
-    resultado = subprocess.run(
-        [sys.executable, "-c", py], capture_output=True, text=True, timeout=10)
-    assert resultado.returncode == 0, resultado.stderr
-    assert resultado.stdout.strip() == "8.0"
 
 
 # ---------- B26 (AL-66): linter -- falso positivo p/ variável de 'inicio' usada só em funções ----------
@@ -3686,50 +3504,7 @@ def test_matematica_aleatorio_com_limites_invertidos_nao_mostra_randrange():
     assert "limite inferior" in resultado.stdout and "limite superior" in resultado.stdout
 
 
-# ---------- B14 (AL-87): codegen_minimo -- '^' devolvia complex silenciosamente, sem erro ----------
-
-def test_minimo_potencia_negativa_fracionaria_falha_nativamente_em_vez_de_devolver_complexo():
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        inicio
-            x:decimal = (-8.0) ^ 0.5
-            escrever(x)
-    """))
-    codigo_py = gerar_python_minimo(programa)
-    env = dict(os.environ, PYTHONIOENCODING="utf-8")
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
-        timeout=10, env=env)
-    assert resultado.returncode != 0
-    assert "complex" in resultado.stderr
-
-
-def test_minimo_potencia_normal_continua_a_funcionar():
-    """AUDITORIA.md secção 3: o valor esperado aqui mudou de '8.0' para
-    '8'. A expectativa original ('8.0') era um efeito colateral de '^'
-    estar SEMPRE embrulhado em float(...) -- o que divergia do modo
-    normal sempre que o expoente é um inteiro literal não-negativo (ex.:
-    'escrever(2^10)' dava 1024.0 aqui, 1024 no modo normal). '--minimo'
-    também não coage nenhuma outra expressão para 'decimal' à entrada de
-    uma declaração (confirmado: 'x:decimal = 5' já dava '5', não '5.0',
-    antes desta correção) -- '8' é o valor consistente com esse
-    comportamento já estabelecido, não uma regressão."""
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        inicio
-            x:decimal = 2 ^ 3
-            escrever(x)
-    """))
-    codigo_py = gerar_python_minimo(programa)
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.returncode == 0
-    assert resultado.stdout.strip() == "8"
-
-
-# ---------- B15 (AL-88): codegen/codegen_minimo -- dimensão interior de array multidimensional avaliada 2x ----------
+# ---------- B15 (AL-88): codegen -- dimensão interior de array multidimensional avaliada 2x ----------
 
 def test_dimensao_interior_de_array_multidimensional_e_avaliada_uma_so_vez():
     saida = executar("""
@@ -3742,24 +3517,6 @@ def test_dimensao_interior_de_array_multidimensional_e_avaliada_uma_so_vez():
             escrever(v[0][0])
     """)
     assert saida.count("chamada") == 1
-
-
-def test_minimo_dimensao_interior_de_array_multidimensional_e_avaliada_uma_so_vez():
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        funcao dim():inteiro
-            escrever("chamada")
-            devolver 2
-        inicio
-            v:inteiro[2][dim()]
-            escrever(v[0][0])
-    """))
-    codigo_py = gerar_python_minimo(programa)
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.returncode == 0
-    assert resultado.stdout.count("chamada") == 1
 
 
 def test_array_de_estrutura_com_campo_multidimensional_continua_a_funcionar():
@@ -3804,44 +3561,6 @@ def test_trace_nao_injeta_passo_espurio_na_linha_da_definicao_da_estrutura(tmp_p
     linha_definicao_estrutura = 3
     linhas_do_trace = [p["linha"] for p in resultado["passos"]]
     assert linha_definicao_estrutura not in linhas_do_trace
-
-
-# ---------- B17 (AL-90): codegen_minimo -- assumia que semantics.verificar() tinha corrido, mas --minimo salta-o ----------
-
-def test_minimo_reatribuicao_de_literal_de_estrutura_nao_rebenta_o_compilador():
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        estrutura Ponto
-            x:inteiro
-        inicio
-            p:Ponto = {x: 1}
-            p = {x: 99}
-            escrever(p.x)
-    """))
-    codigo_py = gerar_python_minimo(programa)
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.returncode == 0
-    assert resultado.stdout.strip() == "99"
-
-
-def test_minimo_ref_com_argumento_invalido_nao_rebenta_o_compilador():
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        procedimento incr(ref a:inteiro)
-            a = a + 1
-        inicio
-            incr(1 + 2)
-    """))
-    # não deve levantar nenhuma exceção do COMPILADOR -- só o Python
-    # nativo, ao correr o ficheiro gerado, é que pode falhar.
-    codigo_py = gerar_python_minimo(programa)
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.returncode != 0
-    assert "SyntaxError" in resultado.stderr
 
 
 # ---------- B21 (AL-91): bibliotecas -- conversao.paraInteiro("inf") escapava ao tratamento de OverflowError ----------
@@ -4643,80 +4362,6 @@ def test_atribuicao_de_literal_de_estrutura_com_tipo_errado_continua_rejeitado()
         """)
 
 
-def test_minimo_devolver_literal_de_estrutura_diretamente_funciona():
-    """Mesmo caso que test_devolver_literal_de_estrutura_diretamente_funciona,
-    mas em '--minimo' -- antes desta correção, o PRÓPRIO COMPILADOR
-    rebentava ('expressão não suportada: EstruturaLiteral'), não só o
-    programa gerado."""
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        estrutura Ponto
-            x:inteiro
-        funcao criar():Ponto
-            devolver {x: 5}
-        inicio
-            p:Ponto = criar()
-            escrever(p.x)
-    """))
-    codigo_py = gerar_python_minimo(programa)
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.returncode == 0, resultado.stderr
-    assert resultado.stdout.strip() == "5"
-
-
-# ---------- AUDITORIA.md secção 3 -- assimetria ErroInternoCompilador vs ErroSemantico ----------
-
-def test_erro_interno_compilador_e_a_mesma_classe_em_codegen_e_codegen_minimo():
-    """A classe deixou de estar duplicada/só em codegen.py -- ambos os
-    geradores importam a mesma classe de gerador_base.py (partilhada),
-    em vez de codegen_minimo.py reutilizar ErroSemantico para o mesmo
-    tipo de falha (um bug do compilador, não um erro do programa do
-    estudante)."""
-    from algo_lang.compilador.codegen import ErroInternoCompilador as DoCodegen
-    from algo_lang.compilador.codegen_minimo import ErroInternoCompilador as DoCodegenMinimo
-    from algo_lang.compilador.gerador_base import ErroInternoCompilador as DaBase
-    assert DoCodegen is DaBase
-    assert DoCodegenMinimo is DaBase
-
-
-def test_minimo_literal_de_estrutura_em_posicao_ambigua_da_erro_interno_com_mensagem_clara():
-    """'escrever({x:1})' não tem tipo conhecido pelo contexto -- nem em
-    --minimo há como adivinhar qual 'estrutura' se quer. Antes desta
-    correção, isto levantava ErroSemantico (rotulado como se fosse um
-    erro de tipos do estudante) em vez de ErroInternoCompilador (uma
-    limitação real do próprio --minimo)."""
-    from algo_lang.compilador.gerador_base import ErroInternoCompilador
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        estrutura Ponto
-            x:inteiro
-        inicio
-            escrever({x: 1})
-    """))
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    with pytest.raises(ErroInternoCompilador, match="mesmo em --minimo"):
-        gerar_python_minimo(programa)
-
-
-def test_cli_minimo_erro_interno_da_mensagem_amigavel_nao_traceback(tmp_path, capsys):
-    """Verificação direta (sem subprocess) de que 'algo compila --minimo'
-    já não deixa um ErroInternoCompilador propagar como traceback cru --
-    cli.py passou a apanhá-lo tal como já apanhava no modo normal."""
-    from algo_lang.cli import compilar_ficheiro
-    algo_path = tmp_path / "prog.algo"
-    algo_path.write_text(
-        'algoritmo "T"\nestrutura Ponto\n    x:inteiro\ninicio\n    escrever({x: 1})\n',
-        encoding="utf-8")
-    with pytest.raises(SystemExit) as exc:
-        compilar_ficheiro(str(algo_path), minimo=True)
-    assert exc.value.code == 1
-    saida = capsys.readouterr().out
-    assert "não suportado em --minimo" in saida
-    assert "Traceback" not in saida
-
-
 # ---------- AUDITORIA.md secção 3 -- mensagem enganadora em p.campo(args) ----------
 
 def test_campo_de_estrutura_chamado_como_metodo_da_mensagem_dedicada():
@@ -4772,136 +4417,6 @@ def test_parametro_ast_tem_campo_linha():
             f(1)
     """))
     assert programa.funcoes[0].parametros[0].linha == 3
-
-
-# ---------- AUDITORIA.md secção 3 -- paridade comportamental codegen.py/codegen_minimo.py ----------
-
-def _executar_minimo(codigo_algo, entrada=""):
-    """Compila com o gerador --minimo E COM verificar() a correr primeiro
-    (ao contrário do uso normal de --minimo) -- aqui o objetivo é
-    comparar comportamento em programas bem tipados, não testar o
-    caminho 'sem rede de segurança' em si."""
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(textwrap.dedent(codigo_algo))
-    verificar(programa)
-    codigo_py = gerar_python_minimo(programa)
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], input=entrada,
-        capture_output=True, text=True, timeout=10)
-    if resultado.returncode != 0:
-        raise RuntimeError(
-            f"O programa --minimo gerado falhou (código {resultado.returncode}):\n"
-            f"{resultado.stderr}\n----- código gerado -----\n{codigo_py}"
-        )
-    return resultado.stdout
-
-
-PROGRAMAS_PARIDADE_NORMAL_VS_MINIMO = [
-    ("aritmetica_com_parenteses",
-     'algoritmo "T"\ninicio\n    escrever(2 + 3 * 4, " ", (2 + 3) * 4)\n'),
-    ("div_mod_truncado_com_negativos",
-     'algoritmo "T"\ninicio\n    escrever(-7 div 2, " ", -7 mod 2)\n'),
-    ("potencia_expoente_inteiro_literal_nao_negativo",
-     'algoritmo "T"\ninicio\n    escrever(2 ^ 10, " ", 2.0 ^ 0.5)\n'),
-    ("biblioteca_cadeia",
-     'algoritmo "T"\nimportar Cadeia\ninicio\n'
-     '    escrever(cadeia.maiusculas("ola"), " ", cadeia.subcadeia("algoritmo", 0, 4))\n'),
-    ("biblioteca_matematica",
-     'algoritmo "T"\nimportar Matematica\ninicio\n'
-     '    escrever(matematica.raiz(16.0), " ", matematica.absoluto(-5))\n'),
-    ("condicional_se_senao",
-     'algoritmo "T"\ninicio\n    x:inteiro = 7\n    se x mod 2 == 0 entao\n'
-     '        escrever("par")\n    senao\n        escrever("impar")\n'),
-    ("loop_enquanto_com_acumulador",
-     'algoritmo "T"\ninicio\n    i:inteiro = 0\n    soma:inteiro = 0\n'
-     '    enquanto i < 5 fazer\n        soma = soma + i\n        i = i + 1\n    escrever(soma)\n'),
-    ("recursao",
-     'algoritmo "T"\nfuncao fat(n:inteiro):inteiro\n    se n <= 1 entao\n        devolver 1\n'
-     '    senao\n        devolver n * fat(n - 1)\ninicio\n    escrever(fat(5))\n'),
-    ("array_multidimensional",
-     'algoritmo "T"\ninicio\n    m:inteiro[2][2] = {{1,2},{3,4}}\n    escrever(m[0][0] + m[1][1])\n'),
-    ("afirmar_verdadeiro",
-     'algoritmo "T"\ninicio\n    x:inteiro = 5\n    afirmar(x > 0)\n    escrever("ok")\n'),
-    ("escolher_caso",
-     'algoritmo "T"\ninicio\n    x:inteiro = 2\n    escolher x\n        caso 1\n'
-     '            escrever("um")\n        caso 2\n            escrever("dois")\n'
-     '        contrario\n            escrever("outro")\n'),
-    ("ref_escalar",
-     'algoritmo "T"\nprocedimento trocar(ref a:inteiro, ref b:inteiro)\n    temp:inteiro = a\n'
-     '    a = b\n    b = temp\ninicio\n    x:inteiro = 3\n    y:inteiro = 9\n'
-     '    trocar(x, y)\n    escrever(x, " ", y)\n'),
-]
-
-
-@pytest.mark.parametrize("nome,codigo", PROGRAMAS_PARIDADE_NORMAL_VS_MINIMO, ids=[c[0] for c in PROGRAMAS_PARIDADE_NORMAL_VS_MINIMO])
-def test_paridade_comportamental_normal_vs_minimo(nome, codigo):
-    """AUDITORIA.md secção 3: 'testes de paridade codegen.py/
-    codegen_minimo.py só verificam paridade estrutural, não
-    comportamental -- daí bugs como B13/B14 (mesma construção,
-    comportamento runtime diferente) escaparem.' Corre o MESMO programa
-    bem tipado pelos dois geradores e compara stdout diretamente, em vez
-    de manter duas listas de resultados esperados escritas à mão (que
-    podiam divergir do mesmo jeito que os próprios geradores). Já apanhou
-    2 divergências reais ao escrever este teste (ver o resto desta
-    secção): '^' com expoente inteiro literal não-negativo numa posição
-    solta (ex.: 'escrever(2^10)') dava 1024.0 em --minimo, 1024 no modo
-    normal.
-
-    Excluído de propósito (divergências já conhecidas/intencionais, não
-    bugs): comparação de estruturas/booleanos (--minimo mostra
-    True/False nativo do Python, nunca traduzido -- já coberto por
-    test_minimo_booleano_e_python_puro_nao_traduzido); '^' com expoente
-    que só é conhecido em tempo de execução (ex.: '2 ^ n') dentro de uma
-    declaração 'decimal' -- --minimo não coage NENHUMA expressão para
-    decimal à entrada de uma declaração (confirmado independentemente do
-    '^': 'x:decimal = 5' já dá '5', não '5.0'), gap mais geral, fora do
-    âmbito desta correção pontual."""
-    saida_normal = executar(codigo)
-    saida_minimo = _executar_minimo(codigo)
-    assert saida_normal == saida_minimo
-
-
-def test_minimo_potencia_com_expoente_inteiro_literal_nao_negativo_nao_embrulha_em_float():
-    """B14 (secção 3), divergência encontrada pelo teste de paridade
-    acima: 'escrever(2^10)' (posição solta, sem tipo-alvo nenhum a
-    coagir para) dava '1024.0' em --minimo (sempre embrulhado em
-    float(...)), '1024' no modo normal -- porque semantics.py tipa esse
-    caso concreto como 'inteiro' (expoente literal inteiro não-negativo),
-    e o '**' nativo do Python já preserva int/float sozinho aí, sem
-    precisar de nenhuma coerção."""
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        inicio
-            escrever(2 ^ 10)
-    """))
-    codigo_py = gerar_python_minimo(programa)
-    assert "float(" not in codigo_py
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.returncode == 0, resultado.stderr
-    assert resultado.stdout.strip() == "1024"
-
-
-def test_minimo_potencia_com_expoente_fracionario_nao_negativo_continua_protegida():
-    """Regressão crítica: um expoente NÃO-NEGATIVO mas FRACIONÁRIO (ex.:
-    0.5) com base negativa também produz 'complex' silenciosamente --
-    não basta olhar para o sinal do expoente (como semantics.py faz, em
-    contexto onde já sabe que o tipo é 'inteiro' antes de chegar aqui);
-    tem de ser um inteiro literal não-negativo especificamente, senão
-    esta proteção reintroduz exatamente o bug que B14 corrigiu."""
-    from algo_lang.compilador.codegen_minimo import gerar_python_minimo
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        inicio
-            x:decimal = (-8.0) ^ 0.5
-            escrever(x)
-    """))
-    codigo_py = gerar_python_minimo(programa)
-    resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
-    assert resultado.returncode != 0
-    assert "complex" in resultado.stderr
 
 
 # ---------- Auditoria (4ª ronda), Etapa 1 -- análise léxica: lacunas

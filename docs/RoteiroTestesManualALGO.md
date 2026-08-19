@@ -301,13 +301,7 @@ inicio
 
 ## 4. Comandos do CLI
 
-### 4.1 `compila` (só gera o `.py`, não corre)
-
-- [ ] `algo compila testes-manuais/ola.algo`
-- [ ] **Esperado**: `✔ Compilado para: .../ola.py` — e não deve
-      aparecer nenhuma saída de execução (porque não corre o programa)
-
-### 4.2 `lint`
+### 4.2 `verifica`
 
 - [ ] `testes-manuais/lint_teste.algo`:
 
@@ -319,7 +313,7 @@ inicio
     escrever(x)
 ```
 
-- [ ] `algo lint testes-manuais/lint_teste.algo`
+- [ ] `algo verifica testes-manuais/lint_teste.algo`
 - [ ] **Esperado**: um aviso a dizer que `y` é declarada mas nunca
       usada
 
@@ -345,30 +339,21 @@ inicio
       confirma que é JSON válido (começa com `{` e tem uma lista
       `"passos"`)
 
-### 4.6 `compila --minimo`
-
-- [ ] `algo compila --minimo testes-manuais/afirmar.algo`
-- [ ] **Esperado**: `✔ Compilado para: .../afirmar_min.py`
-- [ ] Abre `testes-manuais/afirmar/afirmar_min.py` num editor. **Esperado**:
-      código Python bem mais curto e direto do que o `.py` normal — sem
-      funções tipo `_algo_escrever`, e a linha do `afirmar` deve ser
-      literalmente `assert (dobro(5) == 10), "dobro(5) devia ser 10"`
-
 ---
 
 ## 5. Consola interativa
 
 - [ ] Escreve só `algo` (ou `./algo.sh` / `algo.bat` / duplo-clique em
       `algo.command`), sem mais nada a seguir
-- [ ] **Esperado**: abre um ecrã com "Consola ALGO" e a lista dos 4
+- [ ] **Esperado**: abre um ecrã com "Consola ALGO" e a lista dos 3
       comandos principais
 - [ ] Escreve: `executa testes-manuais/ola.algo`
 - [ ] **Esperado**: compila e corre, mostra `Ola, ALGO!`
-- [ ] Escreve só: `lint` (sem nome de ficheiro)
+- [ ] Escreve só: `verifica` (sem nome de ficheiro)
 - [ ] **Esperado**: usa `ola.algo` automaticamente (o último usado) —
       não deve pedir o nome outra vez
 - [ ] Escreve: `ajuda`
-- [ ] **Esperado**: lista detalhada dos 4 comandos, cada um com as
+- [ ] **Esperado**: lista detalhada dos 3 comandos, cada um com as
       respetivas flags e exemplos
 - [ ] Escreve um comando propositadamente errado: `xyz`
 - [ ] **Esperado**: mostra um erro e sugere escrever `ajuda` — **a
@@ -467,12 +452,10 @@ inicio
 - [ ] 3.7 Estruturas — resultado certo
 - [ ] 3.8 Bibliotecas — resultado certo
 - [ ] 3.9 `afirmar` — resultado certo
-- [ ] 4.1 `compila` — gera o `.py` sem correr
-- [ ] 4.2 `lint` — deteta a variável não usada
+- [ ] 4.2 `verifica` — deteta a variável não usada
 - [ ] 4.3 `fluxograma` — gera o diagrama
 - [ ] 4.4 `--debug` — mostra as variáveis passo a passo
 - [ ] 4.5 `--json` — gera um `.json` válido
-- [ ] 4.6 `compila --minimo` — gera Python mínimo
 - [ ] 5. Consola interativa — abre, lembra o ficheiro, `ajuda`, erro
       não fecha, `sair` funciona
 - [ ] 6.1 Colisão com palavra Python — erro claro

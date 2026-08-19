@@ -51,7 +51,7 @@ def test_algo_sh_segunda_execucao_nao_reinstala(tmp_path):
                     capture_output=True, text=True, timeout=120)
 
     resultado = subprocess.run(
-        ["./algo.sh", "lint", "soma.algo"], cwd=projeto,
+        ["./algo.sh", "verifica", "soma.algo"], cwd=projeto,
         capture_output=True, text=True, timeout=15)
     assert resultado.returncode == 0
     assert "Primeira utilização" not in resultado.stdout

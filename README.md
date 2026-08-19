@@ -24,7 +24,7 @@ algo.bat         # Windows
 
 Instala tudo o que for preciso na primeira vez (ambiente virtual
 Python) e abre a consola interativa. `algo executa`, `algo compila`,
-`algo fluxograma`, `algo lint`, e `?` dentro da consola chama o
+`algo fluxograma`, `algo verifica`, e `?` dentro da consola chama o
 Alguem. Referência completa em `docs/ReferenciaCompletaCLI.md`.
 
 ### 2. Serviço web (várias pessoas, cada uma com a sua conta)

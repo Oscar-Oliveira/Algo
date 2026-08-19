@@ -307,8 +307,8 @@ veres todos os comandos disponíveis, e `sair` para terminares a
 consola.
 
 Cada comando tem também um atalho de uma letra, para escreveres ainda
-menos: `e` (executa), `c` (compila), `l` (lint), `f` (fluxograma), `a`
-(ajuda). Por exemplo, `e meus-programas/ola.algo` funciona exatamente
+menos: `e` (executa), `v` (verifica), `f` (fluxograma), `a`
+(ajuda), `s` (sair). Por exemplo, `e meus-programas/ola.algo` funciona exatamente
 como `executa meus-programas/ola.algo`.
 
 ### Onde vai parar o resultado
@@ -390,17 +390,15 @@ passo, até chegar a `total = 6`.
 | `algo executa ficheiro.algo --debug` | Mostra o valor das variáveis a cada passo da execução |
 | `algo executa ficheiro.algo --json` | Gera um ficheiro `.json` com o *trace* completo, para o visualizador web (secção 10) |
 | `algo executa ficheiro.algo --json --entradas dados.txt` | Como acima, mas lendo os valores de `ler()` de um ficheiro de texto em vez de perguntar um a um |
-| `algo compila ficheiro.algo` | Só compila (gera o `.py`, não corre) |
-| `algo compila ficheiro.algo --minimo` | Gera Python mínimo, sem verificação de tipos prévia nem funções de apoio — útil para veres o Python "a seco" por trás do ALGO |
-| `algo lint ficheiro.algo` | Avisa sobre enganos comuns (variáveis não usadas, comparações sempre verdadeiras, etc.) |
+| `algo verifica ficheiro.algo` | Avisa sobre enganos comuns (variáveis não usadas, comparações sempre verdadeiras, etc.) |
 | `algo fluxograma ficheiro.algo` | Gera um diagrama do programa (principal + um por função/procedimento) |
 | `algo fluxograma ficheiro.algo --funcao nome` | Gera o fluxograma só dessa função/procedimento |
 | `algo fluxograma ficheiro.algo --formato svg` | Formato da imagem: `png` (por omissão), `svg` ou `pdf` |
 | `algo` (sem mais nada) | Abre a consola interativa (secção 9b) |
 
 Dentro da consola interativa, cada um destes comandos tem também um
-atalho de uma letra: `e` (executa), `c` (compila), `l` (lint), `f`
-(fluxograma), `a` (ajuda).
+atalho de uma letra: `e` (executa), `v` (verifica), `f`
+(fluxograma), `a` (ajuda), `s` (sair).
 
 Todos os ficheiros gerados (`.py`, `.dot`, imagens, `.json`) ficam
 numa **subpasta com o nome do programa**, ao lado do ficheiro `.algo`
