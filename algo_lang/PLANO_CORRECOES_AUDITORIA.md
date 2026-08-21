@@ -523,6 +523,38 @@ ruído de vírgula flutuante comum".
 
 ---
 
+## Fase 9 — Ronda 13 (segunda reauditoria, 2026-08-21): sanity-check da Fase 8 + 4 bugs novos, todos menores — ✅ CONCLUÍDO
+
+Pedida logo a seguir à Fase 8, com o mesmo método (4 auditorias
+paralelas, cada uma obrigada a verificar primeiro se a correção da
+Fase 8 no seu âmbito aguenta casos extremos, antes de procurar bugs
+novos). Resultado: **as 11 correções da Fase 8 aguentaram tudo o que
+foi testado** — nenhuma regressão nelas próprias. 4 bugs novos, todos
+`média`/`menor`/`cosmético`. Ver `docs/AuditoriaCompilador_2026-08-19.md`,
+secção "Ronda 13", para o detalhe completo (bugs #44-#47).
+
+- **#44** (`escolher` nunca recebeu a correção do bug #9): extraído
+  `_propagar_declaracoes_comuns(escopo, escopos_ramos)` em
+  `semantics.py`, partilhado agora por `A.Se` e `A.Escolha`.
+- **#45** (`-0.0` que só aparece depois de arredondar escapava à
+  normalização): trocada a ordem em `_algo_fmt` -- arredondar sempre
+  primeiro, normalizar zero depois.
+- **#46** (rótulo `"Principal"` do tracer colide com uma função do
+  estudante com o mesmo nome): novo `NOME_VISIVEL_PRINCIPAL =
+  "(Principal)"` em `tracer.py` (parênteses nunca são um identificador
+  ALGO válido).
+- **#47** (construções de topo depois de `inicio` aceites em
+  silêncio): guarda `if corpo is not None` no topo do `while` de
+  `parse_programa`, mantendo a mensagem dedicada para um segundo
+  `inicio` (AL-75) e acrescentando uma genérica para qualquer outra
+  construção.
+
+7 testes de regressão novos em `test_correcoes_auditoria.py`; 2 testes
+existentes atualizados para o novo rótulo `"(Principal)"`
+(`test_tracer.py`, `test_correcoes_auditoria.py`).
+
+---
+
 ## Depois de tudo o que está acima
 
 - Atualizar `test_fuzzing_e_propriedades.py:117` (remover

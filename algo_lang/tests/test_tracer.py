@@ -49,7 +49,7 @@ def test_trace_regista_variaveis_da_pilha_principal(tmp_path):
             escrever(x)
     """, tmp_path=tmp_path)
     ultimo = resultado["passos"][-1]
-    assert ultimo["pilha"][0]["nome"] == "Principal"
+    assert ultimo["pilha"][0]["nome"] == "(Principal)"
     assert ultimo["pilha"][0]["variaveis"]["x"] == 42
 
 

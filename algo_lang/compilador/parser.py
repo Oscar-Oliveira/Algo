@@ -135,6 +135,28 @@ class Parser:
         corpo = None
 
         while not self.ver("EOF"):
+            if corpo is not None:
+                # AUDITORIA_2026-08-19 ronda 13: 'inicio' tem de ser a
+                # última coisa no programa -- sem esta guarda, qualquer
+                # construção de topo (declaração, função, 'estrutura',
+                # 'importar'/'incluir', e até um SEGUNDO 'inicio', ver
+                # AL-75 abaixo) era aceite em silêncio depois do bloco
+                # 'inicio' já ter terminado, sem erro nenhum (o codegen
+                # reordena tudo de qualquer forma, por isso corria
+                # normalmente -- só a ORDEM no ficheiro-fonte deixava de
+                # bater certo com a ordem de execução, sem aviso nenhum
+                # ao estudante).
+                if self.ver("INICIO"):
+                    # AL-75: mensagem dedicada para o caso mais comum
+                    # (copiar/colar um segundo 'inicio' por engano).
+                    raise ErroSintatico(
+                        "o programa já tem um bloco 'inicio' -- só pode haver um",
+                        self.atual().linha, self.atual().coluna)
+                raise ErroSintatico(
+                    "o bloco 'inicio' tem de ser a última coisa do programa -- "
+                    f"encontrou {_nome_amigavel(self.atual().tipo, self.atual().valor)} "
+                    f"depois dele",
+                    self.atual().linha, self.atual().coluna)
             if self.ver("IMPORTAR"):
                 importares.append(self._parse_importar())
             elif self.ver("INCLUIR"):
@@ -148,15 +170,6 @@ class Parser:
             elif self.ver("ID"):
                 declaracoes.extend(self._parse_declaracao_global())
             elif self.ver("INICIO"):
-                if corpo is not None:
-                    # AL-75: sem esta verificacao, um segundo 'inicio' era
-                    # aceite em silencio e SUBSTITUIA o primeiro bloco
-                    # inteiro (corpo = ...), fazendo desaparecer logica sem
-                    # erro nenhum -- em vez de rejeitar como e suposto um
-                    # programa so poder ter um bloco 'inicio'.
-                    raise ErroSintatico(
-                        "o programa já tem um bloco 'inicio' -- só pode haver um",
-                        self.atual().linha, self.atual().coluna)
                 corpo = self._parse_bloco_inicio()
             else:
                 raise ErroSintatico(

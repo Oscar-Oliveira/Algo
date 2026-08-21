@@ -1461,6 +1461,145 @@ correção de domínio genuína.
 `bibliotecas/conversao.py:37` (`int(x)`) e `:53` (`float(x)`) — sem
 validação prévia antes de delegar aos construtores do Python.
 
+## Ronda 13 (2026-08-21) — segunda reauditoria, pedida logo a seguir à ronda 12
+
+Metodologia igual à ronda 12: 4 auditorias paralelas (front-end,
+semântica, codegen+bibliotecas, CLI/ferramentas), cada uma obrigada a
+(a) verificar se as correções da ronda 12 no seu âmbito aguentam casos
+extremos, e (b) procurar bugs genuinamente novos, sem repetir
+investigações já feitas e descartadas nas 12 rondas anteriores.
+Resultado: **as 6 correções da ronda 12 (bugs #2/#9/#18/#19/#24/#36/#37/
+#39/#41/#42/#43) aguentaram todos os casos extremos testados** — nenhuma
+regressão, nenhuma lacuna nova nelas próprias. 4 bugs genuinamente novos
+encontrados, todos de severidade baixa (nenhum `grave`). Baseline:
+750→769 testes a passar (mais os 20 novos da ronda 12), 33 falhas de
+ambiente inalteradas.
+
+### 44. (ronda 13, média) `escolher`/`caso`/`contrario` nunca recebeu a correção do bug #9 — mesma classe de bug, mecanismo irmão esquecido
+
+**[CORRIGIDO]** A correção do bug #9 (ronda 12) só tocou no caso `A.Se`
+de `_verificar_stmt` — o caso `A.Escolha`, que cria exatamente o mesmo
+padrão de um `Escopo` descartável por ramo (`caso`/`contrario`), nunca
+foi tocado. Uma variável declarada com o mesmo tipo em TODOS os `caso`
+e no `contrario` de um `escolher` exaustivo dava, incorretamente, "não
+foi declarada" ao ser usada a seguir — o mesmo sintoma do bug #9,
+noutra sintaxe.
+
+Repro:
+```algo
+algoritmo "T"
+inicio
+    x:inteiro = 1
+    escolher x
+        caso 1
+            y:inteiro = 10
+        contrario
+            y:inteiro = 20
+    escrever(y)
+```
+Antes: `ErroSemantico: a variável 'y' não foi declarada`. Depois:
+compila e imprime `10`.
+
+**Correção:** extraída a lógica de fusão/propagação de
+`_verificar_stmt`'s caso `A.Se` para um novo método partilhado,
+`_propagar_declaracoes_comuns(escopo, escopos_ramos)` — chamado tanto
+por `A.Se` (com `senao`) como por `A.Escolha` (com `contrario`), para
+que um terceiro tipo de instrução com ramos exaustivos que apareça no
+futuro não repita o mesmo esquecimento.
+
+`semantics.py` (caso `A.Escolha` de `_verificar_stmt`, antes das linhas
+1063-1100 da ronda 12).
+
+### 45. (ronda 13, menor) Normalização de `-0.0` em `escrever` corria ANTES do arredondamento, não depois — um valor que só chega a `-0.0` DEPOIS de arredondar continuava a escapar
+
+**[CORRIGIDO]** A correção do bug #18 (ronda 12) verificava `v == 0.0`
+no valor ORIGINAL, antes de arredondar — um valor que não é exatamente
+zero mas ARREDONDA para `-0.0` a 12 casas decimais (ex.: `-1e-13`)
+nunca passava por essa verificação, porque só entrava no ramo `else`
+(arredondar sem normalizar).
+
+Repro:
+```algo
+algoritmo "T"
+inicio
+    escrever(-1.0 / 10000000000000.0)
+```
+Antes: `-0.0`. Depois: `0.0`.
+
+**Correção:** trocada a ordem — arredondar sempre primeiro, só depois
+verificar `== 0.0` e normalizar.
+
+`codegen.py:_algo_fmt`.
+
+**Achado relacionado, não um bug (comentário corrigido):** a docstring
+de `_algo_texto_para_decimal` (bug #19) afirmava ser "partilhada" com
+`conversao.paraDecimal` — falso, essa função tem a sua própria
+verificação separada (só `_` de milhar, não `nan`/`inf`, de propósito,
+ver bug #40). Comentário corrigido para não induzir em erro um
+maintainer futuro que edite o helper e assuma incorretamente que
+`conversao.paraDecimal` herda a mudança.
+
+### 46. (ronda 13, cosmético) Rótulo "Principal" da pilha do tracer colide com uma função do estudante literalmente chamada `Principal`
+
+**[CORRIGIDO]** "Principal" (o rótulo hardcoded para o frame do
+programa principal em `tools/tracer.py`) não é uma palavra reservada —
+um estudante pode legalmente ter `funcao Principal(...)`. Quando tem,
+a pilha do trace (`--debug`/`--json`/visualizador web) mostra duas
+entradas indistinguíveis, ambas "Principal", uma sendo o programa real
+e outra a função do estudante.
+
+Repro:
+```algo
+algoritmo "T"
+funcao Principal(x:inteiro):inteiro
+    devolver x + 1
+inicio
+    y:inteiro = Principal(10)
+    escrever(y)
+```
+Antes: pilha `['Principal', 'Principal']` dentro da chamada — ambíguo.
+Depois: pilha `['(Principal)', 'Principal']` — o programa usa
+`(Principal)` (com parênteses, nunca um identificador ALGO válido, ver
+lexer.py), a função do estudante mantém o nome dela sem alteração.
+
+**Correção:** novo `NOME_VISIVEL_PRINCIPAL = "(Principal)"` em
+`tracer.py`, substituindo os 4 usos hardcoded de `"Principal"`.
+Atualizados os 2 testes existentes que comparavam com o literal antigo
+(`test_tracer.py`, `test_correcoes_auditoria.py`).
+
+`tools/tracer.py` (`construir_pilha`, `_nome_visivel_ou_none`,
+`_indice_do_ultimo_passo_em_principal`, o `tracer()` interno).
+
+### 47. (ronda 13, menor) Construções de topo depois do bloco `inicio` eram aceites em silêncio — só um SEGUNDO `inicio` era rejeitado
+
+**[CORRIGIDO]** `parse_programa`'s `while not self.ver("EOF")` só
+verificava explicitamente contra um segundo `inicio` (AL-75) — qualquer
+OUTRA construção de topo (declaração de variável, `funcao`/
+`procedimento`, `estrutura`, `importar`/`incluir`) continuava a ser
+aceite sintaticamente mesmo depois de `inicio` já ter terminado.
+Impacto em runtime é nulo (o codegen já reordena tudo,
+independentemente da ordem no ficheiro-fonte), mas nenhum diagnóstico
+avisava de um erro real de organização (ex.: colar uma função por
+engano depois de `inicio`).
+
+Repro:
+```algo
+algoritmo "T"
+inicio
+    escrever(x)
+x:inteiro = 5
+```
+Antes: compila e corre normalmente (imprime `5`). Depois:
+`ErroSintatico: o bloco 'inicio' tem de ser a última coisa do programa
+-- encontrou um identificador ('x') depois dele`.
+
+**Correção:** guarda `if corpo is not None` logo no topo do `while`,
+antes de despachar para qualquer ramo -- mantém a mensagem dedicada
+para um segundo `inicio` (AL-75), e uma mensagem genérica nova para
+qualquer outra construção.
+
+`parser.py:parse_programa`.
+
 ## Meta-achado (ronda 10): porque é que o bug #31 (índices negativos) escapou a 97+ correções anteriores
 
 Investigação dedicada, não apenas mais um bug. Conclusão com evidência

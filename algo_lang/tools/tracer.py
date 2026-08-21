@@ -15,6 +15,14 @@ import contextlib
 
 MAX_PASSOS = 4000
 NOME_FUNCAO_PRINCIPAL = "_algo_programa"
+# AUDITORIA_2026-08-19 bug #36-bis (ronda 13): "Principal" sozinho é um
+# identificador ALGO válido -- um estudante podia legalmente chamar uma
+# função sua "Principal" (a palavra até faz sentido nesse contexto) e
+# ficar com duas entradas indistinguíveis na pilha do trace. Parênteses
+# nunca são válidos num identificador (ver lexer.py: um ID só aceita
+# letra/'_' seguido de alfanumérico/'_'), por isso este rótulo nunca
+# pode colidir com o nome de nenhuma função do estudante.
+NOME_VISIVEL_PRINCIPAL = "(Principal)"
 
 
 class LimiteDePassosExcedido(Exception):
@@ -138,7 +146,7 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
             if nome == NOME_FUNCAO_PRINCIPAL:
                 variaveis = {k: _valor_serializavel(v) for k, v in f.f_globals.items()
                              if k in nomes_globais}
-                pilha.append({"nome": "Principal", "variaveis": variaveis})
+                pilha.append({"nome": NOME_VISIVEL_PRINCIPAL, "variaveis": variaveis})
             elif nome in nomes_funcoes_conhecidas:
                 # AL-67/B27: o lexer permite explicitamente identificadores
                 # ALGO começados por '_' (ex.: 'funcao f(_x:inteiro)') --
@@ -180,7 +188,8 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         for i in range(len(passos) - 1, -1, -1):
             passo = passos[i]
             pilha = passo["pilha"]
-            if len(pilha) == 1 and pilha[0]["nome"] == "Principal" and passo["linha"] == linha_alvo:
+            if (len(pilha) == 1 and pilha[0]["nome"] == NOME_VISIVEL_PRINCIPAL
+                    and passo["linha"] == linha_alvo):
                 return i
         return None  # pragma: no cover -- defensivo, ver docstring
 
@@ -195,7 +204,7 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
             return None
         nome = frame.f_code.co_name
         if nome == NOME_FUNCAO_PRINCIPAL:
-            return "Principal"
+            return NOME_VISIVEL_PRINCIPAL
         if nome in nomes_funcoes_conhecidas:
             return nome
         return None
@@ -270,7 +279,7 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         # SUBSTITUÍDA (não mutada), para não corromper um 'list(...)'
         # já guardado num passo anterior.
         nome_atual = pilha_incremental[-1]["nome"]
-        if nome_atual == "Principal":
+        if nome_atual == NOME_VISIVEL_PRINCIPAL:
             variaveis_atuais = {k: _valor_serializavel(v) for k, v in frame.f_globals.items()
                                  if k in nomes_globais}
         else:

@@ -63,10 +63,14 @@ def _algo_fmt(v):
         # (ex.: 10.0^20 -> "1e+20") fica deliberadamente por resolver --
         # fora do alcance razoavel de "arredondar ruido", ver bug #18 em
         # docs/AuditoriaCompilador_2026-08-19.md.
+        # AUDITORIA_2026-08-19 bug #18-bis (ronda 13): a normalizacao de
+        # "-0.0" tem de correr DEPOIS do arredondamento, nao antes -- um
+        # valor que nao e exatamente 0.0 mas ARREDONDA para -0.0 (ex.:
+        # -1e-13) continuava a escapar a normalizacao, mostrando "-0.0"
+        # na mesma.
+        v = round(v, 12)
         if v == 0.0:
             v = 0.0
-        else:
-            v = round(v, 12)
         return repr(v)
     return str(v)
 
@@ -84,14 +88,18 @@ def _algo_ler_inteiro(prompt=""):
 
 
 def _algo_texto_para_decimal(texto):
-    """AUDITORIA_2026-08-19 bugs #19/#40: float() do Python aceita
+    """AUDITORIA_2026-08-19 bug #19: float() do Python aceita
     "nan"/"inf"/"-inf"/"Infinity" (case-insensitive) e separadores '_' de
     milhar -- nenhum dos dois e um numero decimal valido em ALGO (o
     lexer nao suporta '_' em literais numericos, e nao ha forma de o
-    estudante escrever um 'nan'/'inf' literal no codigo-fonte). Helper
-    partilhado por '_algo_ler_decimal' (abaixo) e por
-    'conversao.paraDecimal', para os dois pontos de entrada de texto
-    para decimal rejeitarem os dois casos da mesma forma."""
+    estudante escrever um 'nan'/'inf' literal no codigo-fonte). Usado só
+    por '_algo_ler_decimal' (abaixo) -- ao contrário de 'ler()' (entrada
+    interativa, onde "nan" é quase sempre um erro de digitação),
+    'conversao.paraDecimal' aceita 'nan'/'inf' DE PROPÓSITO (bug #40,
+    investigado na ronda 12: é o único ponto de todo o ALGO por onde um
+    programa consegue construir esses valores deliberadamente) e por
+    isso tem a sua PRÓPRIA verificação, mais permissiva, só para
+    separadores '_' -- não reaproveita este helper."""
     t = texto.strip()
     if "_" in t or t.lstrip("+-").lower() in ("nan", "inf", "infinity"):
         raise ValueError(f"'{texto}' não é um número decimal válido")

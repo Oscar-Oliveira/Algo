@@ -3307,7 +3307,7 @@ def test_trace_nao_corrompe_passo_quando_ultima_instrucao_chama_funcao(tmp_path)
     # apenas "existir algures") -- é o que garante a monotonicidade acima.
     assert passos[-1]["consola"] == "11\n"
     assert len(passos[-1]["pilha"]) == 1
-    assert passos[-1]["pilha"][0]["nome"] == "Principal"
+    assert passos[-1]["pilha"][0]["nome"] == "(Principal)"
 
 
 # ---------- B28 (AL-68): tracer -- linha salta para trás; OverflowError não traduzido ----------
@@ -6398,3 +6398,123 @@ def test_conversao_paradecimal_continua_a_aceitar_infinito():
             escrever(x)
     """)
     assert saida.strip() == "inf"
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 13: variável declarada em todos os
+# 'caso' + 'contrario' de um 'escolher' exaustivo fica disponível depois
+# dele (mesma classe do bug #9, mas em 'escolher') ----------
+
+def test_variavel_declarada_em_todos_os_casos_e_contrario_fica_disponivel_depois_do_escolher():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            x:inteiro = 1
+            escolher x
+                caso 1
+                    y:inteiro = 10
+                contrario
+                    y:inteiro = 20
+            escrever(y)
+    """)
+    assert saida.strip() == "10"
+
+
+def test_variavel_com_tipos_diferentes_entre_casos_continua_indisponivel_depois_do_escolher():
+    """Não regressão: ramos que não concordam em tipo continuam sem
+    propagação (sem erro na própria declaração, só ao usar 'z' depois).
+    Dentro de um procedimento para isolar do mecanismo, à parte, de
+    globais visíveis a funções (mesma razão do teste equivalente para
+    'se'/'senao')."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
+        compilar("""
+            algoritmo "T"
+            procedimento p()
+                x:inteiro = 1
+                escolher x
+                    caso 1
+                        z:inteiro = 10
+                    contrario
+                        z:decimal = 20.0
+                escrever(z)
+            inicio
+                p()
+        """)
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 13: '-0.0' que só aparece depois
+# do arredondamento de 12 casas decimais escapava à normalização de
+# 'escrever' (bug #18-bis) ----------
+
+def test_escrever_decimal_normaliza_zero_negativo_que_so_aparece_apos_arredondar():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            escrever(-1.0 / 10000000000000.0)
+    """)
+    assert saida.strip() == "0.0"
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 13: rótulo "Principal" da pilha do
+# tracer colidia com uma função do estudante literalmente chamada
+# 'Principal' (bug #36-bis) ----------
+
+def test_tracer_nao_confunde_funcao_chamada_principal_com_o_programa_principal():
+    from algo_lang.compilador.codegen import gerar_python_com_mapa
+    from algo_lang.tools.tracer import gerar_trace
+    programa = parse(textwrap.dedent("""\
+        algoritmo "T"
+        funcao Principal(x:inteiro):inteiro
+            devolver x + 1
+        inicio
+            y:inteiro = Principal(10)
+            escrever(y)
+    """))
+    verificar(programa)
+    dados = gerar_python_com_mapa(programa)
+    resultado = gerar_trace(
+        dados["codigo"], "fake_path.py", dados["mapa_linhas"],
+        dados["nomes_globais"], dados["nomes_funcoes"])
+    nomes_por_passo = [[f["nome"] for f in p["pilha"]] for p in resultado["passos"]]
+    # o frame do PROGRAMA (não da função do estudante) usa um rótulo que
+    # nenhum identificador ALGO válido pode ter (parênteses)
+    assert any(pilha == ["(Principal)"] for pilha in nomes_por_passo)
+    # o frame da FUNÇÃO do estudante mantém o nome dela, sem confusão
+    assert any("Principal" in pilha and "(Principal)" in pilha for pilha in nomes_por_passo)
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 13: construções de topo (variável,
+# função, 'estrutura', 'importar'/'incluir') depois do bloco 'inicio' eram
+# aceites em silêncio ----------
+
+def test_declaracao_global_depois_de_inicio_da_erro_de_sintaxe():
+    with pytest.raises(ErroSintatico, match="última coisa do programa"):
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            inicio
+                escrever(x)
+            x:inteiro = 5
+        """))
+
+
+def test_funcao_depois_de_inicio_da_erro_de_sintaxe():
+    with pytest.raises(ErroSintatico, match="última coisa do programa"):
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            inicio
+                escrever(soma(1,2))
+            funcao soma(a:inteiro, b:inteiro):inteiro
+                devolver a+b
+        """))
+
+
+def test_segundo_inicio_continua_com_mensagem_dedicada():
+    """Não regressão: um segundo 'inicio' continua a dar a mensagem
+    específica (AL-75), não a mensagem genérica nova."""
+    with pytest.raises(ErroSintatico, match="só pode haver um"):
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            inicio
+                escrever(1)
+            inicio
+                escrever(2)
+        """))
