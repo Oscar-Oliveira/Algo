@@ -49,6 +49,22 @@ def test_ficheiro_principal_em_falta_da_erro_claro(tmp_path):
             [{"nome": "a.algo", "conteudo": "x"}], "b.algo", str(tmp_path))
 
 
+def test_compilar_codigo_recursion_error_vira_erro_compilacao_amigavel(tmp_path, monkeypatch):
+    """AUDITORIA_2026-08-19 bugs #7/#10: rede de segurança adicional --
+    a correção principal está no parser (algo_lang), que já impede uma
+    AST demasiado profunda de sequer existir. Isto simula um
+    RecursionError de qualquer OUTRA travessia recursiva (presente ou
+    futura) que o escape, confirmando que vira um ErroCompilacao
+    amigável em vez de propagar cru até ao handler genérico do
+    FastAPI (que devolveria um 500 opaco)."""
+    def _verificar_que_rebenta(programa):
+        raise RecursionError("simulado")
+    monkeypatch.setattr(executor, "verificar", _verificar_que_rebenta)
+    ficheiros, principal = _um_ficheiro('algoritmo "T"\ninicio\n    escrever(1)\n')
+    with pytest.raises(executor.ErroCompilacao, match="complexa"):
+        executor.compilar_codigo(ficheiros, principal, str(tmp_path))
+
+
 def test_dois_ficheiros_com_o_mesmo_nome_da_erro_claro(tmp_path):
     with pytest.raises(executor.ErroCompilacao, match="mesmo nome"):
         executor.compilar_codigo(
@@ -642,6 +658,21 @@ def test_analisar_linter_corre_mesmo_com_erro_semantico(tmp_path):
         'algoritmo "T"\ninicio\n    a:inteiro = 1\n    escrever(a + "x")\n')
     avisos = executor.analisar_linter(ficheiros, principal, str(tmp_path))
     assert avisos == []
+
+
+def test_analisar_linter_recursion_error_vira_erro_compilacao_amigavel(tmp_path, monkeypatch):
+    """Mesma rede de segurança que test_compilar_codigo_recursion_error_...,
+    mas para o endpoint /api/linter -- este é o caminho real do bug
+    #10: analisar_linter salta verificar() de propósito, por isso é o
+    único sítio do serviço web que chegava a um RecursionError cru do
+    próprio linter sem passar primeiro por um limiar mais baixo em
+    verificar()."""
+    def _analisar_que_rebenta(programa, codigo):
+        raise RecursionError("simulado")
+    monkeypatch.setattr(executor.linter_modulo, "analisar", _analisar_que_rebenta)
+    ficheiros, principal = _um_ficheiro('algoritmo "T"\ninicio\n    escrever(1)\n')
+    with pytest.raises(executor.ErroCompilacao, match="complexa"):
+        executor.analisar_linter(ficheiros, principal, str(tmp_path))
 
 
 def test_analisar_linter_com_incluir(tmp_path):

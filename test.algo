@@ -14,13 +14,13 @@ inicio
 
     i:inteiro
     para i de 0 ate 4 fazer
-        escrever(primos[i])
+        escrever(primos[0][i])
 
 
     primos2:inteiro[5] = adcionais(primos, 5)
     primos2[5] = 6
 
     para i de 0 ate 5 fazer
-        escrever(primos2[i])
+        escrever(primos2[1]]
 
     escrever("ola")

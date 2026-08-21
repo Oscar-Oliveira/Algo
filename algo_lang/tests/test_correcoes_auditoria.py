@@ -951,10 +951,13 @@ def test_expressao_moderadamente_aninhada_continua_a_funcionar():
 def test_cadeia_longa_de_operadores_sem_parenteses_nao_e_afetada():
     """Uma cadeia longa do MESMO operador (a+b+c+...) é tratada de
     forma iterativa (while), não recursiva -- não deve disparar o
-    limite de profundidade, ao contrário de parênteses aninhados."""
-    termos = " + ".join(["1"] * 200)
+    limite de profundidade de PARÊNTESES aninhados (50), muito mais
+    baixo. Continua sujeita ao seu próprio limite, mais alto, dedicado
+    à profundidade real da árvore (ver AUDITORIA_2026-08-19 bug #7/#10,
+    LIMITE_PROFUNDIDADE_ARVORE) -- 100 termos fica bem dentro dele."""
+    termos = " + ".join(["1"] * 100)
     saida = executar(f'algoritmo "T"\ninicio\n    escrever({termos})\n')
-    assert saida.strip() == "200"
+    assert saida.strip() == "100"
 
 
 # ---------- AUDIT_PLAN Fase 2: AL-19 -- matematica.absoluto preserva o tipo do argumento ----------
@@ -1382,6 +1385,91 @@ def test_nome_igual_a_funcao_de_biblioteca_nao_importada_e_permitido():
             escrever(matematica_raiz(4.0))
     """)
     assert saida.strip() == "4.0"
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 2.3: colisão com nomes que o
+# próprio codegen usa (bugs #23 e #27) ----------
+
+@pytest.mark.parametrize("nome_reservado", ["sys", "copy", "print", "input"])
+def test_variavel_global_com_nome_reservado_pelo_codegen_da_erro(nome_reservado):
+    """bug #23: 'sys'/'copy' vêm do cabeçalho do próprio codegen.py;
+    'print'/'input' são builtins que o código gerado chama diretamente.
+    Antes, só palavras-chave do Python eram rejeitadas -- estes nomes
+    perfeitamente normais rebatiam o import/builtin correspondente no
+    módulo Python gerado, partindo o compilador de formas diferentes
+    (a pior: 'copy' fazia o handler de AttributeError mentir ao
+    estudante, dizendo 'acesso a campo de nulo')."""
+    with pytest.raises(ErroSemantico, match="nome interno"):
+        compilar(f"""
+            algoritmo "T"
+            {nome_reservado}:inteiro = 5
+            inicio
+                escrever({nome_reservado})
+        """)
+
+
+def test_funcao_com_nome_reservado_pelo_codegen_da_erro():
+    with pytest.raises(ErroSemantico, match="nome interno"):
+        compilar("""
+            algoritmo "T"
+            funcao sys(): inteiro
+                devolver 1
+            inicio
+                escrever(sys())
+        """)
+
+
+def test_estrutura_com_nome_reservado_pelo_codegen_da_erro():
+    with pytest.raises(ErroSemantico, match="nome interno"):
+        compilar("""
+            algoritmo "T"
+            estrutura copy
+                x:inteiro
+            inicio
+                escrever(1)
+        """)
+
+
+def test_parametro_com_nome_reservado_pelo_codegen_da_erro():
+    with pytest.raises(ErroSemantico, match="nome interno"):
+        compilar("""
+            algoritmo "T"
+            procedimento f(print:inteiro)
+                escrever(print)
+            inicio
+                f(1)
+        """)
+
+
+@pytest.mark.parametrize("nome_reservado", ["_math", "_random"])
+def test_variavel_global_com_alias_interno_de_biblioteca_importada_da_erro(nome_reservado):
+    """bug #27: mesma classe do bug #23, mas para o alias que uma
+    biblioteca injeta no seu próprio CABECALHO (matematica.py ->
+    'import math as _math'/'import random as _random') -- só
+    verificado dinamicamente (_nomes_importados_no_cabecalho), não uma
+    lista fixa por biblioteca."""
+    with pytest.raises(ErroSemantico, match="nome interno"):
+        compilar(f"""
+            algoritmo "T"
+            importar Matematica
+            {nome_reservado}:inteiro = 5
+            inicio
+                escrever(matematica.raiz(4.0))
+        """)
+
+
+@pytest.mark.parametrize("nome_reservado", ["_math", "_random"])
+def test_alias_interno_de_biblioteca_nao_importada_e_permitido(nome_reservado):
+    """A colisão só existe quando a biblioteca está mesmo importada --
+    sem 'importar Matematica', o CABECALHO dela (e os seus aliases)
+    nunca entra no ficheiro gerado."""
+    saida = executar(f"""
+        algoritmo "T"
+        inicio
+            {nome_reservado}:inteiro = 5
+            escrever({nome_reservado})
+    """)
+    assert saida.strip() == "5"
 
 
 # ---------- lacunas de cobertura: codegen.py ----------
@@ -1919,6 +2007,74 @@ def test_carregar_ficheiro_algo_com_codificacao_invalida_da_erro_amigavel(tmp_pa
         _carregar_e_resolver_inclusoes(str(algo_path))
     assert exc.value.code == 1
     assert "UTF-8" in capsys.readouterr().out
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 2.4: codificação (bugs #25 e #28) ----------
+
+def test_ficheiro_algo_com_bom_utf8_compila_normalmente(tmp_path):
+    """bug #28: 'encoding="utf-8"' simples não remove o BOM (EF BB BF)
+    que vários editores no Windows (incluindo o Bloco de Notas) escrevem
+    por omissão -- ficava como um caractere invisível na linha 1, coluna
+    1, dando um erro léxico que o estudante não conseguia relacionar com
+    nada visível no seu editor. 'utf-8-sig' remove-o se existir."""
+    from algo_lang.cli import _ler_ficheiro_algo
+    algo_path = tmp_path / "prog.algo"
+    codigo = 'algoritmo "T"\ninicio\n    escrever(1 + 1)\n'
+    algo_path.write_bytes(b"\xef\xbb\xbf" + codigo.encode("utf-8"))
+    lido = _ler_ficheiro_algo(str(algo_path))
+    assert lido == codigo
+    compilar(lido)  # não deve levantar nada
+
+
+def test_ficheiro_algo_sem_bom_continua_a_funcionar(tmp_path):
+    """Não regressão: 'utf-8-sig' é um no-op seguro quando não há BOM."""
+    from algo_lang.cli import _ler_ficheiro_algo
+    algo_path = tmp_path / "prog.algo"
+    codigo = 'algoritmo "T"\ninicio\n    escrever("café")\n'
+    algo_path.write_bytes(codigo.encode("utf-8"))
+    assert _ler_ficheiro_algo(str(algo_path)) == codigo
+
+
+def test_escrever_acentos_e_emoji_nao_crasha_numa_codepage_restrita():
+    """bug #25: sem sys.stdout.reconfigure(encoding="utf-8") no
+    preâmbulo gerado, 'escrever' de um acento/emoji fora do codepage do
+    AMBIENTE (não do ficheiro fonte, já UTF-8) rebentava com
+    UnicodeEncodeError -- apanhado como ValueError genérico, mensagem
+    sem relação nenhuma com o problema real. Simula uma codepage
+    restrita removendo PYTHONIOENCODING/LANG/LC_ALL do ambiente do
+    subprocesso -- em produção, online/executor.py limpa exatamente
+    estas variáveis (ver _env_minimo), por isso não é um cenário
+    artificial."""
+    import os
+    codigo_py = compilar("""
+        algoritmo "T"
+        inicio
+            escrever("café ☕ não")
+    """)
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("PYTHONIOENCODING", "LANG", "LC_ALL")}
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, timeout=10, env=env)
+    assert resultado.returncode == 0
+    assert resultado.stdout.decode("utf-8").strip() == "café ☕ não"
+
+
+def test_sys_stdout_reconfigure_nao_e_chamado_quando_indisponivel():
+    """Sob tools/tracer.py (--debug/--json), o mesmo ficheiro gerado
+    corre com sys.stdout redirecionado para um io.StringIO() em
+    memória (contextlib.redirect_stdout), que não tem '.reconfigure()'
+    -- sem o 'hasattr' de guarda, isto seria um AttributeError cru
+    logo ao arrancar QUALQUER programa em modo --debug/--json."""
+    from algo_lang.compilador.codegen import gerar_python_com_mapa
+    from algo_lang.tools.tracer import gerar_trace
+    programa = parse('algoritmo "T"\ninicio\n    escrever("café ☕")\n')
+    verificar(programa)
+    dados = gerar_python_com_mapa(programa)
+    resultado = gerar_trace(
+        dados["codigo"], "<mem>", dados["mapa_linhas"],
+        dados["nomes_globais"], dados["nomes_funcoes"])
+    assert resultado["erro"] is None
+    assert resultado["consolaFinal"].strip() == "café ☕"
 
 
 # ---------- AUDIT_PLAN Fase 2: AL-36 -- 'incluir' transitivo a sério ----------
@@ -2948,7 +3104,8 @@ def test_executa_com_debug_sai_com_codigo_1_quando_programa_falha(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
         'algoritmo "T"\ninicio\n    v:inteiro[2]\n    escrever(v[5])\n', encoding="utf-8")
-    args = argparse.Namespace(ficheiro=str(algo_path), debug=True, json=False, entradas=None)
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), debug=True, json=False, entradas=None, mostrar_python=False)
     with pytest.raises(SystemExit) as exc:
         cmd_executa_com_trace(args)
     assert exc.value.code == 1
@@ -2960,7 +3117,8 @@ def test_executa_com_json_sai_com_codigo_1_quando_programa_falha(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
         'algoritmo "T"\ninicio\n    v:inteiro[2]\n    escrever(v[5])\n', encoding="utf-8")
-    args = argparse.Namespace(ficheiro=str(algo_path), debug=False, json=True, entradas=None)
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), debug=False, json=True, entradas=None, mostrar_python=False)
     with pytest.raises(SystemExit) as exc:
         cmd_executa_com_trace(args)
     assert exc.value.code == 1
@@ -2971,7 +3129,8 @@ def test_executa_com_debug_nao_sai_com_erro_quando_programa_e_bem_sucedido(tmp_p
     import argparse
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
-    args = argparse.Namespace(ficheiro=str(algo_path), debug=True, json=False, entradas=None)
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), debug=True, json=False, entradas=None, mostrar_python=False)
     cmd_executa_com_trace(args)  # não deve levantar SystemExit
 
 
@@ -3642,7 +3801,8 @@ def test_entradas_com_codificacao_invalida_da_erro_amigavel(tmp_path, capsys):
     entradas_path = tmp_path / "entradas.txt"
     entradas_path.write_bytes(b"caf\xe9\n")  # bytes inválidos em UTF-8
     args = argparse.Namespace(
-        ficheiro=str(algo_path), entradas=str(entradas_path), debug=False, json=False)
+        ficheiro=str(algo_path), entradas=str(entradas_path), debug=False, json=False,
+        mostrar_python=False)
     with pytest.raises(SystemExit) as excinfo:
         cmd_executa_com_trace(args)
     assert excinfo.value.code == 1
@@ -4195,7 +4355,8 @@ def test_subcadeia_com_limites_invertidos_da_erro_amigavel():
             escrever(cadeia.subcadeia("algoritmo", 4, 1))
     """)
     resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True,
+        encoding="utf-8", timeout=10)
     assert "Erro em tempo de execução" in resultado.stdout
     assert "início" in resultado.stdout and "fim" in resultado.stdout
 
@@ -4872,13 +5033,1368 @@ inicio
     assert "valor inválido" in resultado.stdout
 
 
-def test_matematica_potencia_com_expoente_gigante_da_overflow_amigavel():
+def test_matematica_potencia_com_expoente_grande_calcula_e_imprime_sem_overflow():
+    """AUDITORIA_2026-08-19 bug #35: antes da correção, 'potencia()'
+    forçava float(base**exp) incondicionalmente -- um resultado inteiro
+    exato mas com dígitos a mais para caber num float (10**1000, 1001
+    dígitos, bem dentro do limite de impressão de 4300) rebentava com
+    OverflowError, inconsistente com o operador '^' (que calcula isto
+    sem problema nenhum). Fica sem erro nenhum, tal como '^'."""
+    saida = executar("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.potencia(10, 1000))
+    """)
+    assert saida.strip() == str(10 ** 1000)
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 1.1: bug #1 -- cópia por valor de
+# estruturas/vetores (9 caminhos confirmados) ----------
+
+def test_atribuicao_simples_de_estrutura_nao_e_partilhada():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        inicio
+            p1:Ponto
+            p2:Ponto
+            p1.x = 1
+            p1.y = 2
+            p2 = p1
+            p2.x = 99
+            escrever(p1.x)
+            escrever(p2.x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_declaracao_com_inicializador_de_estrutura_nao_e_partilhada():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            p1:Ponto = {x: 1}
+            p2:Ponto = p1
+            p2.x = 99
+            escrever(p1.x)
+            escrever(p2.x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_devolver_variavel_de_estrutura_existente_nao_e_partilhada():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        g:Ponto
+        funcao pegaG():Ponto
+            devolver g
+        inicio
+            g.x = 1
+            p:Ponto = pegaG()
+            p.x = 99
+            escrever(g.x)
+            escrever(p.x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_devolver_vetor_inteiro_existente_nao_e_partilhado():
+    saida = executar("""
+        algoritmo "T"
+        v:inteiro[3]
+        funcao pegaV():inteiro[]
+            devolver v
+        inicio
+            v[0] = 1
+            a:inteiro[3] = pegaV()
+            a[0] = 99
+            escrever(v[0])
+            escrever(a[0])
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_atribuicao_a_campo_de_estrutura_aninhada_nao_e_partilhada():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        estrutura Retangulo
+            canto:Ponto
+        inicio
+            p1:Ponto = {x: 1}
+            r:Retangulo
+            r.canto = p1
+            r.canto.x = 99
+            escrever(p1.x)
+            escrever(r.canto.x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_literal_de_vetor_com_elementos_variaveis_estrutura_nao_e_partilhado():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            p1:Ponto = {x: 1}
+            p2:Ponto = {x: 2}
+            v:Ponto[2] = {p1, p2}
+            v[0].x = 99
+            escrever(p1.x)
+            escrever(v[0].x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_elemento_a_elemento_num_vetor_de_estruturas_nao_e_partilhado():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            arr:Ponto[2]
+            arr[0].x = 1
+            arr[1].x = 2
+            arr[0] = arr[1]
+            arr[0].x = 99
+            escrever(arr[1].x)
+            escrever(arr[0].x)
+    """)
+    assert saida.strip() == "2\n99"
+
+
+def test_elemento_de_vetor_a_partir_de_variavel_estrutura_nao_e_partilhado():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            p1:Ponto = {x: 1}
+            arr:Ponto[1]
+            arr[0] = p1
+            arr[0].x = 99
+            escrever(p1.x)
+            escrever(arr[0].x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_campo_de_literal_de_estrutura_a_partir_de_variavel_nao_e_partilhado():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        estrutura Retangulo
+            canto:Ponto
+        inicio
+            p1:Ponto = {x: 1}
+            r:Retangulo = {canto: p1}
+            r.canto.x = 99
+            escrever(p1.x)
+            escrever(r.canto.x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_literal_de_vetor_como_argumento_direto_nao_partilha_elementos():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento muda(v:Ponto[])
+            v[0].x = 99
+        inicio
+            p1:Ponto = {x: 1}
+            p2:Ponto = {x: 2}
+            muda({p1, p2})
+            escrever(p1.x)
+    """)
+    assert saida.strip() == "1"
+
+
+def test_literal_de_estrutura_como_argumento_direto_nao_partilha_campo():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        estrutura Retangulo
+            canto:Ponto
+        procedimento muda(r:Retangulo)
+            r.canto.x = 99
+        inicio
+            p1:Ponto = {x: 1}
+            muda({canto: p1})
+            escrever(p1.x)
+    """)
+    assert saida.strip() == "1"
+
+
+def test_copia_de_estrutura_e_profunda_nao_superficial_em_campo_vetor():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        estrutura Poligono
+            pontos:Ponto[2]
+        inicio
+            p1:Ponto = {x: 1}
+            p2:Ponto = {x: 2}
+            a:Poligono
+            a.pontos[0] = p1
+            a.pontos[1] = p2
+            b:Poligono = a
+            b.pontos[0].x = 99
+            escrever(a.pontos[0].x)
+            escrever(b.pontos[0].x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_bug14_atribuir_constante_a_variavel_normal_nao_quebra_a_constante():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            constante c:Ponto = {x: 1}
+            p:Ponto
+            p = c
+            p.x = 99
+            escrever(c.x)
+            escrever(p.x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+def test_ref_continua_a_ser_aliasing_intencional_apos_copia_por_valor():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento muda(ref p:Ponto)
+            p.x = 99
+        inicio
+            p1:Ponto = {x: 1}
+            p2:Ponto = p1
+            muda(p2)
+            escrever(p1.x)
+            escrever(p2.x)
+    """)
+    assert saida.strip() == "1\n99"
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 1.2: bug #31 -- índice negativo
+# nunca validado ----------
+
+def test_indice_negativo_computado_em_leitura_1d_da_erro_amigavel():
     resultado = _correr_esperando_erro("""\
 algoritmo "T"
-importar Matematica
 inicio
-    escrever(matematica.potencia(10, 1000))
+    v:inteiro[3]
+    v[0] = 10
+    v[1] = 20
+    v[2] = 30
+    i:inteiro = -1
+    escrever(v[i])
 """)
     assert resultado.returncode == 1
     assert "Traceback" not in resultado.stdout
-    assert "overflow" in resultado.stdout.lower()
+    assert "posição de vetor" in resultado.stdout
+
+
+def test_indice_negativo_literal_em_leitura_1d_da_erro_amigavel():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    v:inteiro[3]
+    escrever(v[-1])
+""")
+    assert resultado.returncode == 1
+    assert "posição de vetor" in resultado.stdout
+
+
+def test_indice_negativo_em_escrita_1d_da_erro_amigavel_nao_escreve_no_fim():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    v:inteiro[3]
+    v[0] = 10
+    v[1] = 20
+    v[2] = 30
+    i:inteiro = -1
+    v[i] = 99
+    escrever(v[2])
+""")
+    assert resultado.returncode == 1
+    assert "99" not in resultado.stdout
+    assert "posição de vetor" in resultado.stdout
+
+
+def test_indice_negativo_na_primeira_dimensao_de_vetor_2d_da_erro():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    m:inteiro[2][2]
+    i:inteiro = -1
+    escrever(m[i][0])
+""")
+    assert resultado.returncode == 1
+    assert "posição de vetor" in resultado.stdout
+
+
+def test_indice_negativo_na_segunda_dimensao_de_vetor_2d_da_erro():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    m:inteiro[2][2]
+    m[0][0] = 1
+    i:inteiro = -1
+    escrever(m[0][i])
+""")
+    assert resultado.returncode == 1
+    assert "posição de vetor" in resultado.stdout
+
+
+def test_indice_negativo_em_vetor_de_estruturas_da_erro():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+estrutura Ponto
+    x:inteiro
+inicio
+    arr:Ponto[2]
+    arr[0].x = 1
+    i:inteiro = -1
+    escrever(arr[i].x)
+""")
+    assert resultado.returncode == 1
+    assert "posição de vetor" in resultado.stdout
+
+
+def test_indice_positivo_continua_a_funcionar_apos_correcao_do_indice_negativo():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            v:inteiro[3]
+            v[0] = 10
+            v[1] = 20
+            v[2] = 30
+            escrever(v[2])
+    """)
+    assert saida.strip() == "30"
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 1.2: bug #34 -- dupla avaliação de
+# índice computado num argumento 'ref' ----------
+
+def test_indice_com_efeito_lateral_em_argumento_ref_e_avaliado_uma_so_vez():
+    saida = executar("""
+        algoritmo "T"
+        contador:inteiro
+        funcao proximoIndice():inteiro
+            contador = contador + 1
+            devolver contador - 1
+        procedimento incrementa(ref x:inteiro)
+            x = x + 100
+        inicio
+            v:inteiro[3]
+            v[0] = 1
+            v[1] = 2
+            v[2] = 3
+            contador = 0
+            incrementa(v[proximoIndice()])
+            escrever(v[0])
+            escrever(v[1])
+            escrever(v[2])
+            escrever(contador)
+    """)
+    assert saida.strip() == "101\n2\n3\n1"
+
+
+def test_indices_2d_com_efeito_lateral_em_argumento_ref_cada_um_avaliado_uma_vez():
+    saida = executar("""
+        algoritmo "T"
+        contador:inteiro
+        funcao proximoIndice():inteiro
+            contador = contador + 1
+            devolver contador - 1
+        procedimento incrementa(ref x:inteiro)
+            x = x + 100
+        inicio
+            m:inteiro[2][2]
+            m[0][0] = 1
+            m[0][1] = 2
+            m[1][0] = 3
+            m[1][1] = 4
+            contador = 0
+            incrementa(m[proximoIndice()][proximoIndice()])
+            escrever(m[0][0])
+            escrever(m[0][1])
+            escrever(m[1][0])
+            escrever(m[1][1])
+            escrever(contador)
+    """)
+    assert saida.strip() == "1\n102\n3\n4\n2"
+
+
+def test_indice_com_efeito_lateral_apos_campo_de_estrutura_em_ref_e_avaliado_uma_vez():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        contador:inteiro
+        funcao proximoIndice():inteiro
+            contador = contador + 1
+            devolver contador - 1
+        procedimento incrementa(ref x:inteiro)
+            x = x + 100
+        inicio
+            arr:Ponto[2]
+            arr[0].x = 1
+            arr[1].x = 2
+            contador = 0
+            incrementa(arr[proximoIndice()].x)
+            escrever(arr[0].x)
+            escrever(arr[1].x)
+            escrever(contador)
+    """)
+    assert saida.strip() == "101\n2\n1"
+
+
+def test_dois_argumentos_ref_com_indices_independentes_cada_um_avaliado_uma_vez():
+    saida = executar("""
+        algoritmo "T"
+        contador:inteiro
+        funcao proximoIndice():inteiro
+            contador = contador + 1
+            devolver contador - 1
+        procedimento somaAosDois(ref a:inteiro, ref b:inteiro)
+            a = a + 100
+            b = b + 1000
+        inicio
+            v:inteiro[3]
+            v[0] = 1
+            v[1] = 2
+            v[2] = 3
+            contador = 0
+            somaAosDois(v[proximoIndice()], v[proximoIndice()])
+            escrever(v[0])
+            escrever(v[1])
+            escrever(v[2])
+            escrever(contador)
+    """)
+    assert saida.strip() == "101\n1002\n3\n2"
+
+
+def test_indice_simples_em_ref_sem_efeito_lateral_continua_a_funcionar():
+    saida = executar("""
+        algoritmo "T"
+        procedimento incrementa(ref x:inteiro)
+            x = x + 1
+        inicio
+            v:inteiro[3]
+            v[0] = 10
+            v[1] = 20
+            v[2] = 30
+            i:inteiro = 1
+            incrementa(v[i])
+            escrever(v[0])
+            escrever(v[1])
+            escrever(v[2])
+    """)
+    assert saida.strip() == "10\n21\n30"
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 2.1: bugs #7/#10 -- cadeia plana de
+# operadores crasha com RecursionError/SyntaxError cru ----------
+
+def test_cadeia_de_mais_no_limite_da_arvore_compila_e_corre():
+    from algo_lang.compilador.parser import parse
+    from algo_lang.compilador.semantics import verificar
+    from algo_lang.compilador.codegen import gerar_python
+    import os
+    termos = " + ".join(["1"] * 150)  # 149 operadores -- exatamente no limite
+    codigo = f'algoritmo "T"\ninicio\n    escrever({termos})\n'
+    programa = parse(codigo)
+    verificar(programa)
+    codigo_py = gerar_python(programa)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, encoding="utf-8",
+        timeout=10, env=env)
+    assert resultado.returncode == 0
+    assert resultado.stdout.strip() == "150"
+
+
+def test_cadeia_de_mais_acima_do_limite_da_erro_sintatico_amigavel():
+    termos = " + ".join(["1"] * 151)  # 150 operadores -- 1 a mais que o limite
+    with pytest.raises(ErroSintatico, match="operadores a mais"):
+        compilar(f'algoritmo "T"\ninicio\n    escrever({termos})\n')
+
+
+def test_cadeia_de_vezes_acima_do_limite_da_erro_sintatico_amigavel():
+    termos = " * ".join(["1"] * 151)
+    with pytest.raises(ErroSintatico, match="operadores a mais"):
+        compilar(f'algoritmo "T"\ninicio\n    escrever({termos})\n')
+
+
+def test_cadeia_de_concatenacao_de_cadeia_acima_do_limite_da_erro_sintatico_amigavel():
+    termos = " + ".join(['"a"'] * 151)
+    with pytest.raises(ErroSintatico, match="operadores a mais"):
+        compilar(f'algoritmo "T"\ninicio\n    escrever({termos})\n')
+
+
+def test_cadeia_a_mais_e_apanhada_no_parser_nao_chega_ao_linter():
+    """A correção fica no parser -- uma cadeia longa a mais nunca chega
+    a produzir uma AST para o linter percorrer (bug #10: o linter tem o
+    seu próprio RecursionError cru, alcançável sem passar por
+    verificar() no serviço online)."""
+    from algo_lang.tools.linter import analisar as analisar_linter
+    termos = " + ".join(["1"] * 151)
+    codigo = f'algoritmo "T"\ninicio\n    escrever({termos})\n'
+    with pytest.raises(ErroSintatico, match="operadores a mais"):
+        programa = parse(codigo)
+        analisar_linter(programa, codigo)  # nunca deveria ser alcançado
+
+
+def test_cadeia_combinada_entre_niveis_de_precedencia_tambem_e_limitada():
+    """Bug encontrado ao desenhar a correção: um contador local por
+    nível (só 'aditiva', só 'e', ...) não compõe corretamente quando o
+    PRIMEIRO operando de uma cadeia já é ele próprio profundo -- esse
+    operando fica mais enterrado na árvore final, não menos. A
+    profundidade real (por nó, não por nível) tem de apanhar este caso
+    combinado mesmo que nenhum nível isolado ultrapasse o limite."""
+    cadeia_mais = " + ".join(["1"] * 111)  # 110 operadores
+    cauda_e = " e ".join(["verdadeiro"] * 60)  # 59 operadores 'e'
+    codigo = (
+        f'algoritmo "T"\ninicio\n'
+        f'    x:booleano = ({cadeia_mais} > 0) e {cauda_e}\n'
+        f'    escrever(x)\n'
+    )
+    with pytest.raises(ErroSintatico, match="operadores a mais"):
+        compilar(codigo)
+
+
+def test_cadeia_moderada_entre_niveis_de_precedencia_continua_a_compilar():
+    """Contraste com o teste anterior -- bem dentro do limite combinado
+    (150), não deve disparar."""
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            escrever((1 + 1 + 1 > 0) e verdadeiro e verdadeiro)
+    """)
+    assert saida.strip() == "verdadeiro"
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 2.2: mensagens em inglês / não
+# traduzidas (bugs #4, #5, #8, #33, #35) ----------
+
+def test_ler_a_mais_com_entradas_esgotadas_da_erro_amigavel_nao_eof_em_ingles():
+    """bug #4: EOFError nativo (input() esgotado) não estava na cadeia
+    de exceções traduzidas -- caía no handler genérico do tracer.
+    Simula 'algo executa --entradas ficheiro_vazio.txt': stdin fecha
+    sem nenhuma linha, ler() esgota o ficheiro na primeira leitura."""
+    import os
+    codigo_py = compilar("""
+        algoritmo "T"
+        inicio
+            x:inteiro
+            ler(x)
+            escrever(x)
+    """)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], input="", capture_output=True,
+        encoding="utf-8", timeout=10, env=env)
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "EOF" not in resultado.stdout
+    assert "ficheiro de entradas" in resultado.stdout
+
+
+def test_passo_zero_calculado_em_runtime_da_erro_amigavel_nao_texto_de_range():
+    """bug #5: semantics.py só rejeita 'passo' ZERO LITERAL em
+    compilação -- um 'passo' que só dá 0 em runtime (ex.: vindo de uma
+    variável) chegava ao range() nativo sem tradução."""
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    i:inteiro = 0
+    p:inteiro = 0
+    para i de 1 ate 3 passo p fazer
+        escrever(i)
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "range()" not in resultado.stdout
+    assert "passo" in resultado.stdout
+    assert "não pode ser zero" in resultado.stdout
+
+
+def test_conversao_parainteiro_de_infinito_da_erro_amigavel():
+    """bug #8: conversao.paraInteiro/paraDecimal apanham OverflowError e
+    voltam a levantá-lo como ValueError (por design), mas a mensagem
+    exata não estava na tabela de tradução."""
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Conversao
+inicio
+    x:decimal = conversao.paraDecimal("inf")
+    escrever(conversao.paraInteiro(x))
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "infinity" not in resultado.stdout.lower()
+    assert "infinito" in resultado.stdout
+
+
+def test_conversao_paradecimal_de_inteiro_gigante_da_erro_amigavel():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Conversao
+inicio
+    escrever(conversao.paraDecimal(2^2000))
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "int too large" not in resultado.stdout.lower()
+    assert "grande demais" in resultado.stdout
+
+
+def test_escrever_inteiro_com_digitos_a_mais_da_erro_amigavel():
+    """bug #33: 2^100000 (30103 dígitos) é um inteiro legítimo (precisão
+    arbitrária) -- só ESCREVER falha, pela proteção do próprio Python
+    3.11+ contra DoS na conversão inteiro->texto (~4300 dígitos)."""
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    escrever(2^100000)
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "set_int_max_str_digits" not in resultado.stdout
+    assert "dígitos a mais" in resultado.stdout
+
+
+def test_matematica_potencia_e_operador_potencia_consistentes_para_inteiro_grande():
+    """bug #35: '^' e matematica.potencia() faziam a mesma matemática de
+    formas inconsistentes para inteiros grandes -- matematica.potencia
+    forçava float() incondicionalmente e rebentava antes mesmo de
+    escrever(); '^' nunca força float quando o resultado fica inteiro,
+    só falhando (de forma amigável, bug #33) ao imprimir."""
+    saida_operador = executar("""
+        algoritmo "T"
+        inicio
+            escrever(2^400)
+    """)
+    saida_funcao = executar("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.potencia(2, 400))
+    """)
+    # '^' aqui produz 'inteiro' (expoente literal não-negativo, tipo
+    # provado em compilação); matematica.potencia() é sempre 'decimal'
+    # -- os VALORES numéricos continuam iguais, só o texto final (".0")
+    # difere, esperado dado os tipos declarados serem diferentes.
+    assert saida_operador.strip() == str(2 ** 400)
+    assert saida_funcao.strip() == str(float(2 ** 400))
+
+
+def test_matematica_potencia_caso_normal_continua_decimal_com_ponto():
+    """Não regressão: o caso comum (resultado pequeno) continua sempre
+    'decimal' (com '.0'), a correção do bug #35 só evita o float()
+    forçado quando ele próprio rebentaria com OverflowError."""
+    saida = executar("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.potencia(2, 3))
+    """)
+    assert saida.strip() == "8.0"
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 2.5: referência antecipada a uma
+# global escondida dentro do corpo de uma função (bug #26) ----------
+
+def test_referencia_antecipada_escondida_em_funcao_da_erro_de_compilacao():
+    """Repro exato do bug: 'pegaB()' lê a global 'b', que só é
+    declarada DEPOIS de 'a' ser inicializada a partir dela -- antes,
+    compilava sem erro e crashava em runtime com NameError cru."""
+    with pytest.raises(ErroSemantico, match="'b'.*declarada mais tarde"):
+        compilar("""
+            algoritmo "T"
+            funcao pegaB():inteiro
+                devolver b
+            inicio
+                a:inteiro = pegaB()
+                b:inteiro = 10
+                escrever(a, b)
+        """)
+
+
+def test_referencia_antecipada_em_ordem_correta_continua_a_compilar():
+    saida = executar("""
+        algoritmo "T"
+        funcao pegaB():inteiro
+            devolver b
+        inicio
+            b:inteiro = 10
+            a:inteiro = pegaB()
+            escrever(a)
+    """)
+    assert saida.strip() == "10"
+
+
+def test_referencia_antecipada_e_detetada_transitivamente_por_chamadas_encadeadas():
+    """A verificação segue chamadas a OUTRAS funções do próprio
+    ficheiro -- 'pegaA' não lê 'c' diretamente, só chama 'pegaB', que
+    lê."""
+    with pytest.raises(ErroSemantico, match="'pegaA'.*'c'"):
+        compilar("""
+            algoritmo "T"
+            funcao pegaB():inteiro
+                devolver c
+            funcao pegaA():inteiro
+                devolver pegaB() + 1
+            inicio
+                a:inteiro = pegaA()
+                c:inteiro = 5
+                escrever(a)
+        """)
+
+
+def test_referencia_antecipada_nao_dispara_para_parametro_que_sombreia_global():
+    """Não regressão: um parâmetro com o mesmo nome de uma global
+    futura NÃO é uma referência a essa global -- é uma variável local
+    própria, independente."""
+    saida = executar("""
+        algoritmo "T"
+        funcao pegaB(b:inteiro):inteiro
+            devolver b
+        inicio
+            a:inteiro = pegaB(5)
+            b:inteiro = 10
+            escrever(a, b)
+    """)
+    assert saida.strip() == "510"
+
+
+def test_referencia_antecipada_com_recursao_mutua_nao_entra_em_ciclo_infinito():
+    """A análise transitiva tem de terminar mesmo com funções que se
+    chamam mutuamente -- 'vistas' em _globais_lidas_transitivamente
+    evita reprocessar a mesma função indefinidamente."""
+    saida = executar("""
+        algoritmo "T"
+        funcao par(n:inteiro):booleano
+            se n == 0 entao
+                devolver verdadeiro
+            senao
+                devolver impar(n - 1)
+        funcao impar(n:inteiro):booleano
+            se n == 0 entao
+                devolver falso
+            senao
+                devolver par(n - 1)
+        inicio
+            escrever(par(4))
+    """)
+    assert saida.strip() == "verdadeiro"
+
+
+def test_referencia_a_biblioteca_nao_e_confundida_com_referencia_antecipada():
+    """Uma chamada de biblioteca ('matematica.raiz', com '.') nunca lê
+    uma global ALGO -- não deve ser tratada como candidata a
+    referência antecipada."""
+    saida = executar("""
+        algoritmo "T"
+        importar Matematica
+        funcao raizDe4():decimal
+            devolver matematica.raiz(4.0)
+        inicio
+            x:decimal = raizDe4()
+            escrever(x)
+    """)
+    assert saida.strip() == "2.0"
+
+
+def test_referencia_antecipada_em_atribuicao_normal_nao_apanhada_em_compilacao_mas_da_erro_amigavel_em_runtime():
+    """A verificação estática (_registar_decl) só cobre o valor inicial
+    de uma DECLARAÇÃO, tal como o plano de correção descreve -- uma
+    ATRIBUIÇÃO normal a uma variável já existente não passa por ali.
+    Compila sem erro (limite conhecido e aceite do alcance da análise
+    estática), mas a rede de segurança (NameError traduzido em
+    codegen.py) garante que o erro em runtime continua amigável, não
+    um traceback cru."""
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+funcao pegaB():inteiro
+    devolver b
+inicio
+    a:inteiro = 0
+    a = pegaB()
+    b:inteiro = 10
+    escrever(a, b)
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "not defined" not in resultado.stdout
+    assert "'b' foi usada antes de existir um valor nela" in resultado.stdout
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 3.1: 'constante' como tamanho de
+# vetor não tratada como um literal (bug #29) ----------
+
+def test_constante_como_tamanho_negativo_de_vetor_da_erro_em_compilacao():
+    """Antes, 'constante N:inteiro = -3; v:inteiro[N]' compilava sem
+    erro (o equivalente literal 'v:inteiro[-3]' já dava erro de
+    compilação) -- só falhava ao EXECUTAR, tarde demais."""
+    with pytest.raises(ErroSemantico, match="não pode ser negativo"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                constante N:inteiro = -3
+                v:inteiro[N]
+                escrever(1)
+        """)
+
+
+def test_constante_multi_nivel_como_tamanho_negativo_da_erro_em_compilacao():
+    """'M = N + 1' com 'N' também 'constante' e resultado negativo --
+    dobragem de constantes de mais de um nível, tal como o resto da
+    compilação (codegen) já faz."""
+    with pytest.raises(ErroSemantico, match="não pode ser negativo"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                constante N:inteiro = -4
+                constante M:inteiro = N + 1
+                v:inteiro[M]
+                escrever(1)
+        """)
+
+
+def test_constante_como_tamanho_incompativel_com_literal_da_erro_em_compilacao():
+    """Antes, 'constante N:inteiro = 3; v:inteiro[N] = {1,2}' compilava
+    sem erro (o equivalente literal 'v:inteiro[3] = {1,2}' já dava erro
+    de compilação) -- só se notava ao aceder ao elemento em falta, em
+    runtime."""
+    with pytest.raises(ErroSemantico, match="tamanho declarado 3"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                constante N:inteiro = 3
+                v:inteiro[N] = {1, 2}
+                escrever(1)
+        """)
+
+
+def test_constante_como_tamanho_de_vetor_uso_correto_continua_a_compilar():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            constante N:inteiro = 3
+            v:inteiro[N] = {10, 20, 30}
+            escrever(v[0], v[1], v[2])
+    """)
+    assert saida.strip() == "102030"
+
+
+def test_constante_declarada_dentro_de_inicio_como_tamanho_e_resolvida_dentro_de_funcao():
+    """A resolução também funciona para uma 'constante' declarada
+    DENTRO de 'inicio' (não só antes) quando referenciada a partir de
+    dentro de uma função -- self.globais precisa do mesmo tratamento
+    que escopo_topo (_pre_registar_recursivo, não só _registar_decl).
+    Funções são verificadas contra self.globais, que já inclui tudo o
+    que 'inicio' declara, independentemente da ordem textual."""
+    with pytest.raises(ErroSemantico, match="não pode ser negativo"):
+        compilar("""
+            algoritmo "T"
+            procedimento usaTamanho()
+                v:inteiro[N]
+            inicio
+                constante N:inteiro = -2
+                usaTamanho()
+        """)
+
+
+def test_constante_como_tamanho_de_campo_de_estrutura_continua_proibida():
+    """Não regressão: uma 'constante' do programa principal usada como
+    tamanho de um vetor-campo de 'estrutura' continua um erro dedicado
+    -- estruturas são registadas antes do resto do programa, nada aí é
+    visível ainda (comportamento já existente, não faz parte do
+    alcance do bug #29)."""
+    with pytest.raises(ErroSemantico, match="não pode referenciá-la"):
+        compilar("""
+            algoritmo "T"
+            constante N:inteiro = 3
+            estrutura Caixa
+                valores: inteiro[N]
+            inicio
+                escrever(1)
+        """)
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 5: cli.py (bugs #6/#15, #16, #30) ----------
+
+def test_erro_de_sintaxe_em_ficheiro_incluido_identifica_o_ficheiro(tmp_path):
+    """bug #15: um erro de sintaxe/léxico DENTRO do ficheiro incluído só
+    trazia linha/coluna, nunca o caminho -- o estudante olhava para a
+    linha errada, no ficheiro errado (a sua PRÓPRIA linha 2, o
+    'incluir', é perfeitamente válida)."""
+    import os
+    from algo_lang.cli import _carregar_e_resolver_inclusoes
+    (tmp_path / "lib.algo").write_text(
+        "funcao f():inteiro\n    devolver +\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(1)\n', encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
+    assert exc.value.code == 1
+
+
+def test_erro_de_sintaxe_em_ficheiro_incluido_identifica_o_ficheiro_via_subprocesso(tmp_path):
+    """Confirma o TEXTO da mensagem (não só o código de saída) --
+    _carregar_e_resolver_inclusoes chama sys.exit() diretamente, por
+    isso corre-se num subprocesso para capturar o que foi impresso
+    antes da saída."""
+    import os
+    (tmp_path / "lib.algo").write_text(
+        "funcao f():inteiro\n    devolver +\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(1)\n', encoding="utf-8")
+    script = (
+        "import sys\n"
+        f"sys.path.insert(0, {os.getcwd()!r})\n"
+        "from algo_lang.cli import _carregar_e_resolver_inclusoes\n"
+        f"_carregar_e_resolver_inclusoes({str(tmp_path / 'principal.algo')!r})\n"
+    )
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, encoding="utf-8", env=env)
+    assert resultado.returncode == 1
+    assert "lib.algo" in resultado.stdout
+    assert "linha 2" in resultado.stdout
+
+
+def test_incluir_por_engano_o_proprio_ficheiro_principal_identifica_o_ficheiro(tmp_path):
+    """bug #6: uma biblioteca (aqui, o próprio principal, incluído por
+    engano) que não tem a forma de uma biblioteca ('algoritmo'/'inicio')
+    é rejeitada por parse_biblioteca -- a mensagem deve dizer QUAL
+    ficheiro, mesma causa raiz e correção do bug #15."""
+    import os
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "T"\nincluir "principal.algo"\ninicio\n    escrever(1)\n', encoding="utf-8")
+    script = (
+        "import sys\n"
+        f"sys.path.insert(0, {os.getcwd()!r})\n"
+        "from algo_lang.cli import _carregar_e_resolver_inclusoes\n"
+        f"_carregar_e_resolver_inclusoes({str(tmp_path / 'principal.algo')!r})\n"
+    )
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, encoding="utf-8", env=env)
+    assert resultado.returncode == 1
+    assert "principal.algo" in resultado.stdout
+
+
+def test_mostrar_python_e_respeitado_com_debug(tmp_path, capsys):
+    """bug #16: '--mostrar-python' era ignorado em silêncio quando
+    combinado com '--debug'/'--json' -- o Python era gerado e escrito
+    em disco na mesma, só não era impresso, sem aviso nenhum."""
+    import argparse
+    from algo_lang.cli import cmd_executa_com_trace
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text('algoritmo "T"\ninicio\n    escrever(1)\n', encoding="utf-8")
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), debug=True, json=False, entradas=None, mostrar_python=True)
+    cmd_executa_com_trace(args)
+    saida = capsys.readouterr().out
+    assert "Código Python gerado" in saida
+    assert "def _algo_programa" in saida
+
+
+def test_mostrar_python_desligado_nao_imprime_o_python_com_debug(tmp_path, capsys):
+    """Não regressão: a flag continua opcional -- sem ela, o
+    comportamento fica como antes desta correção."""
+    import argparse
+    from algo_lang.cli import cmd_executa_com_trace
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text('algoritmo "T"\ninicio\n    escrever(1)\n', encoding="utf-8")
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), debug=True, json=False, entradas=None, mostrar_python=False)
+    cmd_executa_com_trace(args)
+    saida = capsys.readouterr().out
+    assert "Código Python gerado" not in saida
+
+
+def test_pasta_saida_caminho_demasiado_longo_da_erro_amigavel(tmp_path):
+    """bug #30: sem isto, um caminho de saída demasiado longo para o
+    Windows dava um OSError cru ('[WinError 206] The filename or
+    extension is too long'), propagado sem tratamento nenhum. Mockado
+    (em vez de construir um caminho real de ~260 caracteres, frágil
+    entre ambientes) -- ver PLANO_CORRECOES_AUDITORIA.md."""
+    from unittest.mock import patch
+    from algo_lang.cli import _pasta_saida
+    with patch("os.makedirs", side_effect=OSError(
+            "[WinError 206] The filename or extension is too long")):
+        with pytest.raises(SystemExit) as exc:
+            _pasta_saida(str(tmp_path / "prog.algo"))
+    assert exc.value.code == 1
+
+
+def test_pasta_saida_normal_continua_a_funcionar_apos_correcao_do_bug30(tmp_path):
+    from algo_lang.cli import _pasta_saida
+    pasta, nome_base = _pasta_saida(str(tmp_path / "prog.algo"))
+    assert nome_base == "prog"
+    assert os.path.isdir(pasta)
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 6.1: tamanho de array sem limite
+# superior (bug #32) ----------
+
+def test_tamanho_de_vetor_acima_do_limite_da_erro_amigavel_rapido():
+    """Antes, um tamanho de vetor suficientemente grande (aqui, bem
+    acima do limite escolhido de 10 milhões) deixava o programa
+    'pendurado' a alocar memória durante segundos, sem nenhuma
+    mensagem. Deve falhar RÁPIDO, com uma mensagem amigável -- não um
+    crash cru nem um programa preso."""
+    import time
+    inicio = time.time()
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    v:inteiro[20000000]
+    escrever(1)
+""")
+    duracao = time.time() - inicio
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "limite permitido" in resultado.stdout
+    assert duracao < 5  # bem antes do 1s que o próprio limite já demoraria
+
+
+def test_tamanho_de_vetor_calculado_em_runtime_acima_do_limite_da_erro_amigavel():
+    """O guarda cobre tanto um tamanho LITERAL como um CALCULADO -- é o
+    mesmo único sítio (_algo_verificar_tamanho_vetor) por onde toda
+    dimensão de vetor passa antes de range()."""
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+inicio
+    n:inteiro = 20000000
+    v:inteiro[n]
+    escrever(1)
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "limite permitido" in resultado.stdout
+
+
+def test_tamanho_de_vetor_dentro_do_limite_continua_a_funcionar():
+    """Não regressão: um tamanho normal, bem dentro do limite, continua
+    sem erro nenhum."""
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            v:inteiro[1000]
+            v[999] = 1
+            escrever(v[999])
+    """)
+    assert saida.strip() == "1"
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 12 (reauditoria): bugs #2/#9/#39
+# -- fusão de âmbito entre ramos irmãos 'se'/'senao' ----------
+
+def test_constante_com_eh_constante_diferente_em_ramos_irmaos_da_erro_em_compilacao():
+    """bug #2: antes, 'x' ficava com o 'eh_constante' do PRIMEIRO ramo
+    visitado em DFS (sempre 's.ramos' antes de 's.senao'),
+    independentemente de qual ramo executa de facto -- permitindo que
+    o ramo que corre em runtime mute em silêncio o que a fonte chama
+    de 'constante'. Repro exato do bug: 'x' é 'constante' no 'senao'
+    (o ramo que executa, já que a condição é 'falso'), mas mutável no
+    'se' -- devia ser um erro de COMPILAÇÃO, não uma mutação silenciosa."""
+    with pytest.raises(ErroSemantico, match="constante"):
+        compilar("""
+            algoritmo "T"
+            procedimento mexe()
+                x = 999
+            procedimento mostra()
+                escrever("x =", x)
+            inicio
+                se falso entao
+                    x:inteiro = 10
+                senao
+                    constante x:inteiro = 5
+                mostra()
+                mexe()
+                mostra()
+        """)
+
+
+def test_variavel_declarada_em_ambos_os_ramos_de_se_senao_fica_disponivel_depois():
+    """bug #9: 'x' declarada com o mesmo tipo em AMBOS os ramos de um
+    'se'/'senao' exaustivo tem sempre um valor a seguir ao 'se' --
+    antes, dava (incorretamente) 'a variável x não foi declarada'."""
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            se verdadeiro entao
+                x: inteiro = 1
+            senao
+                x: inteiro = 2
+            escrever(x)
+    """)
+    assert saida.strip() == "1"
+
+
+def test_variavel_com_tipos_diferentes_em_ramos_irmaos_continua_indisponivel_depois_do_se():
+    """Não regressão da correção do bug #9: quando os ramos NÃO
+    concordam em tipo, o nome continua por declarar depois do 'se' --
+    sem propagação, mas também sem erro nenhum na própria declaração
+    (só ao tentar usar 'y' depois). Dentro de um procedimento (não em
+    'inicio') para isolar do mecanismo, à parte, de globais visíveis a
+    funções (_pre_registar_recursivo), que já rejeita tipos diferentes
+    em ramos irmãos ao nível de topo, com uma mensagem diferente."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
+        compilar("""
+            algoritmo "T"
+            procedimento p()
+                se verdadeiro entao
+                    y: inteiro = 1
+                senao
+                    y: decimal = 2.0
+                escrever(y)
+            inicio
+                p()
+        """)
+
+
+def test_constante_com_valores_diferentes_em_ramos_irmaos_nao_trava_compilacao_valida():
+    """bug #39: análogo ao #2, mas para o VALOR resolvido de uma
+    'constante' inteira escalar (bug #29) -- ramos irmãos com o mesmo
+    tipo mas valores DIFERENTES ficavam congelados no valor do
+    primeiro ramo visitado. Aqui, o 'senao' (o ramo que executa, já
+    que a condição é 'falso') declara x=10, que bate certo com os 10
+    elementos do literal -- antes, o compilador rejeitava isto porque
+    tinha congelado x=5 (o valor do 'se', visitado primeiro)."""
+    saida = executar("""
+        algoritmo "T"
+        funcao tam():inteiro
+            v:inteiro[x] = {1,2,3,4,5,6,7,8,9,10}
+            devolver 3
+        inicio
+            se falso entao
+                constante x:inteiro = 5
+            senao
+                constante x:inteiro = 10
+            escrever(tam())
+    """)
+    assert saida.strip() == "3"
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 12: bug #18 -- artefactos crus de
+# vírgula flutuante em 'escrever' ----------
+
+def test_escrever_decimal_arredonda_ruido_de_representacao_binaria():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            escrever(0.1 + 0.2)
+    """)
+    assert saida.strip() == "0.3"
+
+
+def test_escrever_decimal_normaliza_zero_negativo():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            escrever(0.0 * -1.0)
+    """)
+    assert saida.strip() == "0.0"
+
+
+def test_escrever_decimal_de_valor_inteiro_mantem_ponto_zero():
+    """Não regressão: um 'decimal' de valor inteiro continua a mostrar
+    '.0' (distingue de 'inteiro' na saída)."""
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            escrever(3.0)
+    """)
+    assert saida.strip() == "3.0"
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 12: bug #19 -- ler() para decimal
+# aceitava 'nan'/'inf' em silêncio ----------
+
+def test_ler_decimal_rejeita_nan_e_volta_a_pedir():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            x: decimal
+            ler(x)
+            escrever(x)
+    """, entrada="nan\n5.5\n")
+    assert saida.strip().endswith("5.5")
+    assert "Valor inválido" in saida
+
+
+def test_ler_decimal_rejeita_infinity_e_volta_a_pedir():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            x: decimal
+            ler(x)
+            escrever(x)
+    """, entrada="Infinity\n-3.5\n")
+    assert saida.strip().endswith("-3.5")
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 12: bugs #24/#37 -- 'escolher' só
+# com 'contrario' (sem nenhum 'caso') ----------
+
+def test_escolher_so_com_contrario_compila_e_executa_sem_syntaxerror():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            x:inteiro = 3
+            escolher x
+                contrario
+                    escrever("sempre")
+    """)
+    assert saida.strip() == "sempre"
+
+
+def test_linter_avisa_escolher_sem_nenhum_caso():
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""\
+        algoritmo "T"
+        inicio
+            x:inteiro = 3
+            escolher x
+                contrario
+                    escrever("sempre")
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert any("nenhum 'caso'" in a.mensagem for a in avisos)
+
+
+def test_escolher_com_pelo_menos_um_caso_nao_da_aviso_de_sem_casos():
+    """Não regressão: um 'escolher' normal (com 'caso') não dispara o
+    novo aviso do bug #37."""
+    from algo_lang.tools.linter import analisar
+    programa = parse(textwrap.dedent("""\
+        algoritmo "T"
+        inicio
+            x:inteiro = 3
+            escolher x
+                caso 1
+                    escrever("um")
+                contrario
+                    escrever("outro")
+    """))
+    verificar(programa)
+    avisos = analisar(programa)
+    assert not any("nenhum 'caso'" in a.mensagem for a in avisos)
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 12: bug #36 -- tracer/consola
+# rebentavam com Python gerado sintaticamente inválido ----------
+
+def test_gerar_trace_com_python_invalido_da_erro_amigavel_sem_rebentar():
+    """Rede de segurança do bug #36: mesmo que o codegen algum dia volte
+    a gerar Python sintaticamente inválido (não é preciso reproduzir
+    nenhum bug de codegen específico para testar isto -- o próprio
+    'compile()' do tracer é o que estava desprotegido), 'gerar_trace'
+    não deve propagar o SyntaxError cru."""
+    from algo_lang.tools.tracer import gerar_trace
+    resultado = gerar_trace(
+        "def _algo_programa():\n    else:\n        pass\n",
+        "fake_path.py", {}, [], [])
+    assert resultado["erro"] is not None
+    assert resultado["passos"] == []
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 12: bugs #41/#42 -- mensagens do
+# parser fugiam ao helper '_nome_amigavel' ----------
+
+def test_parser_tipo_em_falta_nao_mostra_nome_de_token_cru():
+    with pytest.raises(ErroSintatico) as exc:
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            x:
+            inicio
+                escrever(1)
+        """))
+    assert "NEWLINE" not in str(exc.value)
+
+
+def test_parser_instrucao_inesperada_nao_mostra_nome_de_token_cru():
+    with pytest.raises(ErroSintatico) as exc:
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            inicio
+                :
+        """))
+    assert "COLON" not in str(exc.value)
+
+
+def test_parser_identificador_inesperado_mostra_o_identificador():
+    with pytest.raises(ErroSintatico) as exc:
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            inicio
+                x = 5 abc
+        """))
+    assert "abc" in str(exc.value)
+
+
+# ---------- AUDITORIA_2026-08-19 ronda 12: bug #43 -- conversao.* aceitava
+# separadores '_' de milhar do Python ----------
+
+def test_conversao_parainteiro_rejeita_separador_de_milhar():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Conversao
+inicio
+    escrever(conversao.paraInteiro("1_000"))
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+
+
+def test_conversao_paradecimal_rejeita_separador_de_milhar():
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+importar Conversao
+inicio
+    escrever(conversao.paraDecimal("1_000.5"))
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+
+
+def test_conversao_paradecimal_continua_a_aceitar_infinito():
+    """Não regressão da investigação do bug #40 (ronda 12): ao contrário
+    de 'ler()' (bug #19), 'conversao.paraDecimal' continua a aceitar
+    'inf'/'nan' -- é o único ponto de todo o ALGO por onde um programa
+    consegue construir esses valores deliberadamente (a linguagem não
+    tem literal nenhum para isso), e os consumidores já traduzem o
+    OverflowError resultante de forma amigável."""
+    saida = executar("""
+        algoritmo "T"
+        importar Conversao
+        inicio
+            x: decimal = conversao.paraDecimal("inf")
+            escrever(x)
+    """)
+    assert saida.strip() == "inf"

@@ -291,6 +291,20 @@ def compilar_codigo(ficheiros: list[dict], nome_principal: str, pasta_estudante:
         raise ErroCompilacao(
             f"{e} -- isto é um bug do próprio ALGO, não do teu programa."
         ) from e
+    except RecursionError as e:  # pragma: no cover -- AUDITORIA_2026-08-19 bugs #7/#10:
+        # rede de segurança, não a correção principal -- essa está no
+        # parser (parser.py:LIMITE_PROFUNDIDADE_ARVORE), que já impede
+        # uma AST demasiado profunda de sequer chegar aqui. Fica como
+        # defesa em profundidade para qualquer OUTRA travessia recursiva
+        # da AST (presente ou futura) que tenha o mesmo problema sem
+        # passar pelo parser -- sem isto, um RecursionError propagava
+        # até ao handler genérico do FastAPI (main.py), um 500 opaco em
+        # vez do erro amigável que o resto do compilador tenta sempre dar.
+        raise ErroCompilacao(
+            "o teu programa tem uma expressão demasiado complexa (operadores/"
+            "aninhamento a mais) para o compilador conseguir processar -- "
+            "tenta simplificá-la, ex. dividindo em variáveis intermédias."
+        ) from e
 
     caminho_py = caminho_principal.rsplit(".", 1)[0] + ".py"
     with open(caminho_py, "w", encoding="utf-8") as f:
@@ -536,7 +550,19 @@ def analisar_linter(ficheiros: list[dict], nome_principal: str, pasta_estudante:
     analisar() já garante."""
     programa, _ = _escrever_ficheiros_e_analisar(ficheiros, nome_principal, pasta_estudante)
     codigo_principal = next(f["conteudo"] for f in ficheiros if f["nome"] == nome_principal)
-    avisos = linter_modulo.analisar(programa, codigo_principal)
+    try:
+        avisos = linter_modulo.analisar(programa, codigo_principal)
+    except RecursionError as e:  # pragma: no cover -- ver o mesmo catch em compilar_codigo:
+        # este endpoint (/api/linter) salta verificar() de propósito, por
+        # isso é o único caminho real do serviço web que chegava a um
+        # RecursionError cru do próprio linter (bug #10) sem passar
+        # primeiro por um limiar mais baixo em verificar(). A correção
+        # principal está no parser; isto é só a rede de segurança.
+        raise ErroCompilacao(
+            "o teu programa tem uma expressão demasiado complexa (operadores/"
+            "aninhamento a mais) para o compilador conseguir processar -- "
+            "tenta simplificá-la, ex. dividindo em variáveis intermédias."
+        ) from e
     return [{"mensagem": a.mensagem, "linha": a.linha} for a in avisos]
 
 

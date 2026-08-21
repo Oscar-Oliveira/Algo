@@ -18,6 +18,23 @@ import copy
 
 sys.setrecursionlimit(10000)
 
+# AUDITORIA_2026-08-19 bug #25: sem isto, 'escrever' de um acento ou
+# emoji fora do codepage do ambiente (ex.: cp1252 no Windows) rebentava
+# com UnicodeEncodeError -- subclasse de ValueError, por isso caía no
+# 'except ValueError' mais abaixo, relabelled como "valor inválido
+# ('charmap' codec can't encode character...)", uma mensagem sem
+# relação nenhuma com o problema real (o código do estudante estava
+# correto). Relevante em produção: online/executor.py limpa as
+# variáveis de ambiente do subprocesso do estudante (LANG/LC_ALL/
+# PYTHONIOENCODING incluídas), por isso a codificação não pode ficar
+# ao critério do ambiente. 'hasattr' porque sys.stdout nem sempre tem
+# '.reconfigure()' -- ex.: sob tools/tracer.py (--debug/--json), este
+# mesmo ficheiro gerado corre com sys.stdout redirecionado para um
+# io.StringIO() em memória (contextlib.redirect_stdout), que não tem
+# esse método.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 
 class _AlgoIndiceCadeiaInvalido(IndexError):
     """AL-09: subclasse de IndexError, para as bibliotecas de texto
@@ -33,6 +50,24 @@ def _algo_fmt(v):
         return "verdadeiro" if v else "falso"
     if v is None:
         return "nulo"
+    if isinstance(v, float):
+        # AUDITORIA_2026-08-19 bug #18: str(float) do Python mostra o
+        # valor exato guardado em binario -- "0.1 + 0.2" imprimia
+        # "0.30000000000000004" em vez de "0.3". Arredondar para 12
+        # casas decimais esconde o ruido de representacao binaria em
+        # praticamente todo o codigo de ensino, mantendo o ".0" para um
+        # 'decimal' de valor inteiro (distingue de 'inteiro' na saida).
+        # "-0.0" (atingivel por aritmetica normal, ex.: 0.0 * -1.0) e
+        # normalizado para "0.0" -- zero negativo nao tem valor
+        # pedagogico nenhum e só confunde. Notacao cientifica
+        # (ex.: 10.0^20 -> "1e+20") fica deliberadamente por resolver --
+        # fora do alcance razoavel de "arredondar ruido", ver bug #18 em
+        # docs/AuditoriaCompilador_2026-08-19.md.
+        if v == 0.0:
+            v = 0.0
+        else:
+            v = round(v, 12)
+        return repr(v)
     return str(v)
 
 
@@ -48,10 +83,25 @@ def _algo_ler_inteiro(prompt=""):
             print("Valor inválido. Introduza um número inteiro.")
 
 
+def _algo_texto_para_decimal(texto):
+    """AUDITORIA_2026-08-19 bugs #19/#40: float() do Python aceita
+    "nan"/"inf"/"-inf"/"Infinity" (case-insensitive) e separadores '_' de
+    milhar -- nenhum dos dois e um numero decimal valido em ALGO (o
+    lexer nao suporta '_' em literais numericos, e nao ha forma de o
+    estudante escrever um 'nan'/'inf' literal no codigo-fonte). Helper
+    partilhado por '_algo_ler_decimal' (abaixo) e por
+    'conversao.paraDecimal', para os dois pontos de entrada de texto
+    para decimal rejeitarem os dois casos da mesma forma."""
+    t = texto.strip()
+    if "_" in t or t.lstrip("+-").lower() in ("nan", "inf", "infinity"):
+        raise ValueError(f"'{texto}' não é um número decimal válido")
+    return float(t)
+
+
 def _algo_ler_decimal(prompt=""):
     while True:
         try:
-            return float(input(prompt))
+            return _algo_texto_para_decimal(input(prompt))
         except ValueError:
             print("Valor inválido. Introduza um número decimal.")
 
@@ -119,6 +169,27 @@ def _algo_traduzir_valueerro(msg):
         return "o texto não pode ser convertido para um número inteiro."
     if "could not convert string to float" in msg_min:
         return "o texto não pode ser convertido para um número decimal."
+    if "range() arg 3 must not be zero" in msg_min:
+        # AUDITORIA_2026-08-19 bug #5: 'passo' só é rejeitado em
+        # compilação quando é um LITERAL igual a 0 (semantics.py) -- um
+        # 'passo' calculado em runtime (ex.: vindo de uma variável) só
+        # é apanhado aqui.
+        return "o 'passo' do ciclo 'para' não pode ser zero (o ciclo nunca avançaria)."
+    if "cannot convert float infinity to integer" in msg_min:
+        # bug #8: conversao.paraInteiro(x) com x = 'infinito'.
+        return "não é possível converter 'infinito' para um número inteiro."
+    if "int too large to convert to float" in msg_min:
+        # bug #8: conversao.paraDecimal(x) com x um inteiro demasiado
+        # grande para caber num número decimal.
+        return "este número é grande demais para ser convertido para decimal."
+    if "exceeds the limit" in msg_min and "integer string conversion" in msg_min:
+        # bug #33: proteção do próprio Python (3.11+) contra a conversão
+        # inteiro->texto de um número com dígitos a mais (ex.: 'escrever'
+        # de 2^100000) -- a mensagem nativa cita
+        # 'sys.set_int_max_str_digits()', que não significa nada para um
+        # estudante. O CÁLCULO em si não tem limite (inteiro de precisão
+        # arbitrária); só mostrá-lo é que tem.
+        return "este número tem dígitos a mais para conseguir ser mostrado."
     return f"valor inválido ({msg})."
 
 
@@ -134,6 +205,20 @@ def _algo_traduzir_attributeerror(msg):
         campo = msg[len(prefixo):-len(sufixo)]
         return f"tentaste aceder ao campo '{campo}' de um valor nulo."
     return "tentaste aceder a um campo de um valor nulo."  # pragma: no cover -- defensivo
+
+
+def _algo_traduzir_nameerror(msg):
+    """AUDITORIA_2026-08-19 bug #26: rede de segurança -- a correção
+    principal é em semantics.py (_globais_lidas_transitivamente),
+    apanhada em compilação; isto cobre qualquer caso que essa análise
+    (que só cobre o valor inicial de uma DECLARAÇÃO) não apanhe, ex.:
+    uma atribuição normal ou uma chamada solta que leia uma global
+    ainda não declarada nesse ponto do programa."""
+    prefixo, sufixo = "name '", "' is not defined"
+    if msg.startswith(prefixo) and msg.endswith(sufixo):
+        nome = msg[len(prefixo):-len(sufixo)]
+        return f"a variável '{nome}' foi usada antes de existir um valor nela."
+    return "uma variável foi usada antes de existir um valor nela."  # pragma: no cover -- defensivo
 
 
 def _algo_linha_do_erro(erro):
@@ -192,15 +277,50 @@ def _algo_pot(a, b):
     return a ** b
 
 
+def _algo_indice(i):
+    """Bug #31: um índice negativo (ex.: 'v[-1]') nunca era validado --
+    o Python nativo aceita índices negativos (conta a partir do fim),
+    por isso 'v[-1]' silenciosamente devolvia/escrevia o ÚLTIMO
+    elemento em vez de dar o erro de 'índice fora dos limites' que um
+    estudante esperaria. Chamado em toda leitura/escrita indexada (ver
+    gerador_base.py:_lvalue), 1D e 2D+ (cada nível de indexação passa
+    por aqui). Levanta o mesmo IndexError nativo que já é apanhado e
+    traduzido no rodapé do programa gerado -- nenhuma mensagem nova
+    precisa de ser adicionada."""
+    if i < 0:
+        raise IndexError("índice negativo")
+    return i
+
+
+_ALGO_LIMITE_TAMANHO_VETOR = 10_000_000
+
+
 def _algo_verificar_tamanho_vetor(tam):
     """Um tamanho de vetor calculado em runtime (nao um literal, ja
     apanhado em compilacao) que de negativo silenciosamente produzia
     um vetor vazio -- range(negativo) do Python nao levanta erro
     nenhum. ValueError e reaproveitado de propósito: ja ha um
     'except ValueError' no programa gerado que traduz para a mensagem
-    amigavel de 'Erro em tempo de execucao: valor invalido (...)'."""
+    amigavel de 'Erro em tempo de execucao: valor invalido (...)'.
+
+    AUDITORIA_2026-08-19 bug #32: também não havia limite SUPERIOR --
+    um tamanho suficientemente grande (literal ou calculado) deixava o
+    programa "pendurado" a alocar memória durante segundos, sem
+    nenhuma mensagem, em vez de falhar rápido e de forma amigável.
+    Este é o único sítio onde QUALQUER dimensão de vetor passa antes
+    de ser usada em range() -- tanto para um tamanho literal como
+    calculado, e para cada dimensão de um vetor 2D+ (chamado uma vez
+    por dimensão) -- por isso não é preciso duplicar esta verificação
+    em semantics.py. 10 milhões por dimensão (não o produto entre
+    dimensões, que continua sem limite agregado -- fora do âmbito
+    desta correção, ver PLANO_CORRECOES_AUDITORIA.md), medido a
+    demorar cerca de 1 segundo (100 milhões já demora ~13s)."""
     if tam < 0:
         raise ValueError(f"tamanho de vetor não pode ser negativo (é {tam})")
+    if tam > _ALGO_LIMITE_TAMANHO_VETOR:
+        raise ValueError(
+            f"o tamanho pedido ({tam}) é maior do que o limite permitido "
+            f"({_ALGO_LIMITE_TAMANHO_VETOR})")
     return tam
 
 '''
@@ -306,6 +426,17 @@ class GeradorCodigo(GeradorCodigoBase):
         self.emit("print(_algo_msg)", 2)
         self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
+        # AUDITORIA_2026-08-19 bug #4: 'ler()' a mais depois de
+        # '--entradas' esgotar o ficheiro levanta EOFError nativo --
+        # sem isto, caía no 'except Exception' genérico do tracer
+        # ("não deve ocorrer" -- mas ocorre).
+        self.emit("except EOFError as _algo_erro:", 1)
+        self.emit(
+            '_algo_msg = f"Erro em tempo de execução: o programa tentou ler mais valores '
+            'do que os que o ficheiro de entradas tinha.{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
+        self.emit("sys.exit(1)", 2)
         self.emit("except ZeroDivisionError as _algo_erro:", 1)
         self.emit(
             '_algo_msg = f"Erro em tempo de execução: divisão por zero.{_algo_sufixo_linha(_algo_erro)}"', 2)
@@ -333,6 +464,15 @@ class GeradorCodigo(GeradorCodigoBase):
         self.emit(
             '_algo_msg = f"Erro em tempo de execução: '
             '{_algo_traduzir_attributeerror(str(_algo_erro))}{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
+        self.emit("sys.exit(1)", 2)
+        # AUDITORIA_2026-08-19 bug #26: rede de segurança -- ver
+        # _algo_traduzir_nameerror.
+        self.emit("except NameError as _algo_erro:", 1)
+        self.emit(
+            '_algo_msg = f"Erro em tempo de execução: '
+            '{_algo_traduzir_nameerror(str(_algo_erro))}{_algo_sufixo_linha(_algo_erro)}"', 2)
         self.emit("print(_algo_msg)", 2)
         self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
@@ -442,6 +582,45 @@ class GeradorCodigo(GeradorCodigoBase):
                 args_py.append(self._expr(a, tipos))
         return ", ".join(args_py)
 
+    def _hoistear_indices_ref(self, f_def, args, tipos, nivel):
+        """Bug #34: um argumento 'ref' cujo alvo usa um índice computado
+        (ex.: 'ref v[f()]') era avaliado duas vezes -- uma para o LER
+        como argumento da chamada, outra para o ESCREVER-DE-VOLTA no
+        unpacking do valor de retorno -- porque cada emissão corre
+        self._expr()/self._lvalue() de forma independente sobre o
+        MESMO nó da AST. Se a expressão do índice tiver efeito lateral
+        (ou apenas calhar a dar valores diferentes de cada vez), a
+        leitura e a escrita acabam em índices diferentes. Eleva cada
+        índice de um argumento 'ref' para uma variável temporária,
+        avaliada uma única vez antes da chamada, devolvendo uma cópia
+        do LValue que refere essa temporária em vez do índice
+        original -- tanto a leitura (args_str) como a escrita
+        (out_vars) passam a usar exatamente o mesmo texto Python,
+        gerado a partir do mesmo nó já hasteado. Eleva SEMPRE, mesmo
+        quando o índice já é uma variável simples ou um literal --
+        mais simples de justificar como correto do que distinguir os
+        casos 'seguros' dos 'arriscados'. Não mexe em acessos '.campo'
+        (nomes estáticos, sem expressão para avaliar) nem em
+        argumentos que não sejam 'ref'."""
+        contador = 0
+        novos = []
+        for p, a in zip(f_def.parametros, args):
+            if not p.por_referencia or not isinstance(a, A.LValue) or not any(
+                    tag == "indice" for tag, _ in a.acessos):
+                novos.append(a)
+                continue
+            novos_acessos = []
+            for tag, valor in a.acessos:
+                if tag == "indice":
+                    nome_tmp = f"_algo_tmp_idx_{contador}"
+                    contador += 1
+                    self.emit(f"{nome_tmp} = {self._expr(valor, tipos)}", nivel)
+                    novos_acessos.append(("indice", A.LValue(nome_tmp, [], a.linha)))
+                else:
+                    novos_acessos.append((tag, valor))
+            novos.append(A.LValue(a.nome, novos_acessos, a.linha))
+        return novos
+
     def _expr_estrutura_literal(self, lit: A.EstruturaLiteral, tipo_nome: str, tipos) -> str:
         """AL-16: um A.EstruturaLiteral não sabe o seu próprio tipo (só os
         campos) -- quem chama tem sempre de indicar 'tipo_nome' a partir
@@ -460,6 +639,9 @@ class GeradorCodigo(GeradorCodigoBase):
                 expr_py = self._expr_estrutura_literal(valor, tipo_campo, tipos)
             else:
                 expr_py = self._coagir_decimal(self._expr(valor, tipos), tipo_campo, valor)
+                # bug#1 (caminhos 8/10): campo de literal de struct a
+                # partir de uma variável existente (ex.: '{canto: p1}').
+                expr_py = self._copiar_se_necessario(expr_py, tipo_campo, 0)
             partes.append(f"{nome}={expr_py}")
         return f"{tipo_nome}({', '.join(partes)})"
 
@@ -480,7 +662,10 @@ class GeradorCodigo(GeradorCodigoBase):
                 # de estrutura (ex.: vetor de estruturas).
                 partes.append(self._expr_estrutura_literal(elem, tipo_elemento, tipos))
             else:
-                partes.append(self._coagir_decimal(self._expr(elem, tipos), tipo_elemento, elem))
+                expr_py = self._coagir_decimal(self._expr(elem, tipos), tipo_elemento, elem)
+                # bug#1 (caminhos 5/9): elemento de literal de vetor a
+                # partir de uma variável existente (ex.: '{p1, p2}').
+                partes.append(self._copiar_se_necessario(expr_py, tipo_elemento, 0))
         return f"[{', '.join(partes)}]"
 
     def _gerar_declaracao(self, d: A.Declaracao, nivel, tipos):
@@ -498,12 +683,13 @@ class GeradorCodigo(GeradorCodigoBase):
         if d.inicial is not None and isinstance(d.inicial, A.Chamada):
             f_def = self._encontrar_funcao(d.inicial.nome)
             if f_def and any(p.por_referencia for p in f_def.parametros):
+                args_hoisted = self._hoistear_indices_ref(f_def, d.inicial.args, tipos, nivel)
                 out_vars = [
                     self._lvalue_de_expr(a, tipos)
-                    for p, a in zip(f_def.parametros, d.inicial.args)
+                    for p, a in zip(f_def.parametros, args_hoisted)
                     if p.por_referencia
                 ]
-                args_str = self._gerar_lista_args(d.inicial.args, f_def, tipos)
+                args_str = self._gerar_lista_args(args_hoisted, f_def, tipos)
                 self.emit(f"{d.nome}, {', '.join(out_vars)} = {d.inicial.nome}({args_str})", nivel)
                 # AL-51/B17: o valor de retorno principal nunca passava por
                 # _coagir_decimal neste caminho -- 'y:decimal = f(x)' com
@@ -514,6 +700,8 @@ class GeradorCodigo(GeradorCodigoBase):
                 return
         if d.inicial is not None:
             expr_py = self._coagir_decimal(self._expr(d.inicial, tipos), d.tipo, d.inicial)
+            dims_n = 0 if d.dims is None else len(d.dims)
+            expr_py = self._copiar_se_necessario(expr_py, d.tipo, dims_n)
             self.emit(f"{d.nome} = {expr_py}", nivel)
         elif d.dims is None:
             self.emit(f"{d.nome} = {self._valor_default(d.tipo)}", nivel)
@@ -532,12 +720,13 @@ class GeradorCodigo(GeradorCodigoBase):
         if isinstance(stmt.expr, A.Chamada):
             f_def = self._encontrar_funcao(stmt.expr.nome)
             if f_def and any(p.por_referencia for p in f_def.parametros):
+                args_hoisted = self._hoistear_indices_ref(f_def, stmt.expr.args, tipos, nivel)
                 out_vars = [
                     self._lvalue_de_expr(a, tipos)
-                    for p, a in zip(f_def.parametros, stmt.expr.args)
+                    for p, a in zip(f_def.parametros, args_hoisted)
                     if p.por_referencia
                 ]
-                args_str = self._gerar_lista_args(stmt.expr.args, f_def, tipos)
+                args_str = self._gerar_lista_args(args_hoisted, f_def, tipos)
                 alvo = self._lvalue(stmt.alvo, tipos)
                 self.emit(f"{alvo}, {', '.join(out_vars)} = {stmt.expr.nome}({args_str})", nivel)
                 tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
@@ -633,6 +822,7 @@ class GeradorCodigo(GeradorCodigoBase):
                 valor = self._expr_vetor_literal(stmt.expr, self.tipo_retorno_atual, tipos)
             else:
                 valor = self._coagir_decimal(self._expr(stmt.expr, tipos), self.tipo_retorno_atual, stmt.expr)
+                valor = self._copiar_se_necessario(valor, self.tipo_retorno_atual, self.dims_retorno_atual)
             if self.refs_atuais:
                 self.emit(f"return {valor}, {', '.join(self.refs_atuais)}", nivel)
             else:
@@ -673,12 +863,13 @@ class GeradorCodigo(GeradorCodigoBase):
         chamada = stmt.chamada
         f_def = self._encontrar_funcao(chamada.nome)
         if f_def and any(p.por_referencia for p in f_def.parametros):
+            args_hoisted = self._hoistear_indices_ref(f_def, chamada.args, tipos, nivel)
             out_vars = [
                 self._lvalue_de_expr(a, tipos)
-                for p, a in zip(f_def.parametros, chamada.args)
+                for p, a in zip(f_def.parametros, args_hoisted)
                 if p.por_referencia
             ]
-            args_str = self._gerar_lista_args(chamada.args, f_def, tipos)
+            args_str = self._gerar_lista_args(args_hoisted, f_def, tipos)
             if f_def.eh_procedimento:
                 self.emit(f"{', '.join(out_vars)} = {chamada.nome}({args_str})", nivel)
             else:

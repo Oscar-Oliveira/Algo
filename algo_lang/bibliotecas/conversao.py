@@ -33,8 +33,14 @@ FUNCOES = {
         # trata ValueError) e propagava até ao wrapper genérico de
         # OverflowError em codegen.py, dando "overflow numérico", uma
         # mensagem enganadora para um texto que não é sequer um número.
+        # AUDITORIA_2026-08-19 bug #43: int()/float() do Python aceitam
+        # separadores '_' de milhar (ex.: "1_000") que o lexer de ALGO
+        # não suporta -- rejeitado explicitamente antes de tentar
+        # qualquer conversão.
         ["primitivo"], "inteiro",
         "def conversao_paraInteiro(x):\n"
+        "    if isinstance(x, str) and \"_\" in x:\n"
+        "        raise ValueError(f\"'{x}' não é um número inteiro válido\")\n"
         "    try:\n"
         "        return int(x)\n"
         "    except OverflowError as e:\n"
@@ -48,8 +54,24 @@ FUNCOES = {
         "        raise e\n",
     ),
     "paraDecimal": (
+        # AUDITORIA_2026-08-19 bug #40 (investigado, não é bug): ao
+        # contrário de 'ler()' (entrada interativa de um estudante, onde
+        # 'nan'/'inf' é quase sempre um erro de digitação), esta função é
+        # o ÚNICO ponto do próprio LEGO -- ALGO não tem literal nenhum
+        # para infinito/nan no código-fonte -- por onde um programa pode
+        # construir esses valores deliberadamente (ver
+        # test_matematica_piso_de_infinito_da_overflow_amigavel e
+        # test_conversao_parainteiro_de_infinito_da_erro_amigavel, que
+        # dependem exatamente disto). matematica.piso/teto e
+        # conversao.paraInteiro já traduzem o OverflowError resultante
+        # para uma mensagem amigável -- por isso aceitar aqui não deixa
+        # nenhum valor "perigoso" escapar sem aviso. Continua a rejeitar
+        # separadores '_' de milhar (bug #43), que nunca têm uso
+        # legítimo.
         ["primitivo"], "decimal",
         "def conversao_paraDecimal(x):\n"
+        "    if isinstance(x, str) and \"_\" in x:\n"
+        "        raise ValueError(f\"'{x}' não é um número decimal válido\")\n"
         "    try:\n"
         "        return float(x)\n"
         "    except OverflowError as e:\n"

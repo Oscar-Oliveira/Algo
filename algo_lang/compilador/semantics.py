@@ -2,6 +2,7 @@
 """Verificador de tipos em tempo de compilação para a linguagem ALGO."""
 
 import keyword
+import re
 
 from . import ast_nodes as A
 from .. import bibliotecas
@@ -9,6 +10,124 @@ from .. import bibliotecas
 NUMERICOS = {"inteiro", "decimal"}
 TEXTUAIS = {"cadeia", "caracter"}
 PRIMITIVOS = NUMERICOS | TEXTUAIS | {"booleano"}
+
+# AUDITORIA_2026-08-19 bugs #23/#27: nomes que o PRÓPRIO código gerado
+# usa sem qualificação, fora de qualquer 'global' do estudante -- uma
+# global com um destes nomes rebate o import/builtin correspondente no
+# módulo Python gerado, partindo o compilador de formas diferentes (a
+# pior: 'copy:inteiro = 5' faz o handler de AttributeError MENTIR ao
+# estudante, dizendo "acesso a campo de nulo" quando o problema real é
+# outro). 'sys'/'copy' vêm do cabeçalho do próprio codegen.py
+# (CABECALHO_RUNTIME); 'print'/'input' são builtins que o código
+# gerado chama diretamente (dentro de _algo_ler_*/_algo_escrever).
+# Fixo, porque isto está sempre presente, em qualquer programa --
+# independente de bibliotecas ALGO importadas (ver
+# _nomes_importados_no_cabecalho para essas, que variam por
+# biblioteca).
+NOMES_RESERVADOS_CODEGEN = {"sys", "copy", "print", "input"}
+
+
+def _nomes_importados_no_cabecalho(cabecalho):
+    """bug #27: cada biblioteca pode injetar 'import X as Y' no seu
+    próprio CABECALHO (ex.: matematica.py -> '_math'/'_random') --
+    extrai os aliases automaticamente em vez de manter uma lista fixa
+    à parte, que ficaria desatualizada sempre que uma biblioteca nova
+    (ou uma alteração a uma já existente) precisasse do seu próprio
+    import."""
+    nomes = set()
+    for linha in cabecalho.splitlines():
+        m = re.match(r"^\s*import\s+([\w.]+)(?:\s+as\s+(\w+))?\s*$", linha)
+        if m:
+            nomes.add(m.group(2) or m.group(1).split(".")[0])
+    return nomes
+
+
+def _nomes_lidos_em_expr(expr, nomes, chamadas):
+    """AUDITORIA_2026-08-19 bug #26: percorre uma expressão recolhendo
+    todo nome de variável LIDO (A.LValue.nome) em 'nomes', e todo nome
+    de função/procedimento do PRÓPRIO ficheiro chamado (A.Chamada.nome,
+    sem '.', já que uma chamada de biblioteca nunca lê uma global ALGO)
+    em 'chamadas' -- usado por _globais_lidas_transitivamente para
+    saber que globais o CORPO de uma função lê, direta ou
+    indiretamente. Espelha a forma de despacho já usada em
+    codegen.py/tools/linter.py para os mesmos tipos de nó, mas
+    devolvendo só nomes, não tipos nem texto Python -- não pode
+    importar de tools/ (o compilador não depende de tools/, ver
+    ARCH-02)."""
+    if expr is None:
+        return
+    if isinstance(expr, A.LValue):
+        nomes.add(expr.nome)
+        for tag, valor in expr.acessos:
+            if tag == "indice":
+                _nomes_lidos_em_expr(valor, nomes, chamadas)
+    elif isinstance(expr, A.BinOp):
+        _nomes_lidos_em_expr(expr.esq, nomes, chamadas)
+        _nomes_lidos_em_expr(expr.dire, nomes, chamadas)
+    elif isinstance(expr, A.UnOp):
+        _nomes_lidos_em_expr(expr.operando, nomes, chamadas)
+    elif isinstance(expr, A.Chamada):
+        if "." not in expr.nome:
+            chamadas.add(expr.nome)
+        for a in expr.args:
+            _nomes_lidos_em_expr(a, nomes, chamadas)
+    elif isinstance(expr, A.VetorLiteral):
+        for e in expr.elementos:
+            _nomes_lidos_em_expr(e, nomes, chamadas)
+    elif isinstance(expr, A.EstruturaLiteral):
+        for _nome, valor in expr.campos:
+            _nomes_lidos_em_expr(valor, nomes, chamadas)
+    # A.Literal: nada a fazer (não lê nenhum nome)
+
+
+def _nomes_lidos_em_stmts(stmts, nomes, chamadas):
+    """Mesma ideia que _nomes_lidos_em_expr, para uma lista de
+    instruções (incluindo dentro de blocos aninhados, via
+    A.subblocos)."""
+    for s in stmts:
+        if isinstance(s, A.Declaracao):
+            _nomes_lidos_em_expr(s.inicial, nomes, chamadas)
+            if s.dims:
+                for dim in s.dims:
+                    _nomes_lidos_em_expr(dim, nomes, chamadas)
+        elif isinstance(s, A.Atribuicao):
+            for tag, valor in s.alvo.acessos:
+                if tag == "indice":
+                    _nomes_lidos_em_expr(valor, nomes, chamadas)
+            _nomes_lidos_em_expr(s.expr, nomes, chamadas)
+        elif isinstance(s, A.Ler):
+            for alvo in s.alvos:
+                for tag, valor in alvo.acessos:
+                    if tag == "indice":
+                        _nomes_lidos_em_expr(valor, nomes, chamadas)
+        elif isinstance(s, A.Escrever):
+            for e in s.exprs:
+                _nomes_lidos_em_expr(e, nomes, chamadas)
+        elif isinstance(s, A.Se):
+            for cond, _corpo in s.ramos:
+                _nomes_lidos_em_expr(cond, nomes, chamadas)
+        elif isinstance(s, A.Para):
+            _nomes_lidos_em_expr(s.ini, nomes, chamadas)
+            _nomes_lidos_em_expr(s.fim, nomes, chamadas)
+            _nomes_lidos_em_expr(s.passo, nomes, chamadas)
+        elif isinstance(s, A.Enquanto):
+            _nomes_lidos_em_expr(s.condicao, nomes, chamadas)
+        elif isinstance(s, A.FazEnquanto):
+            _nomes_lidos_em_expr(s.condicao, nomes, chamadas)
+        elif isinstance(s, A.Escolha):
+            _nomes_lidos_em_expr(s.expr, nomes, chamadas)
+            for valores, _corpo in s.casos:
+                for v in valores:
+                    _nomes_lidos_em_expr(v, nomes, chamadas)
+        elif isinstance(s, A.Devolver):
+            _nomes_lidos_em_expr(s.expr, nomes, chamadas)
+        elif isinstance(s, A.ChamadaStmt):
+            _nomes_lidos_em_expr(s.chamada, nomes, chamadas)
+        elif isinstance(s, A.Afirmar):
+            _nomes_lidos_em_expr(s.condicao, nomes, chamadas)
+            _nomes_lidos_em_expr(s.mensagem, nomes, chamadas)
+        for bloco in A.subblocos(s):
+            _nomes_lidos_em_stmts(bloco, nomes, chamadas)
 
 
 class ErroSemantico(Exception):
@@ -90,6 +209,14 @@ class VerificadorTipos:
             for metodo in info["funcoes"]
         }
 
+        # bugs #23/#27: nomes reservados pelo próprio código gerado --
+        # ver NOMES_RESERVADOS_CODEGEN (sempre presentes) e
+        # _nomes_importados_no_cabecalho (por biblioteca, só quando
+        # importada).
+        self.nomes_reservados_codegen = set(NOMES_RESERVADOS_CODEGEN)
+        for info in self.bibliotecas_importadas.values():
+            self.nomes_reservados_codegen |= _nomes_importados_no_cabecalho(info["cabecalho"])
+
         self.funcoes = {}
         for f in programa.funcoes:
             if f.nome in self.funcoes:
@@ -102,6 +229,10 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"'{f.nome}' já é o nome de uma biblioteca importada; "
                     f"escolhe outro nome para a função/procedimento", f.linha)
+            if f.nome in self.nomes_reservados_codegen:
+                raise ErroSemantico(
+                    f"'{f.nome}' colide com um nome interno usado pelo código "
+                    f"gerado; escolhe outro nome para a função/procedimento", f.linha)
             if f.nome in self.nomes_internos_bibliotecas:
                 raise ErroSemantico(
                     f"'{f.nome}' colide com o nome interno gerado para "
@@ -116,6 +247,21 @@ class VerificadorTipos:
         # dar uma mensagem dedicada em _validar_dims quando um campo de
         # vetor de 'estrutura' referencia um destes nomes.
         self._nomes_globais_top_level = {d.nome for d in programa.declaracoes}
+
+        # bug #26: conjunto COMPLETO de nomes que alguma vez vão ser
+        # globais no programa (topo + declarados dentro de 'inicio', a
+        # qualquer nível de aninhamento) -- calculado aqui, cedo, só
+        # pelos NOMES (sem validar tipos/conflitos, isso já é feito por
+        # _pre_registar_recursivo mais tarde) porque _registar_decl
+        # precisa disto ANTES de 'self.globais' existir (só é
+        # construído depois do primeiro 'for' em verificar()). Usado
+        # por _globais_lidas_transitivamente para distinguir "nome que
+        # nunca vai ser global" (não é um forward-reference, é só uma
+        # variável inexistente -- já apanhado noutro sítio) de "nome
+        # que VAI ser global, mas ainda não está disponível aqui".
+        tipos_corpo = {}
+        A.coletar_declaracoes_tipadas(programa.corpo, tipos_corpo)
+        self._nomes_globais_eventuais = self._nomes_globais_top_level | set(tipos_corpo)
 
         self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims)}
         linhas_dos_campos = {}   # (nome_estrutura, nome_campo) -> linha (só para mensagens de erro)
@@ -134,6 +280,10 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"'{e.nome}' já é o nome de uma biblioteca importada; "
                     f"escolhe outro nome para a estrutura", e.linha)
+            if e.nome in self.nomes_reservados_codegen:
+                raise ErroSemantico(
+                    f"'{e.nome}' colide com um nome interno usado pelo código "
+                    f"gerado; escolhe outro nome para a estrutura", e.linha)
             if e.nome in self.nomes_internos_bibliotecas:
                 raise ErroSemantico(
                     f"'{e.nome}' colide com o nome interno gerado para "
@@ -227,15 +377,54 @@ class VerificadorTipos:
                     # incorreto. Só é erro se o TIPO diferir -- o mesmo
                     # nome com o mesmo tipo em ramos irmãos é legítimo (o
                     # tipo estático fica correto seja qual for o ramo).
-                    tipo_existente, dims_existente, _eh_const = destino[s.nome]
+                    tipo_existente, dims_existente, eh_constante_existente, valor_existente = destino[s.nome]
                     if (tipo_existente, dims_existente) != (s.tipo, dims_n):
                         raise ErroSemantico(
                             f"a variável '{s.nome}' é declarada com tipos diferentes "
                             f"em ramos diferentes ('{tipo_existente}' e '{s.tipo}') -- "
                             f"para ser visível a funções, o compilador precisa de um "
                             f"único tipo estático para '{s.nome}'", s.linha)
+                    # bug #2: o mesmo raciocínio do tipo, acima, mas para
+                    # 'eh_constante' -- antes, um nome 'constante' num ramo
+                    # e variável normal no ramo irmão ficava silenciosamente
+                    # com o 'eh_constante' do PRIMEIRO ramo visitado em DFS
+                    # (sempre 's.ramos' antes de 's.senao'), independente de
+                    # qual ramo executa de facto -- permitindo que o ramo
+                    # que corre em runtime mute em silêncio o que a fonte
+                    # chama de 'constante' (ou, ao contrário, tratasse como
+                    # imutável uma variável que a fonte deixa clara que
+                    # pode mudar).
+                    if eh_constante_existente != s.eh_constante:
+                        raise ErroSemantico(
+                            f"a variável '{s.nome}' é declarada como 'constante' num ramo "
+                            f"e como variável normal noutro -- para ser visível a funções, "
+                            f"o compilador precisa de uma única decisão para '{s.nome}'",
+                            s.linha)
+                    # bug #39: mesmo raciocínio, agora para o VALOR
+                    # resolvido de uma constante inteira escalar (bug #29)
+                    # -- ramos irmãos com o mesmo tipo mas valores
+                    # DIFERENTES ficavam congelados no valor do primeiro
+                    # ramo visitado, mesmo que fosse o ramo irmão a
+                    # executar de facto em runtime. Se os valores não
+                    # baterem certo, marca como não resolvível (None) em
+                    # vez de adivinhar qual dos dois está "certo" -- mais
+                    # seguro do que assumir sempre o primeiro.
+                    if (s.eh_constante and s.tipo == "inteiro" and dims_n == 0
+                            and valor_existente is not None):
+                        valor_deste_ramo = self._resolver_constante(s.inicial, destino)
+                        if valor_deste_ramo != valor_existente:
+                            destino[s.nome] = (tipo_existente, dims_existente,
+                                                 eh_constante_existente, None)
                 else:
-                    destino[s.nome] = (s.tipo, dims_n, s.eh_constante)
+                    # bug #29: mesmo raciocínio de _registar_decl -- guarda
+                    # o valor resolvido, se for uma 'constante' inteira
+                    # escalar, para uma constante declarada DENTRO de
+                    # 'inicio' (não só antes) também ficar resolúvel a
+                    # partir de dentro de uma função.
+                    valor_resolvido = None
+                    if s.eh_constante and s.tipo == "inteiro" and dims_n == 0:
+                        valor_resolvido = self._resolver_constante(s.inicial, destino)
+                    destino[s.nome] = (s.tipo, dims_n, s.eh_constante, valor_resolvido)
             for bloco in A.subblocos(s):
                 self._pre_registar_recursivo(bloco, destino, globais_previas)
 
@@ -337,6 +526,10 @@ class VerificadorTipos:
             raise ErroSemantico(
                 f"'{nome}' já é o nome de uma biblioteca importada; escolhe "
                 f"outro nome para {o_que_e}", linha)
+        if nome in self.nomes_reservados_codegen:
+            raise ErroSemantico(
+                f"'{nome}' colide com um nome interno usado pelo código "
+                f"gerado; escolhe outro nome para {o_que_e}", linha)
         if nome in self.nomes_internos_bibliotecas:
             raise ErroSemantico(
                 f"'{nome}' colide com o nome interno gerado para "
@@ -346,6 +539,43 @@ class VerificadorTipos:
             raise ErroSemantico(
                 f"'{nome}' é o nome de um tipo primitivo; escolhe outro nome "
                 f"para {o_que_e}", linha)
+
+    def _globais_lidas_transitivamente(self, nome_funcao, vistas=None):
+        """bug #26: '_verificar_chamada' só valida os ARGUMENTOS de uma
+        chamada contra o escopo no ponto da chamada -- nunca o que o
+        CORPO da função chamada lê. '_verificar_funcao' verifica esse
+        corpo, mas contra 'self.globais' (o conjunto COMPLETO, final,
+        independente da ordem de declaração), por isso uma referência
+        antecipada escondida dentro do corpo (ex.: 'funcao pegaB()
+        devolver b' chamada antes de 'b' existir) passava despercebida
+        em compilação e só rebentava em runtime com um NameError cru.
+
+        Devolve o conjunto de nomes que SÃO globais do programa (não
+        locais/parâmetros da própria função) lidos pelo corpo de
+        'nome_funcao', transitivamente através de chamadas a outras
+        funções do próprio ficheiro (não bibliotecas, essas não leem
+        globais ALGO). 'vistas' evita recursão infinita em chamadas
+        (mútuas ou diretas) -- uma função já vista não é reprocessada,
+        simplesmente já não pode contribuir NOVOS nomes que a primeira
+        passagem não tenha encontrado."""
+        if vistas is None:
+            vistas = set()
+        if nome_funcao in vistas:
+            return set()
+        vistas.add(nome_funcao)
+        f_def = self.funcoes.get(nome_funcao)
+        if f_def is None:  # pragma: no cover -- só chamado depois de confirmar que a função existe
+            return set()
+        nomes_lidos, chamadas = set(), set()
+        _nomes_lidos_em_stmts(f_def.corpo, nomes_lidos, chamadas)
+        locais = {p.nome for p in f_def.parametros}
+        locais_dict = {}
+        A.coletar_declaracoes_tipadas(f_def.corpo, locais_dict)
+        locais |= set(locais_dict)
+        globais = {n for n in nomes_lidos if n not in locais and n in self._nomes_globais_eventuais}
+        for chamada in chamadas:
+            globais |= self._globais_lidas_transitivamente(chamada, vistas)
+        return globais
 
     def _registar_decl(self, escopo, d: A.Declaracao):
         if self._nome_ativo(escopo, d.nome):
@@ -396,6 +626,17 @@ class VerificadorTipos:
                 if tipo_inicial is None:
                     raise ErroSemantico(
                         f"'{d.inicial.nome}' é um procedimento e não devolve valor", d.linha)
+                if "." not in d.inicial.nome:
+                    # bug #26: só funções do PRÓPRIO ficheiro (não
+                    # bibliotecas) podem ler uma global ALGO -- ver
+                    # _globais_lidas_transitivamente.
+                    for nome_global in sorted(self._globais_lidas_transitivamente(d.inicial.nome)):
+                        if nome_global not in escopo:
+                            raise ErroSemantico(
+                                f"'{d.inicial.nome}' lê a variável global '{nome_global}', que "
+                                f"só é declarada mais tarde no programa -- move a declaração de "
+                                f"'{nome_global}' para antes desta linha, ou a de '{d.nome}' "
+                                f"para depois", d.linha)
                 dims_n = 0 if d.dims is None else len(d.dims)
                 dims_inicial = self._dims_retorno_de_chamada(d.inicial)
                 if dims_inicial != dims_n:
@@ -433,7 +674,51 @@ class VerificadorTipos:
                         f"não é possível inicializar '{d.nome}' (tipo '{d.tipo}') com um "
                         f"valor do tipo '{tipo_inicial}'", d.linha)
         dims_n = 0 if d.dims is None else len(d.dims)
-        escopo[d.nome] = (d.tipo, dims_n, d.eh_constante)
+        # bug #29: guarda o valor resolvido de uma 'constante' inteira
+        # escalar (None para tudo o resto -- variável normal, vetor,
+        # ou constante de outro tipo) na própria entrada do escopo,
+        # para _resolver_constante conseguir "dobrar" uma referência a
+        # esta constante quando outra declaração a usar como tamanho
+        # de vetor (ex.: 'v:inteiro[N]') ou noutra constante (ex.:
+        # 'M = N + 1').
+        valor_resolvido = None
+        if d.eh_constante and d.tipo == "inteiro" and dims_n == 0:
+            valor_resolvido = self._resolver_constante(d.inicial, escopo)
+        escopo[d.nome] = (d.tipo, dims_n, d.eh_constante, valor_resolvido)
+
+    def _resolver_constante(self, expr, escopo):
+        """bug #29: 'constante N:inteiro = 5' usada como 'v:inteiro[N]'
+        é internamente uma referência a variável (A.LValue), não um
+        A.Literal, apesar de ser tão previsível em compilação como o
+        literal '5' -- mas _valor_literal_negativo/_tamanho_estatico
+        (e as suas cópias em tools/linter.py) só reconhecem
+        A.Literal, por isso ficam cegas a 'constante' nessas
+        verificações específicas de tamanho/limites (o resto da
+        compilação, incluindo codegen, não precisa disto: o Python
+        gerado só referencia 'N' pelo nome, resolvido em runtime).
+
+        Devolve o valor inteiro estático de 'expr' se for um literal,
+        OU uma referência (direta, ou através de '+'/'-'/'*', para
+        cobrir 'M = N + 1' com 'N' também 'constante') a uma
+        'constante' inteira já registada em 'escopo'. Devolve None se
+        não for estaticamente resolúvel desta forma (variável normal,
+        chamada, etc.)."""
+        if isinstance(expr, A.Literal) and expr.tipo == "inteiro":
+            return expr.valor
+        if isinstance(expr, A.UnOp) and expr.op == "-":
+            valor = self._resolver_constante(expr.operando, escopo)
+            return None if valor is None else -valor
+        if isinstance(expr, A.BinOp) and expr.op in ("+", "-", "*"):
+            esq = self._resolver_constante(expr.esq, escopo)
+            dire = self._resolver_constante(expr.dire, escopo)
+            if esq is None or dire is None:
+                return None
+            return {"+": esq + dire, "-": esq - dire, "*": esq * dire}[expr.op]
+        if isinstance(expr, A.LValue) and not expr.acessos and expr.nome in escopo:
+            entrada = escopo[expr.nome]
+            if len(entrada) > 3:
+                return entrada[3]
+        return None
 
     def _validar_dims(self, dims, escopo, linha, contexto_campo=False):
         """Valida cada expressão de dimensão de um vetor: tem de ser
@@ -461,6 +746,13 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     "o tamanho de um vetor tem de ser uma expressão inteira", linha)
             valor_literal = self._valor_literal_negativo(dim_expr)
+            if valor_literal is None:
+                # bug #29: 'constante N:inteiro = -3; v:inteiro[N]' não
+                # é um A.Literal negativo (é uma referência a 'N'), mas
+                # é tão previsível em compilação como o literal '-3'.
+                valor_resolvido = self._resolver_constante(dim_expr, escopo)
+                if valor_resolvido is not None and valor_resolvido < 0:
+                    valor_literal = valor_resolvido
             if valor_literal is not None:
                 raise ErroSemantico(
                     f"o tamanho de um vetor não pode ser negativo (é {valor_literal})",
@@ -515,15 +807,18 @@ class VerificadorTipos:
                     f"o campo '{nome_campo}' de '{tipo_esperado}' espera '{tipo_campo}' "
                     f"mas recebeu '{tipo_valor}'", lit.linha)
 
-    def _tamanho_estatico(self, dim_expr):
+    def _tamanho_estatico(self, dim_expr, escopo):
         """AL-79/B7: devolve o tamanho declarado de uma dimensão se for um
         literal inteiro estático (o único caso em que dá para validar o
         número de elementos de um literal '{...}' em compilação); None se
         for uma expressão dinâmica (variável, chamada, etc.), caso em que
-        não há como validar estaticamente."""
+        não há como validar estaticamente. bug #29: também resolve uma
+        referência a 'constante' (ver _resolver_constante) -- 'dim_expr'
+        pode ser None (vetor de tamanho não-estático vindo de um
+        parâmetro, ver _verificar_vetor_literal)."""
         if isinstance(dim_expr, A.Literal) and dim_expr.tipo == "inteiro":
             return dim_expr.valor
-        return None
+        return self._resolver_constante(dim_expr, escopo)
 
     def _verificar_vetor_literal(self, lit: A.VetorLiteral, tipo_elemento, dims, escopo):
         # AL-16: desde que o parser deixou de saber de antemão quantas
@@ -535,7 +830,7 @@ class VerificadorTipos:
         # literal estático -- antes só a profundidade de aninhamento era
         # verificada, nunca o número de elementos contra o tamanho
         # declarado (ex.: 'v:inteiro[5] = {1,2,3}' compilava sem erro).
-        tam_esperado = self._tamanho_estatico(dims[0])
+        tam_esperado = self._tamanho_estatico(dims[0], escopo)
         if tam_esperado is not None and len(lit.elementos) != tam_esperado:
             raise ErroSemantico(
                 f"o vetor tem tamanho declarado {tam_esperado} mas o literal "
@@ -684,15 +979,39 @@ class VerificadorTipos:
                         f"ex: '{A.texto_expr(e)}.campo'", s.linha)
 
         elif isinstance(s, A.Se):
+            escopos_ramos = []
             for cond, corpo in s.ramos:
                 tipo, _ = self._tipo_expr(cond, escopo)
                 if tipo != "booleano":
                     raise ErroSemantico(
                         f"a condição de 'se' tem de ser booleana (é '{tipo}')",
                         getattr(cond, "linha", s.linha))
-                self._verificar_bloco(corpo, Escopo(escopo), ctx_funcao)
+                escopo_ramo = Escopo(escopo)
+                self._verificar_bloco(corpo, escopo_ramo, ctx_funcao)
+                escopos_ramos.append(escopo_ramo)
             if s.senao is not None:
-                self._verificar_bloco(s.senao, Escopo(escopo), ctx_funcao)
+                escopo_senao = Escopo(escopo)
+                self._verificar_bloco(s.senao, escopo_senao, ctx_funcao)
+                escopos_ramos.append(escopo_senao)
+                # bug #9: um 'se'/'senao' exaustivo (tem 'senao', por isso
+                # cobre TODOS os casos possíveis) que declara o MESMO nome,
+                # com o MESMO tipo/dims/eh_constante, em TODOS os ramos,
+                # garante que esse nome tem sempre um valor a seguir ao
+                # 'se' -- fica disponível no escopo pai, tal como uma
+                # declaração normal. Sem isto, 'x' declarada em ambos os
+                # ramos era descartada com o resto do escopo de cada ramo,
+                # e usar 'x' logo a seguir dava, incorretamente, "a
+                # variável 'x' não foi declarada". Se os ramos não
+                # concordarem (tipos diferentes, ou falta um 'senao'), o
+                # nome fica por declarar, como antes -- sem erro, só sem
+                # propagação (mais seguro do que adivinhar).
+                nomes_comuns = set(escopos_ramos[0].locais)
+                for esc in escopos_ramos[1:]:
+                    nomes_comuns &= set(esc.locais)
+                for nome in nomes_comuns:
+                    valores = [esc.locais[nome] for esc in escopos_ramos]
+                    if all(v == valores[0] for v in valores):
+                        escopo[nome] = valores[0]
 
         elif isinstance(s, A.Para):
             escopo_corpo = Escopo(escopo)

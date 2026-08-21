@@ -29,7 +29,7 @@ online
 - visualizador so no online. + link
 - report error
 - trace de pois de executar doawload?
-
+- manual
 - increase decrease font
 - theme
 

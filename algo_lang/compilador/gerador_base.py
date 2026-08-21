@@ -56,6 +56,7 @@ class GeradorCodigoBase:
         self.tabela_tipos_globais = {}   # nome -> tipo (tudo o que é global no programa)
         self.refs_atuais = []            # nomes ref da função a gerar neste momento
         self.tipo_retorno_atual = None   # tipo de retorno da função a gerar neste momento
+        self.dims_retorno_atual = 0      # nº de dimensões do vetor devolvido pela função a gerar neste momento
         self.estruturas = {}
         self.mapa_linhas = {}            # nº de linha do .py gerado -> nº de linha do .algo original
         self._linha_algo_atual = None    # linha ALGO da instrução a ser gerada neste momento
@@ -119,6 +120,22 @@ class GeradorCodigoBase:
             return f"float({expr_py})"
         return expr_py
 
+    def _copiar_se_necessario(self, expr_python, tipo, dims):
+        """Bug #1 da auditoria: 'estrutura' e vetor são tipos por VALOR em
+        ALGO, mas listas e instâncias de classe do Python gerado são
+        sempre referências -- sem isto, 'p2 = p1' (ou 'devolver g',
+        'v = {p1, p2}', etc.) partilhava a mesma instância em vez de a
+        copiar, e mutar p2 mutava p1 em silêncio. Ponto único de cópia,
+        chamado em todos os caminhos que podem ler o valor de uma
+        variável já existente (atribuição, declaração, devolver,
+        literais de vetor/estrutura); copy.deepcopy (não uma cópia
+        superficial) para cobrir também níveis aninhados (Ponto[] dentro
+        de Ponto[][], campo-struct dentro de struct). Não se aplica a
+        passagem 'ref' -- aliasing é intencional aí."""
+        if dims > 0 or tipo in self.estruturas:
+            return f"copy.deepcopy({expr_python})"
+        return expr_python
+
     # -------- statements --------
     def _gerar_corpo(self, corpo, nivel, tipos):
         if not corpo:  # pragma: no cover -- o parser exige >=1 instrução em qualquer bloco
@@ -169,6 +186,10 @@ class GeradorCodigoBase:
             expr = self._expr_vetor_literal(stmt.expr, tipo_alvo, tipos)
         else:
             expr = self._coagir_decimal(self._expr(stmt.expr, tipos), tipo_alvo, stmt.expr)
+            # AL-XX/bug#1: semantics.py já rejeita atribuir um vetor
+            # inteiro diretamente (o alvo aqui é sempre dims==0), por
+            # isso só 'estrutura' importa neste caminho.
+            expr = self._copiar_se_necessario(expr, tipo_alvo, 0)
         self.emit(f"{alvo} = {expr}", nivel)
 
     def _gerar_se(self, stmt: A.Se, nivel, tipos):
@@ -216,8 +237,16 @@ class GeradorCodigoBase:
             self._gerar_corpo(corpo, nivel + 1, tipos)
             primeiro = False
         if stmt.contrario is not None:
-            self.emit("else:", nivel)
-            self._gerar_corpo(stmt.contrario, nivel + 1, tipos)
+            if primeiro:
+                # bug #24: 'stmt.casos' está vazio -- nenhum 'if' foi
+                # emitido acima, por isso não há nada a que um 'else:'
+                # se possa juntar (seria um 'else' sem 'if', Python
+                # inválido). O 'contrario' executa sempre neste caso, sem
+                # condição nenhuma.
+                self._gerar_corpo(stmt.contrario, nivel, tipos)
+            else:
+                self.emit("else:", nivel)
+                self._gerar_corpo(stmt.contrario, nivel + 1, tipos)
 
     def _encontrar_funcao(self, nome):
         if "." in nome:
@@ -229,10 +258,14 @@ class GeradorCodigoBase:
 
     # -------- lvalue / expressões --------
     def _lvalue(self, lv: A.LValue, tipos):
+        # Bug #31: '_algo_indice' rejeita índices negativos em runtime
+        # (ver codegen.py) -- aplicado aqui para leitura E escrita,
+        # cada nível de indexação (1D, 2D+), porque este é o único
+        # sítio que constrói o texto Python de um acesso indexado.
         base = lv.nome
         for tag, valor in lv.acessos:
             if tag == "indice":
-                base += f"[{self._expr(valor, tipos)}]"
+                base += f"[_algo_indice({self._expr(valor, tipos)})]"
             else:
                 base += f".{valor}"
         return base
@@ -271,6 +304,7 @@ class GeradorCodigoBase:
         # codegen.py o consulta (para coagir 'devolver <inteiro>' de uma
         # função 'decimal'); irrelevante para codegen_minimo.py.
         self.tipo_retorno_atual = f.tipo_retorno
+        self.dims_retorno_atual = f.dims_retorno
 
         if not f.corpo:  # pragma: no cover -- o parser exige >=1 instrução no corpo
             self.emit("pass", 1)
@@ -289,5 +323,6 @@ class GeradorCodigoBase:
 
         self.refs_atuais = []
         self.tipo_retorno_atual = None
+        self.dims_retorno_atual = 0
         self._linha_algo_atual = None
         self.linhas.append("")

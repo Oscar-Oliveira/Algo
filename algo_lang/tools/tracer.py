@@ -109,6 +109,24 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
     limite_excedido = {"valor": False}
     resultado_erro = {"valor": None}
 
+    # AUDITORIA_2026-08-19 bug #17: 'pilha_frames'/'pilha_incremental'
+    # mantêm a pilha de frames VISÍVEIS (mesmo filtro que
+    # construir_pilha) incrementalmente, empurrada/retirada só nos
+    # eventos 'call'/'return' -- em vez de reconstruir a cadeia
+    # completa (frame.f_back) a CADA linha traçada, que tornava o
+    # custo total O(profundidade²) numa recursão profunda (medido:
+    # profundidade 1990 a demorar ~9.5s). A cada evento 'line', só a
+    # entrada do TOPO (o frame atualmente a executar) é recalculada --
+    # as entradas das frames ANCESTRAIS mantêm-se tal como estavam na
+    # ÚLTIMA vez que cada uma foi o frame "atual" (não podem ter mudado
+    # entretanto: Python é de execução única, uma frame ancestral fica
+    # inerte enquanto uma frame mais funda está a correr). Cada entrada
+    # é sempre SUBSTITUÍDA (nunca mutada) ao ser atualizada, para o
+    # 'list(pilha_incremental)' de um passo já registado nunca ficar
+    # corrompido por uma atualização posterior a essa MESMA lista viva.
+    pilha_frames = []
+    pilha_incremental = []
+
     def construir_pilha(frame):
         pilha = []
         f = frame
@@ -166,8 +184,33 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                 return i
         return None  # pragma: no cover -- defensivo, ver docstring
 
+    def _nome_visivel_ou_none(frame):
+        """bug #17: mesmo filtro que construir_pilha usa para decidir se
+        uma frame conta para a pilha visível (a função principal, ou uma
+        função/procedimento do próprio estudante) -- devolve o nome a
+        mostrar, ou None se a frame não for visível (ex.: um frame
+        interno _algo_..., de uma biblioteca, ou fora do ficheiro
+        gerado)."""
+        if frame.f_code.co_filename != caminho_py:
+            return None
+        nome = frame.f_code.co_name
+        if nome == NOME_FUNCAO_PRINCIPAL:
+            return "Principal"
+        if nome in nomes_funcoes_conhecidas:
+            return nome
+        return None
+
     def tracer(frame, evento, arg):
+        if evento == "call":
+            nome_visivel = _nome_visivel_ou_none(frame)
+            if nome_visivel is not None:
+                pilha_frames.append(frame)
+                pilha_incremental.append({"nome": nome_visivel, "variaveis": {}})
+            return tracer
         if evento == "return":
+            if pilha_frames and frame is pilha_frames[-1]:
+                pilha_frames.pop()
+                pilha_incremental.pop()
             # a função principal terminou -- o 'line' da sua última instrução
             # só regista o estado ANTES dela correr, por isso o efeito dessa
             # última linha (consola/variáveis) nunca aparecia em nenhum
@@ -216,19 +259,31 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         linha_algo = mapa_linhas.get(frame.f_lineno)
         if linha_algo is None:
             return tracer
-        pilha = construir_pilha(frame)
-        if not pilha:
+        if not pilha_incremental:
             # execução ainda ao nível do módulo (ex: a definir 'class Ponto' ou
             # 'def dobro' antes do programa entrar em _algo_programa) -- não é
             # um passo relevante para mostrar ao aluno
             return tracer
+        # bug #17: só a entrada do TOPO (a frame atual) precisa de ser
+        # recalculada -- as ancestrais mantêm o valor da última vez que
+        # cada uma foi a frame atual (ver comentário mais acima).
+        # SUBSTITUÍDA (não mutada), para não corromper um 'list(...)'
+        # já guardado num passo anterior.
+        nome_atual = pilha_incremental[-1]["nome"]
+        if nome_atual == "Principal":
+            variaveis_atuais = {k: _valor_serializavel(v) for k, v in frame.f_globals.items()
+                                 if k in nomes_globais}
+        else:
+            variaveis_atuais = {k: _valor_serializavel(v) for k, v in frame.f_locals.items()
+                                 if not k.startswith("_algo_") and k != "_"}
+        pilha_incremental[-1] = {"nome": nome_atual, "variaveis": variaveis_atuais}
         if len(passos) >= MAX_PASSOS:
             limite_excedido["valor"] = True
             raise LimiteDePassosExcedido()
         passos.append({
             "linha": linha_algo,
             "consola": buffer_saida.getvalue(),
-            "pilha": pilha,
+            "pilha": list(pilha_incremental),
         })
         return tracer
 
@@ -236,7 +291,25 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
     entrada_stream = io.StringIO("\n".join(entradas)) if entradas is not None else None
 
     namespace = {"__name__": "__main__", "__file__": caminho_py}
-    codigo_compilado = compile(codigo_py, caminho_py, "exec")
+    try:
+        codigo_compilado = compile(codigo_py, caminho_py, "exec")
+    except SyntaxError as e:
+        # bug #36: ao contrário do exec() mais abaixo (já protegido por um
+        # 'except Exception' de rede de segurança), este compile() estava
+        # completamente desprotegido -- se o Python gerado for
+        # sintaticamente inválido (ex.: bug #24, um bug de codegen
+        # gerando 'else' sem 'if'), a exceção propagava crua até
+        # cli.py, e dentro da consola interativa (cmd_consola) chegava a
+        # fechar a sessão inteira, já que o ciclo de comandos só apanhava
+        # SystemExit/KeyboardInterrupt. Devolve o mesmo formato de erro
+        # que qualquer outra falha, sem tentar traçar nada (não há nada
+        # de executável para traçar).
+        return {
+            "passos": [],
+            "consolaFinal": "",
+            "erro": {"mensagem": f"erro interno do compilador: {e}", "linha": None},
+            "limiteExcedido": False,
+        }
 
     gestor_stdin = _redirect_stdin(entrada_stream) if entrada_stream is not None \
         else contextlib.nullcontext()

@@ -35,7 +35,22 @@ def _pasta_saida(caminho_algo: str):
             f"ficheiro com esse nome. Renomeia ou remove esse ficheiro e tenta outra vez."
         )
         sys.exit(1)
-    os.makedirs(pasta, exist_ok=True)
+    try:
+        os.makedirs(pasta, exist_ok=True)
+    except OSError as e:
+        # AUDITORIA_2026-08-19 bug #30: sem isto, um caminho de saída a
+        # rondar os ~260 caracteres (facilmente alcançável com uma
+        # estrutura de pastas de curso aninhada, ou com o Ambiente de
+        # Trabalho sincronizado por OneDrive) dava um OSError cru do
+        # Windows ("[WinError 206] The filename or extension is too
+        # long"), propagado sem tratamento nenhum -- nenhuma das outras
+        # mensagens amigáveis deste ficheiro apanhava este caso.
+        print(
+            f"❌ Erro: não consegui criar a pasta de saída '{pasta}' ({e}) -- "
+            f"o caminho pode ser demasiado longo para o Windows; tenta mover o "
+            f"ficheiro para uma pasta com um caminho mais curto."
+        )
+        sys.exit(1)
     return pasta, nome_base
 
 
@@ -43,9 +58,18 @@ def _ler_ficheiro_algo(caminho: str) -> str:
     """Lê um .algo como UTF-8 -- AL-34: sem isto, um ficheiro noutra
     codificação (ex: Latin-1 guardado por engano) levantava
     UnicodeDecodeError não tratado, um traceback confuso em vez de uma
-    sugestão do que fazer."""
+    sugestão do que fazer.
+
+    AUDITORIA_2026-08-19 bug #28: 'utf-8-sig', não 'utf-8' -- vários
+    editores no Windows (incluindo o Bloco de Notas, ao "Guardar como
+    UTF-8") escrevem um BOM (EF BB BF) no início do ficheiro por
+    omissão. 'utf-8' simples não o remove, por isso ficava como um
+    caractere invisível logo na linha 1, coluna 1, dando um erro
+    léxico que o estudante não conseguia relacionar com nada visível
+    no seu editor. 'utf-8-sig' remove-o se existir e é um no-op seguro
+    quando não há BOM nenhum."""
     try:
-        with open(caminho, "r", encoding="utf-8") as f:
+        with open(caminho, "r", encoding="utf-8-sig") as f:
             return f.read()
     except UnicodeDecodeError as e:
         print(
@@ -88,7 +112,19 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
             )
             sys.exit(1)
         codigo = _ler_ficheiro_algo(caminho)
-        declaracoes, funcoes, estruturas, inclusoes_aninhadas = parse_biblioteca(codigo)
+        try:
+            # AUDITORIA_2026-08-19 bugs #6/#15: sem isto, um erro de
+            # sintaxe/léxico DENTRO do ficheiro incluído (ex.: um erro
+            # genuíno na sua linha 2, ou incluir por engano o próprio
+            # ficheiro principal, que 'parse_biblioteca' rejeita por não
+            # ter a forma de uma biblioteca) só trazia linha/coluna --
+            # nunca o CAMINHO -- fazendo o estudante olhar para a linha
+            # errada, no ficheiro errado. Mesmo padrão que
+            # online/executor.py já usa corretamente.
+            declaracoes, funcoes, estruturas, inclusoes_aninhadas = parse_biblioteca(codigo)
+        except (ErroLexico, ErroSintatico) as e:
+            print(f"❌ Erro em '{inc.caminho}': {e}")
+            sys.exit(1)
 
         try:
             mesclar_biblioteca_no_programa(
@@ -233,6 +269,14 @@ def cmd_executa_com_trace(args):
     with open(caminho_py, "w", encoding="utf-8") as f:
         f.write(dados["codigo"])
     print(f"✔ Compilado para: {caminho_py}")
+    if args.mostrar_python:
+        # AUDITORIA_2026-08-19 bug #16: '--mostrar-python' era ignorado
+        # em silêncio quando combinado com '--debug'/'--json' -- o
+        # Python era gerado e escrito em disco na mesma, só não era
+        # impresso, sem aviso nenhum de que a flag tinha sido ignorada.
+        print("----- Código Python gerado -----")
+        print(dados["codigo"])
+        print("---------------------------------\n")
 
     entradas = None
     if args.entradas:
@@ -625,6 +669,16 @@ def cmd_consola(parser):
             continue
         except KeyboardInterrupt:
             print("\n(interrompido)")
+            continue
+        except Exception as e:
+            # bug #36: rede de segurança -- o contrato documentado desta
+            # consola (docstring acima) é que um comando com erro só
+            # mostra o erro e volta ao prompt, nunca fecha a consola. Até
+            # aqui só SystemExit/KeyboardInterrupt eram apanhados neste
+            # ciclo; qualquer outra exceção (ex.: um SyntaxError cru vindo
+            # de um bug de codegen que gere Python inválido) fechava a
+            # sessão inteira em vez de só mostrar o erro.
+            print(f"❌ erro interno do compilador: {e}")
             continue
 
         if getattr(args, "ficheiro", None):

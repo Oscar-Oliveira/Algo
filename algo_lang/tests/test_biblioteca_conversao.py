@@ -101,7 +101,11 @@ inicio
     assert resultado.returncode == 1
     assert "Traceback" not in resultado.stdout
     assert "Traceback" not in resultado.stderr
-    assert "valor inválido" in resultado.stdout
+    # AUDITORIA_2026-08-19 bug #8: passou a ter uma tradução dedicada
+    # (antes caía no genérico "valor inválido (...)", com o texto do
+    # Python "cannot convert float infinity to integer" à mistura).
+    assert "infinito" in resultado.stdout
+    assert "infinity" not in resultado.stdout.lower()
 
 
 # ---------- paraDecimal ----------

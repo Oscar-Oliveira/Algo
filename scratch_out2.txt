@@ -1,0 +1,1 @@
+❌ Erro em 'principal.algo': Erro de sintaxe na linha 1, coluna 1: um ficheiro incluído só pode conter declarações de variáveis, 'constante', 'estrutura', 'funcao', 'procedimento' ou 'incluir' (encontrou ALGORITMO)

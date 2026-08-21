@@ -359,3 +359,56 @@ def test_debug_formata_vetores_e_estruturas_e_intercala_saida_real(tmp_path):
     linhas = texto.split("\n")
     assert "1" in linhas
     assert "5" in linhas
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 7.1: construir_pilha quadrático em
+# recursão profunda (bug #17, desempenho -- não é correção) ----------
+
+def test_pilha_incremental_mostra_valores_distintos_de_cada_nivel_da_recursao(tmp_path):
+    """Confirma a correção do bug #17 (pilha mantida incrementalmente
+    via eventos call/return, só a entrada do topo recalculada a cada
+    linha) -- cada frame ancestral tem de continuar a mostrar o SEU
+    PRÓPRIO valor de 'n', não o valor mais recente/do topo. Seria
+    exatamente o tipo de bug que uma implementação incremental
+    incorreta introduziria (todas as entradas a apontar para o mesmo
+    estado em vez de cada uma congelada no seu próprio nível)."""
+    resultado = _trace("""
+        algoritmo "T"
+        funcao contar(n:inteiro):inteiro
+            se n <= 0 entao
+                devolver 0
+            senao
+                devolver 1 + contar(n - 1)
+        inicio
+            escrever(contar(4))
+    """, tmp_path=tmp_path)
+    assert resultado["erro"] is None
+    passo_mais_fundo = max(resultado["passos"], key=lambda p: len(p["pilha"]))
+    assert len(passo_mais_fundo["pilha"]) == 6  # Principal + n=4,3,2,1,0
+    valores_n = [frame["variaveis"]["n"] for frame in passo_mais_fundo["pilha"][1:]]
+    assert valores_n == [4, 3, 2, 1, 0]
+
+
+def test_recursao_moderadamente_profunda_gera_trace_rapidamente(tmp_path):
+    """bug #17: antes, o custo total era O(profundidade²) -- uma
+    recursão de profundidade ~2000 demorava ~9.5s a gerar o trace.
+    Depois da correção (pilha incremental), a mesma profundidade deve
+    ficar bem abaixo de um segundo. Limite generoso (5s) para não
+    tornar o teste frágil em CI mais lenta, mas ainda assim muito
+    abaixo do que a versão quadrática demorava."""
+    import time
+    inicio = time.time()
+    resultado = _trace("""
+        algoritmo "T"
+        funcao contar(n:inteiro):inteiro
+            se n <= 0 entao
+                devolver 0
+            senao
+                devolver 1 + contar(n - 1)
+        inicio
+            escrever(contar(1990))
+    """, tmp_path=tmp_path)
+    duracao = time.time() - inicio
+    assert resultado["erro"] is None
+    assert resultado["consolaFinal"].strip() == "1990"
+    assert duracao < 5

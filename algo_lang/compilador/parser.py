@@ -15,6 +15,8 @@ NOMES_AMIGAVEIS = {
 
 
 def _nome_amigavel(tipo, valor=None):
+    if tipo == "ID" and valor is not None:
+        return f"um identificador ({valor!r})"
     if tipo in NOMES_AMIGAVEIS:
         return NOMES_AMIGAVEIS[tipo]
     if valor is not None:
@@ -55,6 +57,39 @@ class ErroSintatico(Exception):
 #   cresce com o número de operadores do MESMO nível numa cadeia plana.
 LIMITE_PROFUNDIDADE_EXPR = 50
 LIMITE_PROFUNDIDADE_BLOCO = 50
+
+# AUDITORIA_2026-08-19 bugs #7/#10: uma cadeia PLANA de operadores do
+# MESMO nível de precedência (ex.: '1+1+1+...', sem parênteses) não
+# cresce a pilha do PARSER (avança num 'while', não recursa -- daí não
+# usar LIMITE_PROFUNDIDADE_EXPR acima), mas produz uma árvore BinOp
+# encadeada com profundidade igual ao nº de operadores. codegen.py
+# envolve CADA BinOp em parênteses Python literais, por isso essa
+# profundidade vira profundidade real de parênteses aninhados no .py
+# gerado -- e o próprio CPython tem um limite de aninhamento (~200:
+# 200 termos corre bem, 201 falha com 'SyntaxError: too many nested
+# parentheses', um erro cru do Python, ao EXECUTAR o .py já compilado,
+# não ao compilar). Sem isto, semantics.py/linter.py também rebentavam
+# antes disso com RecursionError cru (limiares mais altos, ~498-995,
+# mas ainda assim crus).
+#
+# Guardado como atributo no PRÓPRIO nó (_algo_prof_arv), calculado
+# bottom-up (1 + profundidade máxima dos filhos) em CADA sítio que
+# constrói um BinOp/UnOp -- ver _criar_binop/_criar_unop/_profundidade_no
+# abaixo. Um contador simples (incrementado por 'while' e decrementado
+# no fim desse 'while') foi tentado primeiro e descartado: não compõe
+# corretamente quando o PRIMEIRO operando de uma cadeia já é ele
+# próprio profundo (esse operando acaba TOTALMENTE parseado, com o
+# contador já de volta à base, antes de a cadeia começar a contar) --
+# mas é exatamente esse operando que fica mais enterrado na árvore
+# final (uma cadeia esquerda-associativa embrulha o primeiro operando
+# N vezes). Medir a profundidade real da árvore, em vez de tentar
+# adivinhá-la a partir da pilha do parser, evita esse buraco por
+# construção.
+LIMITE_PROFUNDIDADE_ARVORE = 150
+
+
+def _profundidade_no(no):
+    return getattr(no, "_algo_prof_arv", 1)
 
 
 class Parser:
@@ -126,7 +161,8 @@ class Parser:
             else:
                 raise ErroSintatico(
                     f"esperava-se uma declaração de variável, 'constante', 'estrutura', "
-                    f"'funcao', 'procedimento' ou 'inicio', encontrou {self.atual().tipo}",
+                    f"'funcao', 'procedimento' ou 'inicio', encontrou "
+                    f"{_nome_amigavel(self.atual().tipo, self.atual().valor)}",
                     self.atual().linha, self.atual().coluna)
 
         if corpo is None:
@@ -171,7 +207,9 @@ class Parser:
         semantics.py, quando já sabemos que estruturas foram definidas."""
         tok = self.atual()
         if tok.tipo != "ID":
-            raise ErroSintatico(f"esperava-se um tipo, encontrou {tok.tipo}", tok.linha, tok.coluna)
+            raise ErroSintatico(
+                f"esperava-se um tipo, encontrou {_nome_amigavel(tok.tipo, tok.valor)}",
+                tok.linha, tok.coluna)
         self.avancar()
         return tok.valor
 
@@ -419,7 +457,8 @@ class Parser:
             return self._parse_afirmar()
         if tok.tipo == "ID":
             return self._parse_decl_atrib_ou_chamada()
-        raise ErroSintatico(f"instrução inesperada: {tok.tipo}", tok.linha, tok.coluna)
+        raise ErroSintatico(
+            f"instrução inesperada: {_nome_amigavel(tok.tipo, tok.valor)}", tok.linha, tok.coluna)
 
     def _parse_decl_atrib_ou_chamada(self):
         """Tenta interpretar como declaração (nome[, nome...]:tipo); caso
@@ -629,6 +668,37 @@ class Parser:
                 "tenta simplificar, ex. dividindo em variáveis intermédias",
                 self.atual().linha)
 
+    def _criar_binop(self, op, esq, dire, linha):
+        # bug #7/#10: ver comentário de LIMITE_PROFUNDIDADE_ARVORE acima.
+        # Chamado em TODOS os sítios que constroem um A.BinOp -- inclui os
+        # 4 níveis que avançam em 'while' (_parse_ou/_parse_e/
+        # _parse_aditiva/_parse_multiplicativa), que não recursam mas
+        # ainda assim produzem uma árvore tão profunda quanto o nº de
+        # operadores da cadeia, e os níveis que já recursam (relacional,
+        # potencia), cuja profundidade de árvore também importa aqui,
+        # independentemente de já estarem cobertos por
+        # _entrar_profundidade_expr (essa protege a pilha do PARSER; esta
+        # protege quem consome a árvore depois: semantics.py, linter.py,
+        # e o Python gerado por codegen.py).
+        profundidade = 1 + max(_profundidade_no(esq), _profundidade_no(dire))
+        if profundidade > LIMITE_PROFUNDIDADE_ARVORE:
+            raise ErroSintatico(
+                "esta expressão tem operadores a mais -- tenta dividi-la em "
+                "variáveis intermédias", linha)
+        no = A.BinOp(op, esq, dire, linha)
+        no._algo_prof_arv = profundidade
+        return no
+
+    def _criar_unop(self, op, operando, linha):
+        profundidade = 1 + _profundidade_no(operando)
+        if profundidade > LIMITE_PROFUNDIDADE_ARVORE:
+            raise ErroSintatico(
+                "esta expressão tem operadores a mais -- tenta dividi-la em "
+                "variáveis intermédias", linha)
+        no = A.UnOp(op, operando, linha)
+        no._algo_prof_arv = profundidade
+        return no
+
     def _parse_expr(self):
         self._entrar_profundidade_expr()
         try:
@@ -641,7 +711,7 @@ class Parser:
         while self.ver("OU"):
             linha = self.avancar().linha
             dire = self._parse_e()
-            esq = A.BinOp("ou", esq, dire, linha)
+            esq = self._criar_binop("ou", esq, dire, linha)
         return esq
 
     def _parse_e(self):
@@ -649,7 +719,7 @@ class Parser:
         while self.ver("E"):
             linha = self.avancar().linha
             dire = self._parse_nao()
-            esq = A.BinOp("e", esq, dire, linha)
+            esq = self._criar_binop("e", esq, dire, linha)
         return esq
 
     def _parse_nao(self):
@@ -660,7 +730,7 @@ class Parser:
                 operando = self._parse_nao()
             finally:
                 self._profundidade_expr -= 1
-            return A.UnOp("nao", operando, linha)
+            return self._criar_unop("nao", operando, linha)
         return self._parse_relacional()
 
     def _parse_relacional(self):
@@ -669,7 +739,7 @@ class Parser:
         if self.atual().tipo in ops:
             op_tok = self.avancar()
             dire = self._parse_aditiva()
-            esq = A.BinOp(ops[op_tok.tipo], esq, dire, op_tok.linha)
+            esq = self._criar_binop(ops[op_tok.tipo], esq, dire, op_tok.linha)
             if self.atual().tipo in ops:
                 # Deliberadamente proibido (mesma decisão da maioria das
                 # linguagens): 'a < b < c' não significa "a < b e b < c",
@@ -688,7 +758,7 @@ class Parser:
         while self.atual().tipo in ("MAIS", "MENOS"):
             op_tok = self.avancar()
             dire = self._parse_multiplicativa()
-            esq = A.BinOp(op_tok.valor, esq, dire, op_tok.linha)
+            esq = self._criar_binop(op_tok.valor, esq, dire, op_tok.linha)
         return esq
 
     def _parse_multiplicativa(self):
@@ -697,7 +767,7 @@ class Parser:
             op_tok = self.avancar()
             simbolo = {"VEZES": "*", "DIVIDE": "/", "DIV": "div", "MOD": "mod"}[op_tok.tipo]
             dire = self._parse_unaria()
-            esq = A.BinOp(simbolo, esq, dire, op_tok.linha)
+            esq = self._criar_binop(simbolo, esq, dire, op_tok.linha)
         return esq
 
     def _parse_unaria(self):
@@ -708,7 +778,7 @@ class Parser:
                 operando = self._parse_unaria()
             finally:
                 self._profundidade_expr -= 1
-            return A.UnOp("-", operando, linha)
+            return self._criar_unop("-", operando, linha)
         return self._parse_potencia()
 
     def _parse_potencia(self):
@@ -720,7 +790,7 @@ class Parser:
                 expoente = self._parse_unaria()
             finally:
                 self._profundidade_expr -= 1
-            return A.BinOp("^", base, expoente, linha)
+            return self._criar_binop("^", base, expoente, linha)
         return base
 
     def _parse_primario(self):
@@ -809,6 +879,6 @@ def parse_biblioteca(codigo: str):
             raise ErroSintatico(
                 "um ficheiro incluído só pode conter declarações de variáveis, "
                 f"'constante', 'estrutura', 'funcao', 'procedimento' ou 'incluir' "
-                f"(encontrou {parser.atual().tipo})",
+                f"(encontrou {_nome_amigavel(parser.atual().tipo, parser.atual().valor)})",
                 parser.atual().linha, parser.atual().coluna)
     return declaracoes, funcoes, estruturas, inclusoes

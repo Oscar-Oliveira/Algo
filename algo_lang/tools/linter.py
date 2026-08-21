@@ -39,6 +39,7 @@ class Linter:
         self._verificar_inclusoes_duplicadas()
         self._verificar_importares_duplicados()
         self._verificar_casos_duplicados_em_escolha()
+        self._verificar_escolha_sem_casos()
         self._verificar_resultado_de_funcao_descartado()
         self._verificar_campos_em_falta_em_literal_de_estrutura()
         self._verificar_recursao_sem_condicao()
@@ -50,13 +51,19 @@ class Linter:
         nomes_constantes |= self._nomes_constantes_declaradas(self.programa.corpo)
         nomes_globais_mutaveis = nomes_globais - nomes_constantes
 
-        vetores_globais = self._vetores_com_tamanho_literal(self.programa.declaracoes)
+        # bug #29: nome de 'constante' -> valor inteiro resolvido,
+        # calculado uma única vez e partilhado pelos dois mapas abaixo
+        # (ver _valores_constantes).
+        valores_constantes = self._valores_constantes()
+
+        vetores_globais = self._vetores_com_tamanho_literal(
+            self.programa.declaracoes, valores_constantes)
         # AL-98/B26: nome_campo -> tamanho, para campos-vetor de QUALQUER
         # 'estrutura' -- sem isto, um índice fora dos limites só era
         # verificado para vetores declarados diretamente como variável
         # (ex.: 'v[10]'), nunca para um campo-vetor de estrutura (ex.:
         # 't.notas[10]'), que tem exatamente a mesma restrição estática.
-        campos_vetor = self._campos_vetor_por_nome()
+        campos_vetor = self._campos_vetor_por_nome(valores_constantes)
 
         self._verificar_variaveis_nao_usadas(
             self.programa.corpo, contexto="no programa principal",
@@ -65,7 +72,8 @@ class Linter:
         self._verificar_divisoes_e_comparacoes(self.programa.corpo)
         self._verificar_codigo_depois_de_devolver(self.programa.corpo)
         self._verificar_ciclo_verdadeiro_sem_saida(self.programa.corpo)
-        self._verificar_indices_fora_dos_limites(self.programa.corpo, vetores_globais, campos_vetor)
+        self._verificar_indices_fora_dos_limites(
+            self.programa.corpo, vetores_globais, campos_vetor, valores_constantes)
 
         for f in self.programa.funcoes:
             self._verificar_parametros_nao_usados(f)
@@ -79,7 +87,8 @@ class Linter:
             self._verificar_atribuicao_a_parametro_por_valor(f)
             self._verificar_codigo_depois_de_devolver(f.corpo)
             self._verificar_ciclo_verdadeiro_sem_saida(f.corpo)
-            self._verificar_indices_fora_dos_limites(f.corpo, vetores_globais, campos_vetor)
+            self._verificar_indices_fora_dos_limites(
+                f.corpo, vetores_globais, campos_vetor, valores_constantes)
 
         self.avisos.sort(key=lambda a: a.linha)
         return self.avisos
@@ -114,7 +123,15 @@ class Linter:
         """Expressões que a instrução 's' LÊ (não conta o nome de uma
         variável simples só porque está a ser atribuída)."""
         if isinstance(s, A.Declaracao):
-            return [s.inicial] if s.inicial is not None else []
+            # bug #29: 's.dims' (tamanho de um vetor, ex.: 'v:inteiro[N]')
+            # também LÊ cada nome que usar -- sem isto, uma 'constante'
+            # usada SÓ como tamanho de vetor nunca contava como "usada",
+            # e _verificar_globais_nao_usadas/_verificar_variaveis_nao_usadas
+            # avisavam (erradamente) que "nunca é usada".
+            exprs = list(s.dims) if s.dims else []
+            if s.inicial is not None:
+                exprs.append(s.inicial)
+            return exprs
         if isinstance(s, A.Atribuicao):
             exprs = [s.expr]
             if s.alvo.acessos:
@@ -289,10 +306,24 @@ class Linter:
         cada vez."""
         usadas = set()
         for corpo in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
+            eh_corpo_principal = corpo is self.programa.corpo
             for s in self._todas_as_stmts(corpo):
                 for e in self._expressoes_lidas(s):
                     self._extrair_lvalues(e, usadas)
-                if isinstance(s, A.Para):
+                if isinstance(s, A.Para) and eh_corpo_principal:
+                    # bug #3: 'para var' DENTRO de uma função é sempre
+                    # uma variável local independente -- _gerar_funcao
+                    # (gerador_base.py) exclui-a do 'global' dessa
+                    # função (via A.coletar_declaracoes_tipadas, que já
+                    # trata qualquer variável de ciclo como local),
+                    # confirmado em runtime: nunca muta uma global
+                    # homónima, mesmo que não haja nenhuma declaração
+                    # local explícita com esse nome. Só no CORPO
+                    # PRINCIPAL ('inicio') é que _algo_programa() já
+                    # declara 'global' para TODAS as globais
+                    # incondicionalmente -- só aí 'para var' mesmo
+                    # muta a global a sério, por isso só aí conta como
+                    # "uso".
                     usadas.add(s.var)
         for d in self.programa.declaracoes:
             if d.nome not in usadas:
@@ -477,6 +508,19 @@ class Linter:
                         else:
                             vistos.append((v, v.linha))
 
+    def _verificar_escolha_sem_casos(self):
+        """AUDITORIA_2026-08-19 bug #24/#37: 'escolher' sem nenhum 'caso'
+        (só 'contrario', ou nem isso) não faz o que o nome sugere -- não
+        há nada a escolher entre. Vale a pena avisar mesmo sem ser um
+        erro de compilação, porque quase sempre é um 'caso' esquecido
+        por engano."""
+        for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
+            for s in self._todas_as_stmts(stmts):
+                if isinstance(s, A.Escolha) and not s.casos:
+                    self.avisos.append(Aviso(
+                        "'escolher' sem nenhum 'caso' -- só o 'contrario' (se existir) "
+                        "é executado, sempre, sem nenhuma escolha a fazer", s.linha))
+
     def _verificar_codigo_depois_de_devolver(self, stmts):
         """Instruções a seguir a um 'devolver', no mesmo bloco, são código
         morto -- normalmente sobras de uma refatoração incompleta."""
@@ -600,46 +644,132 @@ class Linter:
             return any(self._chamada_com_argumento_nu(v, nome) for _n, v in expr.campos)
         return False
 
-    def _vetores_com_tamanho_literal(self, declaracoes):
-        """nome -> tamanho, só para vetores de 1 dimensão declarados com um
-        tamanho literal (ex: 'v:inteiro[5]') -- os únicos casos em que dá
-        para verificar limites estaticamente."""
+    def _valores_constantes(self):
+        """bug #29: nome de 'constante' -> valor inteiro resolvido,
+        achatado para todo o programa (topo + dentro de 'inicio' +
+        dentro de qualquer função) -- mesma filosofia de aproximação
+        por NOME que _campos_vetor_por_nome: um nome de 'constante'
+        redeclarado com valores potencialmente diferentes fica ambíguo
+        e é excluído (melhor não resolver do que resolver com o valor
+        errado). Resolve literais e expressões '+'/'-'/'*' entre
+        constantes já resolvidas (ex.: 'M = N + 1', com 'N' também
+        'constante'), com proteção contra referência circular."""
+        declaracoes = list(self.programa.declaracoes)
+        declaracoes += [s for s in self._todas_as_stmts(self.programa.corpo)
+                        if isinstance(s, A.Declaracao)]
+        for f in self.programa.funcoes:
+            declaracoes += [s for s in self._todas_as_stmts(f.corpo)
+                             if isinstance(s, A.Declaracao)]
+
+        por_nome = {}
+        ambiguos = set()
+        for d in declaracoes:
+            if not d.eh_constante:
+                continue
+            if d.nome in por_nome:
+                ambiguos.add(d.nome)
+            else:
+                por_nome[d.nome] = d
+        for nome in ambiguos:
+            del por_nome[nome]
+
+        cache = {}
+
+        def resolver_expr(expr, vistos):
+            if isinstance(expr, A.Literal) and expr.tipo == "inteiro":
+                return expr.valor
+            if isinstance(expr, A.UnOp) and expr.op == "-":
+                valor = resolver_expr(expr.operando, vistos)
+                return None if valor is None else -valor
+            if isinstance(expr, A.BinOp) and expr.op in ("+", "-", "*"):
+                esq = resolver_expr(expr.esq, vistos)
+                dire = resolver_expr(expr.dire, vistos)
+                if esq is None or dire is None:
+                    return None
+                return {"+": esq + dire, "-": esq - dire, "*": esq * dire}[expr.op]
+            if isinstance(expr, A.LValue) and not expr.acessos:
+                return resolver_nome(expr.nome, vistos)
+            return None
+
+        def resolver_nome(nome, vistos):
+            if nome in cache:
+                return cache[nome]
+            if nome in vistos or nome not in por_nome:
+                return None
+            vistos.add(nome)
+            valor = resolver_expr(por_nome[nome].inicial, vistos)
+            cache[nome] = valor
+            return valor
+
+        valores = {}
+        for nome in por_nome:
+            valor = resolver_nome(nome, set())
+            if valor is not None:
+                valores[nome] = valor
+        return valores
+
+    def _tamanho_resolvido(self, dim_expr, valores_constantes):
+        """bug #29: tamanho estático de UMA dimensão, literal ou
+        'constante' (ver _valores_constantes)."""
+        if isinstance(dim_expr, A.Literal) and dim_expr.tipo == "inteiro":
+            return dim_expr.valor
+        if isinstance(dim_expr, A.LValue) and not dim_expr.acessos:
+            return valores_constantes.get(dim_expr.nome)
+        return None
+
+    def _vetores_com_tamanho_literal(self, declaracoes, valores_constantes):
+        """nome -> lista de tamanhos, um por dimensão (ex.:
+        'v:inteiro[8][8]' -> [8, 8]; None numa posição para uma
+        dimensão dinâmica, não estaticamente resolúvel). bug #20:
+        antes, um filtro 'len(d.dims) == 1' ignorava por completo
+        qualquer vetor com 2+ dimensões -- nem sequer a 1ª dimensão
+        era verificada. Registar a lista completa (com None onde não
+        dá para resolver) deixa cada dimensão ser verificada
+        independentemente em _verificar_indices_expr."""
         tamanhos = {}
         for d in declaracoes:
-            if d.dims and len(d.dims) == 1 and isinstance(d.dims[0], A.Literal) \
-                    and d.dims[0].tipo == "inteiro":
-                tamanhos[d.nome] = d.dims[0].valor
+            if d.dims:
+                tamanhos[d.nome] = [self._tamanho_resolvido(dim, valores_constantes)
+                                     for dim in d.dims]
         return tamanhos
 
-    def _campos_vetor_por_nome(self):
-        """AL-98/B26: nome_campo -> tamanho, para campos de QUALQUER
-        'estrutura' que sejam vetores de 1 dimensão com tamanho literal --
-        aproximação por NOME de campo (não pelo tipo da variável, que o
-        linter não infere de forma completa como semantics.py). Se o
-        mesmo nome de campo aparecer em mais do que uma 'estrutura' com
+    def _campos_vetor_por_nome(self, valores_constantes):
+        """AL-98/B26 + bug #20: nome_campo -> lista de tamanhos (um por
+        dimensão), para campos de QUALQUER 'estrutura' -- aproximação
+        por NOME de campo (não pelo tipo da variável, que o linter não
+        infere de forma completa como semantics.py). Se o mesmo nome
+        de campo aparecer em mais do que uma 'estrutura' com listas de
         tamanhos DIFERENTES, fica ambíguo e é excluído -- melhor não
         avisar do que avisar com um tamanho errado."""
         tamanhos = {}
         ambiguos = set()
         for e in self.programa.estruturas:
             for c in e.campos:
-                if c.dims and len(c.dims) == 1 and isinstance(c.dims[0], A.Literal) \
-                        and c.dims[0].tipo == "inteiro":
-                    tamanho = c.dims[0].valor
-                    if c.nome in tamanhos and tamanhos[c.nome] != tamanho:
+                if c.dims:
+                    lista = [self._tamanho_resolvido(dim, valores_constantes) for dim in c.dims]
+                    if c.nome in tamanhos and tamanhos[c.nome] != lista:
                         ambiguos.add(c.nome)
                     else:
-                        tamanhos[c.nome] = tamanho
+                        tamanhos[c.nome] = lista
         for nome in ambiguos:
             del tamanhos[nome]
         return tamanhos
 
-    def _verificar_indices_fora_dos_limites(self, corpo, vetores_globais, campos_vetor):
+    def _verificar_indices_fora_dos_limites(self, corpo, vetores_globais, campos_vetor,
+                                             valores_constantes):
         vetores = dict(vetores_globais)
         locais = [s for s in self._todas_as_stmts(corpo) if isinstance(s, A.Declaracao)]
-        vetores.update(self._vetores_com_tamanho_literal(locais))
+        vetores.update(self._vetores_com_tamanho_literal(locais, valores_constantes))
         for s in self._todas_as_stmts(corpo):
             for e in self._expressoes_lidas(s):
+                # bug #12: _expressoes_lidas já inclui 's.alvo' quando é
+                # indexado/tem campo (necessário para deteção de
+                # variáveis não usadas, noutros chamadores) -- mas aqui
+                # o alvo de uma Atribuicao é verificado explicitamente
+                # logo a seguir; sem este 'continue', dava o mesmo
+                # aviso de índice fora dos limites DUAS vezes.
+                if isinstance(s, A.Atribuicao) and e is s.alvo:
+                    continue
                 self._verificar_indices_expr(e, vetores, campos_vetor)
             if isinstance(s, A.Atribuicao):
                 self._verificar_indices_expr(s.alvo, vetores, campos_vetor)
@@ -648,17 +778,30 @@ class Linter:
         if expr is None:  # pragma: no cover -- mesmo raciocínio de _extrair_lvalues_e_chamadas
             return
         if isinstance(expr, A.LValue):
-            tamanho = vetores.get(expr.nome)
+            # bug #20: 'dims_tamanhos' é agora uma LISTA (um tamanho por
+            # dimensão, ver _vetores_com_tamanho_literal/
+            # _campos_vetor_por_nome) -- 'nivel' avança a cada acesso
+            # 'indice' consecutivo, para cada dimensão ser comparada
+            # contra o SEU próprio tamanho, não sempre o da 1ª. Antes,
+            # um vetor 2D+ nem chegava a ser registado (filtro
+            # 'len(dims)==1'), por isso nenhuma dimensão era verificada,
+            # nem sequer a mais externa.
+            dims_tamanhos = vetores.get(expr.nome)
+            nivel = 0
             caminho = expr.nome
             for tag, valor in expr.acessos:
                 if tag == "campo":
-                    # AL-98/B26: muda para o tamanho (se algum) do CAMPO
+                    # AL-98/B26: muda para os tamanhos (se algum) do CAMPO
                     # agora acedido -- sem isto, só o tamanho do vetor de
                     # TOPO (a variável base) era considerado; um índice
                     # num campo-vetor de estrutura nunca era verificado.
-                    tamanho = campos_vetor.get(valor)
+                    dims_tamanhos = campos_vetor.get(valor)
+                    nivel = 0
                     caminho = f"{caminho}.{valor}"
                     continue
+                tamanho = (dims_tamanhos[nivel]
+                           if dims_tamanhos is not None and nivel < len(dims_tamanhos)
+                           else None)
                 indice = self._valor_literal_inteiro(valor)
                 if tamanho is not None and indice is not None and not (0 <= indice < tamanho):
                     self.avisos.append(Aviso(
@@ -666,6 +809,7 @@ class Linter:
                         f"{tamanho}, índices válidos: 0 a {tamanho - 1})", expr.linha))
                 self._verificar_indices_expr(valor, vetores, campos_vetor)
                 caminho = f"{caminho}[{A.texto_expr(valor)}]"
+                nivel += 1
         elif isinstance(expr, A.BinOp):
             self._verificar_indices_expr(expr.esq, vetores, campos_vetor)
             self._verificar_indices_expr(expr.dire, vetores, campos_vetor)

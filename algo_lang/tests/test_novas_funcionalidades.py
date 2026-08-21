@@ -239,7 +239,8 @@ def test_afirmar_falso_termina_o_programa():
     """
     codigo_py = compilar(codigo)
     resultado = subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True,
+        encoding="utf-8", timeout=10)
     assert resultado.returncode == 1
     assert "um não é dois" in resultado.stdout
     assert "nunca chega aqui" not in resultado.stdout
@@ -268,7 +269,8 @@ def test_afirmar_mensagem_nao_textual_da_erro():
 def _executar_sem_levantar(codigo_algo):
     codigo_py = compilar(codigo_algo)
     return subprocess.run(
-        [sys.executable, "-c", codigo_py], capture_output=True, text=True, timeout=10)
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True,
+        encoding="utf-8", timeout=10)
 
 
 def test_indice_fora_dos_limites_da_mensagem_amigavel():

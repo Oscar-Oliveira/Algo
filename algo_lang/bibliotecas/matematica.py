@@ -21,10 +21,28 @@ FUNCOES = {
         # fracionário faz 'base ** exp' devolver um 'complex', e
         # float(complex) levanta TypeError cru (não traduzido por
         # _algo_traduzir_valueerro, que só trata ValueError).
+        #
+        # AUDITORIA_2026-08-19 bug #35: 'float(base ** exp)' incondicional
+        # rebentava com OverflowError para um resultado inteiro exato mas
+        # com dígitos a mais para caber num float (ex.: 2**100000) --
+        # inconsistente com o operador '^' (_algo_pot, codegen.py), que
+        # nesse caso NUNCA força float e por isso nunca rebenta (só falha
+        # mais tarde ao IMPRIMIR, bug #33, já traduzido). Tentar float()
+        # primeiro (em vez de nunca converter, como o plano inicial
+        # sugeria) preserva o contrato "potencia() devolve sempre decimal"
+        # para o caso normal -- só cai para o inteiro em bruto quando o
+        # próprio float() rebenta, replicando exatamente o comportamento
+        # de sucesso do '^' só nesse caso extremo.
         "def matematica_potencia(base, exp):\n"
         "    if base < 0 and not float(exp).is_integer():\n"
         "        raise ValueError(\"negative number cannot be raised to a fractional power\")\n"
-        "    return float(base ** exp)\n",
+        "    resultado = base ** exp\n"
+        "    if not isinstance(resultado, int):\n"
+        "        return resultado\n"
+        "    try:\n"
+        "        return float(resultado)\n"
+        "    except OverflowError:\n"
+        "        return resultado\n",
     ),
     "absoluto": (
         # AL-19: "numeric" como tipo de retorno é um marcador especial --

@@ -20,11 +20,19 @@ def compilar(codigo_algo: str) -> str:
 
 
 def executar(codigo_algo: str, entrada: str = "") -> str:
-    """Compila e executa um programa ALGO, devolvendo o stdout produzido."""
+    """Compila e executa um programa ALGO, devolvendo o stdout produzido.
+
+    AUDITORIA_2026-08-19 bug #25: 'encoding="utf-8"' explícito -- desde
+    que o CABECALHO_RUNTIME gerado força sys.stdout para UTF-8
+    (independentemente do ambiente), este processo (o pai, a correr os
+    testes) tem de decodificar esse stdout como UTF-8 também, ou
+    caracteres fora de ASCII (acentos, emoji) ficam mal decodificados
+    quando o 'text=True' sem encoding explícito cai para a codificação
+    por omissão do sistema (ex.: cp1252 no Windows)."""
     codigo_py = compilar(codigo_algo)
     resultado = subprocess.run(
         [sys.executable, "-c", codigo_py],
-        input=entrada, capture_output=True, text=True, timeout=10,
+        input=entrada, capture_output=True, text=True, encoding="utf-8", timeout=10,
     )
     if resultado.returncode != 0:
         raise RuntimeError(

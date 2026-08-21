@@ -798,3 +798,162 @@ def test_comparacao_da_mesma_variavel_decimal_nao_da_aviso_de_flutuante():
     """)
     assert not any("vírgula flutuante" in a.mensagem for a in avisos)
     assert any("sempre verdadeira" in a.mensagem for a in avisos)
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 3.1: 'constante' como tamanho de
+# vetor não tratada como um literal (bug #29) ----------
+
+def test_indice_fora_dos_limites_em_vetor_de_tamanho_constante_e_assinalado():
+    """Antes, só um tamanho A.Literal (ex.: 'v:inteiro[3]') era
+    reconhecido -- 'v:inteiro[N]' com N 'constante' era invisível a
+    esta verificação, zero avisos mesmo com um índice claramente fora
+    dos limites."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            constante N:inteiro = 3
+            v:inteiro[N]
+            v[10] = 1
+    """)
+    assert any("fora dos limites" in a.mensagem for a in avisos)
+
+
+def test_indice_fora_dos_limites_em_vetor_de_tamanho_constante_multi_nivel_e_assinalado():
+    """'M = N + 1' com 'N' também 'constante' -- dobragem de constantes
+    de mais de um nível, tal como semantics.py já faz para o resto da
+    compilação."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            constante N:inteiro = 2
+            constante M:inteiro = N + 1
+            v:inteiro[M]
+            v[10] = 1
+    """)
+    assert any("fora dos limites" in a.mensagem for a in avisos)
+
+
+def test_constante_usada_so_como_tamanho_de_vetor_nao_e_assinalada_como_nunca_usada():
+    """Efeito colateral do mesmo bug: o linter também não contava o uso
+    de 'N' como tamanho do array como um "uso" -- avisava (errado) que
+    'N' era declarada mas nunca usada."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            constante N:inteiro = 3
+            v:inteiro[N]
+            escrever(v[0])
+    """)
+    assert not any("nunca é usada" in a.mensagem for a in avisos)
+
+
+def test_indice_dentro_dos_limites_em_vetor_de_tamanho_constante_nao_e_assinalado():
+    """Não regressão: um índice válido num vetor de tamanho 'constante'
+    continua sem aviso nenhum."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            constante N:inteiro = 3
+            v:inteiro[N]
+            v[2] = 1
+            escrever(v[2])
+    """)
+    assert not any("fora dos limites" in a.mensagem for a in avisos)
+
+
+# ---------- AUDITORIA_2026-08-19 Fase 4: correções pequenas e
+# independentes em linter.py (bugs #3, #12, #20) ----------
+
+def test_global_usada_apenas_em_para_do_corpo_principal_nao_e_assinalada():
+    """bug #3: dentro do CORPO PRINCIPAL, _algo_programa() já declara
+    'global' para todas as globais incondicionalmente -- um 'para var'
+    aí muta a global a sério, por isso deve contar como uso."""
+    avisos = _avisos("""
+        algoritmo "T"
+        idx:inteiro
+        inicio
+            para idx de 1 ate 3 fazer
+                escrever("oi")
+    """)
+    assert not any("nunca é usada" in a.mensagem for a in avisos)
+
+
+def test_global_usada_apenas_em_para_dentro_de_funcao_continua_assinalada():
+    """bug #3: dentro de uma FUNÇÃO, 'para var' é sempre uma variável
+    local independente (confirmado em runtime: nunca muta uma global
+    homónima) -- antes, isto era tratado incondicionalmente como
+    "prova de uso" da global, mesmo dentro de uma função, escondendo
+    uma global genuinamente morta."""
+    avisos = _avisos("""
+        algoritmo "T"
+        idx:inteiro
+        procedimento loop()
+            para idx de 1 ate 3 fazer
+                escrever("oi")
+        inicio
+            loop()
+    """)
+    assert any("'idx'" in a.mensagem and "nunca é usada" in a.mensagem for a in avisos)
+
+
+def test_indice_fora_dos_limites_em_atribuicao_nao_e_duplicado():
+    """bug #12: 's.alvo' de uma Atribuicao era verificado duas vezes
+    (uma implicitamente via _expressoes_lidas, outra explicitamente
+    logo a seguir) -- o mesmo aviso aparecia duas vezes."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            v:inteiro[5]
+            v[10] = 1
+    """)
+    avisos_de_indice = [a for a in avisos if "fora dos limites" in a.mensagem]
+    assert len(avisos_de_indice) == 1
+
+
+def test_indice_fora_dos_limites_na_primeira_dimensao_de_vetor_2d_e_assinalado():
+    """bug #20: antes, um filtro 'len(dims) == 1' ignorava por completo
+    qualquer vetor com 2+ dimensões -- nem a dimensão mais externa era
+    verificada."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            tabuleiro:inteiro[8][8]
+            escrever(tabuleiro[8][0])
+    """)
+    assert any("fora dos limites" in a.mensagem and "tabuleiro" in a.mensagem for a in avisos)
+
+
+def test_indice_fora_dos_limites_na_segunda_dimensao_de_vetor_2d_e_assinalado():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            tabuleiro:inteiro[8][8]
+            escrever(tabuleiro[0][8])
+    """)
+    assert any("fora dos limites" in a.mensagem and "tabuleiro[0]" in a.mensagem for a in avisos)
+
+
+def test_indices_validos_em_vetor_2d_nao_sao_assinalados():
+    """Não regressão: índices válidos nas duas dimensões continuam sem
+    aviso nenhum."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            tabuleiro:inteiro[8][8]
+            escrever(tabuleiro[7][7])
+    """)
+    assert not any("fora dos limites" in a.mensagem for a in avisos)
+
+
+def test_indice_fora_dos_limites_em_campo_vetor_2d_de_estrutura_e_assinalado():
+    """Mesma lacuna do bug #20, mas para campos-vetor de 'estrutura'
+    (_campos_vetor_por_nome), não só variáveis diretas."""
+    avisos = _avisos("""
+        algoritmo "T"
+        estrutura Grelha
+            celulas: inteiro[8][8]
+        inicio
+            g:Grelha
+            escrever(g.celulas[8][0])
+    """)
+    assert any("fora dos limites" in a.mensagem for a in avisos)

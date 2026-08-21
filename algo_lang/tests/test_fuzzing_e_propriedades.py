@@ -114,7 +114,7 @@ def test_fuzz_mutacao_modo_normal_nunca_escapa_excecao_nao_classificada():
             programa = parse(codigo)
             verificar(programa)
             gerar_python(programa)
-        except (ErroLexico, ErroSintatico, ErroSemantico, RecursionError):
+        except (ErroLexico, ErroSintatico, ErroSemantico):
             pass
         except Exception as e:  # noqa: BLE001 -- é isto que o teste procura
             nao_classificadas.append((codigo, type(e).__name__, str(e)))
