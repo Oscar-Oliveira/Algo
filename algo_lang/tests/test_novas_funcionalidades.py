@@ -31,7 +31,7 @@ def test_constante_local_a_funcao():
         algoritmo "T"
         funcao circulo(raio:decimal):decimal
             constante PI:decimal = 3.14159
-            devolver PI * raio * raio
+            retornar PI * raio * raio
         inicio
             escrever(circulo(2.0))
     """)
@@ -95,7 +95,7 @@ def test_parametro_pode_sombrear_constante_global():
         algoritmo "T"
         constante X:inteiro = 1
         funcao dobro(x:inteiro):inteiro
-            devolver x * 2
+            retornar x * 2
         inicio
             escrever(dobro(21))
     """)
@@ -302,7 +302,7 @@ def test_recursao_infinita_da_mensagem_amigavel():
     resultado = _executar_sem_levantar("""
         algoritmo "T"
         funcao f(n:inteiro):inteiro
-            devolver f(n + 1)
+            retornar f(n + 1)
         inicio
             escrever(f(1))
     """)
@@ -316,10 +316,10 @@ def test_variavel_global_continua_visivel_apos_wrapper_de_erros():
     quebrar a visibilidade de variáveis globais dentro de funções."""
     saida = executar("""
         algoritmo "T"
+        contador:inteiro = 42
         procedimento mostra()
             escrever(contador)
         inicio
-            contador:inteiro = 42
             mostra()
     """)
     assert saida.strip() == "42"

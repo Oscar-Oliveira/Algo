@@ -192,8 +192,13 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, pasta_base_rea
             raise ErroCompilacao(f"Erro em '{inc.caminho}': {e}") from e
 
         try:
-            mesclar_biblioteca_no_programa(programa, inc.caminho, declaracoes, funcoes, estruturas)
+            mesclar_biblioteca_no_programa(
+                programa, inc.caminho, declaracoes, funcoes, estruturas, alias=inc.como)
         except ColisaoDeInclusao as e:
+            if e.tipo == "alias":
+                raise ErroCompilacao(
+                    f"O alias '{e.nome}' (usado em '{e.caminho_origem}') já está a ser "
+                    f"usado por outra inclusão -- escolhe um alias diferente.") from e
             if e.tipo == "função":
                 raise ErroCompilacao(
                     f"'{e.nome}' (incluído de '{e.caminho_origem}') colide com uma "
@@ -380,7 +385,9 @@ class ExecucaoInterativa:
             self.codigo_saida = await self.processo.wait()
             self.terminou = True
             return None
-        return linha.decode("utf-8", errors="replace").rstrip("\n")
+        # rstrip("\r\n") -- em Windows, o processo filho escreve "\r\n"
+        # (tradução de newline do próprio Python ao imprimir), não só "\n".
+        return linha.decode("utf-8", errors="replace").rstrip("\r\n")
 
     async def enviar_entrada(self, texto: str) -> None:
         assert self.processo is not None and self.processo.stdin is not None

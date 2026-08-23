@@ -143,7 +143,7 @@ def test_para_com_passo_de_efeito_lateral_so_avalia_uma_vez():
 
         funcao proximoPasso():inteiro
             contador = contador + 1
-            devolver contador
+            retornar contador
         inicio
             contador = 0
             x:inteiro
@@ -182,9 +182,9 @@ def test_recursao_legitima_profunda_nao_falha():
         algoritmo "T"
         funcao contar(n:inteiro):inteiro
             se n <= 0 entao
-                devolver 0
+                retornar 0
             senao
-                devolver 1 + contar(n - 1)
+                retornar 1 + contar(n - 1)
         inicio
             escrever(contar(5000))
     """)
@@ -194,7 +194,7 @@ def test_recursao_legitima_profunda_nao_falha():
 def test_recursao_infinita_da_mensagem_amigavel_via_cli(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
-        'algoritmo "T"\nfuncao semFim(n:inteiro):inteiro\n    devolver semFim(n + 1)\n'
+        'algoritmo "T"\nfuncao semFim(n:inteiro):inteiro\n    retornar semFim(n + 1)\n'
         'inicio\n    escrever(semFim(1))\n', encoding="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(algo_path)], capture_output=True, text=True, timeout=20)
@@ -268,7 +268,7 @@ inicio
 def test_erro_de_programa_sem_inicio_nao_menciona_dois_pontos():
     from algo_lang.compilador.parser import ErroSintatico
     with pytest.raises(ErroSintatico) as exc:
-        parse('algoritmo "T"\nfuncao f():inteiro\n    devolver 1\n')
+        parse('algoritmo "T"\nfuncao f():inteiro\n    retornar 1\n')
     assert "inicio:" not in str(exc.value)
 
 
@@ -443,9 +443,9 @@ def test_sem_funcao_duplicada():
         compilar("""
             algoritmo "T"
             funcao f():inteiro
-                devolver 1
+                retornar 1
             funcao f():inteiro
-                devolver 2
+                retornar 2
             inicio
                 escrever(f())
         """)
@@ -478,14 +478,14 @@ def test_sem_parametro_duplicado():
         compilar("""
             algoritmo "T"
             funcao f(x:inteiro, x:inteiro):inteiro
-                devolver x
+                retornar x
             inicio
                 escrever(f(1, 2))
         """)
 
 
 def test_sem_funcao_declara_tipo_mas_nunca_devolve():
-    with pytest.raises(ErroSemantico, match="devolver"):
+    with pytest.raises(ErroSemantico, match="retornar"):
         compilar("""
             algoritmo "T"
             funcao f():inteiro
@@ -506,7 +506,7 @@ def test_sem_campo_repetido_no_literal_de_estrutura():
         """)
 
 
-def test_sem_campo_vetor_nao_pode_ser_inicializado_em_literal_de_estrutura():
+def test_sem_campo_vetor_nao_pode_ser_inicializado_com_valor_escalar_em_literal_de_estrutura():
     with pytest.raises(ErroSemantico, match="é um vetor"):
         compilar("""
             algoritmo "T"
@@ -514,6 +514,29 @@ def test_sem_campo_vetor_nao_pode_ser_inicializado_em_literal_de_estrutura():
                 v:inteiro[3]
             inicio
                 p:P = {v: 1}
+        """)
+
+
+def test_campo_vetor_pode_ser_inicializado_com_literal_vetor_em_literal_de_estrutura():
+    saida = executar("""
+        algoritmo "T"
+        estrutura P
+            v:inteiro[3]
+        inicio
+            p:P = {v: {1, 2, 3}}
+            escrever(p.v[0], p.v[1], p.v[2])
+    """)
+    assert saida.strip() == "123"
+
+
+def test_campo_vetor_com_tamanho_errado_em_literal_de_estrutura_da_erro():
+    with pytest.raises(ErroSemantico, match="tamanho declarado 3"):
+        compilar("""
+            algoritmo "T"
+            estrutura P
+                v:inteiro[3]
+            inicio
+                p:P = {v: {1, 2}}
         """)
 
 
@@ -535,7 +558,7 @@ def test_sem_atribuir_tipo_incompativel_vindo_de_chamada_com_ref():
             algoritmo "T"
             funcao f(ref a:inteiro):inteiro
                 a = 5
-                devolver a
+                retornar a
             inicio
                 x:inteiro = 1
                 s:cadeia = "inicial"
@@ -599,23 +622,47 @@ def test_sem_faz_enquanto_condicao_nao_booleana():
         """)
 
 
-def test_sem_devolver_fora_de_funcao():
-    with pytest.raises(ErroSemantico, match="'devolver' só pode ser usado"):
+def test_sem_retornar_fora_de_funcao_ou_procedimento():
+    with pytest.raises(ErroSemantico, match="'retornar' só pode ser usado"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                retornar
+        """)
+
+
+def test_sem_retornar_com_valor_dentro_de_procedimento():
+    with pytest.raises(ErroSemantico, match="não devolve valor"):
         compilar("""
             algoritmo "T"
             procedimento p()
-                devolver 5
+                retornar 5
             inicio
                 p()
         """)
 
 
-def test_sem_devolver_tipo_incompativel():
-    with pytest.raises(ErroSemantico, match="mas está a devolver"):
+def test_retornar_sem_valor_dentro_de_procedimento_sai_mais_cedo():
+    saida = executar("""
+        algoritmo "T"
+        procedimento p(x:inteiro)
+            se x > 0 entao
+                escrever("positivo")
+                retornar
+            escrever("não positivo")
+        inicio
+            p(5)
+            p(-1)
+    """)
+    assert saida == "positivo\nnão positivo\n"
+
+
+def test_sem_retornar_tipo_incompativel():
+    with pytest.raises(ErroSemantico, match="mas está a retornar"):
         compilar("""
             algoritmo "T"
             funcao f():inteiro
-                devolver "texto"
+                retornar "texto"
             inicio
                 escrever(f())
         """)
@@ -698,7 +745,7 @@ def test_sem_chamada_com_ref_dentro_de_expressao():
         compilar("""
             algoritmo "T"
             funcao f(ref a:inteiro):inteiro
-                devolver a
+                retornar a
             inicio
                 y:inteiro = 1
                 x:inteiro = 1 + f(y)
@@ -1214,7 +1261,7 @@ def test_sem_numero_de_argumentos_errado_utilizador():
         compilar("""
             algoritmo "T"
             funcao f(a:inteiro):inteiro
-                devolver a
+                retornar a
             inicio
                 escrever(f(1, 2))
         """)
@@ -1247,7 +1294,7 @@ def test_sem_parametro_tipo_incompativel_utilizador():
         compilar("""
             algoritmo "T"
             funcao f(a:inteiro):inteiro
-                devolver a
+                retornar a
             inicio
                 escrever(f("texto"))
         """)
@@ -1290,7 +1337,7 @@ def test_sem_declaracao_tipo_incompativel_de_chamada_com_ref():
             algoritmo "T"
             funcao f(ref a:inteiro):inteiro
                 a = 5
-                devolver a
+                retornar a
             inicio
                 x:inteiro = 1
                 s:cadeia = f(x)
@@ -1336,7 +1383,7 @@ def test_parametro_e_retorno_decimal_coagem_um_valor_inteiro():
     saida = executar("""
         algoritmo "T"
         funcao dobro(x:decimal):decimal
-            devolver x * 2
+            retornar x * 2
 
         procedimento mostra(x:decimal)
             escrever("param=", x)
@@ -1382,7 +1429,7 @@ def test_funcao_com_nome_interno_de_biblioteca_da_erro():
             importar Matematica
 
             funcao matematica_raiz(x:decimal):decimal
-                devolver 999.0
+                retornar 999.0
             inicio
                 escrever(matematica.raiz(4.0))
         """)
@@ -1418,7 +1465,7 @@ def test_nome_igual_a_funcao_de_biblioteca_nao_importada_e_permitido():
     saida = executar("""
         algoritmo "T"
         funcao matematica_raiz(x:decimal):decimal
-            devolver x
+            retornar x
         inicio
             escrever(matematica_raiz(4.0))
     """)
@@ -1451,7 +1498,7 @@ def test_funcao_com_nome_reservado_pelo_codegen_da_erro():
         compilar("""
             algoritmo "T"
             funcao sys(): inteiro
-                devolver 1
+                retornar 1
             inicio
                 escrever(sys())
         """)
@@ -1517,7 +1564,7 @@ def test_codegen_atribuicao_a_partir_de_funcao_com_ref():
         algoritmo "T"
         funcao incrementar(ref x:inteiro):inteiro
             x = x + 1
-            devolver x
+            retornar x
         inicio
             y:inteiro = 5
             z:inteiro
@@ -1532,7 +1579,7 @@ def test_codegen_funcao_com_ref_chamada_como_instrucao_solta():
         algoritmo "T"
         funcao incrementar(ref x:inteiro):inteiro
             x = x + 1
-            devolver x
+            retornar x
         inicio
             y:inteiro = 5
             incrementar(y)
@@ -1635,7 +1682,7 @@ def test_incluir_funciona_de_ponta_a_ponta(tmp_path):
     (tmp_path / "geometria.algo").write_text(
         "funcao areaCirculo(raio:decimal):decimal\n"
         "    pi:decimal = 3.14159\n"
-        "    devolver pi * raio * raio\n",
+        "    retornar pi * raio * raio\n",
         encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
@@ -1683,11 +1730,11 @@ def test_incluir_estrutura_duplicada_da_erro(tmp_path):
 
 def test_incluir_funcao_duplicada_da_erro(tmp_path):
     (tmp_path / "lib.algo").write_text(
-        "funcao f():inteiro\n    devolver 1\n", encoding="utf-8")
+        "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
         'incluir "lib.algo"\n'
-        "funcao f():inteiro\n    devolver 2\n"
+        "funcao f():inteiro\n    retornar 2\n"
         "inicio\n"
         "    escrever(f())\n",
         encoding="utf-8")
@@ -1729,6 +1776,154 @@ def test_incluir_constante(tmp_path):
         capture_output=True, text=True)
     assert resultado.returncode == 0, resultado.stderr
     assert "3.14" in resultado.stdout
+
+
+# ---------- 'incluir ... como <alias>' -- namespace opcional ----------
+
+def test_incluir_com_alias_chama_funcao_qualificada(tmp_path):
+    (tmp_path / "geometria.algo").write_text(
+        "funcao areaCirculo(raio:decimal):decimal\n"
+        "    pi:decimal = 3.14159\n"
+        "    retornar pi * raio * raio\n",
+        encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "geometria.algo" como geometria\n'
+        "inicio\n"
+        "    escrever(geometria.areaCirculo(2.0))\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode == 0, resultado.stderr
+    assert "12.56636" in resultado.stdout
+
+
+def test_incluir_com_alias_funcao_sem_alias_deixa_de_existir(tmp_path):
+    """Com alias, a função só fica disponível como 'alias.funcao(...)' --
+    chamá-la sem qualificação (o nome original) já não existe."""
+    (tmp_path / "geometria.algo").write_text(
+        "funcao areaCirculo(raio:decimal):decimal\n"
+        "    retornar raio * raio\n",
+        encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "geometria.algo" como geometria\n'
+        "inicio\n"
+        "    escrever(areaCirculo(2.0))\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode != 0
+    assert "areaCirculo" in resultado.stdout
+
+
+def test_incluir_com_alias_parametro_ref_funciona(tmp_path):
+    (tmp_path / "lib.algo").write_text(
+        "procedimento dobra(ref v:inteiro)\n"
+        "    v = v * 2\n",
+        encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo" como m\n'
+        "inicio\n"
+        "    n:inteiro = 5\n"
+        "    m.dobra(n)\n"
+        "    escrever(n)\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode == 0, resultado.stderr
+    assert "10" in resultado.stdout
+
+
+def test_incluir_alias_reutilizado_para_ficheiro_diferente_da_erro(tmp_path):
+    (tmp_path / "a.algo").write_text(
+        "funcao fA():inteiro\n    retornar 1\n", encoding="utf-8")
+    (tmp_path / "b.algo").write_text(
+        "funcao fB():inteiro\n    retornar 2\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "a.algo" como m\n'
+        'incluir "b.algo" como m\n'
+        "inicio\n"
+        "    escrever(1)\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode != 0
+    assert "alias" in resultado.stdout.lower()
+
+
+def test_incluir_alias_colide_com_biblioteca_importada_da_erro(tmp_path):
+    (tmp_path / "lib.algo").write_text(
+        "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        "importar Matematica\n"
+        'incluir "lib.algo" como matematica\n'
+        "inicio\n"
+        "    escrever(1)\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode != 0
+    assert "biblioteca" in resultado.stdout.lower()
+
+
+def test_incluir_alias_metodo_inexistente_da_erro(tmp_path):
+    (tmp_path / "lib.algo").write_text(
+        "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo" como m\n'
+        "inicio\n"
+        "    escrever(m.g())\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode != 0
+    assert "'g'" in resultado.stdout
+
+
+def test_mesclar_biblioteca_com_alias_namespaceia_so_funcoes():
+    """'como <alias>' faz mangling do nome de cada função incluída
+    (f"{alias}_{nome}"); estruturas/variáveis globais continuam a
+    fundir-se sem namespace, tal como as bibliotecas embutidas também só
+    expõem funções (nunca globais/estruturas)."""
+    from algo_lang.compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
+
+    class ProgramaFalso:
+        def __init__(self):
+            self.estruturas = []
+            self.funcoes = []
+            self.declaracoes = []
+            self.aliases_inclusao = {}
+
+    class NoComNome:
+        def __init__(self, nome):
+            self.nome = nome
+
+    programa = ProgramaFalso()
+    mesclar_biblioteca_no_programa(
+        programa, "geometria.algo",
+        [NoComNome("pi")], [NoComNome("area")], [NoComNome("Ponto")],
+        alias="geometria")
+    assert [f.nome for f in programa.funcoes] == ["geometria_area"]
+    assert [e.nome for e in programa.estruturas] == ["Ponto"]
+    assert [d.nome for d in programa.declaracoes] == ["pi"]
+    assert programa.aliases_inclusao == {"geometria": {"area": "geometria_area"}}
+
+    with pytest.raises(ColisaoDeInclusao) as exc_info:
+        mesclar_biblioteca_no_programa(
+            programa, "outro.algo", [], [NoComNome("volume")], [], alias="geometria")
+    assert exc_info.value.tipo == "alias"
+    assert exc_info.value.nome == "geometria"
 
 
 def test_parser_ler_multiplas_variaveis():
@@ -1827,7 +2022,7 @@ def test_linter_sem_falsos_positivos_com_estrutura_vetor_e_nao():
         estrutura Ponto
             x:inteiro
         funcao dobro(n:inteiro):inteiro
-            devolver n * 2
+            retornar n * 2
         inicio
             a:inteiro = 5
             b:booleano = nao verdadeiro
@@ -1846,7 +2041,7 @@ def test_linter_sem_falsos_positivos_com_para_passo_enquanto_escolha():
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         funcao dobro(n:inteiro):inteiro
-            devolver n * 2
+            retornar n * 2
         inicio
             total:inteiro = 0
             i:inteiro = 0
@@ -2007,9 +2202,9 @@ def test_linter_assinala_funcao_puramente_autorrecursiva_nunca_chamada_de_fora()
         algoritmo "T"
         funcao nuncaChamada(n:inteiro):inteiro
             se n <= 0 entao
-                devolver 0
+                retornar 0
             senao
-                devolver nuncaChamada(n - 1)
+                retornar nuncaChamada(n - 1)
         inicio
             escrever("ola")
     """))
@@ -2024,9 +2219,9 @@ def test_linter_nao_assinala_funcao_recursiva_chamada_a_partir_do_principal():
         algoritmo "T"
         funcao fatorial(n:inteiro):inteiro
             se n <= 1 entao
-                devolver 1
+                retornar 1
             senao
-                devolver n * fatorial(n - 1)
+                retornar n * fatorial(n - 1)
         inicio
             escrever(fatorial(5))
     """))
@@ -2159,9 +2354,9 @@ def test_incluir_transitivo_resolve_biblioteca_que_inclui_outra(tmp_path):
     biblioteca)."""
     from algo_lang.cli import _carregar_e_resolver_inclusoes
     (tmp_path / "fundo.algo").write_text(
-        "funcao triplo(n:inteiro):inteiro\n    devolver n * 3\n", encoding="utf-8")
+        "funcao triplo(n:inteiro):inteiro\n    retornar n * 3\n", encoding="utf-8")
     (tmp_path / "meio.algo").write_text(
-        'incluir "fundo.algo"\nfuncao dobro(n:inteiro):inteiro\n    devolver n * 2\n',
+        'incluir "fundo.algo"\nfuncao dobro(n:inteiro):inteiro\n    retornar n * 2\n',
         encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "T"\nincluir "meio.algo"\ninicio\n    escrever(dobro(triplo(5)))\n',
@@ -2177,9 +2372,9 @@ def test_incluir_transitivo_circular_nao_entra_em_ciclo_infinito(tmp_path):
     recursão infinita."""
     from algo_lang.cli import _carregar_e_resolver_inclusoes
     (tmp_path / "a.algo").write_text(
-        'incluir "b.algo"\nfuncao fA():inteiro\n    devolver 1\n', encoding="utf-8")
+        'incluir "b.algo"\nfuncao fA():inteiro\n    retornar 1\n', encoding="utf-8")
     (tmp_path / "b.algo").write_text(
-        'incluir "a.algo"\nfuncao fB():inteiro\n    devolver 2\n', encoding="utf-8")
+        'incluir "a.algo"\nfuncao fB():inteiro\n    retornar 2\n', encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "T"\nincluir "a.algo"\ninicio\n    escrever(fA() + fB())\n',
         encoding="utf-8")
@@ -2193,7 +2388,7 @@ def test_incluir_transitivo_diamante_nao_duplica(tmp_path):
     comum só deve ser processado uma vez."""
     from algo_lang.cli import _carregar_e_resolver_inclusoes
     (tmp_path / "comum.algo").write_text(
-        "funcao fComum():inteiro\n    devolver 42\n", encoding="utf-8")
+        "funcao fComum():inteiro\n    retornar 42\n", encoding="utf-8")
     (tmp_path / "b.algo").write_text('incluir "comum.algo"\n', encoding="utf-8")
     (tmp_path / "c.algo").write_text('incluir "comum.algo"\n', encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
@@ -2213,7 +2408,7 @@ def test_literal_de_estrutura_como_argumento_de_funcao():
             x:decimal
             y:decimal
         funcao distanciaAOrigemQuadrado(p:Ponto):decimal
-            devolver p.x * p.x + p.y * p.y
+            retornar p.x * p.x + p.y * p.y
         inicio
             escrever(distanciaAOrigemQuadrado({x: 3.0, y: 4.0}))
     """)
@@ -2373,7 +2568,7 @@ def test_incluir_o_mesmo_ficheiro_duas_vezes_nao_da_erro(tmp_path):
     mesmo ficheiro duas vezes (ex: dependência em diamante) não deve
     causar 'já foi definido'."""
     (tmp_path / "lib.algo").write_text(
-        "funcao f():inteiro\n    devolver 1\n", encoding="utf-8")
+        "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "T"\n'
         'incluir "lib.algo"\n'
@@ -2522,7 +2717,7 @@ def test_erro_dentro_de_uma_funcao_mostra_a_linha_correta():
     resultado = _correr_esperando_erro("""\
 algoritmo "T"
 funcao dividir(a:inteiro, b:inteiro):inteiro
-    devolver a div b
+    retornar a div b
 inicio
     escrever(dividir(10, 0))
 """)
@@ -2688,7 +2883,7 @@ def test_cli_e_online_produzem_a_mesma_mensagem_de_colisao_de_sempre():
 
 _TIPOS_STMT_DA_AST = {
     "Declaracao", "Atribuicao", "Ler", "Escrever", "Se", "Para", "Enquanto",
-    "FazEnquanto", "Escolha", "Devolver", "ChamadaStmt", "Afirmar",
+    "FazEnquanto", "Escolha", "Retornar", "ChamadaStmt", "Afirmar",
 }
 _TIPOS_EXPR_DA_AST = {
     "LValue", "Literal", "BinOp", "UnOp", "Chamada", "VetorLiteral", "EstruturaLiteral",
@@ -2917,12 +3112,12 @@ def test_tamanho_de_vetor_nao_inteiro_em_campo_de_estrutura_e_erro_de_compilacao
 # ---------- B8 (AL-49): nem todos os caminhos de uma função devolvem valor ----------
 
 def test_funcao_com_se_sem_senao_nem_sempre_devolve_e_erro():
-    with pytest.raises(ErroSemantico, match="devolver"):
+    with pytest.raises(ErroSemantico, match="retornar"):
         compilar("""
             algoritmo "T"
             funcao f(x:inteiro): inteiro
                 se x > 0 entao
-                    devolver 1
+                    retornar 1
             inicio
                 escrever(f(-5) + 1)
         """)
@@ -2933,9 +3128,9 @@ def test_funcao_com_se_senao_devolvendo_nos_dois_ramos_compila():
         algoritmo "T"
         funcao f(x:inteiro): inteiro
             se x > 0 entao
-                devolver 1
+                retornar 1
             senao
-                devolver 0
+                retornar 0
         inicio
             escrever(f(5))
     """)
@@ -2943,13 +3138,13 @@ def test_funcao_com_se_senao_devolvendo_nos_dois_ramos_compila():
 
 
 def test_funcao_com_escolher_sem_contrario_nem_sempre_devolve_e_erro():
-    with pytest.raises(ErroSemantico, match="devolver"):
+    with pytest.raises(ErroSemantico, match="retornar"):
         compilar("""
             algoritmo "T"
             funcao f(x:inteiro): inteiro
                 escolher x
                     caso 1
-                        devolver 10
+                        retornar 10
             inicio
                 escrever(f(2))
         """)
@@ -2978,7 +3173,7 @@ def test_parametro_com_nome_de_estrutura_e_erro_semantico():
             estrutura Ponto
                 x:inteiro
             funcao f(Ponto: inteiro): inteiro
-                devolver Ponto
+                retornar Ponto
             inicio
                 escrever(f(1))
         """)
@@ -2989,7 +3184,7 @@ def test_parametro_com_nome_de_tipo_primitivo_e_erro_semantico():
         compilar("""
             algoritmo "T"
             funcao f(inteiro: inteiro): inteiro
-                devolver inteiro
+                retornar inteiro
             inicio
                 escrever(f(1))
         """)
@@ -3034,7 +3229,7 @@ def test_declaracao_decimal_a_partir_de_funcao_ref_que_devolve_inteiro_e_coagida
         algoritmo "T"
         funcao f(ref a:inteiro):inteiro
             a = 5
-            devolver a
+            retornar a
         inicio
             x:inteiro = 1
             y:decimal = f(x)
@@ -3048,7 +3243,7 @@ def test_atribuicao_decimal_a_partir_de_funcao_ref_que_devolve_inteiro_e_coagida
         algoritmo "T"
         funcao f(ref a:inteiro):inteiro
             a = 5
-            devolver a
+            retornar a
         inicio
             x:inteiro = 1
             y:decimal = 0.0
@@ -3073,13 +3268,18 @@ def test_erro_de_vetor_nao_indexado_menciona_o_subcaminho_real():
 
 
 # ---------- B13 (AL-54): conflito de tipo em ramos irmãos não detetado ----------
+# nota: desde que 'inicio' deixou de expor globais implícitas a funções
+# (ver "Restringir globais implícitas de 'inicio' a funções"), 'x' nunca
+# fica visível a 'usa_x()' -- independentemente de os ramos irmãos
+# concordarem ou não em tipo, por isso os dois testes abaixo esperam
+# sempre "não foi declarada", não mais "tipos diferentes".
 
 def test_variavel_global_com_tipos_diferentes_em_ramos_irmaos_e_erro():
-    with pytest.raises(ErroSemantico, match="tipos diferentes"):
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
         compilar("""
             algoritmo "T"
             funcao usa_x(): inteiro
-                devolver x + 1
+                retornar x + 1
             inicio
                 se falso entao
                     x: inteiro = 1
@@ -3089,19 +3289,19 @@ def test_variavel_global_com_tipos_diferentes_em_ramos_irmaos_e_erro():
         """)
 
 
-def test_variavel_global_com_mesmo_tipo_em_ramos_irmaos_compila():
-    saida = executar("""
+def test_variavel_global_com_mesmo_tipo_em_ramos_irmaos_nao_compila():
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
+        compilar("""
         algoritmo "T"
         funcao usa_x(): inteiro
-            devolver x + 1
+            retornar x + 1
         inicio
             se falso entao
                 x: inteiro = 1
             senao
                 x: inteiro = 2
             escrever(usa_x())
-    """)
-    assert saida.strip() == "3"
+        """)
 
 
 # ---------- B14 (AL-55): 'escrever' de uma estrutura inteira não é rejeitado ----------
@@ -3212,7 +3412,7 @@ def test_executa_com_debug_nao_sai_com_erro_quando_programa_e_bem_sucedido(tmp_p
 def test_incluir_o_mesmo_ficheiro_com_capitalizacao_diferente_nao_colide(tmp_path):
     from algo_lang.cli import _carregar_e_verificar
     (tmp_path / "lib.algo").write_text(
-        'funcao dobro(x:inteiro):inteiro\n    devolver x * 2\n', encoding="utf-8")
+        'funcao dobro(x:inteiro):inteiro\n    retornar x * 2\n', encoding="utf-8")
     principal = tmp_path / "principal.algo"
     principal.write_text(textwrap.dedent("""\
         algoritmo "T"
@@ -3284,10 +3484,10 @@ def test_variavel_de_inicio_usada_so_numa_funcao_nao_da_falso_positivo():
     from algo_lang.tools.linter import analisar
     programa = parse(textwrap.dedent("""
         algoritmo "T"
+        contador:inteiro = 5
         funcao dobroDeContador():inteiro
-            devolver contador * 2
+            retornar contador * 2
         inicio
-            contador:inteiro = 5
             escrever(dobroDeContador())
     """))
     verificar(programa)
@@ -3303,7 +3503,7 @@ def test_trace_mostra_variavel_local_com_nome_comecado_por_underscore(tmp_path):
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         funcao f(_x:inteiro):inteiro
-            devolver _x + 1
+            retornar _x + 1
         inicio
             escrever(f(10))
     """))
@@ -3349,7 +3549,7 @@ def test_trace_nao_corrompe_passo_quando_ultima_instrucao_chama_funcao(tmp_path)
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         funcao f(x:inteiro):inteiro
-            devolver x + 1
+            retornar x + 1
         inicio
             escrever(f(10))
     """))
@@ -3435,7 +3635,7 @@ def test_campo_em_falta_em_literal_passado_como_argumento_da_aviso():
             x:inteiro
             y:inteiro
         funcao soma(p:Ponto):inteiro
-            devolver p.x + p.y
+            retornar p.x + p.y
         inicio
             escrever(soma({x: 3}))
     """))
@@ -3663,8 +3863,13 @@ def test_redeclarar_global_com_tipo_diferente_em_bloco_aninhado_da_mensagem_corr
     assert "tipos diferentes" not in str(excinfo.value)
 
 
-def test_tipos_diferentes_em_ramos_irmaos_continua_a_dar_a_mensagem_de_ramos():
-    with pytest.raises(ErroSemantico, match="tipos diferentes em ramos diferentes"):
+def test_tipos_diferentes_em_ramos_irmaos_nao_propaga_e_falha_no_uso():
+    # nota: desde que 'inicio' deixou de ter um pré-registo eager de
+    # globais para funções, este caso passa a ser tratado só por
+    # _propagar_declaracoes_comuns -- ramos com tipos diferentes não
+    # propagam 'x' para depois do 'se' (sem erro na própria declaração),
+    # e é só o 'escrever(x)' a seguir que falha por 'x' não declarada.
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
         compilar("""
             algoritmo "T"
             inicio
@@ -3799,7 +4004,7 @@ def test_dimensao_interior_de_vetor_multidimensional_e_avaliada_uma_so_vez():
         algoritmo "T"
         funcao dim():inteiro
             escrever("chamada")
-            devolver 2
+            retornar 2
         inicio
             v:inteiro[2][dim()]
             escrever(v[0][0])
@@ -4192,7 +4397,7 @@ def test_tipo_retorno_vetor_parseia_dims_retorno_correto():
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         funcao f(): inteiro[]
-            devolver {1, 2}
+            retornar {1, 2}
         inicio
             escrever("ok")
     """))
@@ -4215,7 +4420,7 @@ def test_colchetes_de_retorno_com_tamanho_e_erro_sintatico():
         compilar("""
             algoritmo "T"
             funcao f(): inteiro[5]
-                devolver {1, 2}
+                retornar {1, 2}
             inicio
                 escrever("ok")
         """)
@@ -4343,12 +4548,12 @@ def test_mesmo_vetor_passado_duas_vezes_por_referencia_da_erro():
         """)
 
 
-def test_funcao_pode_devolver_vetor():
+def test_funcao_pode_retornar_vetor():
     saida = executar("""
         algoritmo "T"
         funcao dobrar(v: inteiro[]): inteiro[]
             r:inteiro[2] = {v[0] * 2, v[1] * 2}
-            devolver r
+            retornar r
         inicio
             a:inteiro[2] = {1, 2}
             b:inteiro[2] = dobrar(a)
@@ -4357,24 +4562,24 @@ def test_funcao_pode_devolver_vetor():
     assert saida.strip() == "2 4"
 
 
-def test_devolver_com_tipo_de_elemento_errado_e_rejeitado():
+def test_retornar_com_tipo_de_elemento_errado_e_rejeitado():
     with pytest.raises(ErroSemantico, match="tipo do elemento"):
         compilar("""
             algoritmo "T"
             funcao f(): decimal[]
                 r:inteiro[2] = {1, 2}
-                devolver r
+                retornar r
             inicio
                 escrever("ok")
         """)
 
 
-def test_devolver_escalar_de_funcao_que_devolve_vetor_e_rejeitado():
+def test_retornar_escalar_de_funcao_que_devolve_vetor_e_rejeitado():
     with pytest.raises(ErroSemantico, match="dimens"):
         compilar("""
             algoritmo "T"
             funcao f(): inteiro[]
-                devolver 5
+                retornar 5
             inicio
                 escrever("ok")
         """)
@@ -4386,7 +4591,7 @@ def test_declaracao_a_partir_de_funcao_ref_que_devolve_vetor_com_dims_erradas_e_
             algoritmo "T"
             funcao f(ref x: inteiro): inteiro[]
                 x = x + 1
-                devolver {x}
+                retornar {x}
             inicio
                 y:inteiro = 1
                 z:inteiro = f(y)
@@ -4395,7 +4600,7 @@ def test_declaracao_a_partir_de_funcao_ref_que_devolve_vetor_com_dims_erradas_e_
 
 def test_escrever_de_vetor_continua_rejeitado_regressao():
     """Regressão: 'permitir_vetor' só é passado True nos dois sítios
-    legítimos (argumento de chamada, 'devolver') -- escrever() continua a
+    legítimos (argumento de chamada, 'retornar') -- escrever() continua a
     rejeitar um vetor nu como antes desta funcionalidade existir."""
     with pytest.raises(ErroSemantico, match="falta indexá-lo"):
         compilar("""
@@ -4410,7 +4615,7 @@ def test_parametro_vetor_2d_indexado_no_corpo():
     saida = executar("""
         algoritmo "T"
         funcao soma(m: inteiro[][]): inteiro
-            devolver m[0][0] + m[1][1]
+            retornar m[0][0] + m[1][1]
         inicio
             grelha:inteiro[2][2] = {{1, 2}, {3, 4}}
             escrever(soma(grelha))
@@ -4664,7 +4869,7 @@ def test_inclusao_com_colisao_entre_categorias_diferentes_e_detetada():
             escrever(1)
     """))
     declaracoes, funcoes, estruturas, _inclusoes = parse_biblioteca(
-        "funcao Ponto():inteiro\n    devolver 1\n")
+        "funcao Ponto():inteiro\n    retornar 1\n")
     with pytest.raises(ColisaoDeInclusao) as exc:
         mesclar_biblioteca_no_programa(programa, "lib.algo", declaracoes, funcoes, estruturas)
     assert exc.value.tipo == "função"
@@ -4679,12 +4884,12 @@ def test_inclusao_com_colisao_na_mesma_categoria_continua_igual():
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         funcao f(): inteiro
-            devolver 1
+            retornar 1
         inicio
             escrever(f())
     """))
     declaracoes, funcoes, estruturas, _inclusoes = parse_biblioteca(
-        "funcao f():inteiro\n    devolver 2\n")
+        "funcao f():inteiro\n    retornar 2\n")
     with pytest.raises(ColisaoDeInclusao) as exc:
         mesclar_biblioteca_no_programa(programa, "lib.algo", declaracoes, funcoes, estruturas)
     assert exc.value.tipo == "função"
@@ -4693,16 +4898,16 @@ def test_inclusao_com_colisao_na_mesma_categoria_continua_igual():
 
 # ---------- AUDITORIA.md secção 3 -- propagação do tipo esperado para literais {...} ----------
 
-def test_devolver_literal_de_estrutura_diretamente_funciona():
+def test_retornar_literal_de_estrutura_diretamente_funciona():
     """B8 (secção 3): o tipo esperado (o tipo de retorno declarado da
-    função) já é conhecido pelo contexto -- 'devolver {...}' não precisa
+    função) já é conhecido pelo contexto -- 'retornar {...}' não precisa
     de indexação/declaração intermédia para saber que forma esperar."""
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
             x:inteiro
         funcao criar():Ponto
-            devolver {x: 5}
+            retornar {x: 5}
         inicio
             p:Ponto = criar()
             escrever(p.x)
@@ -4710,13 +4915,13 @@ def test_devolver_literal_de_estrutura_diretamente_funciona():
     assert saida.strip() == "5"
 
 
-def test_devolver_literal_de_estrutura_coage_campo_decimal():
+def test_retornar_literal_de_estrutura_coage_campo_decimal():
     saida = executar("""
         algoritmo "T"
         estrutura P
             x:decimal
         funcao criar():P
-            devolver {x: 5}
+            retornar {x: 5}
         inicio
             p:P = criar()
             escrever(p.x)
@@ -4724,14 +4929,14 @@ def test_devolver_literal_de_estrutura_coage_campo_decimal():
     assert saida.strip() == "5.0"
 
 
-def test_devolver_literal_de_vetor_decimal_coage_elementos():
-    """Antes desta correção, 'devolver {1,2,3}' já compilava (via o ramo
+def test_retornar_literal_de_vetor_decimal_coage_elementos():
+    """Antes desta correção, 'retornar {1,2,3}' já compilava (via o ramo
     genérico de A.VetorLiteral em _expr()), mas sem coerção de tipo --
     um vetor 'decimal[]' devolvido assim ficava com inteiros crus."""
     saida = executar("""
         algoritmo "T"
         funcao criar():decimal[]
-            devolver {1, 2, 3}
+            retornar {1, 2, 3}
         inicio
             v:decimal[3] = criar()
             escrever(v[0])
@@ -4739,9 +4944,9 @@ def test_devolver_literal_de_vetor_decimal_coage_elementos():
     assert saida.strip() == "1.0"
 
 
-def test_devolver_literal_de_estrutura_com_dims_erradas_continua_rejeitado():
+def test_retornar_literal_de_estrutura_com_dims_erradas_continua_rejeitado():
     """Regressão: uma função que devolve um VETOR de estruturas não pode
-    devolver diretamente um literal de estrutura escalar (dims erradas) --
+    retornar diretamente um literal de estrutura escalar (dims erradas) --
     o gate 'dimensões antes de tipo' continua a aplicar-se aqui."""
     with pytest.raises(ErroSemantico, match="dimens"):
         compilar("""
@@ -4749,7 +4954,7 @@ def test_devolver_literal_de_estrutura_com_dims_erradas_continua_rejeitado():
             estrutura Ponto
                 x:inteiro
             funcao criar():Ponto[]
-                devolver {x: 5}
+                retornar {x: 5}
             inicio
                 escrever("nunca")
         """)
@@ -4871,8 +5076,8 @@ PALAVRAS_CHAVE_ESPERADAS = {
     "para", "de", "ate", "passo", "fazer",
     "enquanto", "sair", "continuar",
     "escolher", "caso", "contrario",
-    "funcao", "procedimento", "devolver", "ref",
-    "importar", "incluir",
+    "funcao", "procedimento", "retornar", "ref",
+    "importar", "incluir", "como",
     "verdadeiro", "falso", "nulo",
     "e", "ou", "nao",
     "div", "mod",
@@ -4880,15 +5085,16 @@ PALAVRAS_CHAVE_ESPERADAS = {
 }
 
 
-def test_lexer_conjunto_de_palavras_chave_tem_exatamente_35():
+def test_lexer_conjunto_de_palavras_chave_tem_exatamente_36():
     """AUDITORIA_2026-08-22 (ronda 14): 33 -> 35 com a introdução de
-    'sair'/'continuar' (break/continue)."""
+    'sair'/'continuar' (break/continue). 35 -> 36 com 'como' (alias
+    opcional de 'incluir', ver 'incluir ... como <alias>')."""
     from algo_lang.compilador.lexer import PALAVRAS_CHAVE
     # Se este teste falhar por o conjunto real ter mudado, a matriz de
     # rastreabilidade (secção 1) e este PALAVRAS_CHAVE_ESPERADAS têm de
     # ser atualizados a par -- não é só um número mágico.
     assert PALAVRAS_CHAVE == PALAVRAS_CHAVE_ESPERADAS
-    assert len(PALAVRAS_CHAVE) == 35
+    assert len(PALAVRAS_CHAVE) == 36
 
 
 @pytest.mark.parametrize("palavra", sorted(PALAVRAS_CHAVE_ESPERADAS))
@@ -4904,7 +5110,7 @@ def test_lexer_cada_palavra_chave_produz_token_dedicado(palavra):
 
 
 def test_lexer_identificador_parecido_com_palavra_chave_nao_e_confundido():
-    # "de" e "devolver" são ambos palavras-chave distintas: o lexer lê o
+    # "de" e "retornar" são ambos palavras-chave distintas: o lexer lê o
     # identificador completo (isalnum/'_') antes de comparar com
     # PALAVRAS_CHAVE, por isso não há correspondência por prefixo.
     # "paragem" (contém "para" como prefixo mas não é palavra-chave) tem
@@ -5093,7 +5299,7 @@ def test_sem_comparacao_de_igualdade_entre_booleano_e_outro_tipo():
 # da Etapa 2): a preocupação do plano "B8 só cobria 2 de ≥4 pontos de
 # propagação de tipo esperado para literais {...}" já não se aplica --
 # os 4 pontos de entrada (declaração, atribuição, argumento de chamada,
-# 'devolver') já têm teste para AMBOS os tipos de literal onde
+# 'retornar') já têm teste para AMBOS os tipos de literal onde
 # sintaticamente possível (vetor/estrutura), incluindo o caso mais
 # específico "vetor de literais de estrutura"
 # (test_vetor_de_literais_de_estrutura, ~linha 3503) e tamanho literal
@@ -5166,11 +5372,11 @@ def test_incluir_estrutura_duplicada_da_erro_em_processo(tmp_path, capsys):
 def test_incluir_funcao_duplicada_da_erro_em_processo(tmp_path, capsys):
     from algo_lang.cli import _carregar_e_resolver_inclusoes
     (tmp_path / "lib.algo").write_text(
-        "funcao f():inteiro\n    devolver 1\n", encoding="utf-8")
+        "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
         'incluir "lib.algo"\n'
-        "funcao f():inteiro\n    devolver 2\n"
+        "funcao f():inteiro\n    retornar 2\n"
         "inicio\n"
         "    escrever(1)\n",
         encoding="utf-8")
@@ -5180,38 +5386,33 @@ def test_incluir_funcao_duplicada_da_erro_em_processo(tmp_path, capsys):
     assert "colide" in capsys.readouterr().out
 
 
-def test_campo_de_estrutura_dentro_de_vetor_por_referencia_duas_vezes_nao_e_detetado():
-    # Limitação CONHECIDA e deliberada de _caminhos_ref_colidem
-    # (semantics.py, comentário AL-04/AL-81/B9 + item 2 da ronda 14): um
-    # acesso com ÍNDICE na MESMA profundidade nos dois caminhos (ex.:
-    # 'pontos[0].x' comparado consigo próprio) nunca é comparável
-    # estaticamente, mesmo quando o índice é o mesmo literal nas duas
-    # chamadas -- ao contrário de 'ref p' + 'ref p.x' (item 2, agora
-    # corrigido, ver test_ref_estrutura_inteira_e_ref_campo_dela_da_erro),
-    # aqui o índice em si é a fonte da ambiguidade, não um caminho mais
-    # curto que termina antes do outro. Variáveis simples ('x') e campos
-    # sem índice ('p.x') são detetados
-    # (test_mesma_variavel_simples_passada_duas_vezes_por_referencia_da_
-    # erro, test_mesmo_campo_de_estrutura_por_referencia_duas_vezes_da_
-    # erro). Este teste fixa o comportamento ATUAL (sem erro, com o
-    # aliasing real a manifestar-se em runtime) como regressão -- não é
-    # uma correção, é documentar o limite conhecido para que não seja
-    # "corrigido" por acidente para um falso positivo (ou silenciosamente
-    # quebrado ao ponto de deixar de detetar os casos que já apanha).
-    saida = executar("""
-        algoritmo "T"
-        estrutura Ponto
-            x:inteiro
-        procedimento somar(ref a:inteiro, ref b:inteiro)
-            a = a + 1
-            b = b + 1
-        inicio
-            pontos:Ponto[2]
-            pontos[0].x = 5
-            somar(pontos[0].x, pontos[0].x)
-            escrever(pontos[0].x)
-    """)
-    assert saida.strip() == "6"
+def test_campo_de_estrutura_dentro_de_vetor_por_referencia_duas_vezes_e_detetado_em_runtime():
+    # Antes, um acesso com ÍNDICE na MESMA profundidade nos dois caminhos
+    # (ex.: 'pontos[0].x' comparado consigo próprio) escapava a
+    # _caminhos_ref_colidem (semantics.py) -- nunca comparável
+    # estaticamente, mesmo com o mesmo índice literal -- e o aliasing
+    # real manifestava-se silenciosamente em runtime (o segundo 'a = a+1'
+    # sobrepunha-se ao primeiro). Agora há uma rede de segurança em
+    # runtime (_verificar_aliasing_ref_runtime, codegen.py) para
+    # precisamente este caso que a compilação não consegue decidir --
+    # compara os caminhos de acesso já com os índices resolvidos,
+    # levanta um erro amigável em vez de deixar a escrita perder-se.
+    resultado = _correr_esperando_erro("""\
+algoritmo "T"
+estrutura Ponto
+    x:inteiro
+procedimento somar(ref a:inteiro, ref b:inteiro)
+    a = a + 1
+    b = b + 1
+inicio
+    pontos:Ponto[2]
+    pontos[0].x = 5
+    somar(pontos[0].x, pontos[0].x)
+    escrever(pontos[0].x)
+""")
+    assert resultado.returncode == 1
+    assert "Traceback" not in resultado.stdout
+    assert "referem-se à mesma posição em runtime" in resultado.stdout
 
 
 def test_incluir_variavel_global_duplicada_da_erro_em_processo(tmp_path, capsys):
@@ -5264,7 +5465,7 @@ def test_recursao_infinita_da_mensagem_amigavel_em_processo():
     resultado = _correr_esperando_erro("""\
 algoritmo "T"
 funcao semFim(n:inteiro):inteiro
-    devolver semFim(n + 1)
+    retornar semFim(n + 1)
 inicio
     escrever(semFim(1))
 """)
@@ -5369,14 +5570,14 @@ def test_declaracao_com_inicializador_de_estrutura_nao_e_partilhada():
     assert saida.strip() == "1\n99"
 
 
-def test_devolver_variavel_de_estrutura_existente_nao_e_partilhada():
+def test_retornar_variavel_de_estrutura_existente_nao_e_partilhada():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
             x:inteiro
         g:Ponto
         funcao pegaG():Ponto
-            devolver g
+            retornar g
         inicio
             g.x = 1
             p:Ponto = pegaG()
@@ -5387,12 +5588,12 @@ def test_devolver_variavel_de_estrutura_existente_nao_e_partilhada():
     assert saida.strip() == "1\n99"
 
 
-def test_devolver_vetor_inteiro_existente_nao_e_partilhado():
+def test_retornar_vetor_inteiro_existente_nao_e_partilhado():
     saida = executar("""
         algoritmo "T"
         v:inteiro[3]
         funcao pegaV():inteiro[]
-            devolver v
+            retornar v
         inicio
             v[0] = 1
             a:inteiro[3] = pegaV()
@@ -5683,7 +5884,7 @@ def test_indice_com_efeito_lateral_em_argumento_ref_e_avaliado_uma_so_vez():
         contador:inteiro
         funcao proximoIndice():inteiro
             contador = contador + 1
-            devolver contador - 1
+            retornar contador - 1
         procedimento incrementa(ref x:inteiro)
             x = x + 100
         inicio
@@ -5707,7 +5908,7 @@ def test_indices_2d_com_efeito_lateral_em_argumento_ref_cada_um_avaliado_uma_vez
         contador:inteiro
         funcao proximoIndice():inteiro
             contador = contador + 1
-            devolver contador - 1
+            retornar contador - 1
         procedimento incrementa(ref x:inteiro)
             x = x + 100
         inicio
@@ -5735,7 +5936,7 @@ def test_indice_com_efeito_lateral_apos_campo_de_estrutura_em_ref_e_avaliado_uma
         contador:inteiro
         funcao proximoIndice():inteiro
             contador = contador + 1
-            devolver contador - 1
+            retornar contador - 1
         procedimento incrementa(ref x:inteiro)
             x = x + 100
         inicio
@@ -5757,7 +5958,7 @@ def test_dois_argumentos_ref_com_indices_independentes_cada_um_avaliado_uma_vez(
         contador:inteiro
         funcao proximoIndice():inteiro
             contador = contador + 1
-            devolver contador - 1
+            retornar contador - 1
         procedimento somaAosDois(ref a:inteiro, ref b:inteiro)
             a = a + 100
             b = b + 1000
@@ -6008,14 +6209,15 @@ def test_matematica_potencia_caso_normal_continua_decimal_com_ponto():
 # global escondida dentro do corpo de uma função (bug #26) ----------
 
 def test_referencia_antecipada_escondida_em_funcao_da_erro_de_compilacao():
-    """Repro exato do bug: 'pegaB()' lê a global 'b', que só é
-    declarada DEPOIS de 'a' ser inicializada a partir dela -- antes,
-    compilava sem erro e crashava em runtime com NameError cru."""
-    with pytest.raises(ErroSemantico, match="'b'.*declarada mais tarde"):
+    """'pegaB()' lê 'b', que só é declarada dentro de 'inicio' -- desde
+    que 'inicio' deixou de expor globais implícitas a funções, 'pegaB'
+    já falha na sua própria verificação (não vê 'b' de todo), antes
+    sequer de a análise de ordem/referência-antecipada entrar em jogo."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
         compilar("""
             algoritmo "T"
             funcao pegaB():inteiro
-                devolver b
+                retornar b
             inicio
                 a:inteiro = pegaB()
                 b:inteiro = 10
@@ -6023,30 +6225,50 @@ def test_referencia_antecipada_escondida_em_funcao_da_erro_de_compilacao():
         """)
 
 
-def test_referencia_antecipada_em_ordem_correta_continua_a_compilar():
-    saida = executar("""
-        algoritmo "T"
-        funcao pegaB():inteiro
-            devolver b
-        inicio
-            b:inteiro = 10
-            a:inteiro = pegaB()
-            escrever(a)
-    """)
-    assert saida.strip() == "10"
-
-
-def test_referencia_antecipada_e_detetada_transitivamente_por_chamadas_encadeadas():
-    """A verificação segue chamadas a OUTRAS funções do próprio
-    ficheiro -- 'pegaA' não lê 'c' diretamente, só chama 'pegaB', que
-    lê."""
-    with pytest.raises(ErroSemantico, match="'pegaA'.*'c'"):
+def test_referencia_antecipada_em_ordem_correta_tambem_nao_compila():
+    """Não regressão: declarar 'b' ANTES de a usar dentro de 'inicio'
+    já não é suficiente -- 'b' continua só declarada dentro de 'inicio',
+    nunca visível a 'pegaB()', independentemente da ordem textual."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
         compilar("""
             algoritmo "T"
             funcao pegaB():inteiro
-                devolver c
+                retornar b
+            inicio
+                b:inteiro = 10
+                a:inteiro = pegaB()
+                escrever(a)
+        """)
+
+
+def test_referencia_antecipada_entre_globais_de_topo_continua_detetada():
+    """O único caso que sobra para _globais_lidas_transitivamente: ordem
+    entre declarações de TOPO (antes de 'inicio'), independente de onde
+    as funções estão escritas no ficheiro -- 'a' é inicializada a partir
+    de 'pegaB()', que lê 'b', só declarada a seguir a 'a'."""
+    with pytest.raises(ErroSemantico, match="'b'.*declarada mais tarde"):
+        compilar("""
+            algoritmo "T"
+            funcao pegaB():inteiro
+                retornar b
+            a:inteiro = pegaB()
+            b:inteiro = 10
+            inicio
+                escrever(a, b)
+        """)
+
+
+def test_referencia_antecipada_e_detetada_transitivamente_por_chamadas_encadeadas():
+    """'pegaB()' lê 'c', declarada dentro de 'inicio' -- 'pegaB' já
+    falha na sua própria verificação por não ver 'c' de todo, antes de
+    'pegaA' (que só chama 'pegaB') sequer ser verificada."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
+        compilar("""
+            algoritmo "T"
+            funcao pegaB():inteiro
+                retornar c
             funcao pegaA():inteiro
-                devolver pegaB() + 1
+                retornar pegaB() + 1
             inicio
                 a:inteiro = pegaA()
                 c:inteiro = 5
@@ -6061,7 +6283,7 @@ def test_referencia_antecipada_nao_dispara_para_parametro_que_sombreia_global():
     saida = executar("""
         algoritmo "T"
         funcao pegaB(b:inteiro):inteiro
-            devolver b
+            retornar b
         inicio
             a:inteiro = pegaB(5)
             b:inteiro = 10
@@ -6078,14 +6300,14 @@ def test_referencia_antecipada_com_recursao_mutua_nao_entra_em_ciclo_infinito():
         algoritmo "T"
         funcao par(n:inteiro):booleano
             se n == 0 entao
-                devolver verdadeiro
+                retornar verdadeiro
             senao
-                devolver impar(n - 1)
+                retornar impar(n - 1)
         funcao impar(n:inteiro):booleano
             se n == 0 entao
-                devolver falso
+                retornar falso
             senao
-                devolver par(n - 1)
+                retornar par(n - 1)
         inicio
             escrever(par(4))
     """)
@@ -6100,7 +6322,7 @@ def test_referencia_a_biblioteca_nao_e_confundida_com_referencia_antecipada():
         algoritmo "T"
         importar Matematica
         funcao raizDe4():decimal
-            devolver matematica.raiz(4.0)
+            retornar matematica.raiz(4.0)
         inicio
             x:decimal = raizDe4()
             escrever(x)
@@ -6108,28 +6330,26 @@ def test_referencia_a_biblioteca_nao_e_confundida_com_referencia_antecipada():
     assert saida.strip() == "2.0"
 
 
-def test_referencia_antecipada_em_atribuicao_normal_nao_apanhada_em_compilacao_mas_da_erro_amigavel_em_runtime():
-    """A verificação estática (_registar_decl) só cobre o valor inicial
-    de uma DECLARAÇÃO, tal como o plano de correção descreve -- uma
-    ATRIBUIÇÃO normal a uma variável já existente não passa por ali.
-    Compila sem erro (limite conhecido e aceite do alcance da análise
-    estática), mas a rede de segurança (NameError traduzido em
-    codegen.py) garante que o erro em runtime continua amigável, não
-    um traceback cru."""
-    resultado = _correr_esperando_erro("""\
-algoritmo "T"
-funcao pegaB():inteiro
-    devolver b
-inicio
-    a:inteiro = 0
-    a = pegaB()
-    b:inteiro = 10
-    escrever(a, b)
-""")
-    assert resultado.returncode == 1
-    assert "Traceback" not in resultado.stdout
-    assert "not defined" not in resultado.stdout
-    assert "'b' foi usada antes de existir um valor nela" in resultado.stdout
+def test_referencia_antecipada_em_atribuicao_normal_agora_e_erro_de_compilacao():
+    """Antes, este caso escapava à verificação estática porque
+    'a = pegaB()' é uma ATRIBUIÇÃO normal, não o valor inicial de uma
+    DECLARAÇÃO (o único sítio que _registar_decl cobre) -- compilava e
+    só falhava em runtime, com uma mensagem amigável traduzida em
+    codegen.py como rede de segurança. Desde que 'inicio' deixou de
+    expor globais implícitas a funções, esse limite deixou de existir
+    para este caso: 'pegaB()' já não vê 'b' de todo, é sempre erro de
+    COMPILAÇÃO, seja a leitura numa declaração ou numa atribuição."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
+        compilar("""
+            algoritmo "T"
+            funcao pegaB():inteiro
+                retornar b
+            inicio
+                a:inteiro = 0
+                a = pegaB()
+                b:inteiro = 10
+                escrever(a, b)
+        """)
 
 
 # ---------- AUDITORIA_2026-08-19 Fase 3.1: 'constante' como tamanho de
@@ -6190,14 +6410,13 @@ def test_constante_como_tamanho_de_vetor_uso_correto_continua_a_compilar():
     assert saida.strip() == "102030"
 
 
-def test_constante_declarada_dentro_de_inicio_como_tamanho_e_resolvida_dentro_de_funcao():
-    """A resolução também funciona para uma 'constante' declarada
-    DENTRO de 'inicio' (não só antes) quando referenciada a partir de
-    dentro de uma função -- self.globais precisa do mesmo tratamento
-    que escopo_topo (_pre_registar_recursivo, não só _registar_decl).
-    Funções são verificadas contra self.globais, que já inclui tudo o
-    que 'inicio' declara, independentemente da ordem textual."""
-    with pytest.raises(ErroSemantico, match="não pode ser negativo"):
+def test_constante_declarada_dentro_de_inicio_nao_e_visivel_dentro_de_funcao():
+    """Uma 'constante' declarada DENTRO de 'inicio' (não antes) nunca
+    fica visível a uma função -- self.globais só contém declarações de
+    topo. 'usaTamanho()' nem chega a ver 'N', logo o erro é sempre
+    'não foi declarada', independentemente do valor de 'N' ser válido
+    ou não."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
         compilar("""
             algoritmo "T"
             procedimento usaTamanho()
@@ -6235,7 +6454,7 @@ def test_erro_de_sintaxe_em_ficheiro_incluido_identifica_o_ficheiro(tmp_path):
     import os
     from algo_lang.cli import _carregar_e_resolver_inclusoes
     (tmp_path / "lib.algo").write_text(
-        "funcao f():inteiro\n    devolver +\n", encoding="utf-8")
+        "funcao f():inteiro\n    retornar +\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(1)\n', encoding="utf-8")
     with pytest.raises(SystemExit) as exc:
@@ -6250,7 +6469,7 @@ def test_erro_de_sintaxe_em_ficheiro_incluido_identifica_o_ficheiro_via_subproce
     antes da saída."""
     import os
     (tmp_path / "lib.algo").write_text(
-        "funcao f():inteiro\n    devolver +\n", encoding="utf-8")
+        "funcao f():inteiro\n    retornar +\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(1)\n', encoding="utf-8")
     script = (
@@ -6396,14 +6615,13 @@ def test_tamanho_de_vetor_dentro_do_limite_continua_a_funcionar():
 # -- fusão de âmbito entre ramos irmãos 'se'/'senao' ----------
 
 def test_constante_com_eh_constante_diferente_em_ramos_irmaos_da_erro_em_compilacao():
-    """bug #2: antes, 'x' ficava com o 'eh_constante' do PRIMEIRO ramo
-    visitado em DFS (sempre 's.ramos' antes de 's.senao'),
-    independentemente de qual ramo executa de facto -- permitindo que
-    o ramo que corre em runtime mute em silêncio o que a fonte chama
-    de 'constante'. Repro exato do bug: 'x' é 'constante' no 'senao'
-    (o ramo que executa, já que a condição é 'falso'), mas mutável no
-    'se' -- devia ser um erro de COMPILAÇÃO, não uma mutação silenciosa."""
-    with pytest.raises(ErroSemantico, match="constante"):
+    """bug #2 (histórico): 'x' era declarada dentro de 'inicio', só num
+    dos ramos como 'constante' -- desde que 'inicio' deixou de expor
+    globais implícitas a funções, 'mexe()'/'mostra()' nem chegam a ver
+    'x', logo o bug (mutação silenciosa do que a fonte chama de
+    'constante') deixou de ser possível estruturalmente, não só
+    apanhado mais cedo."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
         compilar("""
             algoritmo "T"
             procedimento mexe()
@@ -6441,10 +6659,11 @@ def test_variavel_com_tipos_diferentes_em_ramos_irmaos_continua_indisponivel_dep
     """Não regressão da correção do bug #9: quando os ramos NÃO
     concordam em tipo, o nome continua por declarar depois do 'se' --
     sem propagação, mas também sem erro nenhum na própria declaração
-    (só ao tentar usar 'y' depois). Dentro de um procedimento (não em
-    'inicio') para isolar do mecanismo, à parte, de globais visíveis a
-    funções (_pre_registar_recursivo), que já rejeita tipos diferentes
-    em ramos irmãos ao nível de topo, com uma mensagem diferente."""
+    (só ao tentar usar 'y' depois). Usa um procedimento (em vez de
+    'inicio' diretamente) só para exercitar o mesmo cenário dentro do
+    corpo de uma função -- desde que 'inicio' deixou de ter um
+    pré-registo eager de globais para funções, o comportamento é
+    idêntico em ambos os sítios."""
     with pytest.raises(ErroSemantico, match="não foi declarada"):
         compilar("""
             algoritmo "T"
@@ -6459,27 +6678,25 @@ def test_variavel_com_tipos_diferentes_em_ramos_irmaos_continua_indisponivel_dep
         """)
 
 
-def test_constante_com_valores_diferentes_em_ramos_irmaos_nao_trava_compilacao_valida():
-    """bug #39: análogo ao #2, mas para o VALOR resolvido de uma
-    'constante' inteira escalar (bug #29) -- ramos irmãos com o mesmo
-    tipo mas valores DIFERENTES ficavam congelados no valor do
-    primeiro ramo visitado. Aqui, o 'senao' (o ramo que executa, já
-    que a condição é 'falso') declara x=10, que bate certo com os 10
-    elementos do literal -- antes, o compilador rejeitava isto porque
-    tinha congelado x=5 (o valor do 'se', visitado primeiro)."""
-    saida = executar("""
-        algoritmo "T"
-        funcao tam():inteiro
-            v:inteiro[x] = {1,2,3,4,5,6,7,8,9,10}
-            devolver 3
-        inicio
-            se falso entao
-                constante x:inteiro = 5
-            senao
-                constante x:inteiro = 10
-            escrever(tam())
-    """)
-    assert saida.strip() == "3"
+def test_constante_com_valores_diferentes_em_ramos_irmaos_nao_e_visivel_em_funcao():
+    """bug #39 (histórico): 'x' era uma 'constante' declarada dentro de
+    'inicio', com valores diferentes em ramos irmãos -- desde que
+    'inicio' deixou de expor globais implícitas a funções, 'tam()' nem
+    chega a ver 'x', logo o bug (valor congelado no do primeiro ramo
+    visitado) deixou de ser possível estruturalmente."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
+        compilar("""
+            algoritmo "T"
+            funcao tam():inteiro
+                v:inteiro[x] = {1,2,3,4,5,6,7,8,9,10}
+                retornar 3
+            inicio
+                se falso entao
+                    constante x:inteiro = 5
+                senao
+                    constante x:inteiro = 10
+                escrever(tam())
+        """)
 
 
 # ---------- AUDITORIA_2026-08-19 ronda 12: bug #18 -- artefactos crus de
@@ -6775,7 +6992,7 @@ def test_tracer_nao_confunde_funcao_chamada_principal_com_o_programa_principal()
     programa = parse(textwrap.dedent("""\
         algoritmo "T"
         funcao Principal(x:inteiro):inteiro
-            devolver x + 1
+            retornar x + 1
         inicio
             y:inteiro = Principal(10)
             escrever(y)
@@ -6814,7 +7031,7 @@ def test_funcao_depois_de_inicio_da_erro_de_sintaxe():
             inicio
                 escrever(soma(1,2))
             funcao soma(a:inteiro, b:inteiro):inteiro
-                devolver a+b
+                retornar a+b
         """))
 
 

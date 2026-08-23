@@ -278,8 +278,9 @@ def _algo_verificar_tamanho_vetor(tam):
     silenciosamente produzia um vetor vazio -- range(negativo) do Python
     não levanta erro nenhum. Este é o único sítio onde QUALQUER dimensão
     de vetor passa antes de ser usada em range(), por isso não é preciso
-    duplicar esta verificação em semantics.py. 10 milhões por dimensão,
-    não o produto entre dimensões (que continua sem limite agregado).
+    duplicar esta verificação em semantics.py. 10 milhões por dimensão --
+    ver _algo_verificar_tamanho_vetor_agregado, a seguir, para o limite
+    sobre o PRODUTO entre dimensões de um vetor 2D+.
     _AlgoErroAmigavel (não ValueError direto) evita que as mensagens
     fiquem reembrulhadas em "valor inválido (...)" pelo 'except
     ValueError' genérico."""
@@ -290,6 +291,27 @@ def _algo_verificar_tamanho_vetor(tam):
             f"o tamanho pedido ({tam}) é maior do que o limite permitido "
             f"({_ALGO_LIMITE_TAMANHO_VETOR})")
     return tam
+
+
+def _algo_verificar_tamanho_vetor_agregado(*dims):
+    """Cada dimensão individual já passa por _algo_verificar_tamanho_vetor,
+    mas isso não impede um vetor tecnicamente enorme com todas as
+    dimensões individualmente abaixo do limite (ex.: 'inteiro[9999][9999]
+    [9999]', ~10^12 elementos) -- sem isto, a construção só falharia a
+    meio (ou nem isso: esgotava memória sem erro nenhum apanhado) muito
+    depois de já ter começado a alocar. Chamado UMA VEZ, com todas as
+    dimensões já resolvidas, ANTES de começar a construir o vetor
+    aninhado -- falha rápido, sem alocar nada. Usa o MESMO limite que
+    cada dimensão individual usa sozinha (_ALGO_LIMITE_TAMANHO_VETOR),
+    agora sobre o produto, não a soma nem cada eixo à parte -- para um
+    vetor 1D isto é equivalente ao guarda de cima, sem mudar nada."""
+    produto = 1
+    for d in dims:
+        produto *= max(d, 0)
+    if produto > _ALGO_LIMITE_TAMANHO_VETOR:
+        raise _AlgoErroAmigavel(
+            f"o vetor pedido tem {produto} elementos no total, mais do que "
+            f"o limite permitido ({_ALGO_LIMITE_TAMANHO_VETOR})")
 
 '''
 
@@ -349,20 +371,25 @@ class GeradorCodigo(GeradorCodigoBase):
         for f in self.programa.funcoes:
             self._gerar_funcao(f)
 
-        for d in self.programa.declaracoes:
-            self._linha_algo_atual = d.linha
-            self._gerar_declaracao(d, 0, self.tabela_tipos_globais)
-        self._linha_algo_atual = None
-        if self.programa.declaracoes:
-            self.linhas.append("")
-
         self.emit("def _algo_programa():", 0)
         if self.tabela_tipos_globais:
             self.emit(f"global {', '.join(self.tabela_tipos_globais)}", 1)
+        tipos = dict(self.tabela_tipos_globais)
+
+        # As declarações de topo (antes de 'inicio') são geradas AQUI DENTRO
+        # de _algo_programa(), não soltas ao nível do módulo -- um erro em
+        # runtime a avaliar o valor inicial de uma delas (ex.: uma divisão
+        # por zero escondida dentro de uma chamada a função) tem de cair
+        # dentro do mesmo try/except de 'if __name__ == "__main__":' que já
+        # protege o resto do programa, em vez de propagar como traceback
+        # Python cru antes desse try/except sequer ser alcançado.
+        for d in self.programa.declaracoes:
+            self._linha_algo_atual = d.linha
+            self._gerar_declaracao(d, 1, tipos)
+
         corpo_vazio = not self.programa.corpo
         if corpo_vazio:  # pragma: no cover -- o parser exige >=1 instrução após 'inicio'
             self.emit("pass", 1)
-        tipos = dict(self.tabela_tipos_globais)
         for stmt in self.programa.corpo:
             self._gerar_stmt(stmt, 1, tipos)
         self._linha_algo_atual = None
@@ -428,6 +455,19 @@ class GeradorCodigo(GeradorCodigoBase):
         self.emit(
             '_algo_msg = f"Erro em tempo de execução: recursão infinita '
             '(a função nunca chega ao caso base).{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
+        self.emit("sys.exit(1)", 2)
+        # Rede de segurança: _algo_verificar_tamanho_vetor_agregado já
+        # apanha o caso comum (vetor multi-dimensão com produto enorme)
+        # antes de alocar nada, mas MemoryError pode em teoria vir de
+        # outro sítio (ex.: recursão profunda com estruturas grandes por
+        # frame) -- sem isto, seria o único erro de runtime a escapar
+        # como traceback cru em vez de mensagem traduzida.
+        self.emit("except MemoryError as _algo_erro:", 1)
+        self.emit(
+            '_algo_msg = f"Erro em tempo de execução: o programa ficou sem memória '
+            '(o valor pedido é grande demais).{_algo_sufixo_linha(_algo_erro)}"', 2)
         self.emit("print(_algo_msg)", 2)
         self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
@@ -550,7 +590,12 @@ class GeradorCodigo(GeradorCodigoBase):
         duas vezes (uma para ler, outra para escrever de volta) e possa
         dar valores diferentes cada vez. Eleva SEMPRE, mesmo quando o
         índice já é uma variável simples ou um literal. Não mexe em
-        acessos '.campo' nem em argumentos que não sejam 'ref'."""
+        acessos '.campo' nem em argumentos que não sejam 'ref'.
+
+        Aproveita os índices já resolvidos em variáveis temporárias para
+        também emitir, a seguir, os guardas de aliasing em runtime entre
+        pares de argumentos 'ref' que semantics.py não consegue decidir
+        em compilação (ver _verificar_aliasing_ref_runtime)."""
         contador = 0
         novos = []
         for p, a in zip(f_def.parametros, args):
@@ -568,7 +613,60 @@ class GeradorCodigo(GeradorCodigoBase):
                 else:
                     novos_acessos.append((tag, valor))
             novos.append(A.LValue(a.nome, novos_acessos, a.linha))
+        self._verificar_aliasing_ref_runtime(f_def, args, novos, tipos, nivel)
         return novos
+
+    def _verificar_aliasing_ref_runtime(self, f_def, args_originais, args_hoisted, tipos, nivel):
+        """Rede de segurança em runtime para o aliasing de 'ref' que
+        semantics.py (_caminhos_ref_colidem) delibaradamente não consegue
+        decidir em compilação -- dois argumentos 'ref' com o mesmo nome
+        de variável base, cujos caminhos de acesso só divergem num
+        índice (ex.: 'v[i]' e 'v[j]', ou 'v[i]' e 'v[i].campo'), podem
+        apontar para a MESMA posição em runtime consoante o valor de 'i'
+        e 'j' -- nesse caso, a atribuição múltipla do Python que escreve
+        os dois parâmetros de volta sobrepõe silenciosamente um pelo
+        outro. args_hoisted já tem cada índice resolvido numa variável
+        temporária (ver _hoistear_indices_ref) -- usa-as para comparar
+        os caminhos posição a posição, até ao comprimento do mais curto:
+        um 'campo' com nome diferente prova que os caminhos nunca podem
+        colidir (não emite guarda nenhum); um 'índice' contribui uma
+        condição de runtime (os dois valores resolvidos têm de ser
+        iguais); um 'campo' com o mesmo nome não contribui condição
+        nenhuma (é sempre o mesmo campo, estaticamente garantido) e a
+        comparação continua. Usa args_originais só para construir a
+        mensagem de erro (com os índices tal como o estudante os
+        escreveu, não os nomes internos '_algo_tmp_idx_N')."""
+        refs = [
+            (a_orig, a_hoisted)
+            for p, a_orig, a_hoisted in zip(f_def.parametros, args_originais, args_hoisted)
+            if p.por_referencia and isinstance(a_orig, A.LValue) and a_orig.acessos
+        ]
+        for i in range(len(refs)):
+            a_orig, a_hoisted = refs[i]
+            for j in range(i + 1, len(refs)):
+                b_orig, b_hoisted = refs[j]
+                if b_orig.nome != a_orig.nome:
+                    continue
+                condicoes = []
+                for (tag_a, val_a), (tag_b, val_b) in zip(a_hoisted.acessos, b_hoisted.acessos):
+                    if tag_a == "campo" or tag_b == "campo":
+                        if tag_a != tag_b or val_a != val_b:
+                            condicoes = None  # caminhos provadamente distintos -- nunca colidem
+                            break
+                        continue
+                    condicoes.append((self._expr(val_a, tipos), self._expr(val_b, tipos)))
+                if not condicoes:
+                    continue
+                condicao_py = " and ".join(f"({x}) == ({y})" for x, y in condicoes)
+                # texto_expr() devolve texto não escapado -- repr() gera um literal
+                # Python seguro para o embutir no código gerado (mesmo padrão que
+                # _gerar_afirmar usa para a mesma razão).
+                msg_literal = repr(
+                    f"'{A.texto_expr(a_orig)}' e '{A.texto_expr(b_orig)}' referem-se à "
+                    f"mesma posição em runtime -- não podem ser ambos passados por "
+                    f"referência na mesma chamada a '{f_def.nome}'")
+                self.emit(f"if {condicao_py}:", nivel)
+                self.emit(f"raise _AlgoErroAmigavel({msg_literal})", nivel + 1)
 
     def _expr_estrutura_literal(self, lit: A.EstruturaLiteral, tipo_nome: str, tipos) -> str:
         """Um A.EstruturaLiteral não sabe o seu próprio tipo (só os
@@ -584,6 +682,11 @@ class GeradorCodigo(GeradorCodigoBase):
                 # não tem 'self._expr()' próprio, por isso recursão direta
                 # em vez de _expr()/_coagir_decimal.
                 expr_py = self._expr_estrutura_literal(valor, tipo_campo, tipos)
+            elif isinstance(valor, A.VetorLiteral):
+                # Campo-vetor inicializado diretamente num literal de
+                # estrutura (ex.: '{notas: {10, 8, 9}}') -- mesma ideia
+                # que o ramo EstruturaLiteral acima.
+                expr_py = self._expr_vetor_literal(valor, tipo_campo, tipos)
             else:
                 expr_py = self._coagir_decimal(self._expr(valor, tipos), tipo_campo, valor)
                 # Campo de literal de struct a partir de uma variável
@@ -634,7 +737,8 @@ class GeradorCodigo(GeradorCodigoBase):
                     if p.por_referencia
                 ]
                 args_str = self._gerar_lista_args(args_hoisted, f_def, tipos)
-                self.emit(f"{d.nome}, {', '.join(out_vars)} = {d.inicial.nome}({args_str})", nivel)
+                nome_py = d.inicial.nome.replace(".", "_")
+                self.emit(f"{d.nome}, {', '.join(out_vars)} = {nome_py}({args_str})", nivel)
                 valor_coagido = self._coagir_decimal(d.nome, d.tipo, d.inicial)
                 if valor_coagido != d.nome:
                     self.emit(f"{d.nome} = {valor_coagido}", nivel)
@@ -669,7 +773,8 @@ class GeradorCodigo(GeradorCodigoBase):
                 ]
                 args_str = self._gerar_lista_args(args_hoisted, f_def, tipos)
                 alvo = self._lvalue(stmt.alvo, tipos)
-                self.emit(f"{alvo}, {', '.join(out_vars)} = {stmt.expr.nome}({args_str})", nivel)
+                nome_py = stmt.expr.nome.replace(".", "_")
+                self.emit(f"{alvo}, {', '.join(out_vars)} = {nome_py}({args_str})", nivel)
                 tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
                 valor_coagido = self._coagir_decimal(alvo, tipo_alvo, stmt.expr)
                 if valor_coagido != alvo:
@@ -710,6 +815,7 @@ class GeradorCodigo(GeradorCodigoBase):
             nome_temp = f"_algo_dim{i}"
             self.emit(f"{nome_temp} = {self._expr(dim_expr, tipos)}", nivel)
             temps.append(nome_temp)
+        self.emit(f"_algo_verificar_tamanho_vetor_agregado({', '.join(temps)})", nivel)
         expr = self._valor_default(tipo)
         for nome_temp in reversed(temps):
             expr = f"[{expr} for _ in range(_algo_verificar_tamanho_vetor({nome_temp}))]"
@@ -756,28 +862,38 @@ class GeradorCodigo(GeradorCodigoBase):
             self._gerar_corpo(stmt.corpo, nivel + 1, tipos)
         elif isinstance(stmt, A.Escolha):
             self._gerar_escolha(stmt, nivel, tipos)
-        elif isinstance(stmt, A.Devolver):
-            if isinstance(stmt.expr, A.EstruturaLiteral):
-                # Literal de estrutura devolvido diretamente -- semantics.py
-                # já validou a forma contra o tipo de retorno da função.
-                # Usa-se _expr_estrutura_literal (coerção decimal + literais
-                # aninhados) em vez do _expr() genérico, que não tem ramo
-                # nenhum para A.EstruturaLiteral (só sabe construir a partir
-                # do tipo esperado, que aqui já se conhece).
-                valor = self._expr_estrutura_literal(stmt.expr, self.tipo_retorno_atual, tipos)
-            elif isinstance(stmt.expr, A.VetorLiteral):
-                # Mesma ideia para um literal de vetor -- _expr_vetor_literal
-                # coage cada elemento (ex.: inteiro -> decimal), ao contrário
-                # do ramo genérico de A.VetorLiteral em _expr(), que apenas
-                # monta a lista sem coagir nada.
-                valor = self._expr_vetor_literal(stmt.expr, self.tipo_retorno_atual, tipos)
+        elif isinstance(stmt, A.Retornar):
+            if stmt.expr is None:
+                # 'retornar' sem expressão -- só válido dentro de um
+                # procedimento (semantics.py já validou); sai já, devolvendo
+                # os mesmos 'ref' que o fim do corpo devolveria implicitamente
+                # (ver gerador_base.py:_gerar_funcao).
+                if self.refs_atuais:
+                    self.emit(f"return {', '.join(self.refs_atuais)}", nivel)
+                else:
+                    self.emit("return", nivel)
             else:
-                valor = self._coagir_decimal(self._expr(stmt.expr, tipos), self.tipo_retorno_atual, stmt.expr)
-                valor = self._copiar_se_necessario(valor, self.tipo_retorno_atual, self.dims_retorno_atual)
-            if self.refs_atuais:
-                self.emit(f"return {valor}, {', '.join(self.refs_atuais)}", nivel)
-            else:
-                self.emit(f"return {valor}", nivel)
+                if isinstance(stmt.expr, A.EstruturaLiteral):
+                    # Literal de estrutura devolvido diretamente -- semantics.py
+                    # já validou a forma contra o tipo de retorno da função.
+                    # Usa-se _expr_estrutura_literal (coerção decimal + literais
+                    # aninhados) em vez do _expr() genérico, que não tem ramo
+                    # nenhum para A.EstruturaLiteral (só sabe construir a partir
+                    # do tipo esperado, que aqui já se conhece).
+                    valor = self._expr_estrutura_literal(stmt.expr, self.tipo_retorno_atual, tipos)
+                elif isinstance(stmt.expr, A.VetorLiteral):
+                    # Mesma ideia para um literal de vetor -- _expr_vetor_literal
+                    # coage cada elemento (ex.: inteiro -> decimal), ao contrário
+                    # do ramo genérico de A.VetorLiteral em _expr(), que apenas
+                    # monta a lista sem coagir nada.
+                    valor = self._expr_vetor_literal(stmt.expr, self.tipo_retorno_atual, tipos)
+                else:
+                    valor = self._coagir_decimal(self._expr(stmt.expr, tipos), self.tipo_retorno_atual, stmt.expr)
+                    valor = self._copiar_se_necessario(valor, self.tipo_retorno_atual, self.dims_retorno_atual)
+                if self.refs_atuais:
+                    self.emit(f"return {valor}, {', '.join(self.refs_atuais)}", nivel)
+                else:
+                    self.emit(f"return {valor}", nivel)
         elif isinstance(stmt, A.ChamadaStmt):
             self._gerar_chamada_stmt(stmt, nivel, tipos)
         elif isinstance(stmt, A.Afirmar):
@@ -825,10 +941,11 @@ class GeradorCodigo(GeradorCodigoBase):
                 if p.por_referencia
             ]
             args_str = self._gerar_lista_args(args_hoisted, f_def, tipos)
+            nome_py = chamada.nome.replace(".", "_")
             if f_def.eh_procedimento:
-                self.emit(f"{', '.join(out_vars)} = {chamada.nome}({args_str})", nivel)
+                self.emit(f"{', '.join(out_vars)} = {nome_py}({args_str})", nivel)
             else:
-                self.emit(f"_, {', '.join(out_vars)} = {chamada.nome}({args_str})", nivel)
+                self.emit(f"_, {', '.join(out_vars)} = {nome_py}({args_str})", nivel)
         else:
             self.emit(self._expr(chamada, tipos), nivel)
 

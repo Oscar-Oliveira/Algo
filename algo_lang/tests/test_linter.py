@@ -19,7 +19,7 @@ def test_programa_limpo_nao_tem_avisos():
     avisos = _avisos("""
         algoritmo "T"
         funcao dobro(x:inteiro):inteiro
-            devolver x * 2
+            retornar x * 2
         inicio
             n:inteiro = 5
             escrever(dobro(n))
@@ -80,7 +80,7 @@ def test_parametro_nao_usado():
     avisos = _avisos("""
         algoritmo "T"
         funcao f(a:inteiro, b:inteiro):inteiro
-            devolver a
+            retornar a
         inicio
             escrever(f(1, 2))
     """)
@@ -93,7 +93,7 @@ def test_funcao_nunca_chamada():
     avisos = _avisos("""
         algoritmo "T"
         funcao nuncaChamada(x:inteiro):inteiro
-            devolver x
+            retornar x
         inicio
             escrever("ola")
     """)
@@ -118,9 +118,9 @@ def test_funcao_chamada_por_outra_funcao_nao_e_assinalada():
     avisos = _avisos("""
         algoritmo "T"
         funcao auxiliar(x:inteiro):inteiro
-            devolver x * 2
+            retornar x * 2
         funcao principal(x:inteiro):inteiro
-            devolver auxiliar(x) + 1
+            retornar auxiliar(x) + 1
         inicio
             escrever(principal(5))
     """)
@@ -169,7 +169,7 @@ def test_leitura_em_global_mutavel_da_aviso():
         algoritmo "T"
         total:inteiro = 42
         funcao mostraTotal():inteiro
-            devolver total
+            retornar total
         inicio
             escrever(mostraTotal())
     """)
@@ -199,7 +199,7 @@ def test_constante_global_nao_da_aviso_de_uso_de_globais():
         algoritmo "T"
         constante IVA:decimal = 1.23
         funcao precoComIva(preco:decimal):decimal
-            devolver preco * IVA
+            retornar preco * IVA
         inicio
             escrever(precoComIva(10.0))
     """)
@@ -365,6 +365,42 @@ def test_inclusoes_diferentes_nao_dao_aviso():
     assert not any("já tinha sido incluído" in a.mensagem for a in avisos)
 
 
+def test_uma_inclusao_sem_alias_nao_da_aviso():
+    """Só pode colidir com o próprio programa principal -- risco menor,
+    não vale a pena avisar."""
+    avisos = _avisos("""
+        algoritmo "T"
+        incluir "a.algo"
+        inicio
+            escrever("ok")
+    """)
+    assert not any("como <alias>" in a.mensagem for a in avisos)
+
+
+def test_duas_inclusoes_sem_alias_dao_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        incluir "a.algo"
+        incluir "b.algo"
+        inicio
+            escrever("ok")
+    """)
+    relevantes = [a for a in avisos if "como <alias>" in a.mensagem]
+    assert len(relevantes) == 2
+    assert any("a.algo" in a.mensagem for a in relevantes)
+
+
+def test_inclusoes_com_alias_nao_dao_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        incluir "a.algo" como a
+        incluir "b.algo" como b
+        inicio
+            escrever("ok")
+    """)
+    assert not any("como <alias>" in a.mensagem for a in avisos)
+
+
 def test_importar_duplicado_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
@@ -452,11 +488,11 @@ def test_casos_diferentes_em_escolha_nao_dao_aviso():
     assert not any("já apareceu na linha" in a.mensagem for a in avisos)
 
 
-def test_codigo_depois_de_devolver_da_aviso():
+def test_codigo_depois_de_retornar_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         funcao f(x:inteiro):inteiro
-            devolver x
+            retornar x
             escrever("nunca corre")
         inicio
             escrever(f(1))
@@ -464,11 +500,11 @@ def test_codigo_depois_de_devolver_da_aviso():
     assert any("nunca são executadas" in a.mensagem for a in avisos)
 
 
-def test_devolver_no_fim_do_bloco_nao_da_aviso():
+def test_retornar_no_fim_do_bloco_nao_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         funcao f(x:inteiro):inteiro
-            devolver x
+            retornar x
         inicio
             escrever(f(1))
     """)
@@ -505,7 +541,7 @@ def test_resultado_de_funcao_descartado_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         funcao dobro(x:inteiro):inteiro
-            devolver x * 2
+            retornar x * 2
         inicio
             dobro(5)
     """)
@@ -516,7 +552,7 @@ def test_resultado_de_funcao_usado_nao_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         funcao dobro(x:inteiro):inteiro
-            devolver x * 2
+            retornar x * 2
         inicio
             escrever(dobro(5))
     """)
@@ -534,7 +570,7 @@ def test_chamada_a_procedimento_nao_da_aviso_de_resultado_descartado():
     assert not any("é descartado aqui" in a.mensagem for a in avisos)
 
 
-def test_ciclo_enquanto_verdadeiro_sem_devolver_da_aviso():
+def test_ciclo_enquanto_verdadeiro_sem_retornar_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         inicio
@@ -544,12 +580,12 @@ def test_ciclo_enquanto_verdadeiro_sem_devolver_da_aviso():
     assert any("nunca termina" in a.mensagem for a in avisos)
 
 
-def test_ciclo_enquanto_verdadeiro_com_devolver_nao_da_aviso():
+def test_ciclo_enquanto_verdadeiro_com_retornar_nao_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         funcao f():inteiro
             enquanto verdadeiro fazer
-                devolver 1
+                retornar 1
         inicio
             escrever(f())
     """)
@@ -768,8 +804,8 @@ def test_ciclo_enquanto_bandeira_passada_a_chamada_nao_da_aviso():
     assert not any("nunca termina" in a.mensagem for a in avisos)
 
 
-def test_ciclo_enquanto_dentro_de_funcao_com_devolver_nao_da_aviso_de_bandeira():
-    """Um 'devolver' algures no corpo já é uma forma válida de sair,
+def test_ciclo_enquanto_dentro_de_funcao_com_retornar_nao_da_aviso_de_bandeira():
+    """Um 'retornar' algures no corpo já é uma forma válida de sair,
     mesmo sem a bandeira ser alterada -- não deve empilhar os dois
     avisos."""
     avisos = _avisos("""
@@ -777,8 +813,8 @@ def test_ciclo_enquanto_dentro_de_funcao_com_devolver_nao_da_aviso_de_bandeira()
         funcao f():inteiro
             ativo:booleano = verdadeiro
             enquanto ativo fazer
-                devolver 1
-            devolver 0
+                retornar 1
+            retornar 0
         inicio
             escrever(f())
     """)
@@ -889,7 +925,7 @@ def test_recursao_sem_condicao_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         funcao f(n:inteiro):inteiro
-            devolver f(n - 1)
+            retornar f(n - 1)
         inicio
             escrever(f(5))
     """)
@@ -903,8 +939,8 @@ def test_recursao_com_caso_base_nao_da_aviso():
         algoritmo "T"
         funcao fatorial(n:inteiro):inteiro
             se n <= 1 entao
-                devolver 1
-            devolver n * fatorial(n - 1)
+                retornar 1
+            retornar n * fatorial(n - 1)
         inicio
             escrever(fatorial(5))
     """)

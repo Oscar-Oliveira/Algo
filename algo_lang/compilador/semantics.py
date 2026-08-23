@@ -108,8 +108,9 @@ def _nomes_lidos_em_stmts(stmts, nomes, chamadas):
             for valores, _corpo in s.casos:
                 for v in valores:
                     _nomes_lidos_em_expr(v, nomes, chamadas)
-        elif isinstance(s, A.Devolver):
-            _nomes_lidos_em_expr(s.expr, nomes, chamadas)
+        elif isinstance(s, A.Retornar):
+            if s.expr is not None:
+                _nomes_lidos_em_expr(s.expr, nomes, chamadas)
         elif isinstance(s, A.ChamadaStmt):
             _nomes_lidos_em_expr(s.chamada, nomes, chamadas)
         elif isinstance(s, A.Afirmar):
@@ -186,6 +187,20 @@ class VerificadorTipos:
                     f"{disponiveis}", imp.linha)
             self.bibliotecas_importadas[chave] = self.registo_bibliotecas[chave]
 
+        # alias (de 'incluir "x.algo" como alias') -> {metodo_original:
+        # nome_mangled} -- já populado por inclusoes.mesclar_biblioteca_no_programa
+        # antes de semantics.py correr; aqui só se valida que nenhum alias
+        # colide com uma biblioteca importada (uma colisão com
+        # função/estrutura/variável já é apanhada no próprio merge, contra
+        # o nome MANGLED -- ver inclusoes.py).
+        self.aliases_inclusao = programa.aliases_inclusao
+        for inc in programa.inclusoes:
+            if inc.como and inc.como.lower() in self.bibliotecas_importadas:
+                raise ErroSemantico(
+                    f"'{inc.como}' já é o nome de uma biblioteca importada; escolhe "
+                    f"outro alias em 'incluir \"{inc.caminho}\" como {inc.como}'",
+                    inc.linha)
+
         # nome_python_gerado (ex.: "matematica_raiz") -> "biblioteca.metodo"
         # (ex.: "matematica.raiz"), só para bibliotecas importadas -- uma
         # função/estrutura/variável do estudante com o MESMO nome que o
@@ -196,6 +211,16 @@ class VerificadorTipos:
             f"{nome_biblioteca}_{metodo}": f"{nome_biblioteca}.{metodo}"
             for nome_biblioteca, info in self.bibliotecas_importadas.items()
             for metodo in info["funcoes"]
+        }
+
+        # Mesma ideia que 'nomes_internos_bibliotecas', mas para funções
+        # incluídas com alias: 'alias_metodo' (nome Python mangled já
+        # atribuído por inclusoes.py) -> "alias.metodo" (para a mensagem
+        # de erro em '_verificar_nome_disponivel').
+        self.nomes_internos_aliases = {
+            nome_mangled: f"{alias}.{metodo_original}"
+            for alias, mapa in self.aliases_inclusao.items()
+            for metodo_original, nome_mangled in mapa.items()
         }
 
         # bugs #23/#27: nomes reservados pelo próprio código gerado --
@@ -237,17 +262,14 @@ class VerificadorTipos:
         # vetor de 'estrutura' referencia um destes nomes.
         self._nomes_globais_top_level = {d.nome for d in programa.declaracoes}
 
-        # Conjunto COMPLETO de nomes que alguma vez vão ser globais no
-        # programa (topo + declarados dentro de 'inicio') -- calculado
-        # cedo, só pelos NOMES, porque _registar_decl precisa disto ANTES
-        # de 'self.globais' existir. Usado por _globais_lidas_transitivamente
-        # para distinguir "nome que nunca vai ser global" de "nome que VAI
-        # ser global, mas ainda não está disponível aqui".
-        tipos_corpo = {}
-        A.coletar_declaracoes_tipadas(programa.corpo, tipos_corpo)
-        self._nomes_globais_eventuais = self._nomes_globais_top_level | set(tipos_corpo)
+        # Só as declarações de TOPO (antes de 'inicio') chegam a ser
+        # globais -- usado por _globais_lidas_transitivamente para
+        # distinguir "nome que nunca vai ser global" de "nome que VAI ser
+        # global, mas ainda não está disponível aqui" (referência
+        # antecipada entre declarações de topo fora de ordem).
+        self._nomes_globais_eventuais = self._nomes_globais_top_level
 
-        self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims)}
+        self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims, dims_exprs)}
         linhas_dos_campos = {}   # (nome_estrutura, nome_campo) -> linha (só para mensagens de erro)
         for e in programa.estruturas:
             if e.nome in self.estruturas:
@@ -290,7 +312,7 @@ class VerificadorTipos:
                     # nomes fazem sentido aqui.
                     self._validar_dims(c.dims, {}, c.linha, contexto_campo=True)
                 dims_n = 0 if c.dims is None else len(c.dims)
-                campos[c.nome] = (c.tipo, dims_n)
+                campos[c.nome] = (c.tipo, dims_n, c.dims)
                 linhas_dos_campos[(e.nome, c.nome)] = c.linha
             self.estruturas[e.nome] = campos
 
@@ -298,7 +320,7 @@ class VerificadorTipos:
         # registadas, para permitir referências cruzadas entre estruturas
         # (ex: 'estrutura A' pode ter um campo do tipo 'B', definida a seguir)
         for nome_estrutura, campos in self.estruturas.items():
-            for nome_campo, (tipo, _dims) in campos.items():
+            for nome_campo, (tipo, _dims, _dims_exprs) in campos.items():
                 if tipo not in PRIMITIVOS and tipo not in self.estruturas:
                     linha = linhas_dos_campos[(nome_estrutura, nome_campo)]
                     raise ErroSemantico(
@@ -320,72 +342,15 @@ class VerificadorTipos:
         for d in self.programa.declaracoes:
             self._registar_decl(escopo_topo, d)
 
-        # tabela de globais visível às funções = declarações de topo + as
-        # que vierem a ser declaradas dentro do bloco 'inicio'
+        # tabela de globais visível às funções = só as declarações de
+        # topo (antes de 'inicio') -- nada declarado dentro de 'inicio'
+        # é visível a uma função, mesmo ao nível mais externo do bloco.
         self.globais = dict(escopo_topo)
-        self._pre_registar_recursivo(self.programa.corpo, self.globais, set(escopo_topo))
 
         for f in self.programa.funcoes:
             self._verificar_funcao(f)
 
         self._verificar_bloco(self.programa.corpo, escopo_topo, ctx_funcao=None)
-
-    def _pre_registar_recursivo(self, stmts, destino, globais_previas):
-        for s in stmts:
-            if isinstance(s, A.Declaracao):
-                dims_n = 0 if s.dims is None else len(s.dims)
-                if s.nome in destino:
-                    if s.nome in globais_previas:
-                        # 'destino' já continha este nome ANTES de
-                        # percorrer o corpo (é uma global a sério,
-                        # declarada antes de 'inicio') -- não é um
-                        # conflito entre ramos irmãos, é uma redeclaração
-                        # pura e simples.
-                        raise ErroSemantico(
-                            f"a variável '{s.nome}' já foi declarada", s.linha)
-                    # Só é erro se o TIPO diferir -- o mesmo nome com o
-                    # mesmo tipo em ramos irmãos é legítimo (o tipo
-                    # estático fica correto seja qual for o ramo).
-                    tipo_existente, dims_existente, eh_constante_existente, valor_existente = destino[s.nome]
-                    if (tipo_existente, dims_existente) != (s.tipo, dims_n):
-                        raise ErroSemantico(
-                            f"a variável '{s.nome}' é declarada com tipos diferentes "
-                            f"em ramos diferentes ('{tipo_existente}' e '{s.tipo}') -- "
-                            f"para ser visível a funções, o compilador precisa de um "
-                            f"único tipo estático para '{s.nome}'", s.linha)
-                    # Mesmo raciocínio do tipo, acima, mas para
-                    # 'eh_constante' -- um nome 'constante' num ramo e
-                    # variável normal no ramo irmão precisa da mesma
-                    # verificação.
-                    if eh_constante_existente != s.eh_constante:
-                        raise ErroSemantico(
-                            f"a variável '{s.nome}' é declarada como 'constante' num ramo "
-                            f"e como variável normal noutro -- para ser visível a funções, "
-                            f"o compilador precisa de uma única decisão para '{s.nome}'",
-                            s.linha)
-                    # Mesmo raciocínio, agora para o VALOR resolvido de
-                    # uma constante inteira escalar -- se os valores de
-                    # ramos irmãos não baterem certo, marca como não
-                    # resolvível (None) em vez de adivinhar qual dos dois
-                    # está "certo".
-                    if (s.eh_constante and s.tipo == "inteiro" and dims_n == 0
-                            and valor_existente is not None):
-                        valor_deste_ramo = self._resolver_constante(s.inicial, destino)
-                        if valor_deste_ramo != valor_existente:
-                            destino[s.nome] = (tipo_existente, dims_existente,
-                                                 eh_constante_existente, None)
-                else:
-                    # Mesmo raciocínio de _registar_decl -- guarda o valor
-                    # resolvido, se for uma 'constante' inteira escalar,
-                    # para uma constante declarada DENTRO de 'inicio'
-                    # também ficar resolúvel a partir de dentro de uma
-                    # função.
-                    valor_resolvido = None
-                    if s.eh_constante and s.tipo == "inteiro" and dims_n == 0:
-                        valor_resolvido = self._resolver_constante(s.inicial, destino)
-                    destino[s.nome] = (s.tipo, dims_n, s.eh_constante, valor_resolvido)
-            for bloco in A.subblocos(s):
-                self._pre_registar_recursivo(bloco, destino, globais_previas)
 
     # ---------- funções ----------
     def _verificar_funcao(self, f: A.FuncaoDef):
@@ -404,35 +369,35 @@ class VerificadorTipos:
         if not f.eh_procedimento and not self._todos_caminhos_devolvem(f.corpo):
             raise ErroSemantico(
                 f"a função '{f.nome}' declara devolver '{f.tipo_retorno}' mas nem "
-                f"todos os caminhos terminam com 'devolver' (ex.: falta um 'senao', "
+                f"todos os caminhos terminam com 'retornar' (ex.: falta um 'senao', "
                 f"ou um 'escolher' sem 'contrario') -- um caminho que chegue ao fim "
-                f"sem devolver nada crasha em runtime", f.linha)
+                f"sem retornar nada crasha em runtime", f.linha)
 
     def _todos_caminhos_devolvem(self, stmts):
         """Verificação CONSERVADORA de que todos os caminhos de execução
-        do bloco terminam num 'devolver'. Percorre as instruções em
-        ordem; basta UMA garantir sempre 'devolver' para o bloco inteiro
+        do bloco terminam num 'retornar'. Percorre as instruções em
+        ordem; basta UMA garantir sempre 'retornar' para o bloco inteiro
         garantir (tudo o que vier a seguir é código morto, já assinalado
         à parte pelo linter) -- por isso não olha só para a última
         instrução. Um 'se'
-        conta só se tiver 'senao' e TODOS os ramos garantirem devolver
+        conta só se tiver 'senao' e TODOS os ramos garantirem retornar
         (mesma regra para 'escolher'/'contrario'). Um 'faz...enquanto'
         conta se o corpo garantir (executa sempre pelo menos uma vez,
         antes de a condição sequer ser vista); um 'enquanto' só conta com
         condição literalmente 'verdadeiro'. É deliberadamente
         conservadora: pode recusar um programa correto num caso extremo
         não coberto aqui, mas nunca aceita um que tenha de facto um
-        caminho sem 'devolver'.
+        caminho sem 'retornar'.
 
         Um 'sair'/'continuar' NÃO É uma continuação sequencial normal: é
         um salto que pode abandonar o resto do corpo do ciclo sem nunca
-        alcançar um 'devolver' irmão mais à frente na mesma lista. Por
+        alcançar um 'retornar' irmão mais à frente na mesma lista. Por
         isso os dois ramos de ciclo abaixo só confiam na leitura
         sequencial do corpo quando não há nenhum 'sair'/'continuar'
         alcançável nele (ver _tem_sair_ou_continuar_alcancavel) -- sem
         isso, é conservadoramente tratado como não-garantido."""
         for s in stmts:
-            if isinstance(s, A.Devolver):
+            if isinstance(s, A.Retornar):
                 return True
             if isinstance(s, A.Se) and s.senao is not None:
                 if (all(self._todos_caminhos_devolvem(corpo) for _cond, corpo in s.ramos)
@@ -521,6 +486,11 @@ class VerificadorTipos:
                 f"'{nome}' colide com o nome interno gerado para "
                 f"'{self.nomes_internos_bibliotecas[nome]}' (biblioteca "
                 f"importada); escolhe outro nome para {o_que_e}", linha)
+        if nome in self.nomes_internos_aliases:
+            raise ErroSemantico(
+                f"'{nome}' colide com o nome interno gerado para "
+                f"'{self.nomes_internos_aliases[nome]}' (função incluída "
+                f"com alias); escolhe outro nome para {o_que_e}", linha)
         if nome in PRIMITIVOS:
             raise ErroSemantico(
                 f"'{nome}' é o nome de um tipo primitivo; escolhe outro nome "
@@ -532,7 +502,7 @@ class VerificadorTipos:
         função chamada lê. '_verificar_funcao' verifica esse corpo, mas
         contra 'self.globais' (o conjunto COMPLETO, final, independente
         da ordem de declaração), por isso uma referência antecipada
-        escondida dentro do corpo (ex.: 'funcao pegaB() devolver b'
+        escondida dentro do corpo (ex.: 'funcao pegaB() retornar b'
         chamada antes de 'b' existir) precisa desta verificação separada.
 
         Devolve o conjunto de nomes que SÃO globais do programa (não
@@ -625,7 +595,7 @@ class VerificadorTipos:
                 dims_inicial = self._dims_retorno_de_chamada(d.inicial)
                 if dims_inicial != dims_n:
                     # Mesmo gate "dimensões antes de tipo" usado em
-                    # _verificar_chamada/'devolver' -- sem ele um vetor
+                    # _verificar_chamada/'retornar' -- sem ele um vetor
                     # podia inicializar em silêncio uma variável escalar
                     # (ou vice-versa), partilhando o mesmo 'tipo' ignorando
                     # dims.
@@ -765,11 +735,18 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"a estrutura '{tipo_esperado}' não tem nenhum campo '{nome_campo}'. "
                     f"Campos disponíveis: {disponiveis}", lit.linha)
-            tipo_campo, dims_campo = campos_da_estrutura[nome_campo]
+            tipo_campo, dims_campo, dims_campo_exprs = campos_da_estrutura[nome_campo]
+            if isinstance(expr, A.VetorLiteral):
+                if dims_campo == 0:
+                    raise ErroSemantico(
+                        f"o campo '{nome_campo}' não é um vetor; não pode ser "
+                        f"inicializado com '{{...}}'", lit.linha)
+                self._verificar_vetor_literal(expr, tipo_campo, dims_campo_exprs, escopo)
+                continue
             if dims_campo > 0:
                 raise ErroSemantico(
-                    f"o campo '{nome_campo}' é um vetor; não pode ser inicializado "
-                    f"diretamente num literal de estrutura", lit.linha)
+                    f"o campo '{nome_campo}' é um vetor; inicializa-o com "
+                    f"'{{valor, valor, ...}}'", lit.linha)
             if isinstance(expr, A.EstruturaLiteral):
                 # Um literal '{...}' aninhado dentro doutro literal de
                 # estrutura -- o tipo esperado (tipo_campo) já é conhecido
@@ -1079,10 +1056,23 @@ class VerificadorTipos:
                 # _propagar_declaracoes_comuns.
                 self._propagar_declaracoes_comuns(escopo, escopos_ramos)
 
-        elif isinstance(s, A.Devolver):
-            if ctx_funcao is None or ctx_funcao.eh_procedimento:
+        elif isinstance(s, A.Retornar):
+            if ctx_funcao is None:
                 raise ErroSemantico(
-                    "'devolver' só pode ser usado dentro de uma função", s.linha)
+                    "'retornar' só pode ser usado dentro de uma função ou de um "
+                    "procedimento", s.linha)
+            if ctx_funcao.eh_procedimento:
+                if s.expr is not None:
+                    raise ErroSemantico(
+                        f"o procedimento '{ctx_funcao.nome}' não devolve valor "
+                        f"nenhum -- 'retornar' aqui serve só para sair mais cedo, "
+                        f"sem expressão a seguir", s.linha)
+                return
+            if s.expr is None:
+                raise ErroSemantico(
+                    f"a função '{ctx_funcao.nome}' tem de retornar um valor do "
+                    f"tipo '{ctx_funcao.tipo_retorno}' -- 'retornar' sem "
+                    f"expressão só é válido dentro de um procedimento", s.linha)
             if isinstance(s.expr, A.VetorLiteral):
                 self._verificar_vetor_literal(
                     s.expr, ctx_funcao.tipo_retorno, [None] * ctx_funcao.dims_retorno, escopo)
@@ -1102,19 +1092,19 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"a função '{ctx_funcao.nome}' devolve "
                     f"{self._descricao_dims(ctx_funcao.dims_retorno)} mas está a "
-                    f"devolver {self._descricao_dims(dims)}", s.linha)
+                    f"retornar {self._descricao_dims(dims)}", s.linha)
             if ctx_funcao.dims_retorno > 0:
                 if tipo != ctx_funcao.tipo_retorno:
                     raise ErroSemantico(
                         f"a função '{ctx_funcao.nome}' devolve um vetor de "
-                        f"'{ctx_funcao.tipo_retorno}' mas está a devolver um vetor de "
+                        f"'{ctx_funcao.tipo_retorno}' mas está a retornar um vetor de "
                         f"'{tipo}' -- vetores não são alargados/estreitados "
                         f"automaticamente, o tipo do elemento tem de ser exatamente "
                         f"igual", s.linha)
             elif not self._compativel(ctx_funcao.tipo_retorno, tipo):
                 raise ErroSemantico(
                     f"a função '{ctx_funcao.nome}' devolve '{ctx_funcao.tipo_retorno}' "
-                    f"mas está a devolver um valor do tipo '{tipo}'", s.linha)
+                    f"mas está a retornar um valor do tipo '{tipo}'", s.linha)
 
         elif isinstance(s, A.ChamadaStmt):
             self._verificar_chamada(s.chamada, escopo)
@@ -1185,7 +1175,7 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"a estrutura '{tipo}' não tem nenhum campo '{valor}'. "
                         f"Campos disponíveis: {disponiveis}", lv.linha)
-                tipo, dims = campos[valor]
+                tipo, dims, _ = campos[valor]
                 caminho = f"{caminho}.{valor}"
         return tipo, dims
 
@@ -1198,7 +1188,7 @@ class VerificadorTipos:
 
         'permitir_vetor' (por omissão False) controla se um vetor "nu" (não
         indexado) é aceite como valor -- só os dois sítios legítimos disso
-        (argumento de chamada, expressão de 'devolver') passam True; todos
+        (argumento de chamada, expressão de 'retornar') passam True; todos
         os outros contextos (aritmética, condições, escrever(), etc.)
         continuam a rejeitar um vetor nu com o erro de sempre."""
         if isinstance(expr, A.Literal):
@@ -1396,6 +1386,15 @@ class VerificadorTipos:
     def _verificar_chamada(self, chamada: A.Chamada, escopo):
         if "." in chamada.nome:
             biblioteca, metodo = chamada.nome.split(".", 1)
+            if biblioteca in self.aliases_inclusao:
+                mapa = self.aliases_inclusao[biblioteca]
+                if metodo not in mapa:
+                    disponiveis = ", ".join(sorted(mapa))
+                    raise ErroSemantico(
+                        f"'{biblioteca}' (inclusão) não tem nenhuma função '{metodo}'. "
+                        f"Disponíveis: {disponiveis}", chamada.linha)
+                f_def = self.funcoes[mapa[metodo]]
+                return self._verificar_chamada_funcao_definida(f_def, chamada, escopo)
             if biblioteca not in self.bibliotecas_importadas:
                 # 'p.campo(args)' (campo de estrutura chamado como se fosse
                 # método) é sintaticamente indistinguível de uma chamada de
@@ -1459,6 +1458,14 @@ class VerificadorTipos:
         if f_def is None:
             raise ErroSemantico(
                 f"função ou procedimento '{chamada.nome}' não foi definido", chamada.linha)
+        return self._verificar_chamada_funcao_definida(f_def, chamada, escopo)
+
+    def _verificar_chamada_funcao_definida(self, f_def, chamada: A.Chamada, escopo):
+        """Verifica os argumentos de uma chamada contra a definição 'f_def'
+        já resolvida -- partilhado por uma chamada direta ('funcao(...)')
+        e por uma chamada a uma função incluída com alias
+        ('alias.funcao(...)'), que só diferem em COMO 'f_def' é
+        encontrado (ver '_verificar_chamada')."""
         if len(chamada.args) != len(f_def.parametros):
             raise ErroSemantico(
                 f"'{chamada.nome}' espera {len(f_def.parametros)} argumento(s), "

@@ -39,8 +39,8 @@ CORPUS_VALIDO = [
     'algoritmo "T"\ninicio\n    x:inteiro = 5\n    escrever(x)\n',
     'algoritmo "T"\nestrutura Ponto\n    x:inteiro\n    y:inteiro\ninicio\n'
     '    p:Ponto = {x: 1, y: 2}\n    escrever(p.x)\n',
-    'algoritmo "T"\nfuncao f(n:inteiro):inteiro\n    se n <= 1 entao\n        devolver 1\n'
-    '    devolver n * f(n - 1)\ninicio\n    escrever(f(5))\n',
+    'algoritmo "T"\nfuncao f(n:inteiro):inteiro\n    se n <= 1 entao\n        retornar 1\n'
+    '    retornar n * f(n - 1)\ninicio\n    escrever(f(5))\n',
     'algoritmo "T"\ninicio\n    v:inteiro[3] = {1,2,3}\n    i:inteiro\n'
     '    para i de 0 ate 2 fazer\n        escrever(v[i])\n',
     'algoritmo "T"\nimportar Matematica\ninicio\n    escrever(matematica.raiz(4.0))\n',

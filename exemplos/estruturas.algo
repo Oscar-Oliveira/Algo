@@ -10,7 +10,7 @@ estrutura Retangulo
     altura:inteiro
 
 funcao area(r:Retangulo):inteiro
-    devolver r.largura * r.altura
+    retornar r.largura * r.altura
 
 procedimento deslocar(ref p:Ponto, dx:inteiro, dy:inteiro)
     p.x = p.x + dx

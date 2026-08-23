@@ -58,9 +58,9 @@ def test_trace_recursividade_mostra_pilha_a_crescer(tmp_path):
         algoritmo "T"
         funcao fatorial(n:inteiro):inteiro
             se n <= 1 entao
-                devolver 1
+                retornar 1
             senao
-                devolver n * fatorial(n - 1)
+                retornar n * fatorial(n - 1)
         inicio
             escrever(fatorial(4))
     """, tmp_path=tmp_path)
@@ -333,7 +333,7 @@ def test_debug_mostra_globais_e_locais_dentro_de_funcao(tmp_path):
             k:inteiro = 0
             para k de a ate b fazer
                 resultado = resultado + k
-            devolver resultado
+            retornar resultado
         inicio
             total = soma(1, 3)
             escrever(total)
@@ -403,9 +403,9 @@ def test_pilha_incremental_mostra_valores_distintos_de_cada_nivel_da_recursao(tm
         algoritmo "T"
         funcao contar(n:inteiro):inteiro
             se n <= 0 entao
-                devolver 0
+                retornar 0
             senao
-                devolver 1 + contar(n - 1)
+                retornar 1 + contar(n - 1)
         inicio
             escrever(contar(4))
     """, tmp_path=tmp_path)
@@ -429,9 +429,9 @@ def test_recursao_moderadamente_profunda_gera_trace_rapidamente(tmp_path):
         algoritmo "T"
         funcao contar(n:inteiro):inteiro
             se n <= 0 entao
-                devolver 0
+                retornar 0
             senao
-                devolver 1 + contar(n - 1)
+                retornar 1 + contar(n - 1)
         inicio
             escrever(contar(1990))
     """, tmp_path=tmp_path)

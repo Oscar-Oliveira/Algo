@@ -99,9 +99,15 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
 
         try:
             mesclar_biblioteca_no_programa(
-                programa, inc.caminho, declaracoes, funcoes, estruturas
+                programa, inc.caminho, declaracoes, funcoes, estruturas, alias=inc.como
             )
         except ColisaoDeInclusao as e:
+            if e.tipo == "alias":
+                print(
+                    f"❌ Erro: o alias '{e.nome}' (usado em '{e.caminho_origem}') já está a "
+                    f"ser usado por outra inclusão -- escolhe um alias diferente"
+                )
+                sys.exit(1)
             if e.tipo_existente == e.tipo:
                 if e.tipo == "função":
                     print(
@@ -302,10 +308,16 @@ def cmd_executa_com_trace(args):
     if resultado["erro"]:
         print(f"❌ {resultado['erro']['mensagem']}")
     if resultado["limiteExcedido"]:
-        print(
-            "⚠ Limite de passos do trace atingido (possível ciclo infinito) — "
-            "o programa foi interrompido só para efeitos do trace."
-        )
+        if resultado.get("limiteTipo") == "tempo":
+            print(
+                "⚠ Limite de tempo do trace atingido (execução demasiado longa) — "
+                "o programa foi interrompido só para efeitos do trace."
+            )
+        else:
+            print(
+                "⚠ Limite de passos do trace atingido (possível ciclo infinito) — "
+                "o programa foi interrompido só para efeitos do trace."
+            )
 
     if args.json:
         # Reaproveita _ler_ficheiro_algo em vez de reabrir o ficheiro à
@@ -318,6 +330,7 @@ def cmd_executa_com_trace(args):
             "passos": resultado["passos"],
             "erro": resultado["erro"],
             "limiteExcedido": resultado["limiteExcedido"],
+            "limiteTipo": resultado.get("limiteTipo"),
         }
         caminho_json = os.path.join(pasta, nome_base + "_trace.json")
         with open(caminho_json, "w", encoding="utf-8") as f:

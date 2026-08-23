@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """O que o Alguem sabe sobre a sintaxe do ALGO, para as suas pistas e
 exemplos (nível 5, pseudocódigo parcial) usarem sempre a sintaxe
-verdadeira -- 'devolver', não 'retorna'; 'fazer', não 'faz'; arrays a
+verdadeira -- 'retornar', não 'retorna'; 'fazer', não 'faz'; arrays a
 começar em 0; etc.
 
 A lista de palavras-chave vem diretamente de algo_lang.compilador.lexer
@@ -36,7 +36,7 @@ except Exception:  # pragma: no cover -- testado por subprocesso isolado (test_c
     _PALAVRAS_CHAVE = sorted([
         "algoritmo", "inicio", "estrutura", "escrever", "ler", "se", "entao",
         "senao", "para", "de", "ate", "passo", "fazer", "enquanto", "escolher",
-        "caso", "contrario", "funcao", "procedimento", "devolver", "ref",
+        "caso", "contrario", "funcao", "procedimento", "retornar", "ref",
         "importar", "incluir", "verdadeiro", "falso", "e", "ou", "nao", "div",
         "mod", "constante", "afirmar",
     ])
@@ -54,7 +54,7 @@ sintaxe de outra linguagem, como Python ou pseudocódigo genérico):
 inicial opcional: `total:inteiro = 0`.
 - Tipos primitivos: {tipos}.
 - Verbos das palavras-chave de ação estão sempre no INFINITIVO: \
-`escrever`, `ler`, `devolver`, `fazer`, `escolher`, `importar`, \
+`escrever`, `ler`, `retornar`, `fazer`, `escolher`, `importar`, \
 `incluir`, `afirmar` -- nunca "escreve", "retorna", "faz" isolado, \
 "escolha".
 - Decisão: `se condicao entao` / `senao se condicao entao` / `senao`, \
@@ -68,8 +68,9 @@ como qualquer outra variável.
 - Ciclo com teste no fim: `fazer` ... `enquanto condicao` (executa \
 sempre pelo menos uma vez).
 - Funções: `funcao nome(param:tipo):tipo_de_retorno`, terminam sempre \
-com `devolver valor`. Procedimentos: `procedimento nome(param:tipo)`, \
-não devolvem valor.
+com `retornar valor`. Procedimentos: `procedimento nome(param:tipo)`, \
+não devolvem valor -- podem usar `retornar` sozinho (sem valor) para \
+sair mais cedo.
 - Parâmetros por referência: `ref nome:tipo` (só faz sentido em \
 funções/procedimentos).
 - Arrays começam em 0: `v:inteiro[5]`, primeiro elemento é `v[0]`.

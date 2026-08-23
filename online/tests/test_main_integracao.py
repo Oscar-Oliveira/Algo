@@ -863,7 +863,7 @@ def test_projeto_download_e_upload_fazem_ida_e_volta(cliente):
 def test_ws_executar_com_incluir(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(21))\n'
-    biblioteca = "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     with cliente.websocket_connect("/ws/executar") as ws:
         ws.send_json({
             "ficheiros": [
@@ -930,7 +930,7 @@ def test_fluxograma_com_incluir(cliente):
     r = cliente.post("/api/fluxograma", json={
         "ficheiros": [
             {"nome": "principal.algo", "conteudo": 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'},
-            {"nome": "lib.algo", "conteudo": "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"},
+            {"nome": "lib.algo", "conteudo": "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"},
         ],
         "principal": "principal.algo",
     })
@@ -943,7 +943,7 @@ def test_fluxograma_lista_rotinas_e_permite_escolher_uma_de_biblioteca(cliente):
     corpo_pedido = {
         "ficheiros": [
             {"nome": "principal.algo", "conteudo": 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'},
-            {"nome": "lib.algo", "conteudo": "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"},
+            {"nome": "lib.algo", "conteudo": "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"},
         ],
         "principal": "principal.algo",
     }

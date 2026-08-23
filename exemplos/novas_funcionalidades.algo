@@ -9,7 +9,7 @@ algoritmo "NovasFuncionalidades"
 constante IVA:decimal = 1.23
 
 funcao precoComIva(preco:decimal):decimal
-    devolver preco * IVA
+    retornar preco * IVA
 
 inicio
     precos:decimal[3] = {10.0, 25.5, 100.0}   // sem IVA

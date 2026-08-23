@@ -157,7 +157,7 @@ inicio
               <tr>
                 <td>Funções e procedimentos</td>
                 <td><code>funcao</code>, <code>procedimento</code>,
-                  <code>devolver</code>, <code>ref</code>
+                  <code>retornar</code>, <code>ref</code>
                 </td>
               </tr>
               <tr>
@@ -202,7 +202,7 @@ estrutura Ponto
     y:inteiro
 
 funcao dobro(x:inteiro):inteiro
-    devolver x * 2
+    retornar x * 2
 
 inicio
     y:inteiro = dobro(5)     // variáveis locais: declara-se onde for preciso
@@ -334,7 +334,7 @@ inicio
           <pre><code>constante IVA:decimal = 1.23
 
 funcao precoComIva(preco:decimal):decimal
-    devolver preco * IVA</code></pre>
+    retornar preco * IVA</code></pre>
 
           <h2 id="6-operadores">6. Operadores</h2>
           <table>
@@ -479,8 +479,9 @@ inicio
 p2:Ponto = {x: 10}          // y fica 0</code></pre>
 
           <h2 id="12-funcoes-e-procedimentos">12. Funções e procedimentos</h2>
-          <p>Uma função devolve um valor (com <code>devolver</code>); um procedimento não devolve nada,
-            serve para executar uma ação. Os parâmetros usam sempre a forma <code>nome:tipo</code>, e
+          <p>Uma função devolve um valor (com <code>retornar</code>); um procedimento não devolve nada,
+            serve para executar uma ação — pode usar <code>retornar</code> sozinho, sem expressão, para
+            sair mais cedo. Os parâmetros usam sempre a forma <code>nome:tipo</code>, e
             podem ser passados por valor (por omissão — o parâmetro recebe uma cópia) ou por referência
             (<code>ref</code> — o parâmetro partilha a variável do chamador, e alterações dentro da
             função são visíveis fora dela). <code>ref</code> pode ser usado tanto em funções como em
@@ -492,7 +493,7 @@ p2:Ponto = {x: 10}          // y fica 0</code></pre>
 
 funcao incrementar(ref x:inteiro):inteiro
     x = x + 1
-    devolver x
+    retornar x
 
 inicio
     p:inteiro = 3
@@ -507,9 +508,9 @@ inicio
           <h3>12.1 Recursividade</h3>
           <pre><code>funcao fibonacci(n:inteiro):inteiro
     se n &lt;= 1 entao
-        devolver n
+        retornar n
     senao
-        devolver fibonacci(n - 1) + fibonacci(n - 2)</code></pre>
+        retornar fibonacci(n - 1) + fibonacci(n - 2)</code></pre>
           <p>Uma função pode chamar-se a si própria. Não há limite explícito na linguagem, mas a
             recursão infinita é sempre um erro de lógica do programa.</p>
 
@@ -650,7 +651,7 @@ inicio
           <pre><code>// geometria.algo
 funcao areaCirculo(raio:decimal):decimal
     pi:decimal = 3.14159
-    devolver pi * raio * raio</code></pre>
+    retornar pi * raio * raio</code></pre>
           <pre><code>// principal.algo
 algoritmo "Principal"
 incluir "geometria.algo"
@@ -670,7 +671,7 @@ inicio
             mensagem. É a forma que a linguagem dá para um programa se autovalidar, sem precisar de um
             enquadramento de testes à parte:</p>
           <pre><code>funcao dobro(x:inteiro):inteiro
-    devolver x * 2
+    retornar x * 2
 
 inicio
     afirmar dobro(5) == 10, "dobro(5) devia ser 10"
@@ -768,7 +769,7 @@ inicio
               </tr>
               <tr>
                 <td>Função</td>
-                <td><code>funcao nome(p:tipo, ...):tipo ... devolver expr</code></td>
+                <td><code>funcao nome(p:tipo, ...):tipo ... retornar expr</code></td>
               </tr>
               <tr>
                 <td>Procedimento</td>
@@ -799,7 +800,7 @@ inicio
 
           <h2 id="anexo-b">Anexo B — Palavras reservadas</h2>
           <p><code>algoritmo, inicio, estrutura, escrever, ler, se, entao, senao, para, de, ate, passo,
-            fazer, enquanto, escolher, caso, contrario, funcao, procedimento, devolver, ref, importar,
+            fazer, enquanto, escolher, caso, contrario, funcao, procedimento, retornar, ref, importar,
             incluir, constante, afirmar, verdadeiro, falso, e, ou, nao, div, mod</code>.</p>
           <p class="nota">Nota: Os tipos primitivos (<code>inteiro</code>, <code>decimal</code>,
             <code>booleano</code>, <code>cadeia</code>, <code>caracter</code>) não estão nesta lista de

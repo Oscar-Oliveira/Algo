@@ -8,7 +8,7 @@ no ensino superior.
 
 ### Porquê infinitivo, não imperativo, nas palavras-chave de ação
 
-As 8 palavras-chave que são verbos (`escrever`, `ler`, `devolver`,
+As 8 palavras-chave que são verbos (`escrever`, `ler`, `retornar`,
 `fazer`, `escolher`, `importar`, `incluir`, `afirmar`) estão todas no
 **infinitivo**, deliberadamente — não em imperativo (`escreve`, `lê`,
 `devolve`...). Já foi questionado se o imperativo não seria mais
@@ -215,7 +215,7 @@ incluir "outroficheiro.algo"
 total:inteiro = 0            // variável global (visível em todas as funções)
 
 funcao dobro(x:inteiro):inteiro
-    devolver x * 2
+    retornar x * 2
 
 inicio
     y:inteiro = dobro(5)     // variáveis locais: declara-se onde precisares
@@ -223,10 +223,11 @@ inicio
 ```
 
 Não existe uma zona fixa de "variáveis". Declaras uma variável onde
-precisares dela, com `nome:tipo`. **Só as variáveis declaradas fora de
-qualquer `funcao`/`procedimento`** (diretamente no programa principal —
-antes ou dentro do `inicio`) são globais e ficam visíveis dentro das
-funções; tudo o resto é local a cada função.
+precisares dela, com `nome:tipo`. **Só as variáveis declaradas ANTES de
+`inicio`** (diretamente no programa principal, como `total` acima) são
+globais e ficam visíveis dentro das funções; qualquer variável declarada
+DENTRO de `inicio` (como `y` acima) é local ao programa principal —
+tudo o resto é local a cada função.
 
 Os blocos são delimitados por **indentação** — usa sempre espaços, não
 tabs.
@@ -278,7 +279,7 @@ função) ou local a uma função:
 constante IVA:decimal = 1.23
 
 funcao precoComIva(preco:decimal):decimal
-    devolver preco * IVA
+    retornar preco * IVA
 ```
 
 ## Operadores
@@ -371,7 +372,7 @@ enquanto ativo fazer
 ```
 
 `algo verifica` avisa se a bandeira nunca chega a ser alterada dentro
-do corpo do ciclo, nem há nenhum `sair`/`devolver` alcançável --
+do corpo do ciclo, nem há nenhum `sair`/`retornar` alcançável --
 normalmente sinal de que falta o `ativo = falso` (ou equivalente)
 nalgum ramo.
 
@@ -389,7 +390,8 @@ escolher diaSemana
 
 ## Funções e procedimentos
 
-Uma função devolve valor (`devolver`); um procedimento não. Parâmetros
+Uma função devolve valor (`retornar`); um procedimento não, mas pode usar
+`retornar` sozinho, sem expressão, para sair mais cedo. Parâmetros
 usam sempre `nome:tipo`, e podem ser passados por **valor** (por omissão)
 ou por **referência** (`ref`) — em qualquer um dos dois, função ou
 procedimento:
@@ -402,7 +404,7 @@ procedimento trocar(ref a:inteiro, ref b:inteiro)
 
 funcao incrementar(ref x:inteiro):inteiro
     x = x + 1
-    devolver x
+    retornar x
 
 inicio
     p:inteiro = 3
@@ -420,11 +422,12 @@ atualizar as variáveis originais.
 ### Âmbito (escopo)
 
 Uma variável declarada dentro de uma função/procedimento é local a essa
-função. Uma variável declarada fora de qualquer função (no programa
-principal) é global — visível e alterável a partir de qualquer função. Um
-parâmetro ou uma declaração local pode ter o mesmo nome de uma variável
-global: nesse caso, dentro dessa função, o nome refere-se sempre à
-variável local (sombra a global).
+função. Uma variável declarada ANTES de `inicio` é global — visível e
+alterável a partir de qualquer função. Uma variável declarada DENTRO de
+`inicio` é local ao programa principal — não é visível dentro de
+nenhuma função. Um parâmetro ou uma declaração local pode ter o mesmo
+nome de uma variável global: nesse caso, dentro dessa função, o nome
+refere-se sempre à variável local (sombra a global).
 
 ## Bibliotecas
 
@@ -501,15 +504,15 @@ configuração.
 ### Incluir os teus próprios ficheiros
 
 `incluir "caminho/para/ficheiro.algo"` junta as funções e procedimentos
-(e variáveis globais) desse ficheiro ao teu programa, sem namespace — o
-ficheiro incluído contém apenas declarações e `funcao`/`procedimento`,
-sem `algoritmo` nem `inicio`:
+(e variáveis globais) desse ficheiro ao teu programa, sem namespace por
+omissão — o ficheiro incluído contém apenas declarações e
+`funcao`/`procedimento`, sem `algoritmo` nem `inicio`:
 
 ```
 // geometria.algo
 funcao areaCirculo(raio:decimal):decimal
     pi:decimal = 3.14159
-    devolver pi * raio * raio
+    retornar pi * raio * raio
 ```
 
 ```
@@ -519,6 +522,25 @@ incluir "geometria.algo"
 
 inicio
     escrever(areaCirculo(3.0))
+```
+
+Sem namespace, uma função incluída que colida com um nome já existente
+(no programa principal ou noutro ficheiro incluído) é erro fatal de
+compilação. `incluir "caminho/para/ficheiro.algo" como <alias>` evita
+isso: as **funções** desse ficheiro passam a chamar-se
+`alias.funcao(...)`, tal como as bibliotecas embutidas
+(`matematica.raiz(...)`) — estruturas e variáveis globais continuam a
+fundir-se sem namespace mesmo com `como`. Recomendado a partir do
+segundo `incluir` sem alias no mesmo programa (o linter avisa nesse
+caso):
+
+```
+// principal.algo
+algoritmo "Principal"
+incluir "geometria.algo" como geometria
+
+inicio
+    escrever(geometria.areaCirculo(3.0))
 ```
 
 ## Comentários
@@ -540,7 +562,7 @@ parte:
 
 ```
 funcao dobro(x:inteiro):inteiro
-    devolver x * 2
+    retornar x * 2
 
 inicio
     afirmar dobro(5) == 10, "dobro(5) devia ser 10"
@@ -584,7 +606,7 @@ estrutura Retangulo
     altura:inteiro
 
 funcao area(r:Retangulo):inteiro
-    devolver r.largura * r.altura
+    retornar r.largura * r.altura
 
 procedimento deslocar(ref p:Ponto, dx:inteiro, dy:inteiro)
     p.x = p.x + dx
@@ -710,7 +732,7 @@ com o número da linha:
 ```
 
 Também deteta: condições não booleanas, limites de `para` não inteiros,
-chamadas com argumentos errados, funções sem `devolver`, índices de
+chamadas com argumentos errados, funções sem `retornar`, índices de
 vetor não inteiros, bibliotecas não importadas, e variáveis não
 declaradas.
 

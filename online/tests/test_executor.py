@@ -56,7 +56,7 @@ def test_compilar_codigo_recursion_error_vira_erro_compilacao_amigavel(tmp_path,
     RecursionError de qualquer OUTRA travessia recursiva (presente ou
     futura) que o escape, confirmando que vira um ErroCompilacao
     amigável em vez de propagar cru até ao handler genérico do
-    FastAPI (que devolveria um 500 opaco)."""
+    FastAPI (que retornaria um 500 opaco)."""
     def _verificar_que_rebenta(programa):
         raise RecursionError("simulado")
     monkeypatch.setattr(executor, "verificar", _verificar_que_rebenta)
@@ -102,7 +102,7 @@ def test_nome_de_ficheiro_com_separador_e_rejeitado(tmp_path):
 
 def test_incluir_resolve_funcao_de_outro_ficheiro(tmp_path):
     principal = 'algoritmo "T"\nincluir "biblioteca.algo"\ninicio\n    escrever(dobro(21))\n'
-    biblioteca = "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     caminho_py = executor.compilar_codigo(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "biblioteca.algo", "conteudo": biblioteca}],
@@ -116,8 +116,8 @@ def test_incluir_resolve_funcao_de_outro_ficheiro(tmp_path):
 
 def test_incluir_transitivo_biblioteca_que_inclui_outra(tmp_path):
     principal = 'algoritmo "T"\nincluir "meio.algo"\ninicio\n    escrever(dobro(triplo(5)))\n'
-    meio = 'incluir "fundo.algo"\nfuncao dobro(n:inteiro):inteiro\n    devolver n * 2\n'
-    fundo = "funcao triplo(n:inteiro):inteiro\n    devolver n * 3\n"
+    meio = 'incluir "fundo.algo"\nfuncao dobro(n:inteiro):inteiro\n    retornar n * 2\n'
+    fundo = "funcao triplo(n:inteiro):inteiro\n    retornar n * 3\n"
     caminho_py = executor.compilar_codigo(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "meio.algo", "conteudo": meio},
@@ -131,8 +131,8 @@ def test_incluir_transitivo_biblioteca_que_inclui_outra(tmp_path):
 
 def test_incluir_transitivo_circular_nao_entra_em_ciclo_infinito(tmp_path):
     principal = 'algoritmo "T"\nincluir "a.algo"\ninicio\n    escrever(fA() + fB())\n'
-    a = 'incluir "b.algo"\nfuncao fA():inteiro\n    devolver 1\n'
-    b = 'incluir "a.algo"\nfuncao fB():inteiro\n    devolver 2\n'
+    a = 'incluir "b.algo"\nfuncao fA():inteiro\n    retornar 1\n'
+    b = 'incluir "a.algo"\nfuncao fB():inteiro\n    retornar 2\n'
     caminho_py = executor.compilar_codigo(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "a.algo", "conteudo": a},
@@ -157,7 +157,7 @@ def test_incluir_caminho_absoluto_fora_da_pasta_e_rejeitado(tmp_path):
     sistema mas fora de tmp_path, para confirmar que não é a simples
     inexistência do ficheiro que está a ser apanhada."""
     alvo = tmp_path.parent / "segredo.algo"
-    alvo.write_text("funcao f():inteiro\n    devolver 1\n", encoding="utf-8")
+    alvo.write_text("funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
     principal = f'algoritmo "T"\nincluir "{alvo.as_posix()}"\ninicio\n    escrever(f())\n'
     with pytest.raises(executor.ErroCompilacao, match="não encontrado"):
         executor.compilar_codigo(
@@ -168,7 +168,7 @@ def test_incluir_travessia_de_caminho_fora_da_pasta_e_rejeitado(tmp_path):
     """ON-02: '../' não pode escapar da pasta do estudante para ler um
     ficheiro irmão de outra pasta."""
     alvo = tmp_path.parent / "outra_pasta_segredo.algo"
-    alvo.write_text("funcao f():inteiro\n    devolver 1\n", encoding="utf-8")
+    alvo.write_text("funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
     principal = f'algoritmo "T"\nincluir "../{alvo.name}"\ninicio\n    escrever(f())\n'
     with pytest.raises(executor.ErroCompilacao, match="não encontrado"):
         executor.compilar_codigo(
@@ -178,10 +178,10 @@ def test_incluir_travessia_de_caminho_fora_da_pasta_e_rejeitado(tmp_path):
 def test_incluir_colisao_de_funcao_da_erro_claro(tmp_path):
     principal = (
         'algoritmo "T"\nincluir "b.algo"\n'
-        "funcao f():inteiro\n    devolver 1\n"
+        "funcao f():inteiro\n    retornar 1\n"
         "inicio\n    escrever(f())\n"
     )
-    biblioteca = "funcao f():inteiro\n    devolver 2\n"
+    biblioteca = "funcao f():inteiro\n    retornar 2\n"
     with pytest.raises(executor.ErroCompilacao, match="colide"):
         executor.compilar_codigo(
             [{"nome": "principal.algo", "conteudo": principal},
@@ -203,10 +203,55 @@ def test_incluir_colisao_de_estrutura_da_erro_claro(tmp_path):
             "principal.algo", str(tmp_path))
 
 
+# ---------- 'incluir ... como <alias>' -- namespace opcional ----------
+
+def test_incluir_com_alias_gera_funcao_com_nome_mangled(tmp_path):
+    principal = (
+        'algoritmo "T"\nincluir "geometria.algo" como geometria\n'
+        "inicio\n    escrever(geometria.dobro(21))\n"
+    )
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
+    caminho_py = executor.compilar_codigo(
+        [{"nome": "principal.algo", "conteudo": principal},
+         {"nome": "geometria.algo", "conteudo": biblioteca}],
+        "principal.algo", str(tmp_path))
+    with open(caminho_py, encoding="utf-8") as f:
+        conteudo = f.read()
+    assert "def geometria_dobro(n):" in conteudo
+
+
+def test_incluir_alias_reutilizado_para_ficheiro_diferente_da_erro_claro(tmp_path):
+    principal = (
+        'algoritmo "T"\nincluir "a.algo" como m\nincluir "b.algo" como m\n'
+        "inicio\n    escrever(1)\n"
+    )
+    a = "funcao fA():inteiro\n    retornar 1\n"
+    b = "funcao fB():inteiro\n    retornar 2\n"
+    with pytest.raises(executor.ErroCompilacao, match="alias"):
+        executor.compilar_codigo(
+            [{"nome": "principal.algo", "conteudo": principal},
+             {"nome": "a.algo", "conteudo": a},
+             {"nome": "b.algo", "conteudo": b}],
+            "principal.algo", str(tmp_path))
+
+
+def test_incluir_alias_colide_com_biblioteca_importada_da_erro_claro(tmp_path):
+    principal = (
+        'algoritmo "T"\nimportar Matematica\nincluir "lib.algo" como matematica\n'
+        "inicio\n    escrever(1)\n"
+    )
+    biblioteca = "funcao f():inteiro\n    retornar 1\n"
+    with pytest.raises(executor.ErroCompilacao, match="biblioteca"):
+        executor.compilar_codigo(
+            [{"nome": "principal.algo", "conteudo": principal},
+             {"nome": "lib.algo", "conteudo": biblioteca}],
+            "principal.algo", str(tmp_path))
+
+
 def test_execucao_completa_com_incluir(tmp_path):
     async def cenario():
         principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(triplo(4))\n'
-        biblioteca = "funcao triplo(n:inteiro):inteiro\n    devolver n * 3\n"
+        biblioteca = "funcao triplo(n:inteiro):inteiro\n    retornar n * 3\n"
         caminho_py = executor.compilar_codigo(
             [{"nome": "principal.algo", "conteudo": principal},
              {"nome": "lib.algo", "conteudo": biblioteca}],
@@ -535,7 +580,7 @@ inicio
 
 def test_fluxograma_com_incluir(tmp_path):
     principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'
-    biblioteca = "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     resultado = executor.gerar_fluxograma_svg(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "lib.algo", "conteudo": biblioteca}],
@@ -546,10 +591,10 @@ def test_fluxograma_com_incluir(tmp_path):
 def test_fluxograma_lista_todas_as_rotinas_incluindo_de_bibliotecas(tmp_path):
     principal = (
         'algoritmo "T"\nincluir "lib.algo"\n'
-        "funcao local():inteiro\n    devolver 1\n"
+        "funcao local():inteiro\n    retornar 1\n"
         "inicio\n    escrever(local())\n"
     )
-    biblioteca = "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     resultado = executor.gerar_fluxograma_svg(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "lib.algo", "conteudo": biblioteca}],
@@ -559,7 +604,7 @@ def test_fluxograma_lista_todas_as_rotinas_incluindo_de_bibliotecas(tmp_path):
 
 def test_fluxograma_de_uma_rotina_especifica_de_biblioteca_incluida(tmp_path):
     principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'
-    biblioteca = "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     resultado = executor.gerar_fluxograma_svg(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "lib.algo", "conteudo": biblioteca}],
@@ -620,7 +665,7 @@ def test_gerar_rasto_variaveis_aparecem_na_pilha(tmp_path):
 
 def test_gerar_rasto_com_incluir(tmp_path):
     principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(5))\n'
-    biblioteca = "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     rasto = executor.gerar_rasto(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "lib.algo", "conteudo": biblioteca}],
@@ -677,7 +722,7 @@ def test_analisar_linter_recursion_error_vira_erro_compilacao_amigavel(tmp_path,
 
 def test_analisar_linter_com_incluir(tmp_path):
     principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(5))\n'
-    biblioteca = "funcao dobro(n:inteiro):inteiro\n    devolver n * 2\n"
+    biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     avisos = executor.analisar_linter(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "lib.algo", "conteudo": biblioteca}],

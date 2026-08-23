@@ -15,6 +15,10 @@ class Programa(No):
         self.declaracoes = declaracoes       # lista de Declaracao (globais, antes de 'inicio')
         self.funcoes = funcoes               # lista de FuncaoDef
         self.corpo = corpo                   # lista de stmts (bloco 'inicio')
+        # alias (de 'incluir "x.algo" como alias') -> {nome_metodo_original:
+        # nome_mangled} -- populado por inclusoes.mesclar_biblioteca_no_programa,
+        # não pelo parser (fica vazio até as inclusões serem resolvidas).
+        self.aliases_inclusao = {}
 
 
 class EstruturaDef(No):
@@ -31,9 +35,10 @@ class Importar(No):
 
 
 class Incluir(No):
-    def __init__(self, caminho, linha):
+    def __init__(self, caminho, linha, como=None):
         self.caminho = caminho
         self.linha = linha
+        self.como = como   # alias opcional ('incluir "x.algo" como alias'), ou None
 
 
 class Declaracao(No):
@@ -127,8 +132,11 @@ class Escolha(No):
         self.linha = linha
 
 
-class Devolver(No):
+class Retornar(No):
     def __init__(self, expr, linha):
+        # expr é None num 'retornar' sem valor -- só válido dentro de um
+        # procedimento, para sair mais cedo; uma função exige sempre uma
+        # expressão (verificado em semantics.py, não aqui).
         self.expr = expr
         self.linha = linha
 

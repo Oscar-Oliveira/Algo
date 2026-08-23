@@ -18,14 +18,14 @@ from algo_lang.compilador.lexer import PALAVRAS_CHAVE
 from algo_lang.compilador.semantics import NUMERICOS, TEXTUAIS
 
 _PALAVRAS_ACAO = {
-    "escrever", "ler", "devolver", "fazer", "escolher", "importar",
-    "incluir", "afirmar", "para", "de", "ate", "passo", "enquanto",
+    "escrever", "ler", "retornar", "fazer", "escolher", "importar",
+    "incluir", "como", "afirmar", "para", "de", "ate", "passo", "enquanto",
     "se", "entao", "senao", "caso", "contrario", "funcao", "procedimento",
-    "ref", "constante", "estrutura", "algoritmo", "inicio",
+    "ref", "constante", "estrutura", "algoritmo", "inicio", "sair", "continuar",
 }
 _PALAVRAS_LOGICAS = {"e", "ou", "nao", "div", "mod"}
 _TIPOS = sorted(NUMERICOS | TEXTUAIS | {"booleano"})
-_LITERAIS_LOGICOS = {"verdadeiro", "falso"}
+_LITERAIS_LOGICOS = {"verdadeiro", "falso", "nulo"}
 
 _PALAVRAS_NAO_CLASSIFICADAS = PALAVRAS_CHAVE - _PALAVRAS_ACAO - _PALAVRAS_LOGICAS - _LITERAIS_LOGICOS
 # Se o compilador ganhar uma palavra-chave nova que este ficheiro ainda

@@ -51,25 +51,25 @@ def test_recursividade():
         algoritmo "T"
         funcao fatorial(n:inteiro):inteiro
             se n <= 1 entao
-                devolver 1
+                retornar 1
             senao
-                devolver n * fatorial(n - 1)
+                retornar n * fatorial(n - 1)
         inicio
             escrever(fatorial(5))
     """)
     assert saida.strip() == "120"
 
 
-def test_variavel_global_visivel_em_funcao():
-    saida = executar("""
-        algoritmo "T"
-        procedimento mostra()
-            escrever(contador)
-        inicio
-            contador:inteiro = 42
-            mostra()
-    """)
-    assert saida.strip() == "42"
+def test_variavel_declarada_em_inicio_nao_e_visivel_em_funcao():
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
+        compilar("""
+            algoritmo "T"
+            procedimento mostra()
+                escrever(contador)
+            inicio
+                contador:inteiro = 42
+                mostra()
+        """)
 
 
 def test_parametro_sombreia_global():
@@ -77,7 +77,7 @@ def test_parametro_sombreia_global():
         algoritmo "T"
         total:inteiro = 0
         funcao dobro(total:inteiro):inteiro
-            devolver total * 2
+            retornar total * 2
         inicio
             escrever(dobro(5))
     """)
@@ -133,7 +133,7 @@ def test_ref_so_em_procedimento_ja_nao_se_aplica_funciona_em_funcao():
         algoritmo "T"
         funcao incrementa(ref x:inteiro):inteiro
             x = x + 1
-            devolver x
+            retornar x
         inicio
             n:inteiro = 5
             r:inteiro = incrementa(n)

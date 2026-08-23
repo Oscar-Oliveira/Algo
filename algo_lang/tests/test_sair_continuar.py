@@ -120,7 +120,7 @@ def test_sair_dentro_de_escolher_sem_ciclo_exterior_e_rejeitado():
 def test_sair_dentro_de_escolher_dentro_de_ciclo_exterior_e_aceite():
     """'escolher'/'caso' não reseta o contexto de ciclo -- um 'sair' aí
     visa o ciclo exterior mais próximo (passthrough, tal como ctx_funcao
-    já fazia para 'devolver')."""
+    já fazia para 'retornar')."""
     verificar(_parse("""
         algoritmo "T"
         inicio
@@ -144,12 +144,12 @@ def test_sair_dentro_de_se_dentro_de_ciclo_e_aceite():
 
 # ---------- semantics: solidez de _todos_caminhos_devolvem com sair/continuar ----------
 
-def test_funcao_com_sair_sem_devolver_apos_o_ciclo_e_rejeitada():
+def test_funcao_com_sair_sem_retornar_apos_o_ciclo_e_rejeitada():
     """AUDITORIA_2026-08-22 (ronda 14): antes da correção a
     _todos_caminhos_devolvem, isto era ACEITE incorretamente -- a leitura
-    sequencial via 'devolver 1' como irmão mais à frente na lista,
+    sequencial via 'retornar 1' como irmão mais à frente na lista,
     ignorando que 'sair' pode desviar o controlo antes de lá chegar
-    (repro confirmada por execução: a função cai fora sem devolver
+    (repro confirmada por execução: a função cai fora sem retornar
     nada). Tem de ser rejeitado em compilação, não crashar em runtime."""
     with pytest.raises(ErroSemantico, match="nem todos os caminhos terminam"):
         verificar(_parse("""
@@ -158,13 +158,13 @@ def test_funcao_com_sair_sem_devolver_apos_o_ciclo_e_rejeitada():
                 enquanto verdadeiro fazer
                     se verdadeiro entao
                         sair
-                    devolver 1
+                    retornar 1
             inicio
                 escrever(f())
         """))
 
 
-def test_funcao_com_continuar_sem_devolver_apos_o_ciclo_e_rejeitada():
+def test_funcao_com_continuar_sem_retornar_apos_o_ciclo_e_rejeitada():
     with pytest.raises(ErroSemantico, match="nem todos os caminhos terminam"):
         verificar(_parse("""
             algoritmo "T"
@@ -172,27 +172,27 @@ def test_funcao_com_continuar_sem_devolver_apos_o_ciclo_e_rejeitada():
                 enquanto verdadeiro fazer
                     se verdadeiro entao
                         continuar
-                    devolver 1
+                    retornar 1
             inicio
                 escrever(f())
         """))
 
 
-def test_funcao_com_sair_e_devolver_apos_o_ciclo_e_aceite():
+def test_funcao_com_sair_e_retornar_apos_o_ciclo_e_aceite():
     verificar(_parse("""
         algoritmo "T"
         funcao f(): inteiro
             enquanto verdadeiro fazer
                 se verdadeiro entao
                     sair
-                devolver 1
-            devolver 2
+                retornar 1
+            retornar 2
         inicio
             escrever(f())
     """))
 
 
-def test_funcao_com_sair_dentro_de_para_e_devolver_apos_e_aceite():
+def test_funcao_com_sair_dentro_de_para_e_retornar_apos_e_aceite():
     verificar(_parse("""
         algoritmo "T"
         funcao f(): inteiro
@@ -200,20 +200,20 @@ def test_funcao_com_sair_dentro_de_para_e_devolver_apos_e_aceite():
             para i de 1 ate 10 fazer
                 se i == 5 entao
                     sair
-            devolver 0
+            retornar 0
         inicio
             escrever(f())
     """))
 
 
-def test_funcao_sem_sair_com_devolver_sempre_alcancavel_continua_aceite():
+def test_funcao_sem_sair_com_retornar_sempre_alcancavel_continua_aceite():
     """Não regressão do comportamento já existente (sem sair/continuar
     envolvidos)."""
     verificar(_parse("""
         algoritmo "T"
         funcao f(): inteiro
             enquanto verdadeiro fazer
-                devolver 1
+                retornar 1
         inicio
             escrever(f())
     """))
@@ -360,7 +360,7 @@ def test_sair_dentro_de_ciclo_aninhado_so_sai_do_interior():
 
 def test_sair_num_ciclo_interior_nao_afeta_a_garantia_do_exterior():
     """Um 'sair' dentro de um ciclo INTERIOR só sai desse ciclo -- não
-    deve fazer o ciclo EXTERIOR perder a garantia de devolver que já
+    deve fazer o ciclo EXTERIOR perder a garantia de retornar que já
     tinha antes (confirma que _tem_sair_ou_continuar_alcancavel para
     corretamente em ciclos aninhados, não desce neles)."""
     verificar(_parse("""
@@ -371,7 +371,7 @@ def test_sair_num_ciclo_interior_nao_afeta_a_garantia_do_exterior():
                 para i de 1 ate 10 fazer
                     se i == 5 entao
                         sair
-                devolver 1
+                retornar 1
         inicio
             escrever(f())
     """))

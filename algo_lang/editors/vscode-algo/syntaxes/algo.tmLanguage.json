@@ -63,10 +63,12 @@
       }
     },
     "import-include": {
-      "match": "\\b(importar|incluir)\\b\\s*([A-Za-z_][A-Za-z0-9_]*|\"[^\"]*\")?",
+      "match": "\\b(importar|incluir)\\b\\s*([A-Za-z_][A-Za-z0-9_]*|\"[^\"]*\")?(?:\\s+(como)\\s+([A-Za-z_][A-Za-z0-9_]*))?",
       "captures": {
         "1": { "name": "keyword.control.import.algo" },
-        "2": { "name": "entity.name.namespace.algo" }
+        "2": { "name": "entity.name.namespace.algo" },
+        "3": { "name": "keyword.control.import.algo" },
+        "4": { "name": "entity.name.namespace.algo" }
       }
     },
     "function-defs": {
@@ -103,7 +105,7 @@
     },
     "keywords-control": {
       "name": "keyword.control.algo",
-      "match": "\\b(se|entao|senao|para|de|ate|passo|fazer|enquanto|escolher|caso|contrario|devolver|sair|continuar)\\b"
+      "match": "\\b(se|entao|senao|para|de|ate|passo|fazer|enquanto|escolher|caso|contrario|retornar|sair|continuar)\\b"
     },
     "keywords-other": {
       "name": "keyword.other.algo",

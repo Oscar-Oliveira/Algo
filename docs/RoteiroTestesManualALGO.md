@@ -192,7 +192,7 @@ inicio
 ```
 algoritmo "Funcoes"
 funcao dobro(x:inteiro):inteiro
-    devolver x * 2
+    retornar x * 2
 procedimento trocar(ref a:inteiro, ref b:inteiro)
     temp:inteiro = a
     a = b
@@ -220,8 +220,8 @@ p=9 q=3
 algoritmo "Recursao"
 funcao fatorial(n:inteiro):inteiro
     se n <= 1 entao
-        devolver 1
-    devolver n * fatorial(n - 1)
+        retornar 1
+    retornar n * fatorial(n - 1)
 inicio
     escrever(fatorial(5))
 ```
@@ -288,7 +288,7 @@ cba
 ```
 algoritmo "Afirmar"
 funcao dobro(x:inteiro):inteiro
-    devolver x * 2
+    retornar x * 2
 inicio
     afirmar dobro(5) == 10, "dobro(5) devia ser 10"
     escrever("passou no teste")

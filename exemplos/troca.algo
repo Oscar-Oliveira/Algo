@@ -6,11 +6,11 @@ procedimento trocar(ref a:inteiro, ref b:inteiro)
     b = temp
 
 funcao dobro(x:inteiro):inteiro
-    devolver x * 2
+    retornar x * 2
 
 funcao incrementar(ref x:inteiro):inteiro
     x = x + 1
-    devolver x
+    retornar x
 
 inicio
     p:inteiro = 3

@@ -18,32 +18,25 @@ algum item aqui não devia ser assim, é exatamente para isso que este
 documento existe: para poderes rever e decidir, em vez de a decisão ficar
 enterrada num comentário.
 
-## Itens a rever (dúvida levantada, ainda sem decisão)
-
-- **Campo-vetor não pode ser inicializado num literal de estrutura** — ver
-  [Estruturas](#estruturas) abaixo. Sinalizado como estranho; vale a pena
-  decidir se compensa suportar.
-
----
-
 ## Cópia por valor e `ref`
 
-- **Atribuição, declaração, `devolver`, e literais `{...}` copiam
+- **Atribuição, declaração, `retornar`, e literais `{...}` copiam
   structs/vetores por valor** (via `copy.deepcopy`), em vez de partilhar a
   mesma referência. Só `ref` cria aliasing — e isso é intencional (é o
   mecanismo de passagem por referência da linguagem).
-- **Limitação conhecida, não corrigida**: dois parâmetros `ref` que
-  apontem para o MESMO objeto em runtime (`ref v[i], ref v[j]` com `i==j`
-  em runtime; ou `ref p1.x, ref p2.x` depois de `p2 = p1`) fazem com que a
-  escrita do primeiro seja silenciosamente sobreposta pela do segundo — o
-  compilador não consegue provar estaticamente que os dois acessos nunca
-  colidem quando o índice é uma expressão computada, ou quando dois nomes
-  diferentes podem ser o mesmo objeto. Testado e fixado deliberadamente
-  como comportamento atual (`test_indices_diferentes_do_mesmo_vetor_por_
-  referencia_continua_a_compilar`,
-  `test_campo_de_estrutura_dentro_de_vetor_por_referencia_duas_vezes_nao_e_
-  detetado`, em `tests/test_correcoes_auditoria.py`) — corrigir isto a
-  sério exigiria detetar aliasing em runtime, não só em compilação.
+- **Aliasing entre dois parâmetros `ref` da MESMA chamada, com o mesmo
+  nome de variável base** (ex.: `ref v[i], ref v[j]` com `i==j` em
+  runtime, ou `ref pontos[k].x, ref pontos[m].x` com `k==m`) é detetado —
+  em compilação quando possível (`_caminhos_ref_colidem`, `semantics.py`
+  — cobre variáveis simples e campos sem índice), e em runtime quando o
+  caminho passa por um índice que só se conhece ao correr o programa
+  (`_verificar_aliasing_ref_runtime`, `codegen.py` — usa os índices já
+  resolvidos por `_hoistear_indices_ref` para comparar os dois caminhos
+  posição a posição; um nome de campo diferente prova que nunca colidem,
+  sem emitir guarda nenhum). Ver
+  `test_indices_diferentes_do_mesmo_vetor_por_referencia_continua_a_compilar`
+  e `test_campo_de_estrutura_dentro_de_vetor_por_referencia_duas_vezes_e_
+  detetado_em_runtime`, em `tests/test_correcoes_auditoria.py`.
 - Índices em expressões de índice de um argumento `ref` com efeitos
   secundários (ex.: uma chamada de função) são avaliados **exatamente uma
   vez**, e o mesmo valor é reutilizado tanto para ler como para escrever
@@ -54,12 +47,15 @@ enterrada num comentário.
 
 - **Índices negativos são sempre rejeitados** em runtime (leitura, escrita,
   1D/2D+, `ref`, literal ou computado) — não há wraparound à a Python.
-- **Tamanho máximo de um vetor: 10 milhões de elementos, POR DIMENSÃO**
+- **Tamanho máximo de um vetor: 10 milhões de elementos NO TOTAL**
   (decisão do maintainer, escolhida por ser o ponto onde a construção já
-  demora ~1s). **Não é um limite sobre o produto entre dimensões** — um
-  `v:inteiro[9999999][9999999]` (cada dimensão individualmente abaixo do
-  limite) continua sem guarda agregada. Bounding o produto exigiria
-  rastrear todas as dimensões de um vetor em conjunto; deixado como está.
+  demora ~1s) — `_algo_verificar_tamanho_vetor_agregado` (`codegen.py`)
+  verifica o PRODUTO de todas as dimensões, de uma vez, antes de começar
+  a construir o vetor, para um `v:inteiro[9999][9999][9999]` (cada
+  dimensão individualmente pequena, mas o produto ~10¹²) falhar
+  rápido com uma mensagem amigável em vez de tentar alocar terabytes de
+  memória. `MemoryError` também está traduzido (rede de segurança para
+  qualquer outra via de esgotar memória).
 - **`constante` usada como tamanho de vetor só é resolvida em compilação
   através de `+`, `-`, `*`** (ex.: `N = A + B`) — `/` e `%` não são
   dobrados por `_resolver_constante` (`semantics.py`). Um tamanho que
@@ -75,22 +71,18 @@ enterrada num comentário.
 - **Comparação `==`/`<>` entre duas structs compara campo a campo**
   (`__eq__` gerado, recursivo em campos-vetor e structs aninhadas) — não é
   comparação por identidade.
-- **Um campo-vetor de uma estrutura não pode ser inicializado diretamente
-  num literal `{campo: valor}`** — `semantics.py`, `_verificar_estrutura_
-  literal`, rejeita com "o campo '{nome}' é um vetor; não pode ser
-  inicializado diretamente num literal de estrutura". É preciso construir
-  a struct primeiro e atribuir o campo-vetor depois, separadamente.
-  Comportamento deliberado e consistente com o resto do tratamento de
-  `EstruturaLiteral`/`VetorLiteral` (nenhum dos dois tenta inferir forma a
-  partir do valor à direita quando o valor é ele próprio um vetor dentro
-  de um contexto de campo) — mas nunca foi ativamente decidido que seja
-  assim *porque* é a melhor UX, só que é a implementação mais simples e
-  consistente com as restantes regras. **Ver "Itens a rever" no topo.**
+- **Um campo-vetor de uma estrutura pode ser inicializado diretamente num
+  literal `{campo: {...}}`** — `semantics.py`, `_verificar_estrutura_
+  literal`, reconhece um `A.VetorLiteral` como valor de campo e delega em
+  `_verificar_vetor_literal` (mesma validação de forma/tamanho que um
+  vetor normal), tal como já fazia para `A.EstruturaLiteral` aninhado.
+  Atribuir um valor não-vetor a um campo-vetor continua a ser erro ("o
+  campo '{nome}' é um vetor; inicializa-o com '{valor, valor, ...}'").
 - Structs mutuamente recursivas (`A↔B`, ciclos de 3+) são aceites; o campo
   do ciclo fica `nulo` em runtime em vez de recursão infinita no próprio
   compilador.
 
-## `devolver` e caminhos de execução
+## `retornar` e caminhos de execução
 
 - **`_todos_caminhos_devolvem` (verifica que uma função sempre devolve um
   valor) é deliberadamente conservadora**: pode recusar um programa
@@ -98,13 +90,16 @@ enterrada num comentário.
   com limites literais que garantem ≥1 iteração não conta como "sempre
   devolve"; um `se` sem `senao` nunca conta, mesmo que os dois ramos reais
   do domínio cubram todos os casos) — mas nunca aceita, em silêncio, um
-  programa que de facto tem um caminho sem `devolver`. Um `sair`/
+  programa que de facto tem um caminho sem `retornar`. Um `sair`/
   `continuar` alcançável dentro de um ciclo impede esse ciclo de "contar"
-  como garantidamente terminando em `devolver`, porque pode abandonar o
+  como garantidamente terminando em `retornar`, porque pode abandonar o
   corpo antes de lá chegar.
-- **Não existe `devolver` sem valor dentro de um `procedimento`** — a
-  gramática exige sempre uma expressão a seguir a `devolver`. Nota de
-  desenho, não uma limitação a corrigir.
+- **`retornar` sem expressão só é válido dentro de um `procedimento`**,
+  para sair mais cedo (`semantics.py`, ramo `ctx_funcao.eh_procedimento`
+  de `A.Retornar`) — devolve os mesmos parâmetros `ref` que o fim do
+  corpo devolveria implicitamente. Dentro de uma `funcao`, `retornar`
+  exige sempre uma expressão a seguir; um `procedimento` não pode usar
+  `retornar <expr>` (procedimentos não devolvem valor).
 - **`sair`/`continuar` só afetam o ciclo mais interior** que os contém, e
   só são válidos dentro de um ciclo (`enquanto`/`para`/`fazer...enquanto`)
   — rejeitados em compilação fora desse contexto.
@@ -115,21 +110,9 @@ enterrada num comentário.
   os ramos de um `se`/`senao` ou `escolher`/`contrario` **exaustivo**
   fica visível depois do bloco, como uma declaração normal. Um conjunto
   de ramos **não-exaustivo** (sem `senao`/`contrario`) nunca propaga —
-  sem erro, só sem disponibilizar o nome a seguir.
-- **Limitação conhecida, investigada e descartada**: uma declaração feita
-  num único ramo não-exaustivo de `se`/`escolher` (sem `senao`/
-  `contrario`) ainda assim se torna "visível" para chamadas de função
-  através de `_pre_registar_recursivo` (que trata qualquer bloco
-  alcançável como válido, sem noção de exaustividade). A correção óbvia
-  (ignorar ramos com condição literal `falso`) quebra um teste já
-  existente e deliberado
-  (`test_variavel_global_com_tipos_diferentes_em_ramos_irmaos_e_erro`),
-  que espera que MESMO um ramo `se falso` continue a contar para a
-  verificação de tipos entre ramos irmãos. Resolver isto sem quebrar essa
-  garantia exigiria dois comportamentos diferentes para o mesmo
-  mecanismo (alcançabilidade só para "registar como visível", não para
-  "verificar consistência de tipo") — avaliado como mais arriscado do
-  que vale a pena; revertido.
+  sem erro, só sem disponibilizar o nome a seguir. Isto vale dentro de
+  `inicio` e dentro de uma função/procedimento; ver `ReferenciaCompletaCLI.md`
+  para a regra de âmbito entre `inicio` e as funções.
 
 ## `escrever` e formatação
 
@@ -180,7 +163,17 @@ enterrada num comentário.
 ## Limites de recursos
 
 - `algo executa` (sem `--debug`/`--json`) tem um limite de **10s de CPU**
-  (`LIMITE_CPU_SEGUNDOS`, `cli.py`) para apanhar ciclos infinitos/recursão
-  sem memoização — o modo `--debug`/`--json` já tinha `MAX_PASSOS=4000`
-  em `tools/tracer.py`, mas esse limite não protegia o caminho mais
-  comum, sem trace.
+  (`LIMITE_CPU_SEGUNDOS`, `cli.py`), via `resource.setrlimit`, para
+  apanhar ciclos infinitos/recursão sem memoização.
+- `algo executa --debug`/`--json` corre em processo (sem subprocesso,
+  por isso sem `resource.setrlimit`) e tem DOIS limites independentes em
+  `tools/tracer.py`: `MAX_PASSOS=4000` (número de linhas executadas) e,
+  desde que `MAX_PASSOS` sozinho não protegia contra um ciclo com poucas
+  iterações mas caro por iteração, `LIMITE_TEMPO_SEGUNDOS=10` (tempo de
+  CPU acumulado entre passos, via `time.process_time()` -- mesma
+  filosofia do `LIMITE_CPU_SEGUNDOS` do caminho sem trace, incluindo
+  nunca contar tempo bloqueado em `ler()`). Nenhum dos dois consegue
+  interromper uma ÚNICA linha demasiado cara a meio da sua própria
+  execução (`sys.settrace` só devolve o controlo entre linhas) -- isso é
+  trabalho de guardas dedicados como `_algo_verificar_tamanho_vetor_agregado`
+  (ver "Vetores", abaixo), não deste limite geral.

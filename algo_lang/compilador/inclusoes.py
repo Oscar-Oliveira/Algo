@@ -24,7 +24,10 @@ class ColisaoDeInclusao(Exception):
     uma função incluída chamada 'Ponto' colide com uma 'estrutura'
     'Ponto' já definida) tem por omissão o mesmo valor de 'tipo', para
     o caso mais comum (mesma categoria) continuar exatamente como
-    antes desta extração."""
+    antes desta extração. 'tipo' também pode ser 'alias', quando um
+    'incluir ... como <alias>' reutiliza um alias já usado por outro
+    'incluir' -- nesse caso 'nome' é o próprio alias, não um nome de
+    função/estrutura/variável."""
     def __init__(self, tipo: str, nome: str, caminho_origem: str, tipo_existente: str = None):
         self.tipo = tipo
         self.nome = nome
@@ -34,7 +37,8 @@ class ColisaoDeInclusao(Exception):
 
 
 def mesclar_biblioteca_no_programa(programa, caminho_origem: str,
-                                    declaracoes, funcoes, estruturas) -> None:
+                                    declaracoes, funcoes, estruturas,
+                                    alias: str = None) -> None:
     """Acrescenta as estruturas/funções/declarações de uma biblioteca
     incluída (já parseada por parse_biblioteca) ao 'programa',
     verificando colisões de nome contra o que já lá está -- mesma
@@ -46,7 +50,29 @@ def mesclar_biblioteca_no_programa(programa, caminho_origem: str,
     de forma genérica, em semantics.py, sem indicar que veio de um
     ficheiro incluído. Levanta ColisaoDeInclusao na primeira colisão
     encontrada; muta 'programa' em cada acrescento bem-sucedido, tal
-    como o código original fazia."""
+    como o código original fazia.
+
+    'alias' (de 'incluir "x.algo" como alias') namespacea só as FUNÇÕES
+    desta inclusão -- cada 'FuncaoDef' é renomeada de 'nome' para
+    'alias_nome' (mesma convenção de mangling que as bibliotecas
+    embutidas já usam para 'biblioteca.metodo', ver
+    semantics.py:nomes_internos_bibliotecas) ANTES da verificação de
+    colisão abaixo, para que um nome mangled colidir com algo já
+    existente seja apanhado pela mesma lógica, de graça. Estruturas e
+    variáveis globais desta inclusão continuam a fundir-se de forma
+    plana, mesmo com alias -- bibliotecas embutidas também só expõem
+    funções, nunca globais/estruturas, por isso não há paralelo a
+    seguir para namespacear essas categorias."""
+    if alias is not None:
+        if alias in programa.aliases_inclusao:
+            raise ColisaoDeInclusao("alias", alias, caminho_origem, tipo_existente="alias")
+        mapa_metodos = {}
+        for f in funcoes:
+            nome_mangled = f"{alias}_{f.nome}"
+            mapa_metodos[f.nome] = nome_mangled
+            f.nome = nome_mangled
+        programa.aliases_inclusao[alias] = mapa_metodos
+
     nomes_por_categoria = {
         "estrutura": {e.nome for e in programa.estruturas},
         "função": {f.nome for f in programa.funcoes},

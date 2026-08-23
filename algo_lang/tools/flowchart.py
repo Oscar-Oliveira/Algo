@@ -132,9 +132,10 @@ class GeradorFluxograma:
             self.aresta(anterior, id_, rotulo)
             return id_
 
-        if isinstance(stmt, A.Devolver):
+        if isinstance(stmt, A.Retornar):
             id_ = self.novo_id()
-            self.no(id_, f"devolver {texto_expr(stmt.expr)}", "box", extra=', peripheries=2')
+            rotulo_no = "retornar" if stmt.expr is None else f"retornar {texto_expr(stmt.expr)}"
+            self.no(id_, rotulo_no, "box", extra=', peripheries=2')
             self.aresta(anterior, id_, rotulo)
             return id_
 
@@ -158,7 +159,7 @@ class GeradorFluxograma:
             id_ = self.novo_id()
             self.no(id_, rotulo_no, "box", extra=', peripheries=2')
             self.aresta(anterior, id_, rotulo)
-            # Alinhado com A.Devolver: código morto a seguir no mesmo bloco
+            # Alinhado com A.Retornar: código morto a seguir no mesmo bloco
             # continua desenhado em sequência a partir daqui.
             self.aresta(id_, alvo)
             return id_

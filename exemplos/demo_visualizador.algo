@@ -2,9 +2,9 @@ algoritmo "DemoVisualizador"
 
 funcao fatorial(n:inteiro):inteiro
     se n <= 1 entao
-        devolver 1
+        retornar 1
     senao
-        devolver n * fatorial(n - 1)
+        retornar n * fatorial(n - 1)
 
 procedimento trocar(ref a:inteiro, ref b:inteiro)
     temp:inteiro = a

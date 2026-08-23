@@ -183,8 +183,12 @@ class Parser:
         linha = self.atual().linha
         self.esperar("INCLUIR")
         caminho_tok = self.esperar("STRING")
+        como = None
+        if self.ver("COMO"):
+            self.avancar()
+            como = self.esperar("ID").valor
         self.esperar("NEWLINE")
-        return A.Incluir(caminho_tok.valor, linha)
+        return A.Incluir(caminho_tok.valor, linha, como)
 
     def _parse_tipo(self):
         """Um 'tipo' é sintaticamente apenas um identificador -- pode ser um
@@ -432,8 +436,8 @@ class Parser:
             return self._parse_faz_enquanto()
         if tok.tipo == "ESCOLHER":
             return self._parse_escolha()
-        if tok.tipo == "DEVOLVER":
-            return self._parse_devolver()
+        if tok.tipo == "RETORNAR":
+            return self._parse_retornar()
         if tok.tipo == "SAIR":
             return self._parse_sair()
         if tok.tipo == "CONTINUAR":
@@ -568,12 +572,12 @@ class Parser:
         self.esperar("DEDENT")
         return A.Escolha(expr, casos, contrario, linha)
 
-    def _parse_devolver(self):
+    def _parse_retornar(self):
         linha = self.atual().linha
-        self.esperar("DEVOLVER")
-        expr = self._parse_expr()
+        self.esperar("RETORNAR")
+        expr = None if self.ver("NEWLINE") else self._parse_expr()
         self.esperar("NEWLINE")
-        return A.Devolver(expr, linha)
+        return A.Retornar(expr, linha)
 
     def _parse_sair(self):
         linha = self.atual().linha

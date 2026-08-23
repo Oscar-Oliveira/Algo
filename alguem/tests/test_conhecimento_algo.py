@@ -11,15 +11,19 @@ import sys
 
 
 def test_referencia_de_sintaxe_vem_do_compilador_real():
+    # cwd = raiz do repositório (3 níveis acima deste ficheiro) -- 'python -c'
+    # só encontra o pacote 'alguem' se correr a partir dali (sys.path[0] fica
+    # '', que resolve para o cwd).
+    raiz_repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     resultado = subprocess.run(
         [sys.executable, "-c",
          "from alguem.nucleo.conhecimento_algo import _FONTE, _PALAVRAS_CHAVE; "
-         "print(_FONTE); print('devolver' in _PALAVRAS_CHAVE); "
+         "print(_FONTE); print('retornar' in _PALAVRAS_CHAVE); "
          "print('retorna' in _PALAVRAS_CHAVE); print('faz' in _PALAVRAS_CHAVE)"],
-        capture_output=True, text=True, cwd="/home/claude", timeout=15)
+        capture_output=True, text=True, cwd=raiz_repo, timeout=15)
     linhas = resultado.stdout.strip().split("\n")
     assert "algo_lang" in linhas[0]
-    assert linhas[1] == "True"    # 'devolver' está lá
+    assert linhas[1] == "True"    # 'retornar' está lá
     assert linhas[2] == "False"   # 'retorna' (sintaxe antiga) não está
     assert linhas[3] == "False"   # 'faz' isolado (sintaxe antiga) não está
 
@@ -74,7 +78,7 @@ def test_referencia_inclui_regras_chave_da_sintaxe():
     assert "algoritmo" in REFERENCIA_SINTAXE
     assert "infinitivo" in REFERENCIA_SINTAXE.lower()
     assert "0" in REFERENCIA_SINTAXE  # arrays começam em 0
-    assert "devolver" in REFERENCIA_SINTAXE
+    assert "retornar" in REFERENCIA_SINTAXE
 
 
 def test_system_prompt_inclui_a_referencia_de_sintaxe():

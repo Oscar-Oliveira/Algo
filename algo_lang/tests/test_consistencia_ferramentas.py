@@ -46,7 +46,7 @@ def test_campo_de_estrutura_com_mesmo_nome_de_rotina_nao_ganha_contorno_duplo_no
         estrutura Caixa
             dobro:inteiro
         funcao dobro(n:inteiro):inteiro
-            devolver n * 2
+            retornar n * 2
         inicio
             c:Caixa
             c.dobro = 5
@@ -80,7 +80,7 @@ def test_mesmo_programa_interpretado_consistentemente_pelas_tres_ferramentas(tmp
             x:inteiro
             y:inteiro
         funcao somaCoordenadas(pt:Ponto):inteiro
-            devolver pt.x + pt.y
+            retornar pt.x + pt.y
         inicio
             p:Ponto = {x: 3, y: 4}
             total:inteiro = somaCoordenadas(p)

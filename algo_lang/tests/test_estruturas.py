@@ -95,7 +95,7 @@ def test_estrutura_como_parametro_e_retorno_de_funcao():
             x:inteiro
             y:inteiro
         funcao somaCoordenadas(p:Ponto):inteiro
-            devolver p.x + p.y
+            retornar p.x + p.y
         inicio
             p:Ponto
             p.x = 3

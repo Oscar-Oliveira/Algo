@@ -32,6 +32,7 @@ class Linter:
         self.avisos = []
         self._verificar_rotinas_nunca_chamadas()
         self._verificar_inclusoes_duplicadas()
+        self._verificar_inclusoes_sem_alias()
         self._verificar_importares_duplicados()
         self._verificar_casos_duplicados_em_escolha()
         self._verificar_escolha_sem_casos()
@@ -62,7 +63,7 @@ class Linter:
             tambem_procurar_em=[f.corpo for f in self.programa.funcoes])
         self._verificar_globais_nao_usadas()
         self._verificar_divisoes_e_comparacoes(self.programa.corpo)
-        self._verificar_codigo_depois_de_devolver(self.programa.corpo)
+        self._verificar_codigo_depois_de_retornar(self.programa.corpo)
         self._verificar_ciclo_verdadeiro_sem_saida(self.programa.corpo)
         self._verificar_indices_fora_dos_limites(
             self.programa.corpo, vetores_globais, campos_vetor, valores_constantes)
@@ -77,7 +78,7 @@ class Linter:
             self._verificar_uso_de_globais(f, nomes_globais_mutaveis)
             self._verificar_divisoes_e_comparacoes(f.corpo)
             self._verificar_atribuicao_a_parametro_por_valor(f)
-            self._verificar_codigo_depois_de_devolver(f.corpo)
+            self._verificar_codigo_depois_de_retornar(f.corpo)
             self._verificar_ciclo_verdadeiro_sem_saida(f.corpo)
             self._verificar_indices_fora_dos_limites(
                 f.corpo, vetores_globais, campos_vetor, valores_constantes)
@@ -152,8 +153,8 @@ class Linter:
             for valores, _corpo in s.casos:
                 exprs.extend(valores)
             return exprs
-        if isinstance(s, A.Devolver):
-            return [s.expr]
+        if isinstance(s, A.Retornar):
+            return [s.expr] if s.expr is not None else []
         if isinstance(s, A.ChamadaStmt):
             return [s.chamada]
         if isinstance(s, A.Afirmar):
@@ -441,6 +442,26 @@ class Linter:
             else:
                 primeira_ocorrencia[caminho] = inc.linha
 
+    def _verificar_inclusoes_sem_alias(self):
+        """Duas ou mais 'incluir' sem 'como <alias>' partilham o mesmo
+        espaço de nomes plano do programa principal -- uma colisão de
+        nome entre elas (ou com o programa principal) é erro fatal de
+        compilação, sem forma de desambiguar (ver 'incluir ... como
+        alias', que resolve isto para funções). Com 1 só inclusão sem
+        alias o risco é menor (só pode colidir com o próprio programa
+        principal), por isso só avisa a partir de 2."""
+        sem_alias = [inc for inc in self.programa.inclusoes if not inc.como]
+        if len(sem_alias) < 2:
+            return
+        for inc in sem_alias:
+            self.avisos.append(Aviso(
+                f"'{inc.caminho}' incluído sem 'como <alias>' -- com "
+                f"{len(sem_alias)} ficheiros incluídos sem alias, uma colisão "
+                f"de nome entre eles (ou com o programa principal) é erro "
+                f"fatal sem forma de desambiguar; considera "
+                f"'incluir \"{inc.caminho}\" como <nome>'",
+                inc.linha))
+
     def _verificar_importares_duplicados(self):
         """Mesma situação que _verificar_inclusoes_duplicadas, mas para
         'importar' -- semantics.py também ignora silenciosamente uma
@@ -487,16 +508,16 @@ class Linter:
                         "'escolher' sem nenhum 'caso' -- só o 'contrario' (se existir) "
                         "é executado, sempre, sem nenhuma escolha a fazer", s.linha))
 
-    def _verificar_codigo_depois_de_devolver(self, stmts):
-        """Instruções a seguir a um 'devolver', no mesmo bloco, são código
+    def _verificar_codigo_depois_de_retornar(self, stmts):
+        """Instruções a seguir a um 'retornar', no mesmo bloco, são código
         morto -- normalmente sobras de uma refatoração incompleta."""
         for i, s in enumerate(stmts):
-            if isinstance(s, A.Devolver) and i < len(stmts) - 1:
+            if isinstance(s, A.Retornar) and i < len(stmts) - 1:
                 self.avisos.append(Aviso(
-                    "instruções a seguir a este 'devolver' nunca são executadas",
+                    "instruções a seguir a este 'retornar' nunca são executadas",
                     stmts[i + 1].linha))
             for bloco in A.subblocos(s):
-                self._verificar_codigo_depois_de_devolver(bloco)
+                self._verificar_codigo_depois_de_retornar(bloco)
 
     def _verificar_atribuicao_a_parametro_por_valor(self, f: A.FuncaoDef):
         """Atribuir diretamente a um parâmetro que não é 'por referência'
@@ -535,12 +556,12 @@ class Linter:
 
     def _verificar_ciclo_verdadeiro_sem_saida(self, corpo):
         """Um 'enquanto verdadeiro'/'faz...enquanto verdadeiro' só pode
-        terminar através de um 'devolver' ou 'sair' algures no corpo. O
+        terminar através de um 'retornar' ou 'sair' algures no corpo. O
         mesmo problema aparece, de forma menos óbvia, quando a condição
         é uma única variável 'booleano' usada como bandeira de controlo
         (ex.: 'ativo') que nunca é alterada dentro do próprio corpo do
         ciclo -- é um padrão idiomático comum no ALGO para sair de um
-        ciclo dentro do 'inicio', onde 'devolver' não é permitido (ver
+        ciclo dentro do 'inicio', onde 'retornar' não é permitido (ver
         _verificar_recursao_sem_condicao para o equivalente em funções),
         e por isso também um erro comum: esquecer de mudar a bandeira
         (ou de acrescentar um 'sair')."""
@@ -548,12 +569,12 @@ class Linter:
         for s in self._todas_as_stmts(corpo):
             if not isinstance(s, (A.Enquanto, A.FazEnquanto)):
                 continue
-            tem_devolver = any(isinstance(sub, A.Devolver) for sub in self._todas_as_stmts(s.corpo))
-            if tem_devolver or self._tem_sair_alcancavel(s.corpo):
+            tem_retornar = any(isinstance(sub, A.Retornar) for sub in self._todas_as_stmts(s.corpo))
+            if tem_retornar or self._tem_sair_alcancavel(s.corpo):
                 continue
             if self._eh_literal_verdadeiro(s.condicao):
                 self.avisos.append(Aviso(
-                    "ciclo com condição sempre verdadeira e sem nenhum 'devolver'/'sair' "
+                    "ciclo com condição sempre verdadeira e sem nenhum 'retornar'/'sair' "
                     "no corpo -- isto nunca termina", s.linha))
             elif isinstance(s.condicao, A.LValue) and not s.condicao.acessos \
                     and getattr(s.condicao, "_tipo_inferido", None) == "booleano" \

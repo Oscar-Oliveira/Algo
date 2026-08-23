@@ -10,10 +10,20 @@ divergências.
 """
 import sys
 import io
+import time
 import builtins
 import contextlib
 
 MAX_PASSOS = 4000
+# Mesma ideia e mesmo valor que LIMITE_CPU_SEGUNDOS (cli.py) para o
+# caminho sem trace -- MAX_PASSOS sozinho conta LINHAS executadas, não o
+# custo de cada uma; um ciclo com poucas iterações mas caro por iteração
+# (ex.: um passo que serializa uma estrutura/vetor grande para o trace)
+# podia levar muito tempo sem nunca se aproximar de MAX_PASSOS. Usa
+# time.process_time() (tempo de CPU, não de relógio) pela mesma razão que
+# LIMITE_CPU_SEGUNDOS: nunca interromper um programa legitimamente
+# bloqueado em ler() à espera do estudante.
+LIMITE_TEMPO_SEGUNDOS = 10
 NOME_FUNCAO_PRINCIPAL = "_algo_programa"
 # Parênteses nunca são válidos num identificador ALGO, por isso este
 # rótulo nunca colide com o nome de uma função do estudante (mesmo uma
@@ -22,6 +32,10 @@ NOME_VISIVEL_PRINCIPAL = "(Principal)"
 
 
 class LimiteDePassosExcedido(Exception):
+    pass
+
+
+class LimiteDeTempoExcedido(Exception):
     pass
 
 
@@ -115,6 +129,7 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         "consolaFinal": str,
         "erro": None | {"mensagem": str, "linha": int},
         "limiteExcedido": bool,
+        "limiteTipo": None | "passos" | "tempo",
     }
 
     'entradas': lista de strings para alimentar ler(), ou None para usar
@@ -122,7 +137,7 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
     """
     nomes_funcoes_conhecidas = set(nomes_funcoes) | {NOME_FUNCAO_PRINCIPAL}
     passos = []
-    limite_excedido = {"valor": False}
+    limite_excedido = {"valor": False, "tipo": None}
     resultado_erro = {"valor": None}
 
     # 'pilha_frames'/'pilha_incremental' mantêm a pilha de frames visíveis
@@ -262,7 +277,12 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         pilha_incremental[-1] = {"nome": nome_atual, "variaveis": variaveis_atuais}
         if len(passos) >= MAX_PASSOS:
             limite_excedido["valor"] = True
+            limite_excedido["tipo"] = "passos"
             raise LimiteDePassosExcedido()
+        if time.process_time() - tempo_inicio > LIMITE_TEMPO_SEGUNDOS:
+            limite_excedido["valor"] = True
+            limite_excedido["tipo"] = "tempo"
+            raise LimiteDeTempoExcedido()
         passos.append({
             "linha": linha_algo,
             "consola": buffer_saida.getvalue(),
@@ -287,6 +307,7 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
             "consolaFinal": "",
             "erro": {"mensagem": f"erro interno do compilador: {e}", "linha": None},
             "limiteExcedido": False,
+            "limiteTipo": None,
         }
 
     gestor_stdin = _redirect_stdin(entrada_stream) if entrada_stream is not None \
@@ -300,12 +321,15 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
     # a si próprio -- só um pode estar ativo de cada vez. Confirmado
     # manualmente que todo este código corre (--debug/--json têm dezenas
     # de testes), só não fica registado nas métricas.
+    tempo_inicio = time.process_time()
     tracer_anterior = sys.gettrace()
     sys.settrace(tracer)
     try:
         with contextlib.redirect_stdout(buffer_saida), gestor_stdin:
             exec(codigo_compilado, namespace)
     except LimiteDePassosExcedido:
+        pass
+    except LimiteDeTempoExcedido:
         pass
     except SystemExit:
         pass
@@ -332,4 +356,5 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         "consolaFinal": consola_final,
         "erro": resultado_erro["valor"],
         "limiteExcedido": limite_excedido["valor"],
+        "limiteTipo": limite_excedido["tipo"],
     }

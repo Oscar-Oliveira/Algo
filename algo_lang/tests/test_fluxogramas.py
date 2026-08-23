@@ -253,11 +253,11 @@ def test_fluxograma_de_funcao_especifica():
     dot = _dot_para("""
         algoritmo "T"
         funcao dobro(x:inteiro):inteiro
-            devolver x * 2
+            retornar x * 2
         inicio
             escrever(dobro(5))
     """, nome_funcao="dobro")
-    assert "devolver" in dot
+    assert "retornar" in dot
     assert dot.count("shape=oval") == 2
 
 
@@ -285,9 +285,9 @@ def test_graphviz_consegue_renderizar_o_dot_gerado():
         algoritmo "T"
         funcao classificar(nota:inteiro):cadeia
             se nota >= 10 entao
-                devolver "Aprovado"
+                retornar "Aprovado"
             senao
-                devolver "Reprovado"
+                retornar "Reprovado"
         inicio
             i:inteiro = 0
             para i de 1 ate 3 fazer
@@ -328,7 +328,7 @@ def test_cli_gera_um_fluxograma_por_rotina_alem_do_principal(tmp_path):
     algo_path.write_text(textwrap.dedent("""
         algoritmo "T"
         funcao dobro(x:inteiro):inteiro
-            devolver x * 2
+            retornar x * 2
         procedimento mostrar(msg:cadeia)
             escrever(msg)
         inicio
@@ -350,7 +350,7 @@ def test_cli_com_funcao_gera_so_essa(tmp_path):
     algo_path.write_text(textwrap.dedent("""
         algoritmo "T"
         funcao dobro(x:inteiro):inteiro
-            devolver x * 2
+            retornar x * 2
         procedimento mostrar(msg:cadeia)
             escrever(msg)
         inicio
@@ -375,7 +375,7 @@ def test_chamada_a_funcao_definida_tem_contorno_duplo():
     programa = parse(textwrap.dedent("""
         algoritmo "T"
         funcao dobro(x:inteiro):inteiro
-            devolver x * 2
+            retornar x * 2
         procedimento mostrar(msg:cadeia)
             escrever(msg)
         inicio
@@ -419,7 +419,7 @@ def test_declaracao_a_partir_de_chamada_a_rotina_tem_contorno_duplo():
     programa = _parse(textwrap.dedent("""
         algoritmo "T"
         funcao dobro(n:inteiro):inteiro
-            devolver n * 2
+            retornar n * 2
         inicio
             y:inteiro = dobro(5)
     """))

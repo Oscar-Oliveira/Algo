@@ -233,7 +233,15 @@ class GeradorCodigoBase:
 
     def _encontrar_funcao(self, nome):
         if "." in nome:
-            return None
+            # Só uma chamada 'alias.metodo(...)' (função incluída com
+            # alias) corresponde a um FuncaoDef real -- 'biblioteca.metodo'
+            # (biblioteca embutida) não tem, o seu código já vem pronto do
+            # registo (ver GeradorCodigo.gerar()).
+            prefixo, metodo = nome.split(".", 1)
+            mapa = self.programa.aliases_inclusao.get(prefixo)
+            if mapa is None or metodo not in mapa:
+                return None
+            nome = mapa[metodo]
         for f in self.programa.funcoes:
             if f.nome == nome:
                 return f
@@ -283,7 +291,7 @@ class GeradorCodigoBase:
 
         self.refs_atuais = [p.nome for p in f.parametros if p.por_referencia]
         # AL-XX: tipo de retorno da função a gerar neste momento -- só
-        # codegen.py o consulta (para coagir 'devolver <inteiro>' de uma
+        # codegen.py o consulta (para coagir 'retornar <inteiro>' de uma
         # função 'decimal'); irrelevante para codegen_minimo.py.
         self.tipo_retorno_atual = f.tipo_retorno
         self.dims_retorno_atual = f.dims_retorno

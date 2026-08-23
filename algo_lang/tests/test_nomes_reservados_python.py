@@ -11,9 +11,9 @@ from algo_lang.compilador.semantics import ErroSemantico
 
 @pytest.mark.parametrize("codigo,palavra", [
     ('algoritmo "T"\ninicio\n    class:inteiro = 5\n    escrever(class)\n', "class"),
-    ('algoritmo "T"\nfuncao f(return:inteiro):inteiro\n    devolver return\ninicio\n    escrever(f(1))\n', "return"),
+    ('algoritmo "T"\nfuncao f(return:inteiro):inteiro\n    retornar return\ninicio\n    escrever(f(1))\n', "return"),
     ('algoritmo "T"\nestrutura P\n    import:inteiro\ninicio\n    escrever(1)\n', "import"),
-    ('algoritmo "T"\nfuncao def():inteiro\n    devolver 1\ninicio\n    escrever(def())\n', "def"),
+    ('algoritmo "T"\nfuncao def():inteiro\n    retornar 1\ninicio\n    escrever(def())\n', "def"),
     ('algoritmo "T"\ninicio\n    para for de 1 ate 3 fazer\n        escrever(for)\n', "for"),
     ('algoritmo "T"\nestrutura class\n    x:inteiro\ninicio\n    escrever(1)\n', "class"),
 ])
