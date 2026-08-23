@@ -6,6 +6,10 @@ pasta com três variáveis:
     NOME      -- nome da biblioteca em minúsculas (ex: "matematica")
     CABECALHO -- código Python injetado uma vez no topo do ficheiro gerado
     FUNCOES   -- dicionário nome_metodo -> (categorias_args, tipo_retorno, codigo_python)
+                 ou (categorias_args, tipo_retorno, codigo_python, dims_retorno)
+                 -- o 4º elemento é opcional (omitido = 0, valor escalar);
+                 usa-se 1 quando a função devolve um vetor do tipo indicado
+                 em tipo_retorno (ex.: cadeia.dividir devolve cadeia[]).
 
 A biblioteca fica disponível automaticamente com 'importar NomeDaBiblioteca'.
 """

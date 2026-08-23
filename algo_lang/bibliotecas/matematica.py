@@ -15,24 +15,10 @@ FUNCOES = {
         ["numeric", "numeric"], "decimal",
         # potencia() declara sempre retorno 'decimal', mas base**exp do
         # Python fica 'int' quando base e exp são ambos inteiros -- float()
-        # garante que o valor devolvido corresponde ao tipo declarado.
-        # AL-85/B13: mesma proteção que _algo_pot (codegen.py, AL-57/B16)
-        # para o operador '^' -- sem isto, base negativa com expoente
-        # fracionário faz 'base ** exp' devolver um 'complex', e
-        # float(complex) levanta TypeError cru (não traduzido por
-        # _algo_traduzir_valueerro, que só trata ValueError).
-        #
-        # AUDITORIA_2026-08-19 bug #35: 'float(base ** exp)' incondicional
-        # rebentava com OverflowError para um resultado inteiro exato mas
-        # com dígitos a mais para caber num float (ex.: 2**100000) --
-        # inconsistente com o operador '^' (_algo_pot, codegen.py), que
-        # nesse caso NUNCA força float e por isso nunca rebenta (só falha
-        # mais tarde ao IMPRIMIR, bug #33, já traduzido). Tentar float()
-        # primeiro (em vez de nunca converter, como o plano inicial
-        # sugeria) preserva o contrato "potencia() devolve sempre decimal"
-        # para o caso normal -- só cai para o inteiro em bruto quando o
-        # próprio float() rebenta, replicando exatamente o comportamento
-        # de sucesso do '^' só nesse caso extremo.
+        # garante que o valor devolvido corresponde ao tipo declarado. Se
+        # float() rebentar com OverflowError (resultado grande demais para
+        # caber num float), devolve o inteiro em bruto, replicando o
+        # comportamento do operador '^' nesse caso extremo.
         "def matematica_potencia(base, exp):\n"
         "    if base < 0 and not float(exp).is_integer():\n"
         "        raise ValueError(\"negative number cannot be raised to a fractional power\")\n"
@@ -45,9 +31,9 @@ FUNCOES = {
         "        return resultado\n",
     ),
     "absoluto": (
-        # AL-19: "numeric" como tipo de retorno é um marcador especial --
-        # devolve o mesmo tipo do argumento (ver semantics.py:
-        # _verificar_chamada), não sempre 'decimal'.
+        # "numeric" como tipo de retorno é um marcador especial -- devolve
+        # o mesmo tipo do argumento (ver semantics.py: _verificar_chamada),
+        # não sempre 'decimal'.
         ["numeric"], "numeric",
         "def matematica_absoluto(x):\n    return abs(x)\n",
     ),
@@ -61,14 +47,9 @@ FUNCOES = {
     ),
     "aleatorio": (
         ["inteiro", "inteiro"], "inteiro",
-        # AL-86/B22: sem esta verificação, 'a > b' fazia _random.randint
-        # levantar ValueError com o texto interno do Python ("empty range
-        # in randrange(...)"), incluindo um número que não corresponde a
-        # nenhum argumento escrito pelo estudante (é 'b+1', artefacto
-        # interno do randrange) -- mensagem própria e clara em vez disso.
         "def matematica_aleatorio(a, b):\n"
         "    if a > b:\n"
-        "        raise ValueError(\n"
+        "        raise _AlgoErroAmigavel(\n"
         "            f\"o limite inferior ({a}) não pode ser maior do que o limite \"\n"
         "            f\"superior ({b})\")\n"
         "    return _random.randint(a, b)\n",

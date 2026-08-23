@@ -6,7 +6,7 @@ PALAVRAS_CHAVE = {
     "escrever", "ler",
     "se", "entao", "senao",
     "para", "de", "ate", "passo", "fazer",
-    "enquanto",
+    "enquanto", "sair", "continuar",
     "escolher", "caso", "contrario",
     "funcao", "procedimento", "devolver", "ref",
     "importar", "incluir",
@@ -72,24 +72,17 @@ def _remover_comentarios_bloco(codigo: str) -> str:
     while i < n:
         c = codigo[i]
         if (dentro_str or dentro_char) and c == "\\" and i + 1 < n:
-            # AL-42: um '\"'/'\\' escapado dentro de uma string (ou um '\''
-            # escapado dentro de um caracter) não pode alternar dentro_str/
-            # dentro_char -- ao contrário do que este laço fazia antes,
-            # tratando toda aspa como fecho real. Sem isto, uma string como
-            # "say \" then // not a comment" fechava cedo demais no '\"', e
-            # o '//' a seguir apagava o resto da linha como se fosse
-            # comentário.
+            # Um '\"'/'\\' escapado dentro de uma string (ou um '\''
+            # escapado dentro de um caracter) não alterna dentro_str/
+            # dentro_char.
             resultado.append(codigo[i:i + 2])
             i += 2
             continue
         if not dentro_str and not dentro_char and c == "/" and i + 1 < n and codigo[i + 1] == "/":
-            # AL-XX: um '//' de comentário de linha tem de "esconder" o
-            # resto da linha desta passagem -- senão um '/*' que apareça
-            # depois de um '//' na mesma linha (ex.: "// 2 / 4 * 3, nao
-            # e um bloco") é lido como abertura real de comentário de
-            # bloco. A remoção efetiva do '//' acontece mais tarde, em
-            # _remover_comentario (linha a linha); aqui só avançamos até
-            # à quebra de linha sem interpretar o conteúdo.
+            # '//' esconde o resto da linha desta passagem, para um '/*'
+            # depois de um '//' na mesma linha não ser lido como abertura
+            # de comentário de bloco. A remoção efetiva acontece mais
+            # tarde, em _remover_comentario.
             j = i
             while j < n and codigo[j] != "\n":
                 j += 1
@@ -106,12 +99,10 @@ def _remover_comentarios_bloco(codigo: str) -> str:
                     "comentário de bloco '/*' nunca foi fechado com '*/'", linha_abertura)
             trecho = codigo[i:j + 2]
             n_newlines = trecho.count("\n")
-            # AL-41: um comentário de bloco numa só linha (sem newline
-            # nenhum) tem de deixar um separador -- substituí-lo por ""
-            # fundia os tokens dos dois lados (ex.: "a/*c*/b" virava o
-            # identificador único "ab"). Só quando o comentário TEM
-            # newlines é que os preservamos tal-e-qual, para os números de
-            # linha a seguir continuarem corretos.
+            # Um comentário de bloco numa só linha tem de deixar um
+            # separador (substituir por "" fundiria os tokens dos dois
+            # lados). Newlines dentro do comentário são preservados para os
+            # números de linha a seguir continuarem corretos.
             resultado.append("\n" * n_newlines if n_newlines else " ")
             i += len(trecho)
             continue
@@ -156,11 +147,8 @@ def tokenizar(codigo: str):
     tokens = []
     pilha_indent = [0]
     linha_num = 0
-    # AL-15: mistura de tabs/espaços entre LINHAS DIFERENTES do mesmo
-    # ficheiro -- cada linha isolada pode ser válida (só tabs, ou só
-    # grupos de 4 espaços), mas misturar os dois estilos ao longo do
-    # ficheiro já era um erro de compilação dentro da mesma linha;
-    # agora é consistentemente um erro também entre linhas.
+    # Mistura de tabs/espaços entre LINHAS DIFERENTES do mesmo ficheiro é
+    # erro de compilação, mesmo que cada linha isolada seja válida.
     estilo_indentacao = None
     linha_primeiro_estilo = None
 
@@ -185,10 +173,8 @@ def tokenizar(codigo: str):
                     f"e usa-o em todo o ficheiro", linha_num)
 
         if nivel > pilha_indent[-1]:
-            # AL-73: um bloco novo tem de aumentar exatamente 1 unidade em
-            # relacao ao nivel envolvente -- sem isto, um salto de 2+
-            # unidades de uma vez (ex. por engano ao copiar/colar) era
-            # aceite em silencio, mascarando um erro de indentacao comum.
+            # Um bloco novo tem de aumentar exatamente 1 unidade em relação
+            # ao nível envolvente -- um salto de 2+ de uma vez é rejeitado.
             if nivel != pilha_indent[-1] + 1:
                 raise ErroLexico(
                     f"indentação avança {nivel - pilha_indent[-1]} níveis de uma vez "
@@ -199,7 +185,7 @@ def tokenizar(codigo: str):
         while nivel < pilha_indent[-1]:
             pilha_indent.pop()
             tokens.append(Token("DEDENT", nivel, linha_num))
-        if nivel != pilha_indent[-1]:  # pragma: no cover -- AL-73 garante pilha_indent contigua (0,1,...,profundidade), logo nivel corresponde sempre a um valor da pilha apos o loop de DEDENT acima; mantido como rede de seguranca defensiva.
+        if nivel != pilha_indent[-1]:  # pragma: no cover -- pilha_indent e sempre contigua (0,1,...,profundidade), logo nivel corresponde sempre a um valor da pilha apos o loop de DEDENT acima; mantido como rede de seguranca defensiva.
             raise ErroLexico("indentação inconsistente", linha_num)
 
         # coluna_inicial: posição (1-baseada) onde 'linha_stripped' começa
@@ -224,8 +210,8 @@ def _remover_comentario(linha):
     while i < len(linha):
         c = linha[i]
         if (dentro_str or dentro_char) and c == "\\" and i + 1 < len(linha):
-            # AL-42: mesma correção que _remover_comentarios_bloco -- uma
-            # aspa escapada não fecha a string/caracter.
+            # Mesma lógica que _remover_comentarios_bloco: aspa escapada não
+            # fecha a string/caracter.
             i += 2
             continue
         if c == '"' and not dentro_char:
@@ -246,17 +232,16 @@ def _tokenizar_linha(linha, linha_num, coluna_inicial=1):
         c = linha[i]
         coluna = coluna_inicial + i
         if c == " " or c == "\t":
-            # AL-72: um tab a meio de uma linha (fora da indentacao, ex.
-            # colado de um editor com tabs de alinhamento) e whitespace tal
-            # como o espaco -- so a INDENTACAO exige um estilo consistente
-            # (ver _medir_indentacao), nao o resto da linha.
+            # Um tab a meio de uma linha é whitespace tal como o espaço --
+            # só a INDENTAÇÃO exige um estilo consistente (ver
+            # _medir_indentacao), não o resto da linha.
             i += 1
             continue
         if c == '"':
-            # AL-13: escapes reconhecidos dentro de literais de texto --
-            # \" (aspa literal), \\ (barra invertida literal), \n (quebra
-            # de linha). Um '\' seguido de outra coisa qualquer não é uma
-            # sequência de escape reconhecida e fica tal-e-qual no valor.
+            # Escapes reconhecidos dentro de literais de texto -- \" (aspa
+            # literal), \\ (barra invertida literal), \n (quebra de linha).
+            # Um '\' seguido de outra coisa qualquer fica tal-e-qual no
+            # valor.
             j = i + 1
             buf = []
             while j < n and linha[j] != '"':
@@ -272,9 +257,8 @@ def _tokenizar_linha(linha, linha_num, coluna_inicial=1):
             i = j + 1
             continue
         if c == "'":
-            # AL-43: mesmos escapes que STRING (\' aspa simples literal, \\
-            # barra invertida literal) -- sem isto não havia forma nenhuma
-            # de representar um caracter ''' (apóstrofo).
+            # Mesmos escapes que STRING (\' aspa simples literal, \\ barra
+            # invertida literal).
             j = i + 1
             buf = []
             while j < n and linha[j] != "'":
@@ -295,8 +279,8 @@ def _tokenizar_linha(linha, linha_num, coluna_inicial=1):
             i = j + 1
             continue
         if c.isdigit() or (c == "." and i + 1 < n and linha[i + 1].isdigit()):
-            # AL-74: um decimal pode comecar por '.' sem digito antes
-            # (ex. '.5'), nao so terminar sem digito depois (ex. '1.').
+            # Um decimal pode começar por '.' sem dígito antes (ex. '.5'),
+            # não só terminar sem dígito depois (ex. '1.').
             j = i
             is_float = False
             while j < n and (linha[j].isdigit() or (linha[j] == "." and not is_float)):

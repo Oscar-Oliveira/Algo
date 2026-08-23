@@ -86,6 +86,150 @@ def test_ciclo_para_tem_aresta_de_retorno():
     assert len(arestas_entrada) >= 2
 
 
+# ---------- AUDITORIA_2026-08-22 ronda 14: 'sair'/'continuar' no fluxograma ----------
+
+def _no_com_rotulo(dot, rotulo):
+    for linha in dot.splitlines():
+        if f'label="{rotulo}"' in linha:
+            return linha.strip().split(" ")[0]
+    raise AssertionError(f"nenhum nó com rótulo {rotulo!r} encontrado")  # pragma: no cover
+
+
+def _alvos_de(dot, no_id):
+    alvos = []
+    for linha in dot.splitlines():
+        linha = linha.strip()
+        if linha.startswith(f"{no_id} ->"):
+            alvos.append(linha.split("->")[1].strip().rstrip(";").split(" ")[0])
+    return alvos
+
+
+def _forma_do_no(dot, no_id):
+    for linha in dot.splitlines():
+        linha = linha.strip()
+        if linha.startswith(f"{no_id} [") and "label=" in linha:
+            return linha
+    raise AssertionError(f"nó {no_id!r} não declarado")  # pragma: no cover
+
+
+def test_sair_em_enquanto_salta_para_o_fim_do_ciclo():
+    dot = _dot_para("""
+        algoritmo "T"
+        inicio
+            enquanto verdadeiro fazer
+                sair
+    """)
+    sair_id = _no_com_rotulo(dot, "sair")
+    fim_id = next(l.strip().split(" ")[0] for l in dot.splitlines() if 'shape=point' in l)
+    assert fim_id in _alvos_de(dot, sair_id)
+
+
+def test_continuar_em_para_salta_para_o_no_de_condicao():
+    dot = _dot_para("""
+        algoritmo "T"
+        inicio
+            i:inteiro
+            para i de 1 ate 3 fazer
+                continuar
+    """)
+    continuar_id = _no_com_rotulo(dot, "continuar")
+    diamante_id = next(l.strip().split(" ")[0] for l in dot.splitlines() if "shape=diamond" in l)
+    assert diamante_id in _alvos_de(dot, continuar_id)
+
+
+def test_continuar_em_faz_enquanto_salta_para_a_condicao_nao_para_o_inicio_do_corpo():
+    """O teste crítico do fluxograma: a condição de um 'fazer...enquanto'
+    só é avaliada DEPOIS do corpo -- um 'continuar' tem de saltar para
+    essa avaliação (o nó 'diamond'), não para o início do corpo (o nó
+    'point' antes dele), que reentraria sem verificar a condição --
+    mesmo bug que foi corrigido no codegen para este caso."""
+    dot = _dot_para("""
+        algoritmo "T"
+        inicio
+            i:inteiro = 0
+            fazer
+                i = i + 1
+                continuar
+            enquanto i < 5
+    """)
+    continuar_id = _no_com_rotulo(dot, "continuar")
+    alvos = _alvos_de(dot, continuar_id)
+    assert len(alvos) >= 1
+    formas_alvo = [_forma_do_no(dot, a) for a in alvos]
+    assert any("shape=diamond" in f for f in formas_alvo)
+    assert not any("shape=point" in f for f in formas_alvo)
+
+
+def test_sair_dentro_de_escolher_dentro_de_ciclo_salta_para_o_fim_do_ciclo_exterior():
+    dot = _dot_para("""
+        algoritmo "T"
+        inicio
+            x:inteiro = 1
+            enquanto verdadeiro fazer
+                escolher x
+                    caso 1
+                        sair
+    """)
+    sair_id = _no_com_rotulo(dot, "sair")
+    # o fim_id do ciclo é um nó 'point' -- tem de ser um dos alvos do 'sair'
+    pontos = [l.strip().split(" ")[0] for l in dot.splitlines() if "shape=point" in l]
+    assert any(p in _alvos_de(dot, sair_id) for p in pontos)
+
+
+def test_sair_em_ciclos_aninhados_aponta_cada_um_para_o_seu_proprio_fim():
+    dot = _dot_para("""
+        algoritmo "T"
+        inicio
+            i:inteiro
+            j:inteiro
+            para i de 1 ate 3 fazer
+                para j de 1 ate 3 fazer
+                    sair
+                sair
+    """)
+    ids = []
+    for linha in dot.splitlines():
+        linha = linha.strip()
+        if linha.startswith("n") and "[label=" in linha and "->" not in linha:
+            ids.append(linha.split(" ")[0])
+    assert len(ids) == len(set(ids)), "há nós com o mesmo identificador"
+
+
+@pytest.mark.skipif(not GRAPHVIZ_DISPONIVEL, reason="Graphviz ('dot') não está instalado")
+def test_graphviz_consegue_renderizar_dot_com_sair_e_continuar():
+    dot = _dot_para("""
+        algoritmo "T"
+        inicio
+            i:inteiro = 0
+            fazer
+                i = i + 1
+                se i mod 2 == 0 entao
+                    continuar
+                escrever(i)
+            enquanto i < 5
+            j:inteiro
+            para j de 1 ate 3 fazer
+                se j == 2 entao
+                    sair
+            x:inteiro = 1
+            enquanto verdadeiro fazer
+                escolher x
+                    caso 1
+                        sair
+                    contrario
+                        continuar
+    """)
+    with tempfile.TemporaryDirectory() as pasta:
+        caminho_dot = os.path.join(pasta, "grafo.dot")
+        caminho_png = os.path.join(pasta, "grafo.png")
+        with open(caminho_dot, "w", encoding="utf-8") as f:
+            f.write(dot)
+        resultado = subprocess.run(["dot", "-Tpng", caminho_dot, "-o", caminho_png],
+                                    capture_output=True, text=True)
+        assert resultado.returncode == 0, resultado.stderr
+        assert os.path.getsize(caminho_png) > 0
+
+
 def test_escolha_gera_um_ramo_por_caso_mais_contrario():
     dot = _dot_para("""
         algoritmo "T"

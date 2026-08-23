@@ -139,6 +139,20 @@ class ChamadaStmt(No):
         self.linha = linha
 
 
+class Sair(No):
+    """'sair' -- equivalente a 'break', só válido dentro de um ciclo
+    ('enquanto'/'para'/'fazer...enquanto'), verificado em semantics.py."""
+    def __init__(self, linha):
+        self.linha = linha
+
+
+class Continuar(No):
+    """'continuar' -- equivalente a 'continue', mesma restrição de
+    contexto que Sair."""
+    def __init__(self, linha):
+        self.linha = linha
+
+
 # ---- expressões ----
 
 class LValue(No):
@@ -268,8 +282,6 @@ def coletar_identificadores(programa):
     for e in programa.estruturas:
         nomes.append((e.nome, e.linha))
         for c in e.campos:
-            # AL-77: usava e.linha (linha da 'estrutura X') em vez da linha
-            # real do campo -- c.linha ja esta disponivel e correta.
             nomes.append((c.nome, c.linha))
 
     return nomes

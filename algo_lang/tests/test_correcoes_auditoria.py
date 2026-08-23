@@ -1059,6 +1059,44 @@ def test_potencia_com_expoente_variavel_e_tratada_como_decimal():
         """)
 
 
+# ---------- AUDITORIA_2026-08-22 ronda 14: '^' com expoente 'constante'
+# (ou expressão só de literais) era tipado 'decimal' por engano,
+# rejeitando código válido em compilação ----------
+
+def test_potencia_com_expoente_constante_inteira_e_tratada_como_inteiro():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            constante E:inteiro = 3
+            x:inteiro = 5 ^ E
+            escrever(x)
+    """)
+    assert saida.strip() == "125"
+
+
+def test_potencia_com_expoente_soma_de_literais_e_tratada_como_inteiro():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            x:inteiro = 5 ^ (2 + 3)
+            escrever(x)
+    """)
+    assert saida.strip() == "3125"
+
+
+def test_potencia_com_expoente_constante_negativa_continua_decimal():
+    """Não regressão: uma 'constante' com valor negativo continua a dar
+    'decimal', tal como um literal negativo direto já dava."""
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            constante E:inteiro = -2
+            y:decimal = 2 ^ E
+            escrever(y)
+    """)
+    assert saida.strip() == "0.25"
+
+
 def test_sem_comparacao_incomparavel():
     with pytest.raises(ErroSemantico, match="não é possível comparar"):
         compilar("""
@@ -1548,12 +1586,47 @@ def test_codegen_campo_de_estrutura_que_e_vetor_nao_e_partilhado():
     assert saida.strip() == "a=99 b=0"
 
 
-def test_parser_mensagem_de_erro_com_token_sem_nome_amigavel():
-    """Confirma o caminho genérico de _nome_amigavel para tokens que não
-    estão no dicionário NOMES_AMIGAVEIS (ex: INT)."""
+def test_parser_nome_amigavel_generico_para_token_sem_entrada_no_dicionario():
+    """Confirma o caminho genérico de _nome_amigavel para tokens cujo
+    tipo.lower() já é por coincidência uma palavra portuguesa válida
+    (ex: MENOR -> 'menor'), por isso não precisam de entrada dedicada em
+    NOMES_AMIGAVEIS."""
+    from algo_lang.compilador.parser import _nome_amigavel
+    assert _nome_amigavel("MENOR", "<") == "menor ('<')"
+
+
+# ---------- AUDITORIA_2026-08-22 ronda 14: _nome_amigavel deixava passar
+# jargão em inglês/abreviaturas internas (string/int/float/le/ge) para
+# tipos de token sem entrada em NOMES_AMIGAVEIS ----------
+
+def test_parser_mensagem_de_erro_nao_mostra_jargao_ingles_para_string():
     from algo_lang.compilador.parser import ErroSintatico
-    with pytest.raises(ErroSintatico, match=r"int \(5\)"):
+    with pytest.raises(ErroSintatico) as excinfo:
+        parse('algoritmo Teste\ninicio\n    escrever(1)\nfim\n')
+    mensagem = str(excinfo.value)
+    assert "um texto entre aspas duplas" in mensagem
+    assert "string" not in mensagem.lower()
+
+
+def test_parser_mensagem_de_erro_mostra_numero_inteiro_em_portugues_com_valor():
+    from algo_lang.compilador.parser import ErroSintatico
+    with pytest.raises(ErroSintatico, match=r"um número inteiro \(5\)"):
         parse('algoritmo "T"\ninicio\n    x = 5 5\n')
+
+
+def test_parser_mensagem_de_erro_mostra_numero_decimal_em_portugues_com_valor():
+    from algo_lang.compilador.parser import ErroSintatico
+    with pytest.raises(ErroSintatico, match=r"um número decimal \(5\.5\)"):
+        parse('algoritmo "T"\ninicio\n    x = 5 5.5\nfim\n')
+
+
+def test_parser_mensagem_de_erro_nao_mostra_jargao_ingles_para_le_ge():
+    from algo_lang.compilador.parser import ErroSintatico
+    with pytest.raises(ErroSintatico) as excinfo:
+        parse('algoritmo "T"\ninicio\n    escrever(<=5)\nfim\n')
+    mensagem = str(excinfo.value)
+    assert "'<='" in mensagem
+    assert " le " not in mensagem.lower() and not mensagem.lower().endswith(" le")
 
 
 # ---------- lacuna grave encontrada: 'incluir' nunca era testado ----------
@@ -3506,6 +3579,62 @@ def test_mesmo_campo_de_estrutura_por_referencia_duas_vezes_da_erro():
         """)
 
 
+# ---------- AUDITORIA_2026-08-22 ronda 14 (item 2): aliasing entre 'ref'
+# da estrutura/vetor INTEIRO e 'ref' de um campo/elemento dele não era
+# detetado -- uma escrita ficava silenciosamente perdida em runtime,
+# dependendo só da ordem dos parâmetros na assinatura ----------
+
+def test_ref_estrutura_inteira_e_ref_campo_dela_da_erro():
+    """Repro original do item 2: 'ref todo:Ponto' + 'ref campo:inteiro'
+    (com 'p' e 'p.x' passados na mesma chamada) apontam sempre para a
+    mesma posição de memória -- tem de ser detetado em compilação, não
+    deixar uma das duas escritas desaparecer silenciosamente."""
+    with pytest.raises(ErroSemantico, match=r"'p\.x' é passado por referência mais do que uma vez"):
+        compilar("""
+            algoritmo "T"
+            estrutura Ponto
+                x:inteiro
+                y:inteiro
+            procedimento bug(ref todo:Ponto, ref campo:inteiro)
+                todo.x = 100
+                campo = 999
+            inicio
+                p:Ponto = {x: 1, y: 2}
+                bug(p, p.x)
+        """)
+
+
+def test_ref_vetor_inteiro_e_ref_elemento_dele_da_erro():
+    """Extensão natural do item 2: um vetor inteiro e um elemento dele
+    (sem índice do lado do vetor inteiro -- não depende de runtime,
+    ao contrário de 'v[i]'/'v[j]') também são sempre a mesma posição."""
+    with pytest.raises(ErroSemantico, match=r"'v\[0\]' é passado por referência mais do que uma vez"):
+        compilar("""
+            algoritmo "T"
+            procedimento bug(ref todo:inteiro[], ref elem:inteiro)
+                elem = 99
+            inicio
+                v:inteiro[3] = {1, 2, 3}
+                bug(v, v[0])
+        """)
+
+
+def test_ref_campo_vetor_de_estrutura_e_ref_elemento_dele_da_erro():
+    """Caminho mais profundo: um campo-vetor de uma estrutura e um
+    elemento desse mesmo campo."""
+    with pytest.raises(ErroSemantico, match=r"'c\.vetor\[0\]' é passado por referência mais do que uma vez"):
+        compilar("""
+            algoritmo "T"
+            estrutura Caixa
+                vetor:inteiro[3]
+            procedimento bug(ref todo:inteiro[], ref elem:inteiro)
+                elem = 99
+            inicio
+                c:Caixa
+                bug(c.vetor, c.vetor[0])
+        """)
+
+
 def test_indices_diferentes_do_mesmo_vetor_por_referencia_continua_a_compilar():
     compilar("""
         algoritmo "T"
@@ -3764,6 +3893,16 @@ def test_shlex_split_sem_escape_continua_a_suportar_aspas_com_espacos():
     assert partes == ["executa", r"C:\pasta com espacos\prog.algo"]
 
 
+# ---------- AUDITORIA_2026-08-22 ronda 14: shlex tratava '#' como início
+# de comentário, truncando em silêncio um nome de ficheiro sem aspas
+# com '#' (ex.: exercícios numerados) ----------
+
+def test_shlex_split_sem_escape_preserva_cardinal_em_nome_de_ficheiro():
+    from algo_lang.cli import _shlex_split_sem_escape
+    partes = _shlex_split_sem_escape("executa exercicio#3.algo")
+    assert partes == ["executa", "exercicio#3.algo"]
+
+
 # ---------- B19 (AL-93): cli -- cmd_executa saía sempre, mesmo com sucesso, a consola nunca memorizava o ficheiro ----------
 
 def test_cmd_executa_bem_sucedido_nao_levanta_systemexit(tmp_path, capfd):
@@ -3788,6 +3927,64 @@ def test_cmd_executa_com_erro_em_runtime_continua_a_sair_com_codigo_1(tmp_path):
     with pytest.raises(SystemExit) as excinfo:
         cmd_executa(args)
     assert excinfo.value.code != 0
+
+
+# ---------- AUDITORIA_2026-08-22 ronda 14 (ponto concetual): 'algo executa'
+# sem --debug/--json não tinha nenhum guarda contra um programa que nunca
+# termina (só o modo --debug/--json tinha MAX_PASSOS) -- um ciclo infinito
+# CPU-bound (ex.: fibonacci recursivo sem memoização) ficava pendurado
+# indefinidamente, sem aviso nenhum ----------
+
+def test_comando_com_limite_cpu_usa_bootstrap_valido_em_posix():
+    from algo_lang.cli import _comando_com_limite_cpu, _bootstrap_limite_cpu, LIMITE_CPU_SEGUNDOS
+    import algo_lang.cli as cli_mod
+    bootstrap = _bootstrap_limite_cpu()
+    compile(bootstrap, "<bootstrap>", "exec")  # tem de ser Python válido
+    assert f"({LIMITE_CPU_SEGUNDOS}, {LIMITE_CPU_SEGUNDOS})" in bootstrap
+    assert "RLIMIT_CPU" in bootstrap
+    original = cli_mod.os.name
+    cli_mod.os.name = "posix"
+    try:
+        comando = _comando_com_limite_cpu("prog.py")
+    finally:
+        cli_mod.os.name = original
+    assert comando == [sys.executable, "-c", bootstrap, "prog.py"]
+
+
+def test_comando_com_limite_cpu_sem_alteracao_fora_de_posix():
+    """No Windows (algo.bat), sem 'resource', o comando continua exatamente
+    como era antes desta correção -- nenhum guarda, mas nenhuma regressão."""
+    from algo_lang.cli import _comando_com_limite_cpu
+    import algo_lang.cli as cli_mod
+    original = cli_mod.os.name
+    cli_mod.os.name = "nt"
+    try:
+        comando = _comando_com_limite_cpu("prog.py")
+    finally:
+        cli_mod.os.name = original
+    assert comando == [sys.executable, "prog.py"]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="resource.RLIMIT_CPU só existe em POSIX")
+def test_ciclo_infinito_cpu_bound_e_interrompido_com_aviso_amigavel(tmp_path, capfd, monkeypatch):
+    """Fim-a-fim real (não mockado): um programa que nunca termina (ciclo
+    'enquanto verdadeiro' puramente CPU-bound, sem ler()/E-S) é mesmo morto
+    pelo limite de CPU, e o estudante vê um aviso -- não fica preso para
+    sempre nem sai em silêncio. Limite baixado via monkeypatch para o teste
+    não demorar os 10s do valor por omissão."""
+    import argparse
+    import algo_lang.cli as cli_mod
+    monkeypatch.setattr(cli_mod, "LIMITE_CPU_SEGUNDOS", 1)
+    algo_path = tmp_path / "infinito.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    x:inteiro = 0\n    enquanto verdadeiro fazer\n        x = x + 1\n',
+        encoding="utf-8")
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), debug=False, json=False, mostrar_python=False)
+    with pytest.raises(SystemExit) as excinfo:
+        cli_mod.cmd_executa(args)
+    assert excinfo.value.code != 0
+    assert "tempo de CPU" in capfd.readouterr().out
 
 
 # ---------- B20 (AL-94): cli -- ficheiro de --entradas com codificação inválida dava traceback cru ----------
@@ -4361,6 +4558,86 @@ def test_subcadeia_com_limites_invertidos_da_erro_amigavel():
     assert "início" in resultado.stdout and "fim" in resultado.stdout
 
 
+# ---------- AUDITORIA_2026-08-22 ronda 14: mensagens já escritas em
+# português por uma biblioteca (cadeia.subcadeia, matematica.aleatorio,
+# conversao.*, tamanho de vetor negativo/excessivo) ficavam reembrulhadas
+# em "valor inválido (...)" por _algo_traduzir_valueerro, que só reconhece
+# mensagens NATIVAS do Python -- _AlgoErroAmigavel (ver codegen.py)
+# resolve isto de forma genérica, sem precisar de uma entrada na tabela
+# de tradução por mensagem ----------
+
+def test_subcadeia_com_limites_invertidos_nao_fica_reembrulhada():
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Cadeia
+        inicio
+            escrever(cadeia.subcadeia("algoritmo", 4, 1))
+    """)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True,
+        encoding="utf-8", timeout=10)
+    assert "valor inválido" not in resultado.stdout
+
+
+def test_aleatorio_com_limites_invertidos_nao_fica_reembrulhado():
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.aleatorio(10, 1))
+    """)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True,
+        encoding="utf-8", timeout=10)
+    assert "valor inválido" not in resultado.stdout
+
+
+def test_conversao_paracaracter_de_texto_longo_nao_fica_reembrulhado():
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Conversao
+        inicio
+            escrever(conversao.paraCaracter("ab"))
+    """)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True,
+        encoding="utf-8", timeout=10)
+    assert "valor inválido" not in resultado.stdout
+    assert "não pode ser convertido para caracter" in resultado.stdout
+
+
+def test_tamanho_de_vetor_negativo_nao_fica_reembrulhado():
+    codigo_py = compilar("""
+        algoritmo "T"
+        inicio
+            n:inteiro = 0 - 5
+            v:inteiro[n]
+            escrever(v[0])
+    """)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True,
+        encoding="utf-8", timeout=10)
+    assert "valor inválido" not in resultado.stdout
+    assert "tamanho de vetor não pode ser negativo" in resultado.stdout
+
+
+def test_mensagens_traduzidas_da_tabela_continuam_a_funcionar():
+    """Não regressão: _AlgoErroAmigavel só cobre mensagens ESCRITAS por
+    nós; um ValueError nativo do Python (ex.: potência fracionária de
+    base negativa, texto inválido para inteiro/decimal) continua a
+    passar por _algo_traduzir_valueerro normalmente."""
+    codigo_py = compilar("""
+        algoritmo "T"
+        importar Matematica
+        inicio
+            escrever(matematica.potencia(-8.0, 0.5))
+    """)
+    resultado = subprocess.run(
+        [sys.executable, "-c", codigo_py], capture_output=True, text=True,
+        encoding="utf-8", timeout=10)
+    assert "não é possível elevar um número negativo a um expoente fracionário" in resultado.stdout
+
+
 def test_subcadeia_com_limites_normais_continua_a_funcionar():
     saida = executar("""
         algoritmo "T"
@@ -4592,7 +4869,7 @@ PALAVRAS_CHAVE_ESPERADAS = {
     "escrever", "ler",
     "se", "entao", "senao",
     "para", "de", "ate", "passo", "fazer",
-    "enquanto",
+    "enquanto", "sair", "continuar",
     "escolher", "caso", "contrario",
     "funcao", "procedimento", "devolver", "ref",
     "importar", "incluir",
@@ -4603,13 +4880,15 @@ PALAVRAS_CHAVE_ESPERADAS = {
 }
 
 
-def test_lexer_conjunto_de_palavras_chave_tem_exatamente_33():
+def test_lexer_conjunto_de_palavras_chave_tem_exatamente_35():
+    """AUDITORIA_2026-08-22 (ronda 14): 33 -> 35 com a introdução de
+    'sair'/'continuar' (break/continue)."""
     from algo_lang.compilador.lexer import PALAVRAS_CHAVE
     # Se este teste falhar por o conjunto real ter mudado, a matriz de
     # rastreabilidade (secção 1) e este PALAVRAS_CHAVE_ESPERADAS têm de
     # ser atualizados a par -- não é só um número mágico.
     assert PALAVRAS_CHAVE == PALAVRAS_CHAVE_ESPERADAS
-    assert len(PALAVRAS_CHAVE) == 33
+    assert len(PALAVRAS_CHAVE) == 35
 
 
 @pytest.mark.parametrize("palavra", sorted(PALAVRAS_CHAVE_ESPERADAS))
@@ -4902,19 +5181,23 @@ def test_incluir_funcao_duplicada_da_erro_em_processo(tmp_path, capsys):
 
 
 def test_campo_de_estrutura_dentro_de_vetor_por_referencia_duas_vezes_nao_e_detetado():
-    # Limitação CONHECIDA e deliberada de _chave_ref_estatica
-    # (semantics.py:1063-1072, comentário AL-04/AL-81/B9): um acesso com
-    # ÍNDICE (ex.: 'pontos[0].x') nunca é comparável estaticamente,
-    # mesmo quando o índice é o mesmo literal nas duas chamadas -- só
-    # variáveis simples ('x') e campos sem índice ('p.x') são
-    # detetados (test_mesma_variavel_simples_passada_duas_vezes_por_
-    # referencia_da_erro, test_mesmo_campo_de_estrutura_por_referencia_
-    # duas_vezes_da_erro). Este teste fixa o comportamento ATUAL (sem
-    # erro, com o aliasing real a manifestar-se em runtime) como
-    # regressão -- não é uma correção, é documentar o limite conhecido
-    # para que não seja "corrigido" por acidente para um falso positivo
-    # (ou silenciosamente quebrado ao ponto de deixar de detetar os
-    # casos que já apanha).
+    # Limitação CONHECIDA e deliberada de _caminhos_ref_colidem
+    # (semantics.py, comentário AL-04/AL-81/B9 + item 2 da ronda 14): um
+    # acesso com ÍNDICE na MESMA profundidade nos dois caminhos (ex.:
+    # 'pontos[0].x' comparado consigo próprio) nunca é comparável
+    # estaticamente, mesmo quando o índice é o mesmo literal nas duas
+    # chamadas -- ao contrário de 'ref p' + 'ref p.x' (item 2, agora
+    # corrigido, ver test_ref_estrutura_inteira_e_ref_campo_dela_da_erro),
+    # aqui o índice em si é a fonte da ambiguidade, não um caminho mais
+    # curto que termina antes do outro. Variáveis simples ('x') e campos
+    # sem índice ('p.x') são detetados
+    # (test_mesma_variavel_simples_passada_duas_vezes_por_referencia_da_
+    # erro, test_mesmo_campo_de_estrutura_por_referencia_duas_vezes_da_
+    # erro). Este teste fixa o comportamento ATUAL (sem erro, com o
+    # aliasing real a manifestar-se em runtime) como regressão -- não é
+    # uma correção, é documentar o limite conhecido para que não seja
+    # "corrigido" por acidente para um falso positivo (ou silenciosamente
+    # quebrado ao ponto de deixar de detetar os casos que já apanha).
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6036,11 +6319,10 @@ def test_mostrar_python_desligado_nao_imprime_o_python_com_debug(tmp_path, capsy
 
 
 def test_pasta_saida_caminho_demasiado_longo_da_erro_amigavel(tmp_path):
-    """bug #30: sem isto, um caminho de saída demasiado longo para o
-    Windows dava um OSError cru ('[WinError 206] The filename or
-    extension is too long'), propagado sem tratamento nenhum. Mockado
-    (em vez de construir um caminho real de ~260 caracteres, frágil
-    entre ambientes) -- ver PLANO_CORRECOES_AUDITORIA.md."""
+    """Um caminho de saída demasiado longo para o Windows deve dar um erro
+    amigável em vez de um OSError cru ('[WinError 206] The filename or
+    extension is too long'). Mockado em vez de construir um caminho real
+    de ~260 caracteres, frágil entre ambientes."""
     from unittest.mock import patch
     from algo_lang.cli import _pasta_saida
     with patch("os.makedirs", side_effect=OSError(
@@ -6370,6 +6652,35 @@ inicio
 """)
     assert resultado.returncode == 1
     assert "Traceback" not in resultado.stdout
+
+
+# ---------- AUDITORIA_2026-08-22 ronda 14: conversao.paraInteiro de uma
+# cadeia decimal com muitos dígitos perdia precisão em silêncio (o
+# fallback usava int(float(x)), e float() só tem ~15-17 dígitos
+# significativos) ----------
+
+def test_conversao_parainteiro_de_cadeia_decimal_com_muitos_digitos_preserva_precisao():
+    numero = "9" * 49
+    saida = executar(f"""
+        algoritmo "T"
+        importar Conversao
+        inicio
+            x:cadeia = "{numero}.5"
+            escrever(conversao.paraInteiro(x))
+    """)
+    assert saida.strip() == numero
+
+
+def test_conversao_parainteiro_de_cadeia_decimal_negativa_com_muitos_digitos_preserva_precisao():
+    numero = "9" * 49
+    saida = executar(f"""
+        algoritmo "T"
+        importar Conversao
+        inicio
+            x:cadeia = "-{numero}.9"
+            escrever(conversao.paraInteiro(x))
+    """)
+    assert saida.strip() == f"-{numero}"
 
 
 def test_conversao_paradecimal_rejeita_separador_de_milhar():

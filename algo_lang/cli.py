@@ -6,6 +6,7 @@ import os
 import json
 import shutil
 import shlex
+import signal
 import subprocess
 import argparse
 
@@ -27,9 +28,6 @@ def _pasta_saida(caminho_algo: str):
     nome_base = os.path.splitext(os.path.basename(caminho_algo))[0]
     pasta = os.path.join(pasta_base, nome_base)
     if os.path.isfile(pasta):
-        # AL-33: os.makedirs(..., exist_ok=True) só tolera a pasta já
-        # existir -- se já houver um FICHEIRO com este nome, levanta
-        # FileExistsError/NotADirectoryError não tratado.
         print(
             f"❌ Erro: não é possível criar a pasta '{pasta}' -- já existe um "
             f"ficheiro com esse nome. Renomeia ou remove esse ficheiro e tenta outra vez."
@@ -38,13 +36,6 @@ def _pasta_saida(caminho_algo: str):
     try:
         os.makedirs(pasta, exist_ok=True)
     except OSError as e:
-        # AUDITORIA_2026-08-19 bug #30: sem isto, um caminho de saída a
-        # rondar os ~260 caracteres (facilmente alcançável com uma
-        # estrutura de pastas de curso aninhada, ou com o Ambiente de
-        # Trabalho sincronizado por OneDrive) dava um OSError cru do
-        # Windows ("[WinError 206] The filename or extension is too
-        # long"), propagado sem tratamento nenhum -- nenhuma das outras
-        # mensagens amigáveis deste ficheiro apanhava este caso.
         print(
             f"❌ Erro: não consegui criar a pasta de saída '{pasta}' ({e}) -- "
             f"o caminho pode ser demasiado longo para o Windows; tenta mover o "
@@ -55,19 +46,10 @@ def _pasta_saida(caminho_algo: str):
 
 
 def _ler_ficheiro_algo(caminho: str) -> str:
-    """Lê um .algo como UTF-8 -- AL-34: sem isto, um ficheiro noutra
-    codificação (ex: Latin-1 guardado por engano) levantava
-    UnicodeDecodeError não tratado, um traceback confuso em vez de uma
-    sugestão do que fazer.
-
-    AUDITORIA_2026-08-19 bug #28: 'utf-8-sig', não 'utf-8' -- vários
-    editores no Windows (incluindo o Bloco de Notas, ao "Guardar como
-    UTF-8") escrevem um BOM (EF BB BF) no início do ficheiro por
-    omissão. 'utf-8' simples não o remove, por isso ficava como um
-    caractere invisível logo na linha 1, coluna 1, dando um erro
-    léxico que o estudante não conseguia relacionar com nada visível
-    no seu editor. 'utf-8-sig' remove-o se existir e é um no-op seguro
-    quando não há BOM nenhum."""
+    """Lê um .algo como UTF-8. Usa 'utf-8-sig' (não 'utf-8') porque vários
+    editores no Windows (incluindo o Bloco de Notas) escrevem um BOM no
+    início do ficheiro; 'utf-8-sig' remove-o se existir e é um no-op
+    seguro quando não há BOM nenhum."""
     try:
         with open(caminho, "r", encoding="utf-8-sig") as f:
             return f.read()
@@ -81,8 +63,8 @@ def _ler_ficheiro_algo(caminho: str) -> str:
 
 def _resolver_inclusoes(programa, pasta_base, ja_incluidos=None):
     """Lê os ficheiros de 'incluir' e junta as suas funções/declarações
-    ao programa principal -- recursivamente (AL-36: uma biblioteca
-    incluída também pode ter 'incluir'), com deduplicação por caminho
+    ao programa principal -- recursivamente (uma biblioteca incluída
+    também pode ter 'incluir'), com deduplicação por caminho
     absoluto partilhada por toda a árvore de inclusões, para nunca
     processar o mesmo ficheiro duas vezes nem entrar em ciclo infinito
     (ex.: A inclui B, B inclui A)."""
@@ -96,12 +78,9 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
         caminho = inc.caminho
         if not os.path.isabs(caminho):
             caminho = os.path.join(pasta_base, caminho)
-        # AL-62/B22: os.path.normcase, não só normpath -- em sistemas de
-        # ficheiros case-insensitive (Windows/macOS, onde este projeto é
-        # desenvolvido), "lib.algo" e "LIB.algo" são o MESMO ficheiro, mas
-        # normpath sozinho não normaliza capitalização; sem isto, a
-        # segunda referência "colidia" com a primeira em vez de ser
-        # reconhecida como o mesmo ficheiro já incluído.
+        # os.path.normcase, não só normpath -- em sistemas de ficheiros
+        # case-insensitive (Windows/macOS), "lib.algo" e "LIB.algo" são o
+        # MESMO ficheiro, mas normpath sozinho não normaliza capitalização.
         caminho = os.path.normcase(os.path.normpath(caminho))
         if caminho in ja_incluidos:
             continue
@@ -113,14 +92,6 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
             sys.exit(1)
         codigo = _ler_ficheiro_algo(caminho)
         try:
-            # AUDITORIA_2026-08-19 bugs #6/#15: sem isto, um erro de
-            # sintaxe/léxico DENTRO do ficheiro incluído (ex.: um erro
-            # genuíno na sua linha 2, ou incluir por engano o próprio
-            # ficheiro principal, que 'parse_biblioteca' rejeita por não
-            # ter a forma de uma biblioteca) só trazia linha/coluna --
-            # nunca o CAMINHO -- fazendo o estudante olhar para a linha
-            # errada, no ficheiro errado. Mesmo padrão que
-            # online/executor.py já usa corretamente.
             declaracoes, funcoes, estruturas, inclusoes_aninhadas = parse_biblioteca(codigo)
         except (ErroLexico, ErroSintatico) as e:
             print(f"❌ Erro em '{inc.caminho}': {e}")
@@ -219,6 +190,32 @@ def compilar_ficheiro(caminho_algo: str) -> str:
     return caminho_py
 
 
+LIMITE_CPU_SEGUNDOS = 10
+
+# Limite de TEMPO DE CPU (não de relógio): ao contrário de um 'timeout='
+# de parede, nunca interrompe um programa legitimamente bloqueado em
+# ler() à espera do estudante -- E/S bloqueante não consome CPU. Mesma
+# técnica que online/executor.py usa para o serviço web. 'resource' é
+# só-POSIX -- no Windows (algo.bat), o programa corre sem este guarda.
+def _bootstrap_limite_cpu() -> str:
+    """Construído a cada chamada (não pré-calculado num literal de módulo)
+    para ler sempre o valor ATUAL de LIMITE_CPU_SEGUNDOS -- permite a um
+    teste baixar o limite via monkeypatch e confirmar o comportamento
+    real do 'resource.setrlimit' de ponta a ponta, sem esperar os 10s do
+    valor por omissão."""
+    return (
+        "import resource, os, sys\n"
+        f"resource.setrlimit(resource.RLIMIT_CPU, ({LIMITE_CPU_SEGUNDOS}, {LIMITE_CPU_SEGUNDOS}))\n"
+        "os.execv(sys.executable, [sys.executable, sys.argv[1]])\n"
+    )
+
+
+def _comando_com_limite_cpu(caminho_py: str) -> list:
+    if os.name == "posix":
+        return [sys.executable, "-c", _bootstrap_limite_cpu(), caminho_py]
+    return [sys.executable, caminho_py]  # pragma: no cover -- ambiente de desenvolvimento é sempre Windows aqui, mas mantém o código correto para POSIX
+
+
 def cmd_executa(args):
     if args.debug or args.json:
         cmd_executa_com_trace(args)
@@ -233,14 +230,16 @@ def cmd_executa(args):
         print("---------------------------------\n")
     print("----- Execução -----")
     sys.stdout.flush()
-    resultado = subprocess.run([sys.executable, caminho_py])
+    resultado = subprocess.run(_comando_com_limite_cpu(caminho_py))
+    if os.name == "posix" and resultado.returncode == -signal.SIGXCPU:
+        print(
+            f"\n⚠ O programa foi interrompido por exceder {LIMITE_CPU_SEGUNDOS}s de "
+            "tempo de CPU (possível ciclo infinito ou recursão sem fim)."
+        )
     if resultado.returncode != 0:
-        # AL-93/B19: só sai com o código de erro em INSUCESSO -- antes,
-        # isto corria incondicionalmente (mesmo com returncode 0), e como
-        # a consola só atualiza 'ultimo_ficheiro' depois de args.func(args)
-        # terminar SEM SystemExit (ver cmd_consola), o comando 'executa'/
-        # 'e' -- o mais usado -- nunca memorizava o último ficheiro, mesmo
-        # depois de correr com sucesso.
+        # Só sai com o código de erro em INSUCESSO -- cmd_consola só
+        # atualiza 'ultimo_ficheiro' depois de args.func(args) terminar
+        # SEM SystemExit.
         sys.exit(resultado.returncode)
 
 
@@ -270,10 +269,6 @@ def cmd_executa_com_trace(args):
         f.write(dados["codigo"])
     print(f"✔ Compilado para: {caminho_py}")
     if args.mostrar_python:
-        # AUDITORIA_2026-08-19 bug #16: '--mostrar-python' era ignorado
-        # em silêncio quando combinado com '--debug'/'--json' -- o
-        # Python era gerado e escrito em disco na mesma, só não era
-        # impresso, sem aviso nenhum de que a flag tinha sido ignorada.
         print("----- Código Python gerado -----")
         print(dados["codigo"])
         print("---------------------------------\n")
@@ -283,10 +278,8 @@ def cmd_executa_com_trace(args):
         if not os.path.isfile(args.entradas):
             print(f"❌ Erro: ficheiro de entradas '{args.entradas}' não encontrado")
             sys.exit(1)
-        # AL-94/B20: reaproveita _ler_ficheiro_algo (mesmo tratamento de
-        # UnicodeDecodeError que já existe para o .algo principal) -- sem
-        # isto, um ficheiro de entradas noutra codificação (ex.: Latin-1)
-        # dava um traceback cru em vez de uma mensagem amigável.
+        # Reaproveita _ler_ficheiro_algo (mesmo tratamento de
+        # UnicodeDecodeError que já existe para o .algo principal).
         entradas = _ler_ficheiro_algo(args.entradas).splitlines()
     # se não houver ficheiro de entradas, gerar_trace() usa o stdin real
     # do processo -- podes escrever os valores interativamente
@@ -315,10 +308,8 @@ def cmd_executa_com_trace(args):
         )
 
     if args.json:
-        # AL-95/B23: reaproveita _ler_ficheiro_algo em vez de reabrir o
-        # ficheiro à mão -- o conteúdo já foi lido e validado como UTF-8
-        # momentos antes (em _carregar_e_verificar), mas sem o mesmo
-        # tratamento de UnicodeDecodeError que essa função já tem.
+        # Reaproveita _ler_ficheiro_algo em vez de reabrir o ficheiro à
+        # mão, para ter o mesmo tratamento de UnicodeDecodeError.
         codigo_fonte = _ler_ficheiro_algo(args.ficheiro)
         trace_final = {
             "titulo": programa.nome,
@@ -337,12 +328,9 @@ def cmd_executa_com_trace(args):
         )
 
     if resultado["erro"] or resultado["limiteExcedido"]:
-        # AL-61/B21: cmd_executa (sem --debug/--json) propaga o código de
-        # saída real do subprocesso; este caminho nunca chamava sys.exit,
-        # por isso o MESMO programa com erro em runtime dava 'exit 1' sem
-        # --json e 'exit 0' com --json -- qualquer script/CI/corretor
-        # automático que confie no código de saída via um programa
-        # ALGO com erro como bem-sucedido.
+        # cmd_executa (sem --debug/--json) propaga o código de saída real
+        # do subprocesso; este caminho precisa do mesmo comportamento para
+        # um script/CI/corretor automático que confie no código de saída.
         sys.exit(1)
 
 
@@ -397,7 +385,6 @@ def cmd_fluxograma(args):
 
 def cmd_verifica(args):
     programa = _carregar_e_verificar(args.ficheiro)
-    # AL-95/B23: ver a mesma nota em cmd_executa_com_trace.
     codigo_fonte = _ler_ficheiro_algo(args.ficheiro)
     avisos = linter_modulo.analisar(programa, codigo_fonte)
     if not avisos:
@@ -438,13 +425,6 @@ def _linha_com_ficheiro_por_omissao(comando, resto, ultimo_ficheiro):
         if tok.startswith("--"):
             if tok in flags_com_valor:
                 if i + 1 >= len(resto):
-                    # AL-96/B24: sem esta verificação, uma flag como
-                    # '--entradas' esquecida sem valor a seguir era tratada
-                    # como se não houvesse ficheiro nenhum na linha, e o
-                    # ÚLTIMO FICHEIRO da sessão era acrescentado como se
-                    # fosse o VALOR de '--entradas' -- o argparse acabava a
-                    # reclamar de um argumento 'ficheiro' em falta, uma
-                    # mensagem que não aponta para a causa real.
                     raise ValueError(
                         f"a opção '{tok}' precisa de um valor a seguir "
                         f"(ex.: '{tok} nome_do_ficheiro')"
@@ -583,19 +563,15 @@ def _ler_linha_prompt(prompt):
 
 
 def _shlex_split_sem_escape(linha):
-    """Como shlex.split(linha), mas sem tratar '\\' como caráter de escape.
-
-    AL-92/B18: shlex.split() usa modo POSIX por omissão, em que '\\' é
-    caráter de escape -- um caminho Windows colado sem aspas (ex.:
-    'C:\\Users\\aluno\\prog.algo', típico ao copiar do Explorador) ficava
-    corrompido ('C:UsersalunoProg.algo'), e a consola reportava "ficheiro
-    não encontrado" sem nenhuma pista da causa real. Desativar só o
-    'escape' (deixando aspas simples/duplas a funcionar normalmente, para
-    nomes de ficheiro com espaços) resolve isto sem perder a separação por
-    espaços nem as aspas."""
+    """Como shlex.split(linha), mas sem tratar '\\' como caráter de escape
+    nem '#' como início de comentário -- um caminho Windows colado sem
+    aspas (ex.: 'C:\\Users\\aluno\\prog.algo') ou um nome de ficheiro com
+    '#' devem chegar intactos. Aspas simples/duplas continuam a funcionar
+    normalmente, para nomes de ficheiro com espaços."""
     lexer = shlex.shlex(linha, posix=True)
     lexer.whitespace_split = True
     lexer.escape = ""
+    lexer.commenters = ""
     return list(lexer)
 
 
@@ -655,14 +631,11 @@ def cmd_consola(parser):
         except SystemExit:
             # os comandos usam sys.exit(1) para reportar erro numa
             # invocação única -- aqui isso só deve voltar ao prompt.
-            # AL-63/B23: um ficheiro que NÃO existe (erro de escrita no
-            # nome) não deve substituir o 'ultimo_ficheiro' -- senão o
-            # estudante perde o contexto do ficheiro anterior (que
-            # funcionava) e fica preso a repetir o mesmo erro "não
-            # encontrado". Mas um ficheiro que EXISTE e falhou por outra
-            # razão (erro léxico/sintático/semântico) fica na mesma como
-            # 'ultimo_ficheiro': o fluxo normal é corrigir o erro no
-            # editor e voltar a correr só com 'e', sem repetir o nome.
+            # Um ficheiro que NÃO existe não deve substituir
+            # 'ultimo_ficheiro'; um ficheiro que EXISTE mas falhou por
+            # outra razão (erro léxico/sintático/semântico) fica na mesma
+            # como 'ultimo_ficheiro', para o fluxo normal ser corrigir e
+            # voltar a correr só com 'e'.
             ficheiro = getattr(args, "ficheiro", None)
             if ficheiro and os.path.isfile(ficheiro):
                 ultimo_ficheiro = ficheiro
@@ -671,13 +644,9 @@ def cmd_consola(parser):
             print("\n(interrompido)")
             continue
         except Exception as e:
-            # bug #36: rede de segurança -- o contrato documentado desta
-            # consola (docstring acima) é que um comando com erro só
-            # mostra o erro e volta ao prompt, nunca fecha a consola. Até
-            # aqui só SystemExit/KeyboardInterrupt eram apanhados neste
-            # ciclo; qualquer outra exceção (ex.: um SyntaxError cru vindo
-            # de um bug de codegen que gere Python inválido) fechava a
-            # sessão inteira em vez de só mostrar o erro.
+            # Rede de segurança: o contrato desta consola (docstring
+            # acima) é que um comando com erro só mostra o erro e volta ao
+            # prompt, nunca fecha a consola.
             print(f"❌ erro interno do compilador: {e}")
             continue
 
@@ -686,18 +655,12 @@ def cmd_consola(parser):
 
 
 def main():
-    # AL-35 (achado da Etapa 8 da 4ª auditoria, alargando a correção
-    # original): algo.bat/algo.sh mitigam isto só para quem invoca
-    # SEMPRE através do script de arranque (chcp 65001 + PYTHONIOENCODING
-    # no .bat) -- mas o próprio ficheiro deste módulo já documentava
-    # 'python -m algo_lang.cli' como forma alternativa de invocação
-    # (ver docstring de main(), abaixo, e o comando 'algo' instalado por
-    # pip, que chama esta função diretamente, sem passar pelo .bat, se o
-    # venv for ativado manualmente). Sem isto, qualquer um desses
-    # caminhos crasha com UnicodeEncodeError na consola do Windows
-    # (code page 1252/850 por omissão, não UTF-8) ao tentar imprimir
-    # '✔'/'❌'. Reconfigura aqui, uma única vez, para todos os caminhos
-    # de invocação ficarem protegidos por igual -- não só o .bat.
+    # algo.bat/algo.sh mitigam isto só para quem invoca sempre através do
+    # script de arranque -- mas 'python -m algo_lang.cli' e o comando
+    # 'algo' instalado por pip (venv ativado manualmente) não passam por
+    # eles. Sem isto, a consola do Windows (code page 1252/850 por
+    # omissão, não UTF-8) crasha com UnicodeEncodeError ao imprimir
+    # '✔'/'❌'.
     for fluxo in (sys.stdout, sys.stderr):
         if hasattr(fluxo, "reconfigure"):
             fluxo.reconfigure(encoding="utf-8", errors="replace")

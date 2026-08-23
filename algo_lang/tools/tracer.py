@@ -15,13 +15,9 @@ import contextlib
 
 MAX_PASSOS = 4000
 NOME_FUNCAO_PRINCIPAL = "_algo_programa"
-# AUDITORIA_2026-08-19 bug #36-bis (ronda 13): "Principal" sozinho é um
-# identificador ALGO válido -- um estudante podia legalmente chamar uma
-# função sua "Principal" (a palavra até faz sentido nesse contexto) e
-# ficar com duas entradas indistinguíveis na pilha do trace. Parênteses
-# nunca são válidos num identificador (ver lexer.py: um ID só aceita
-# letra/'_' seguido de alfanumérico/'_'), por isso este rótulo nunca
-# pode colidir com o nome de nenhuma função do estudante.
+# Parênteses nunca são válidos num identificador ALGO, por isso este
+# rótulo nunca colide com o nome de uma função do estudante (mesmo uma
+# chamada "Principal").
 NOME_VISIVEL_PRINCIPAL = "(Principal)"
 
 
@@ -45,11 +41,21 @@ class _redirect_stdin:
         return False
 
 
+def _arredondar_decimal(v):
+    """Espelha o arredondamento de codegen.py:_algo_fmt (12 casas decimais,
+    '-0.0' normalizado para 0.0), para o inspetor de variáveis do
+    --debug/--json mostrar o mesmo valor que 'escrever' mostraria."""
+    v = round(v, 12)
+    return 0.0 if v == 0.0 else v
+
+
 def _valor_serializavel(v):
     """Converte um valor Python num valor pronto para JSON, mantendo os
     tipos nativos quando possível (para a página web poder formatar como
     quiser) em vez de os transformar já em texto."""
-    if isinstance(v, (int, float, bool, str)) or v is None:
+    if isinstance(v, float):
+        return _arredondar_decimal(v)
+    if isinstance(v, (int, bool, str)) or v is None:
         return v
     if isinstance(v, list):
         return [_valor_serializavel(e) for e in v]
@@ -61,6 +67,8 @@ def _valor_serializavel(v):
 def _fmt_debug(v):
     if isinstance(v, bool):
         return "verdadeiro" if v else "falso"
+    if isinstance(v, float):
+        return repr(_arredondar_decimal(v))
     if isinstance(v, list):
         return "[" + ", ".join(_fmt_debug(e) for e in v) + "]"
     if isinstance(v, dict):
@@ -117,21 +125,13 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
     limite_excedido = {"valor": False}
     resultado_erro = {"valor": None}
 
-    # AUDITORIA_2026-08-19 bug #17: 'pilha_frames'/'pilha_incremental'
-    # mantêm a pilha de frames VISÍVEIS (mesmo filtro que
-    # construir_pilha) incrementalmente, empurrada/retirada só nos
-    # eventos 'call'/'return' -- em vez de reconstruir a cadeia
-    # completa (frame.f_back) a CADA linha traçada, que tornava o
-    # custo total O(profundidade²) numa recursão profunda (medido:
-    # profundidade 1990 a demorar ~9.5s). A cada evento 'line', só a
-    # entrada do TOPO (o frame atualmente a executar) é recalculada --
-    # as entradas das frames ANCESTRAIS mantêm-se tal como estavam na
-    # ÚLTIMA vez que cada uma foi o frame "atual" (não podem ter mudado
-    # entretanto: Python é de execução única, uma frame ancestral fica
-    # inerte enquanto uma frame mais funda está a correr). Cada entrada
-    # é sempre SUBSTITUÍDA (nunca mutada) ao ser atualizada, para o
-    # 'list(pilha_incremental)' de um passo já registado nunca ficar
-    # corrompido por uma atualização posterior a essa MESMA lista viva.
+    # 'pilha_frames'/'pilha_incremental' mantêm a pilha de frames visíveis
+    # incrementalmente (empurrada/retirada só nos eventos 'call'/'return'),
+    # em vez de reconstruir a cadeia completa a cada linha traçada, o que
+    # seria O(profundidade²) numa recursão profunda. Cada entrada é sempre
+    # SUBSTITUÍDA (nunca mutada) ao ser atualizada, para o
+    # 'list(pilha_incremental)' de um passo já registado não ficar
+    # corrompido por uma atualização posterior.
     pilha_frames = []
     pilha_incremental = []
 
@@ -148,15 +148,12 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                              if k in nomes_globais}
                 pilha.append({"nome": NOME_VISIVEL_PRINCIPAL, "variaveis": variaveis})
             elif nome in nomes_funcoes_conhecidas:
-                # AL-67/B27: o lexer permite explicitamente identificadores
-                # ALGO começados por '_' (ex.: 'funcao f(_x:inteiro)') --
-                # filtrar por "começa com '_'" escondia essas variáveis
-                # REAIS do estudante do trace, não só os temporários
-                # internos do compilador (que usam sempre o prefixo
-                # '_algo_'). '_' sozinho é o único outro nome interno
-                # gerado sem esse prefixo (destino descartado do valor de
-                # retorno principal de uma chamada com 'ref' usada como
-                # instrução solta -- ver _gerar_chamada_stmt).
+                # O lexer permite identificadores ALGO começados por '_' --
+                # filtrar variáveis por "começa com '_'" esconderia essas
+                # variáveis reais do estudante. Só '_algo_'-prefixados e o
+                # nome '_' sozinho (destino descartado de um 'ref' usado
+                # como instrução solta -- ver _gerar_chamada_stmt) são
+                # internos do compilador.
                 variaveis = {k: _valor_serializavel(v) for k, v in f.f_locals.items()
                              if not k.startswith("_algo_") and k != "_"}
                 pilha.append({"nome": nome, "variaveis": variaveis})
@@ -166,25 +163,12 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         return pilha
 
     def _indice_do_ultimo_passo_em_principal(linha_alvo):
-        """AL-71/AL-97(B25): encontra o último passo cuja pilha estava
-        diretamente em _algo_programa (só "Principal", sem nenhuma função
-        aninhada) E cuja linha é a da própria instrução final (linha_alvo)
-        -- NÃO presumir que é sempre 'passos[-1]', nem que basta filtrar
-        pela forma da pilha. Se a ÚLTIMA instrução do 'inicio' for (ou
-        terminar n)a ÚNICA chamada a uma função/procedimento do
-        utilizador em todo o programa, o passo "só Principal" mais
-        recente por FORMA fica na posição 0 (a primeira e única vez que
-        esse padrão apareceu em todo o trace, não perto do fim) -- sem o
-        filtro adicional por linha, sobrescrever esse índice corrompia o
-        PRIMEIRO passo do trace com o estado FINAL do programa, fazendo a
-        consola "andar para trás" ao avançar passo a passo. Filtrar
-        também por linha_alvo (a linha ALGO da própria instrução que está
-        a retornar, não das linhas dentro da função chamada) garante que
-        encontramos sempre o passo certo, mesmo que o mesmo padrão "só
-        Principal" já tenha aparecido antes para outra instrução. Devolve
-        None se não encontrar nenhum (não deve acontecer -- a própria
-        instrução que levou a esta chamada tem de ter gerado um passo em
-        _algo_programa antes de entrar em qualquer função)."""
+        """Encontra o último passo cuja pilha estava só em _algo_programa
+        (sem função aninhada) E cuja linha é a da própria instrução
+        (linha_alvo) -- filtrar só pela forma da pilha pode escolher a
+        ocorrência errada quando o mesmo padrão "só Principal" já apareceu
+        antes, noutra instrução. Devolve None se não encontrar (não deve
+        acontecer)."""
         for i in range(len(passos) - 1, -1, -1):
             passo = passos[i]
             pilha = passo["pilha"]
@@ -194,12 +178,10 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
         return None  # pragma: no cover -- defensivo, ver docstring
 
     def _nome_visivel_ou_none(frame):
-        """bug #17: mesmo filtro que construir_pilha usa para decidir se
-        uma frame conta para a pilha visível (a função principal, ou uma
-        função/procedimento do próprio estudante) -- devolve o nome a
-        mostrar, ou None se a frame não for visível (ex.: um frame
-        interno _algo_..., de uma biblioteca, ou fora do ficheiro
-        gerado)."""
+        """Mesmo filtro que construir_pilha usa para decidir se uma frame
+        conta para a pilha visível -- devolve o nome a mostrar, ou None se
+        a frame não for visível (ex.: um frame interno _algo_..., de uma
+        biblioteca, ou fora do ficheiro gerado)."""
         if frame.f_code.co_filename != caminho_py:
             return None
         nome = frame.f_code.co_name
@@ -239,26 +221,18 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                         "pilha": pilha_final,
                     }
                     if indice == len(passos) - 1:
-                        # AL-97/B25: a última instrução não entrou em
-                        # nenhuma função do utilizador -- o seu próprio
-                        # passo já é o último da lista, por isso
-                        # atualizá-lo em vez de acrescentar mantém "um
-                        # passo por linha executada" sem reordenar nada.
+                        # A última instrução não entrou em nenhuma função
+                        # do utilizador -- o seu próprio passo já é o
+                        # último da lista, por isso atualizá-lo mantém "um
+                        # passo por linha executada".
                         passos[indice] = passo_final
                     else:
-                        # AL-97/B25: a última instrução ENTROU numa
-                        # função do utilizador (ex.: 'escrever(f(10))'),
-                        # que já acrescentou passos a seguir ao seu
-                        # próprio (dentro de 'f'). Sobrescrever esse
-                        # passo mais antigo, como antes, corrompia a
-                        # ORDEM CRONOLÓGICA da lista -- ficava com o
-                        # estado FINAL do programa (consola completa)
-                        # numa posição anterior a passos que na
-                        # realidade aconteceram primeiro, fazendo a
-                        # consola "andar para trás" ao avançar no trace.
-                        # Acrescentar um passo novo no fim preserva a
-                        # ordem; o passo antigo mantém-se tal como
-                        # estava (o estado ANTES de entrar em 'f').
+                        # A última instrução ENTROU numa função do
+                        # utilizador (ex.: 'escrever(f(10))'), que já
+                        # acrescentou passos a seguir ao seu. Sobrescrever
+                        # esse passo mais antigo corromperia a ordem
+                        # cronológica; acrescentar um passo novo no fim
+                        # preserva-a.
                         passos.append(passo_final)
             return tracer
         if evento != "line":
@@ -273,11 +247,11 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
             # 'def dobro' antes do programa entrar em _algo_programa) -- não é
             # um passo relevante para mostrar ao aluno
             return tracer
-        # bug #17: só a entrada do TOPO (a frame atual) precisa de ser
-        # recalculada -- as ancestrais mantêm o valor da última vez que
-        # cada uma foi a frame atual (ver comentário mais acima).
-        # SUBSTITUÍDA (não mutada), para não corromper um 'list(...)'
-        # já guardado num passo anterior.
+        # Só a entrada do TOPO (a frame atual) precisa de ser recalculada
+        # -- as ancestrais mantêm o valor da última vez que cada uma foi a
+        # frame atual (ver comentário mais acima). SUBSTITUÍDA (não
+        # mutada), para não corromper um 'list(...)' já guardado num passo
+        # anterior.
         nome_atual = pilha_incremental[-1]["nome"]
         if nome_atual == NOME_VISIVEL_PRINCIPAL:
             variaveis_atuais = {k: _valor_serializavel(v) for k, v in frame.f_globals.items()
@@ -303,16 +277,11 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
     try:
         codigo_compilado = compile(codigo_py, caminho_py, "exec")
     except SyntaxError as e:
-        # bug #36: ao contrário do exec() mais abaixo (já protegido por um
-        # 'except Exception' de rede de segurança), este compile() estava
-        # completamente desprotegido -- se o Python gerado for
-        # sintaticamente inválido (ex.: bug #24, um bug de codegen
-        # gerando 'else' sem 'if'), a exceção propagava crua até
-        # cli.py, e dentro da consola interativa (cmd_consola) chegava a
-        # fechar a sessão inteira, já que o ciclo de comandos só apanhava
-        # SystemExit/KeyboardInterrupt. Devolve o mesmo formato de erro
-        # que qualquer outra falha, sem tentar traçar nada (não há nada
-        # de executável para traçar).
+        # Se o Python gerado for sintaticamente inválido, esta exceção não
+        # pode propagar crua até cli.py -- dentro da consola interativa
+        # (cmd_consola) isso fecharia a sessão inteira, já que o ciclo de
+        # comandos só apanha SystemExit/KeyboardInterrupt. Devolve o mesmo
+        # formato de erro que qualquer outra falha.
         return {
             "passos": [],
             "consolaFinal": "",
@@ -347,15 +316,10 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
 
     consola_final = buffer_saida.getvalue()
 
-    # AL-23/AL-24: o próprio runtime já apanha os erros de execução comuns
-    # (e falhas de 'afirmar') e regista a mensagem/linha em
-    # _ALGO_ERRO_RUNTIME antes de sys.exit(1) (ver
-    # codegen.py:_algo_registar_erro_runtime) -- lido diretamente do
-    # namespace da execução, em vez de inferir a partir do texto impresso
-    # na consola. A deteção antiga (endswith de frases fixas) cobria só 3
-    # dos 4 tipos de erro (faltava ValueError, AL-23) e corria o risco de
-    # um escrever() legítimo do próprio estudante coincidir por acaso com
-    # uma dessas frases (AL-24) -- este canal não depende de texto nenhum.
+    # O runtime já regista a mensagem/linha do erro em _ALGO_ERRO_RUNTIME
+    # antes de sys.exit(1) (ver codegen.py:_algo_registar_erro_runtime) --
+    # lido diretamente do namespace da execução, em vez de inferir a partir
+    # do texto impresso na consola.
     erro_runtime = namespace.get("_ALGO_ERRO_RUNTIME")
     if resultado_erro["valor"] is None and erro_runtime is not None:
         linha_erro = erro_runtime["linha"]

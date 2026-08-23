@@ -11,12 +11,21 @@ NOMES_AMIGAVEIS = {
     "NEWLINE": "fim de linha", "INDENT": "aumento de indentação",
     "DEDENT": "diminuição de indentação", "EOF": "fim do ficheiro",
     "ENTAO": "'entao'", "FAZER": "'fazer'", "ID": "um identificador",
+    # Sem estas entradas, _nome_amigavel cairia no ramo genérico
+    # (tipo.lower()) para estes tokens, mostrando jargão em inglês/
+    # abreviaturas internas em vez de português.
+    "STRING": "um texto entre aspas duplas", "INT": "um número inteiro",
+    "FLOAT": "um número decimal", "CARACTER": "um caracter entre aspas simples",
+    "LE": "'<='", "GE": "'>='",
 }
 
 
+TOKENS_COM_VALOR = {"ID", "STRING", "INT", "FLOAT", "CARACTER"}
+
+
 def _nome_amigavel(tipo, valor=None):
-    if tipo == "ID" and valor is not None:
-        return f"um identificador ({valor!r})"
+    if valor is not None and tipo in TOKENS_COM_VALOR:
+        return f"{NOMES_AMIGAVEIS[tipo]} ({valor!r})"
     if tipo in NOMES_AMIGAVEIS:
         return NOMES_AMIGAVEIS[tipo]
     if valor is not None:
@@ -34,57 +43,35 @@ class ErroSintatico(Exception):
         self.coluna = coluna
 
 
-# AUDITORIA.md secção 3: este limite não é aplicado automaticamente --
-# cada ponto de recursão DIRETA (uma função que se chama a si própria,
-# não um 'while' que avança para o próximo nível de precedência) tem de
-# chamar self._entrar_profundidade_expr() manualmente antes de recursar.
-# Já foi esquecido 2x no mesmo ficheiro (causa raiz de B5/AL-76).
-# Considerou-se automatizar isto (ex.: apanhar RecursionError uma única
-# vez à volta de parse_programa()), mas perder-se-ia o número de linha
-# ALGO exato onde a expressão fica demasiado aninhada -- RecursionError
-# nativo não carrega essa informação, e reconstruí-la a partir da
-# traceback seria mais frágil do que o contador explícito. Fica manual,
-# de propósito; confirma que TODOS os pontos abaixo continuam a chamar
-# _entrar_profundidade_expr() antes de qualquer novo ponto de recursão
-# direta em expressões:
+# Este limite não é aplicado automaticamente -- cada ponto de recursão
+# DIRETA (uma função que se chama a si própria, não um 'while' que avança
+# para o próximo nível de precedência) tem de chamar
+# self._entrar_profundidade_expr() manualmente antes de recursar. Confirma
+# que TODOS os pontos abaixo continuam a chamar _entrar_profundidade_expr()
+# antes de qualquer novo ponto de recursão direta em expressões:
 #   _parse_expr (parênteses aninhados), _parse_nao ('nao' encadeado),
 #   _parse_unaria ('-' unário encadeado), _parse_potencia (expoente de
 #   '^', que é ele próprio right-associative e recursa via
 #   _parse_unaria). Os níveis de precedência entre estes (_parse_ou,
 #   _parse_e, _parse_relacional, _parse_aditiva, _parse_multiplicativa)
 #   NÃO precisam do guard -- avançam para o próximo nível via 'while',
-#   não se chamam a si próprios, por isso a profundidade da pilha não
-#   cresce com o número de operadores do MESMO nível numa cadeia plana.
+#   não se chamam a si próprios.
 LIMITE_PROFUNDIDADE_EXPR = 50
 LIMITE_PROFUNDIDADE_BLOCO = 50
 
-# AUDITORIA_2026-08-19 bugs #7/#10: uma cadeia PLANA de operadores do
-# MESMO nível de precedência (ex.: '1+1+1+...', sem parênteses) não
-# cresce a pilha do PARSER (avança num 'while', não recursa -- daí não
-# usar LIMITE_PROFUNDIDADE_EXPR acima), mas produz uma árvore BinOp
-# encadeada com profundidade igual ao nº de operadores. codegen.py
-# envolve CADA BinOp em parênteses Python literais, por isso essa
-# profundidade vira profundidade real de parênteses aninhados no .py
-# gerado -- e o próprio CPython tem um limite de aninhamento (~200:
-# 200 termos corre bem, 201 falha com 'SyntaxError: too many nested
-# parentheses', um erro cru do Python, ao EXECUTAR o .py já compilado,
-# não ao compilar). Sem isto, semantics.py/linter.py também rebentavam
-# antes disso com RecursionError cru (limiares mais altos, ~498-995,
-# mas ainda assim crus).
+# Uma cadeia PLANA de operadores do MESMO nível de precedência (ex.:
+# '1+1+1+...', sem parênteses) não cresce a pilha do PARSER (avança num
+# 'while', não recursa -- daí não usar LIMITE_PROFUNDIDADE_EXPR acima),
+# mas produz uma árvore BinOp encadeada com profundidade igual ao nº de
+# operadores. codegen.py envolve CADA BinOp em parênteses Python
+# literais, por isso essa profundidade vira profundidade real de
+# parênteses aninhados no .py gerado -- e o próprio CPython tem um
+# limite de aninhamento (~200).
 #
 # Guardado como atributo no PRÓPRIO nó (_algo_prof_arv), calculado
 # bottom-up (1 + profundidade máxima dos filhos) em CADA sítio que
 # constrói um BinOp/UnOp -- ver _criar_binop/_criar_unop/_profundidade_no
-# abaixo. Um contador simples (incrementado por 'while' e decrementado
-# no fim desse 'while') foi tentado primeiro e descartado: não compõe
-# corretamente quando o PRIMEIRO operando de uma cadeia já é ele
-# próprio profundo (esse operando acaba TOTALMENTE parseado, com o
-# contador já de volta à base, antes de a cadeia começar a contar) --
-# mas é exatamente esse operando que fica mais enterrado na árvore
-# final (uma cadeia esquerda-associativa embrulha o primeiro operando
-# N vezes). Medir a profundidade real da árvore, em vez de tentar
-# adivinhá-la a partir da pilha do parser, evita esse buraco por
-# construção.
+# abaixo.
 LIMITE_PROFUNDIDADE_ARVORE = 150
 
 
@@ -136,19 +123,7 @@ class Parser:
 
         while not self.ver("EOF"):
             if corpo is not None:
-                # AUDITORIA_2026-08-19 ronda 13: 'inicio' tem de ser a
-                # última coisa no programa -- sem esta guarda, qualquer
-                # construção de topo (declaração, função, 'estrutura',
-                # 'importar'/'incluir', e até um SEGUNDO 'inicio', ver
-                # AL-75 abaixo) era aceite em silêncio depois do bloco
-                # 'inicio' já ter terminado, sem erro nenhum (o codegen
-                # reordena tudo de qualquer forma, por isso corria
-                # normalmente -- só a ORDEM no ficheiro-fonte deixava de
-                # bater certo com a ordem de execução, sem aviso nenhum
-                # ao estudante).
                 if self.ver("INICIO"):
-                    # AL-75: mensagem dedicada para o caso mais comum
-                    # (copiar/colar um segundo 'inicio' por engano).
                     raise ErroSintatico(
                         "o programa já tem um bloco 'inicio' -- só pode haver um",
                         self.atual().linha, self.atual().coluna)
@@ -254,11 +229,9 @@ class Parser:
             if len(nomes) > 1:
                 raise ErroSintatico(
                     "não é possível inicializar várias variáveis na mesma linha", linha, coluna)
-            # AL-16: '{...}' já não é tratado à parte aqui -- _parse_primario
-            # reconhece-o em qualquer posição de expressão (incluindo este
-            # valor inicial); se a FORMA não corresponder a 'tipo'/'dims'
-            # (ex.: '{...}' para inicializar algo que não é vetor nem
-            # estrutura), semantics.py é que dá o erro claro.
+            # '{...}' é reconhecido por _parse_primario em qualquer posição
+            # de expressão (incluindo este valor inicial); se a FORMA não
+            # corresponder a 'tipo'/'dims', semantics.py dá o erro claro.
             inicial = self._parse_expr()
         self.esperar("NEWLINE")
         return [A.Declaracao(tipo, nome, dims, linha, inicial) for nome in nomes]
@@ -267,7 +240,7 @@ class Parser:
         """Um literal '{...}' -- vetor ('{v1, v2, ...}', possivelmente
         aninhado para vetores multidimensionais) ou estrutura
         ('{campo: valor, ...}'), disambiguado pela forma do conteúdo
-        logo a seguir a '{'. AL-16: usado tanto no valor inicial de uma
+        logo a seguir a '{'. Usado tanto no valor inicial de uma
         declaração como em qualquer posição de expressão (ex.:
         argumento de uma chamada, via _parse_primario) -- a verificação
         de que a FORMA (nº de dimensões do vetor / tipo dos campos)
@@ -419,12 +392,9 @@ class Parser:
         return self._parse_bloco_stmts()
 
     def _parse_bloco_stmts(self):
-        # AL-44: mesmo padrão de _parse_expr/_profundidade_expr (AL-18) --
-        # sem isto, blocos 'se'/'para'/'enquanto'/... aninhados a mais
-        # estouravam a pilha de recursão do próprio Python (RecursionError
-        # não tratado, sem número de linha nem explicação); cli.py só
-        # apanha (ErroLexico, ErroSintatico, ErroSemantico), por isso um
-        # RecursionError propagava como traceback Python cru.
+        # Sem isto, blocos aninhados a mais estouravam a pilha de recursão
+        # do próprio Python (RecursionError cru, sem número de linha); só
+        # ErroLexico/ErroSintatico/ErroSemantico são apanhados em cli.py.
         self._profundidade_bloco += 1
         if self._profundidade_bloco > LIMITE_PROFUNDIDADE_BLOCO:
             raise ErroSintatico(
@@ -464,6 +434,10 @@ class Parser:
             return self._parse_escolha()
         if tok.tipo == "DEVOLVER":
             return self._parse_devolver()
+        if tok.tipo == "SAIR":
+            return self._parse_sair()
+        if tok.tipo == "CONTINUAR":
+            return self._parse_continuar()
         if tok.tipo == "CONSTANTE":
             return self._parse_constante()
         if tok.tipo == "AFIRMAR":
@@ -601,6 +575,18 @@ class Parser:
         self.esperar("NEWLINE")
         return A.Devolver(expr, linha)
 
+    def _parse_sair(self):
+        linha = self.atual().linha
+        self.esperar("SAIR")
+        self.esperar("NEWLINE")
+        return A.Sair(linha)
+
+    def _parse_continuar(self):
+        linha = self.atual().linha
+        self.esperar("CONTINUAR")
+        self.esperar("NEWLINE")
+        return A.Continuar(linha)
+
     def _parse_chamada_biblioteca_ou_none(self):
         """Se o token atual for ID e formar 'biblioteca.metodo(' devolve a
         Chamada correspondente; caso contrário não consome nada e devolve None."""
@@ -666,14 +652,12 @@ class Parser:
 
     # ---------- expressões (precedência) ----------
     def _entrar_profundidade_expr(self):
-        # AL-18/AL-76: sem isto, uma expressão fortemente aninhada (ex:
-        # muitos parênteses, ou cadeias de 'nao'/'-'/'^' encadeados)
-        # estourava a pilha de recursão do próprio Python (RecursionError
-        # não tratado, sem número de linha nem explicação) em vez de um
-        # erro de sintaxe amigável. Partilhado por todos os pontos de
-        # recursão direta em expressões -- não só _parse_expr (AL-18), mas
-        # também _parse_nao/_parse_unaria/_parse_potencia (AL-76), que
-        # nunca incrementavam este contador antes.
+        # Sem isto, uma expressão fortemente aninhada (muitos parênteses,
+        # ou cadeias de 'nao'/'-'/'^' encadeados) estourava a pilha de
+        # recursão do próprio Python em vez de um erro de sintaxe
+        # amigável. Partilhado por todos os pontos de recursão direta em
+        # expressões -- não só _parse_expr, mas também _parse_nao/
+        # _parse_unaria/_parse_potencia.
         self._profundidade_expr += 1
         if self._profundidade_expr > LIMITE_PROFUNDIDADE_EXPR:
             raise ErroSintatico(
@@ -682,7 +666,7 @@ class Parser:
                 self.atual().linha)
 
     def _criar_binop(self, op, esq, dire, linha):
-        # bug #7/#10: ver comentário de LIMITE_PROFUNDIDADE_ARVORE acima.
+        # Ver comentário de LIMITE_PROFUNDIDADE_ARVORE acima.
         # Chamado em TODOS os sítios que constroem um A.BinOp -- inclui os
         # 4 níveis que avançam em 'while' (_parse_ou/_parse_e/
         # _parse_aditiva/_parse_multiplicativa), que não recursam mas
@@ -835,9 +819,9 @@ class Parser:
             self.esperar("RPAREN")
             return expr
         if tok.tipo == "LBRACE":
-            # AL-16: literal de vetor/estrutura como expressão geral, não
-            # só como valor inicial de uma declaração (ex.: argumento de
-            # uma chamada com um parâmetro do tipo certo).
+            # Literal de vetor/estrutura como expressão geral, não só como
+            # valor inicial de uma declaração (ex.: argumento de uma
+            # chamada com um parâmetro do tipo certo).
             return self._parse_literal_chaveta()
         if tok.tipo == "ID":
             chamada = self._parse_chamada_biblioteca_ou_none()
@@ -866,8 +850,8 @@ def parse(codigo: str) -> A.Programa:
 def parse_biblioteca(codigo: str):
     """Interpreta um ficheiro incluído (via 'incluir') como uma biblioteca:
     apenas declarações globais, 'estrutura', definições de função/
-    procedimento e, para suportar 'incluir' transitivo (AL-36: uma
-    biblioteca incluir outra), também 'incluir' -- sem cabeçalho
+    procedimento e, para suportar 'incluir' transitivo (uma biblioteca
+    incluir outra), também 'incluir' -- sem cabeçalho
     'algoritmo' nem bloco 'inicio'. Devolve (declaracoes, funcoes,
     estruturas, inclusoes); quem chama é responsável por resolver as
     inclusões recursivamente (ver cli.py/online/executor.py)."""

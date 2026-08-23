@@ -12,7 +12,7 @@ import pytest
 from algo_lang.compilador.parser import parse
 from algo_lang.compilador.semantics import verificar
 from algo_lang.compilador.codegen import gerar_python_com_mapa
-from algo_lang.tools.tracer import gerar_trace
+from algo_lang.tools.tracer import gerar_trace, formatar_consola_com_debug
 
 
 def _trace(codigo_algo, entradas=None, tmp_path=None):
@@ -116,6 +116,33 @@ def test_trace_vetor_serializa_como_lista(tmp_path):
     """, tmp_path=tmp_path)
     ultimo = resultado["passos"][-1]
     assert ultimo["pilha"][0]["variaveis"]["v"] == [10, 20, 30]
+
+
+# ---------- AUDITORIA_2026-08-22 ronda 14: o inspetor de variáveis do
+# --debug/--json mostrava floats crus ("0.30000000000000004"),
+# inconsistente com 'escrever' (já arredondado desde o bug #18) ----------
+
+def test_trace_decimal_com_ruido_binario_e_arredondado_no_json(tmp_path):
+    resultado = _trace("""
+        algoritmo "T"
+        inicio
+            x:decimal = 0.1 + 0.2
+            escrever(x)
+    """, tmp_path=tmp_path)
+    ultimo = resultado["passos"][-1]
+    assert ultimo["pilha"][0]["variaveis"]["x"] == 0.3
+
+
+def test_trace_decimal_com_ruido_binario_e_arredondado_no_debug_da_consola(tmp_path):
+    resultado = _trace("""
+        algoritmo "T"
+        inicio
+            x:decimal = 0.1 + 0.2
+            escrever(x)
+    """, tmp_path=tmp_path)
+    texto = formatar_consola_com_debug(resultado)
+    assert "0.30000000000000004" not in texto
+    assert "x=0.3" in texto
 
 
 def test_trace_ler_consome_entradas_fornecidas(tmp_path):

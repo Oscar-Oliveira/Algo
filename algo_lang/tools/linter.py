@@ -31,11 +31,6 @@ class Linter:
     def analisar(self):
         self.avisos = []
         self._verificar_rotinas_nunca_chamadas()
-        # AL-31: a verificação de indentação mista entre linhas foi
-        # promovida a erro de compilação (AL-15, lexer.py:tokenizar) --
-        # um ficheiro com essa mistura já não chega a compilar, por isso
-        # nunca chegaria aqui; o aviso equivalente do linter ficou
-        # inalcançável na prática e foi removido.
         self._verificar_inclusoes_duplicadas()
         self._verificar_importares_duplicados()
         self._verificar_casos_duplicados_em_escolha()
@@ -51,18 +46,15 @@ class Linter:
         nomes_constantes |= self._nomes_constantes_declaradas(self.programa.corpo)
         nomes_globais_mutaveis = nomes_globais - nomes_constantes
 
-        # bug #29: nome de 'constante' -> valor inteiro resolvido,
-        # calculado uma única vez e partilhado pelos dois mapas abaixo
-        # (ver _valores_constantes).
+        # nome de 'constante' -> valor inteiro resolvido, calculado uma
+        # única vez e partilhado pelos dois mapas abaixo.
         valores_constantes = self._valores_constantes()
 
         vetores_globais = self._vetores_com_tamanho_literal(
             self.programa.declaracoes, valores_constantes)
-        # AL-98/B26: nome_campo -> tamanho, para campos-vetor de QUALQUER
-        # 'estrutura' -- sem isto, um índice fora dos limites só era
-        # verificado para vetores declarados diretamente como variável
-        # (ex.: 'v[10]'), nunca para um campo-vetor de estrutura (ex.:
-        # 't.notas[10]'), que tem exatamente a mesma restrição estática.
+        # nome_campo -> tamanho, para campos-vetor de QUALQUER 'estrutura'
+        # (ex.: 't.notas[10]') terem a mesma verificação de índice fora
+        # dos limites que um vetor declarado diretamente já tem.
         campos_vetor = self._campos_vetor_por_nome(valores_constantes)
 
         self._verificar_variaveis_nao_usadas(
@@ -123,11 +115,8 @@ class Linter:
         """Expressões que a instrução 's' LÊ (não conta o nome de uma
         variável simples só porque está a ser atribuída)."""
         if isinstance(s, A.Declaracao):
-            # bug #29: 's.dims' (tamanho de um vetor, ex.: 'v:inteiro[N]')
-            # também LÊ cada nome que usar -- sem isto, uma 'constante'
-            # usada SÓ como tamanho de vetor nunca contava como "usada",
-            # e _verificar_globais_nao_usadas/_verificar_variaveis_nao_usadas
-            # avisavam (erradamente) que "nunca é usada".
+            # 's.dims' (tamanho de um vetor, ex.: 'v:inteiro[N]') também LÊ
+            # cada nome que usar.
             exprs = list(s.dims) if s.dims else []
             if s.inicial is not None:
                 exprs.append(s.inicial)
@@ -189,10 +178,9 @@ class Linter:
                 if isinstance(s, A.ChamadaStmt):
                     self._extrair_lvalues_e_chamadas(s.chamada, set(), chamadas_aqui)
                 if dono is not None:
-                    # AL-29: uma rotina que só se chama a si própria não
-                    # deve contar como "usada" por essa autochamada -- só
-                    # chamadas vindas de FORA (de outra rotina, ou do
-                    # programa principal) contam.
+                    # Uma rotina que só se chama a si própria não deve
+                    # contar como "usada" por essa autochamada -- só
+                    # chamadas vindas de FORA contam.
                     chamadas_aqui.discard(dono)
                 chamadas |= chamadas_aqui
         for f in self.programa.funcoes:
@@ -213,11 +201,9 @@ class Linter:
         esconder um caso base -- é sempre o mesmo caminho, sempre
         executado, sempre com a mesma chamada recursiva -- por isso nunca
         termina. Deliberadamente conservador: uma função com QUALQUER
-        estrutura de controlo já pode estar a usá-la como caso base (ex.:
-        'se n <= 1 entao devolver 1' seguido, sem aninhamento, de
-        'devolver n * f(n - 1)') -- não tenta perceber se esse controlo é
-        mesmo o caso base; só apanha o caso mais claro de todos, um corpo
-        inteiramente em linha reta que ainda assim se chama a si próprio."""
+        estrutura de controlo já pode estar a usá-la como caso base -- só
+        apanha o caso mais claro, um corpo inteiramente em linha reta que
+        ainda assim se chama a si próprio."""
         for f in self.programa.funcoes:
             stmts = self._todas_as_stmts(f.corpo)
             if any(isinstance(s, (A.Se, A.Escolha, A.Para, A.Enquanto, A.FazEnquanto))
@@ -262,19 +248,10 @@ class Linter:
                 self._extrair_lvalues_e_chamadas(valor, destino_vars, destino_chamadas)
 
     def _verificar_variaveis_nao_usadas(self, corpo, contexto, tambem_procurar_em=None):
-        """AL-66/B26: 'tambem_procurar_em' (lista extra de corpos onde
-        procurar USO, não declarações) -- uma variável declarada dentro
-        de 'inicio' é tão global quanto uma declarada antes (ver
-        codegen.py: A.coletar_declaracoes_tipadas percorre
-        'programa.corpo' para a tabela de globais), por isso pode ser
-        usada só dentro de uma função. Sem isto (só usado pela chamada
-        para 'self.programa.corpo', a partir de analisar()), esta
-        verificação só via uso dentro do PRÓPRIO corpo, dando um falso
-        positivo "declarada mas nunca usada" ao mesmo tempo que
-        _verificar_uso_de_globais provava o contrário (a função "acede
-        diretamente" a essa mesma variável) -- a mesma classe de bug que
-        AL-28 já tinha corrigido para _verificar_globais_nao_usadas,
-        deixada por corrigir aqui."""
+        """'tambem_procurar_em' (lista extra de corpos onde procurar USO,
+        não declarações) -- uma variável declarada dentro de 'inicio' é
+        tão global quanto uma declarada antes, por isso pode ser usada só
+        dentro de uma função."""
         declaradas = {}   # nome -> linha (só declarações explícitas, não variáveis de ciclo 'para')
         for s in self._todas_as_stmts(corpo):
             if isinstance(s, A.Declaracao):
@@ -298,12 +275,10 @@ class Linter:
                     linha))
 
     def _verificar_globais_nao_usadas(self):
-        """AL-28: _verificar_variaveis_nao_usadas só olha para o bloco
-        'inicio' e para cada função isoladamente -- nunca para as
-        declarações globais de topo (fora de 'inicio'), que podem ser
-        usadas em QUALQUER função ou no próprio 'inicio'. Por isso o
-        uso tem de ser recolhido combinando todos os corpos, não um de
-        cada vez."""
+        """_verificar_variaveis_nao_usadas só olha para o bloco 'inicio' e
+        para cada função isoladamente -- nunca para as declarações
+        globais de topo, que podem ser usadas em QUALQUER função. Por
+        isso o uso tem de ser recolhido combinando todos os corpos."""
         usadas = set()
         for corpo in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
             eh_corpo_principal = corpo is self.programa.corpo
@@ -311,19 +286,11 @@ class Linter:
                 for e in self._expressoes_lidas(s):
                     self._extrair_lvalues(e, usadas)
                 if isinstance(s, A.Para) and eh_corpo_principal:
-                    # bug #3: 'para var' DENTRO de uma função é sempre
-                    # uma variável local independente -- _gerar_funcao
-                    # (gerador_base.py) exclui-a do 'global' dessa
-                    # função (via A.coletar_declaracoes_tipadas, que já
-                    # trata qualquer variável de ciclo como local),
-                    # confirmado em runtime: nunca muta uma global
-                    # homónima, mesmo que não haja nenhuma declaração
-                    # local explícita com esse nome. Só no CORPO
-                    # PRINCIPAL ('inicio') é que _algo_programa() já
-                    # declara 'global' para TODAS as globais
-                    # incondicionalmente -- só aí 'para var' mesmo
-                    # muta a global a sério, por isso só aí conta como
-                    # "uso".
+                    # 'para var' DENTRO de uma função é sempre uma
+                    # variável local independente (gerador_base.py
+                    # exclui-a do 'global' dessa função) -- só no CORPO
+                    # PRINCIPAL ('inicio') é que 'para var' mesmo muta a
+                    # global, por isso só aí conta como "uso".
                     usadas.add(s.var)
         for d in self.programa.declaracoes:
             if d.nome not in usadas:
@@ -509,11 +476,10 @@ class Linter:
                             vistos.append((v, v.linha))
 
     def _verificar_escolha_sem_casos(self):
-        """AUDITORIA_2026-08-19 bug #24/#37: 'escolher' sem nenhum 'caso'
-        (só 'contrario', ou nem isso) não faz o que o nome sugere -- não
-        há nada a escolher entre. Vale a pena avisar mesmo sem ser um
-        erro de compilação, porque quase sempre é um 'caso' esquecido
-        por engano."""
+        """'escolher' sem nenhum 'caso' (só 'contrario', ou nem isso) não
+        faz o que o nome sugere. Vale a pena avisar mesmo sem ser um erro
+        de compilação, porque quase sempre é um 'caso' esquecido por
+        engano."""
         for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
             for s in self._todas_as_stmts(stmts):
                 if isinstance(s, A.Escolha) and not s.casos:
@@ -544,11 +510,9 @@ class Linter:
                     f"atribuir-lhe aqui um novo valor não é visto por quem chamou a função",
                     s.linha))
             elif isinstance(s, A.Ler):
-                # AL-70/B30: só A.Atribuicao era verificado -- 'ler(x)'
-                # sobre um parâmetro por valor 'x' também só escreve na
-                # cópia local, mas só disparava o aviso genérico "nunca é
-                # usado" (x É lido/escrito, só que a escrita não conta
-                # como "uso" para esse aviso), nunca este, mais específico.
+                # 'ler(x)' sobre um parâmetro por valor também só escreve
+                # na cópia local -- mesmo aviso que A.Atribuicao, mais
+                # específico do que o genérico "nunca é usado".
                 for alvo in s.alvos:
                     if not alvo.acessos and alvo.nome in nomes_por_valor:
                         self.avisos.append(Aviso(
@@ -570,31 +534,31 @@ class Linter:
                         f"caso contrário falta usar o valor devolvido", s.linha))
 
     def _verificar_ciclo_verdadeiro_sem_saida(self, corpo):
-        """O ALGO não tem instrução para sair de um ciclo a meio -- um
-        'enquanto verdadeiro'/'faz...enquanto verdadeiro' só pode terminar
-        através de um 'devolver' algures no corpo. O mesmo problema
-        aparece, de forma menos óbvia, quando a condição é uma única
-        variável 'booleano' usada como bandeira de controlo (ex.:
-        'continuar') que nunca é alterada dentro do próprio corpo do
-        ciclo -- é o padrão idiomático mais comum no ALGO para sair de um
+        """Um 'enquanto verdadeiro'/'faz...enquanto verdadeiro' só pode
+        terminar através de um 'devolver' ou 'sair' algures no corpo. O
+        mesmo problema aparece, de forma menos óbvia, quando a condição
+        é uma única variável 'booleano' usada como bandeira de controlo
+        (ex.: 'ativo') que nunca é alterada dentro do próprio corpo do
+        ciclo -- é um padrão idiomático comum no ALGO para sair de um
         ciclo dentro do 'inicio', onde 'devolver' não é permitido (ver
         _verificar_recursao_sem_condicao para o equivalente em funções),
-        e por isso também o erro mais comum: esquecer de mudar a
-        bandeira."""
+        e por isso também um erro comum: esquecer de mudar a bandeira
+        (ou de acrescentar um 'sair')."""
+        funcoes_por_nome = {f.nome: f for f in self.programa.funcoes}
         for s in self._todas_as_stmts(corpo):
             if not isinstance(s, (A.Enquanto, A.FazEnquanto)):
                 continue
             tem_devolver = any(isinstance(sub, A.Devolver) for sub in self._todas_as_stmts(s.corpo))
-            if tem_devolver:
+            if tem_devolver or self._tem_sair_alcancavel(s.corpo):
                 continue
             if self._eh_literal_verdadeiro(s.condicao):
                 self.avisos.append(Aviso(
-                    "ciclo com condição sempre verdadeira e sem nenhum 'devolver' no "
-                    "corpo -- como o ALGO não tem instrução para sair de um ciclo, "
-                    "isto nunca termina", s.linha))
+                    "ciclo com condição sempre verdadeira e sem nenhum 'devolver'/'sair' "
+                    "no corpo -- isto nunca termina", s.linha))
             elif isinstance(s.condicao, A.LValue) and not s.condicao.acessos \
                     and getattr(s.condicao, "_tipo_inferido", None) == "booleano" \
-                    and not self._variavel_e_alterada_no_corpo(s.condicao.nome, s.corpo):
+                    and not self._variavel_e_alterada_no_corpo(
+                        s.condicao.nome, s.corpo, funcoes_por_nome):
                 self.avisos.append(Aviso(
                     f"o ciclo depende da variável '{s.condicao.nome}' para terminar, "
                     f"mas ela nunca é alterada dentro do corpo -- isto nunca termina",
@@ -603,13 +567,37 @@ class Linter:
     def _eh_literal_verdadeiro(self, expr):
         return isinstance(expr, A.Literal) and expr.tipo == "booleano" and expr.valor is True
 
-    def _variavel_e_alterada_no_corpo(self, nome, corpo):
+    def _tem_sair_alcancavel(self, stmts):
+        """Verdade se 'stmts' contém um 'sair' alcançável, descendo em
+        'se'/'escolher' mas SEM entrar em 'para'/'enquanto'/
+        'fazer...enquanto' aninhados -- um 'sair' num ciclo interior só
+        sai desse ciclo, é irrelevante para o ciclo EXTERIOR que
+        _verificar_ciclo_verdadeiro_sem_saida está a avaliar. Não pode
+        reutilizar _todas_as_stmts/A.subblocos (essa travessia desce
+        também em ciclos aninhados)."""
+        for s in stmts:
+            if isinstance(s, A.Sair):
+                return True
+            if isinstance(s, A.Se):
+                if any(self._tem_sair_alcancavel(corpo) for _cond, corpo in s.ramos):
+                    return True
+                if s.senao is not None and self._tem_sair_alcancavel(s.senao):
+                    return True
+            elif isinstance(s, A.Escolha):
+                if any(self._tem_sair_alcancavel(corpo) for _valores, corpo in s.casos):
+                    return True
+                if s.contrario is not None and self._tem_sair_alcancavel(s.contrario):
+                    return True
+        return False
+
+    def _variavel_e_alterada_no_corpo(self, nome, corpo, funcoes_por_nome=None):
         """Verdade se 'nome' pode deixar de ter o valor que tinha à
-        entrada do ciclo: atribuição direta, 'ler' direto, ou passada
-        como argumento (nu, sem acessos) a qualquer chamada -- nesse
-        último caso não se sabe se o parâmetro correspondente é 'ref',
-        por isso assume-se que sim (mais vale não avisar do que avisar
-        com um falso positivo)."""
+        entrada do ciclo: atribuição direta, 'ler' direto, passada nua
+        como argumento a qualquer chamada (assume-se 'ref' possível), ou
+        uma chamada cujo PRÓPRIO corpo atribui diretamente a 'nome'. Este
+        último caso só olha 1 nível (não segue chamadas transitivas) --
+        mesma filosofia conservadora: prefere um falso negativo a um
+        falso positivo."""
         for s in self._todas_as_stmts(corpo):
             if isinstance(s, A.Atribuicao) and not s.alvo.acessos and s.alvo.nome == nome:
                 return True
@@ -619,9 +607,30 @@ class Linter:
             for e in self._expressoes_lidas(s):
                 if self._chamada_com_argumento_nu(e, nome):
                     return True
-            if isinstance(s, A.ChamadaStmt) and self._chamada_com_argumento_nu(s.chamada, nome):
-                return True
+                if funcoes_por_nome and self._chamada_altera_global_diretamente(
+                        e, nome, funcoes_por_nome):
+                    return True
+            if isinstance(s, A.ChamadaStmt):
+                if self._chamada_com_argumento_nu(s.chamada, nome):
+                    return True
+                if funcoes_por_nome and self._chamada_altera_global_diretamente(
+                        s.chamada, nome, funcoes_por_nome):
+                    return True
         return False
+
+    def _chamada_altera_global_diretamente(self, expr, nome, funcoes_por_nome):
+        """Verdade se chamar 'expr' altera 'nome' diretamente dentro do
+        próprio corpo da função/procedimento chamado (ex.: um
+        procedimento que faz 'ativo = falso') -- caso que
+        _variavel_e_alterada_no_corpo, sozinha, não reconhece."""
+        if not isinstance(expr, A.Chamada):
+            return False
+        f_def = funcoes_por_nome.get(expr.nome)
+        if f_def is None:
+            return False
+        return any(
+            isinstance(s, A.Atribuicao) and not s.alvo.acessos and s.alvo.nome == nome
+            for s in self._todas_as_stmts(f_def.corpo))
 
     def _chamada_com_argumento_nu(self, expr, nome):
         if expr is None:  # pragma: no cover -- mesmo raciocínio de _extrair_lvalues_e_chamadas
@@ -645,15 +654,11 @@ class Linter:
         return False
 
     def _valores_constantes(self):
-        """bug #29: nome de 'constante' -> valor inteiro resolvido,
-        achatado para todo o programa (topo + dentro de 'inicio' +
-        dentro de qualquer função) -- mesma filosofia de aproximação
-        por NOME que _campos_vetor_por_nome: um nome de 'constante'
-        redeclarado com valores potencialmente diferentes fica ambíguo
-        e é excluído (melhor não resolver do que resolver com o valor
-        errado). Resolve literais e expressões '+'/'-'/'*' entre
-        constantes já resolvidas (ex.: 'M = N + 1', com 'N' também
-        'constante'), com proteção contra referência circular."""
+        """nome de 'constante' -> valor inteiro resolvido, achatado para
+        todo o programa. Aproximação por NOME: um nome redeclarado com
+        valores potencialmente diferentes fica ambíguo e é excluído.
+        Resolve literais e expressões '+'/'-'/'*' entre constantes já
+        resolvidas, com proteção contra referência circular."""
         declaracoes = list(self.programa.declaracoes)
         declaracoes += [s for s in self._todas_as_stmts(self.programa.corpo)
                         if isinstance(s, A.Declaracao)]
@@ -709,8 +714,8 @@ class Linter:
         return valores
 
     def _tamanho_resolvido(self, dim_expr, valores_constantes):
-        """bug #29: tamanho estático de UMA dimensão, literal ou
-        'constante' (ver _valores_constantes)."""
+        """Tamanho estático de UMA dimensão, literal ou 'constante' (ver
+        _valores_constantes)."""
         if isinstance(dim_expr, A.Literal) and dim_expr.tipo == "inteiro":
             return dim_expr.valor
         if isinstance(dim_expr, A.LValue) and not dim_expr.acessos:
@@ -719,13 +724,10 @@ class Linter:
 
     def _vetores_com_tamanho_literal(self, declaracoes, valores_constantes):
         """nome -> lista de tamanhos, um por dimensão (ex.:
-        'v:inteiro[8][8]' -> [8, 8]; None numa posição para uma
-        dimensão dinâmica, não estaticamente resolúvel). bug #20:
-        antes, um filtro 'len(d.dims) == 1' ignorava por completo
-        qualquer vetor com 2+ dimensões -- nem sequer a 1ª dimensão
-        era verificada. Registar a lista completa (com None onde não
-        dá para resolver) deixa cada dimensão ser verificada
-        independentemente em _verificar_indices_expr."""
+        'v:inteiro[8][8]' -> [8, 8]; None numa posição para uma dimensão
+        dinâmica, não estaticamente resolúvel). Regista a lista completa
+        para cada dimensão ser verificada independentemente em
+        _verificar_indices_expr."""
         tamanhos = {}
         for d in declaracoes:
             if d.dims:
@@ -734,13 +736,11 @@ class Linter:
         return tamanhos
 
     def _campos_vetor_por_nome(self, valores_constantes):
-        """AL-98/B26 + bug #20: nome_campo -> lista de tamanhos (um por
-        dimensão), para campos de QUALQUER 'estrutura' -- aproximação
-        por NOME de campo (não pelo tipo da variável, que o linter não
-        infere de forma completa como semantics.py). Se o mesmo nome
-        de campo aparecer em mais do que uma 'estrutura' com listas de
-        tamanhos DIFERENTES, fica ambíguo e é excluído -- melhor não
-        avisar do que avisar com um tamanho errado."""
+        """nome_campo -> lista de tamanhos (um por dimensão), para campos
+        de QUALQUER 'estrutura' -- aproximação por NOME de campo (não
+        pelo tipo da variável). Se o mesmo nome de campo aparecer em mais
+        do que uma 'estrutura' com listas de tamanhos DIFERENTES, fica
+        ambíguo e é excluído."""
         tamanhos = {}
         ambiguos = set()
         for e in self.programa.estruturas:
@@ -762,12 +762,10 @@ class Linter:
         vetores.update(self._vetores_com_tamanho_literal(locais, valores_constantes))
         for s in self._todas_as_stmts(corpo):
             for e in self._expressoes_lidas(s):
-                # bug #12: _expressoes_lidas já inclui 's.alvo' quando é
-                # indexado/tem campo (necessário para deteção de
-                # variáveis não usadas, noutros chamadores) -- mas aqui
-                # o alvo de uma Atribuicao é verificado explicitamente
-                # logo a seguir; sem este 'continue', dava o mesmo
-                # aviso de índice fora dos limites DUAS vezes.
+                # _expressoes_lidas já inclui 's.alvo' quando indexado/tem
+                # campo -- mas aqui o alvo de uma Atribuicao é verificado
+                # explicitamente a seguir; sem este 'continue', dava o
+                # mesmo aviso duas vezes.
                 if isinstance(s, A.Atribuicao) and e is s.alvo:
                     continue
                 self._verificar_indices_expr(e, vetores, campos_vetor)
@@ -778,23 +776,17 @@ class Linter:
         if expr is None:  # pragma: no cover -- mesmo raciocínio de _extrair_lvalues_e_chamadas
             return
         if isinstance(expr, A.LValue):
-            # bug #20: 'dims_tamanhos' é agora uma LISTA (um tamanho por
-            # dimensão, ver _vetores_com_tamanho_literal/
-            # _campos_vetor_por_nome) -- 'nivel' avança a cada acesso
-            # 'indice' consecutivo, para cada dimensão ser comparada
-            # contra o SEU próprio tamanho, não sempre o da 1ª. Antes,
-            # um vetor 2D+ nem chegava a ser registado (filtro
-            # 'len(dims)==1'), por isso nenhuma dimensão era verificada,
-            # nem sequer a mais externa.
+            # 'dims_tamanhos' é uma LISTA (um tamanho por dimensão) --
+            # 'nivel' avança a cada acesso 'indice' consecutivo, para cada
+            # dimensão ser comparada contra o SEU próprio tamanho, não
+            # sempre o da 1ª.
             dims_tamanhos = vetores.get(expr.nome)
             nivel = 0
             caminho = expr.nome
             for tag, valor in expr.acessos:
                 if tag == "campo":
-                    # AL-98/B26: muda para os tamanhos (se algum) do CAMPO
-                    # agora acedido -- sem isto, só o tamanho do vetor de
-                    # TOPO (a variável base) era considerado; um índice
-                    # num campo-vetor de estrutura nunca era verificado.
+                    # Muda para os tamanhos (se algum) do CAMPO agora
+                    # acedido, não o do vetor de TOPO.
                     dims_tamanhos = campos_vetor.get(valor)
                     nivel = 0
                     caminho = f"{caminho}.{valor}"
@@ -845,20 +837,29 @@ class Linter:
                 f"o literal de '{tipo_nome}' não define o(s) campo(s) {lista} -- ficam "
                 f"com o valor por omissão", lit.linha))
 
+    def _verificar_literais_de_estrutura_em_valor(self, tipo_nome, valor, campos_por_estrutura):
+        """Percorre 'valor' recursivamente -- cobre EstruturaLiteral direto,
+        e EstruturaLiteral dentro de VetorLiteral a qualquer profundidade
+        (vetores 2D+ de estruturas), usando SEMPRE o mesmo 'tipo_nome'
+        (o tipo do ELEMENTO do vetor, não muda com a profundidade)."""
+        if isinstance(valor, A.EstruturaLiteral):
+            self._verificar_literal_de_estrutura_campos_em_falta(
+                tipo_nome, valor, campos_por_estrutura)
+        elif isinstance(valor, A.VetorLiteral):
+            for elemento in valor.elementos:
+                self._verificar_literais_de_estrutura_em_valor(
+                    tipo_nome, elemento, campos_por_estrutura)
+
     def _verificar_campos_em_falta_em_chamada(self, expr, funcoes_por_nome, campos_por_estrutura):
-        """AL-69/B29: semantics.py já documenta que um literal de estrutura
-        é válido "como argumento de uma função/procedimento" também --
-        esta verificação só olhava para Declaracao.inicial, deixando
-        'soma({x: 3})' (com 'y' a ficar silenciosamente a 0) sem aviso
-        nenhum. Percorre recursivamente à procura de A.Chamada, para
-        também apanhar literais passados a chamadas aninhadas."""
+        """Também verifica literais de estrutura passados como argumento
+        de uma chamada (ex.: 'soma({x: 3})'), percorrendo recursivamente
+        para apanhar chamadas aninhadas."""
         if isinstance(expr, A.Chamada):
             f_def = funcoes_por_nome.get(expr.nome)
             if f_def is not None:
                 for arg, p in zip(expr.args, f_def.parametros):
-                    if isinstance(arg, A.EstruturaLiteral):
-                        self._verificar_literal_de_estrutura_campos_em_falta(
-                            p.tipo, arg, campos_por_estrutura)
+                    self._verificar_literais_de_estrutura_em_valor(
+                        p.tipo, arg, campos_por_estrutura)
             for a in expr.args:
                 self._verificar_campos_em_falta_em_chamada(a, funcoes_por_nome, campos_por_estrutura)
         elif isinstance(expr, A.BinOp):
@@ -880,8 +881,8 @@ class Linter:
         for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
             declaracoes.extend(s for s in self._todas_as_stmts(stmts) if isinstance(s, A.Declaracao))
         for d in declaracoes:
-            if isinstance(d.inicial, A.EstruturaLiteral):
-                self._verificar_literal_de_estrutura_campos_em_falta(
+            if d.inicial is not None:
+                self._verificar_literais_de_estrutura_em_valor(
                     d.tipo, d.inicial, campos_por_estrutura)
 
         funcoes_por_nome = {f.nome: f for f in self.programa.funcoes}

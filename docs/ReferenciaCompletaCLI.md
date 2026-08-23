@@ -332,32 +332,48 @@ fazer
 enquanto x < 10
 ```
 
-### Sair de um ciclo a meio
+### Sair de um ciclo a meio: `sair` e `continuar`
 
-O ALGO não tem `parar`/`break`: a única forma de terminar uma
-função/procedimento a meio de um ciclo é `devolver`, e `devolver` só é
-permitido dentro de `funcao`/`procedimento` (nunca no `inicio`). Para um
-ciclo dentro do `inicio` que precise de terminar antes da condição
-"natural" (menu com opção de sair, procurar um valor e parar assim que
-o encontrar, ler até um valor-sentinela), usa uma variável `booleano`
-como bandeira de controlo, alterada algures dentro do próprio corpo do
-ciclo:
+`sair` termina o ciclo (`enquanto`/`para`/`fazer...enquanto`) mais
+interior de imediato; `continuar` salta para a próxima iteração desse
+mesmo ciclo. Ambos só são válidos dentro de um ciclo -- usá-los fora
+de um (incluindo dentro de `escolher`, que não tem fall-through entre
+casos e por isso não precisa de `sair`) é um erro de compilação.
 
 ```
-continuar:booleano = verdadeiro
 opcao:inteiro
-enquanto continuar fazer
+enquanto verdadeiro fazer
     escrever("1-Somar  2-Sair")
     ler(opcao)
     se opcao == 1 entao
         escrever("resultado: ", 2 + 2)
     senao se opcao == 2 entao
-        continuar = falso
+        sair
+
+i:inteiro
+para i de 1 ate 100 fazer
+    se i mod 2 == 0 entao
+        continuar
+    escrever(i)     // só os ímpares
+```
+
+Alternativa mais antiga, ainda válida: uma variável `booleano` como
+bandeira de controlo, alterada algures dentro do próprio corpo do
+ciclo (útil quando a condição de saída é mais natural de exprimir como
+condição do `enquanto` do que como um `se`/`sair` a meio do corpo):
+
+```
+ativo:booleano = verdadeiro
+enquanto ativo fazer
+    ...
+    se condicao_de_paragem entao
+        ativo = falso
 ```
 
 `algo verifica` avisa se a bandeira nunca chega a ser alterada dentro
-do corpo do ciclo -- normalmente sinal de que falta o `continuar =
-falso` (ou equivalente) nalgum ramo.
+do corpo do ciclo, nem há nenhum `sair`/`devolver` alcançável --
+normalmente sinal de que falta o `ativo = falso` (ou equivalente)
+nalgum ramo.
 
 ## escolher / caso
 
@@ -448,6 +464,9 @@ inicio
 | `cadeia.inverter(s)` | inverte a cadeia |
 | `cadeia.subcadeia(s, ini, fim)` | sub-cadeia entre índices (0-baseado; `fim` exclusivo, tal como as fatias do Python) |
 | `cadeia.caracter(s, i)` | o caracter na posição `i` (0-baseado, tal como os vetores) |
+| `cadeia.procurar(s, sub)` | índice (0-baseado) da 1ª ocorrência de `sub` em `s`, ou `-1` se não encontrado |
+| `cadeia.substituir(s, antigo, novo)` | substitui todas as ocorrências de `antigo` por `novo` |
+| `cadeia.dividir(s, sep)` | divide `s` em partes separadas por `sep`, devolve um vetor de `cadeia` |
 
 **Conversao** (`importar Conversao`) — converte entre os 5 tipos primitivos:
 

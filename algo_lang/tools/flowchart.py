@@ -32,6 +32,9 @@ class GeradorFluxograma:
         self.contador = 0
         self.declaracoes_nos = []
         self.declaracoes_arestas = []
+        # Pilha de (alvo_continuar, fim_id) do ciclo mais interior em geração;
+        # 'sair'/'continuar' consultam sempre o topo.
+        self.pilha_ciclos = []
 
     def novo_id(self):
         self.contador += 1
@@ -141,6 +144,25 @@ class GeradorFluxograma:
             self.aresta(anterior, id_, rotulo)
             return id_
 
+        if isinstance(stmt, (A.Sair, A.Continuar)):
+            # semantics.py já garante que isto só existe dentro de um
+            # ciclo -- a pilha nunca deve estar vazia aqui; guarda
+            # defensiva em vez de um IndexError cru, mesma filosofia de
+            # ErroInternoFluxograma (ver docstring da classe).
+            if not self.pilha_ciclos:
+                raise ErroInternoFluxograma(  # pragma: no cover -- defensivo, semantics.py já valida isto
+                    f"'{texto_expr(stmt)}' fora de um ciclo (linha {getattr(stmt, 'linha', 0)})")
+            alvo_continuar, fim_id = self.pilha_ciclos[-1]
+            rotulo_no = "sair" if isinstance(stmt, A.Sair) else "continuar"
+            alvo = fim_id if isinstance(stmt, A.Sair) else alvo_continuar
+            id_ = self.novo_id()
+            self.no(id_, rotulo_no, "box", extra=', peripheries=2')
+            self.aresta(anterior, id_, rotulo)
+            # Alinhado com A.Devolver: código morto a seguir no mesmo bloco
+            # continua desenhado em sequência a partir daqui.
+            self.aresta(id_, alvo)
+            return id_
+
         if isinstance(stmt, A.Se):
             return self._gerar_se(stmt, anterior, rotulo)
 
@@ -192,12 +214,20 @@ class GeradorFluxograma:
         self.no(d, f"{stmt.var} de {texto_expr(stmt.ini)} até "
                    f"{texto_expr(stmt.fim)}{passo_txt}", "diamond")
         self.aresta(anterior, d, rotulo)
-        if stmt.corpo:
-            saida_corpo = self.gerar_bloco(stmt.corpo, d, rotulo_primeira="sim")
-            self.aresta(saida_corpo, d)
-        else:  # pragma: no cover -- o parser exige >=1 instrução em qualquer bloco
-            self.aresta(d, d, "sim")
+        # 'continuar' volta a avaliar a condição -> o próprio 'd'; 'sair'
+        # salta para o 'fim_id', reservado já aqui (antes de gerar o
+        # corpo) para poder ser empilhado -- só declarado com self.no()
+        # mais abaixo, mas isso é seguro (ver _gerar_faz_enquanto).
         fim_id = self.novo_id()
+        self.pilha_ciclos.append((d, fim_id))
+        try:
+            if stmt.corpo:
+                saida_corpo = self.gerar_bloco(stmt.corpo, d, rotulo_primeira="sim")
+                self.aresta(saida_corpo, d)
+            else:  # pragma: no cover -- o parser exige >=1 instrução em qualquer bloco
+                self.aresta(d, d, "sim")
+        finally:
+            self.pilha_ciclos.pop()
         self.no(fim_id, "", "point")
         self.aresta(d, fim_id, "não")
         return fim_id
@@ -206,12 +236,16 @@ class GeradorFluxograma:
         d = self.novo_id()
         self.no(d, texto_expr(stmt.condicao), "diamond")
         self.aresta(anterior, d, rotulo)
-        if stmt.corpo:
-            saida_corpo = self.gerar_bloco(stmt.corpo, d, rotulo_primeira="sim")
-            self.aresta(saida_corpo, d)
-        else:  # pragma: no cover -- o parser exige >=1 instrução em qualquer bloco
-            self.aresta(d, d, "sim")
         fim_id = self.novo_id()
+        self.pilha_ciclos.append((d, fim_id))
+        try:
+            if stmt.corpo:
+                saida_corpo = self.gerar_bloco(stmt.corpo, d, rotulo_primeira="sim")
+                self.aresta(saida_corpo, d)
+            else:  # pragma: no cover -- o parser exige >=1 instrução em qualquer bloco
+                self.aresta(d, d, "sim")
+        finally:
+            self.pilha_ciclos.pop()
         self.no(fim_id, "", "point")
         self.aresta(d, fim_id, "não")
         return fim_id
@@ -220,12 +254,26 @@ class GeradorFluxograma:
         inicio_corpo = self.novo_id()
         self.no(inicio_corpo, "", "point")
         self.aresta(anterior, inicio_corpo, rotulo)
-        saida_corpo = self.gerar_bloco(stmt.corpo, inicio_corpo)
+        # A condição só é avaliada DEPOIS do corpo (nó 'd' criado mais
+        # abaixo) -- mas um 'continuar' dentro do corpo precisa de saltar
+        # para essa avaliação, não para 'inicio_corpo' (isso reentraria
+        # no corpo sem verificar a condição, o mesmo bug corrigido no
+        # codegen para este caso). Reserva-se o ID de 'd' já aqui, antes
+        # de gerar o corpo, para poder ser empilhado -- só é declarado
+        # com self.no()/self.aresta() mais abaixo; seguro, porque no()/
+        # aresta() só acrescentam texto a duas listas independentes, sem
+        # validação cruzada, e o DOT final não exige declaração antes de
+        # uso.
         d = self.novo_id()
+        fim_id = self.novo_id()
+        self.pilha_ciclos.append((d, fim_id))
+        try:
+            saida_corpo = self.gerar_bloco(stmt.corpo, inicio_corpo)
+        finally:
+            self.pilha_ciclos.pop()
         self.no(d, texto_expr(stmt.condicao), "diamond")
         self.aresta(saida_corpo, d)
         self.aresta(d, inicio_corpo, "sim")
-        fim_id = self.novo_id()
         self.no(fim_id, "", "point")
         self.aresta(d, fim_id, "não")
         return fim_id

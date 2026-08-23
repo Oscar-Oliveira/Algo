@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""AL-07: base partilhada entre compilador/codegen.py e
+"""Base partilhada entre compilador/codegen.py e
 compilador/codegen_minimo.py.
 
 Os dois geradores têm a mesma estrutura de dispatch (mesma sequência
@@ -60,6 +60,11 @@ class GeradorCodigoBase:
         self.estruturas = {}
         self.mapa_linhas = {}            # nº de linha do .py gerado -> nº de linha do .algo original
         self._linha_algo_atual = None    # linha ALGO da instrução a ser gerada neste momento
+        # Contador persistente (não uma variável local): dá a CADA
+        # 'fazer...enquanto' a sua própria bandeira '_algo_fazer_primeira_N',
+        # que precisa de sobreviver a toda a vida do ciclo, incluindo
+        # através de ciclos aninhados.
+        self._contador_faz_enquanto = 0
 
     def emit(self, texto, nivel):
         self.linhas.append("    " * nivel + texto)
@@ -121,17 +126,12 @@ class GeradorCodigoBase:
         return expr_py
 
     def _copiar_se_necessario(self, expr_python, tipo, dims):
-        """Bug #1 da auditoria: 'estrutura' e vetor são tipos por VALOR em
-        ALGO, mas listas e instâncias de classe do Python gerado são
-        sempre referências -- sem isto, 'p2 = p1' (ou 'devolver g',
-        'v = {p1, p2}', etc.) partilhava a mesma instância em vez de a
-        copiar, e mutar p2 mutava p1 em silêncio. Ponto único de cópia,
-        chamado em todos os caminhos que podem ler o valor de uma
-        variável já existente (atribuição, declaração, devolver,
-        literais de vetor/estrutura); copy.deepcopy (não uma cópia
-        superficial) para cobrir também níveis aninhados (Ponto[] dentro
-        de Ponto[][], campo-struct dentro de struct). Não se aplica a
-        passagem 'ref' -- aliasing é intencional aí."""
+        """'estrutura' e vetor são tipos por VALOR em ALGO; listas e
+        instâncias de classe do Python gerado são sempre referências.
+        Ponto único de cópia (copy.deepcopy, cobrindo níveis aninhados),
+        chamado em todos os caminhos que podem ler o valor de uma variável
+        já existente. Não se aplica a passagem 'ref' -- aliasing é
+        intencional aí."""
         if dims > 0 or tipo in self.estruturas:
             return f"copy.deepcopy({expr_python})"
         return expr_python
@@ -160,25 +160,10 @@ class GeradorCodigoBase:
         alvo = self._lvalue(stmt.alvo, tipos)
         tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
         if isinstance(stmt.expr, A.EstruturaLiteral):
-            # AL-90/B17: um literal de estrutura como valor de uma
-            # ATRIBUIÇÃO (não só de uma declaração). semantics.py já
-            # permite este caso também em modo normal (propaga o tipo já
-            # declarado do alvo para o literal), mas codegen.py sobrepõe
-            # este método e trata o caso ali com _expr_estrutura_literal
-            # (coerção decimal, literais aninhados) antes de chegar aqui --
-            # este ramo simplificado só é mesmo alcançado a partir de
-            # codegen_minimo.py (--minimo, que salta verificar() de
-            # propósito e não tem o mesmo cuidado). Sem este caso especial,
-            # _expr() não tem nenhum ramo para EstruturaLiteral e o PRÓPRIO
-            # COMPILADOR rebentava ("expressão não suportada"), em vez de
-            # gerar Python válido -- aqui é sempre possível, porque
-            # 'tipo_alvo' já dá o nome do construtor a usar.
-            # Etapa 6 da 4ª auditoria: '_expr_estrutura_literal' (definido
-            # só em codegen_minimo.py, já que codegen.py sobrepõe este
-            # método inteiro) em vez de kwargs construídos à mão -- sem
-            # isto, um literal ANINHADO (struct-em-struct) continuava a
-            # rebentar o compilador mesmo depois de o caso simples ser
-            # tratado.
+            # Um literal de estrutura como valor de uma ATRIBUIÇÃO. Este
+            # ramo só é mesmo alcançado a partir de codegen_minimo.py --
+            # codegen.py sobrepõe este método e trata o caso com
+            # _expr_estrutura_literal antes de chegar aqui.
             expr = self._expr_estrutura_literal(stmt.expr, tipo_alvo, tipos)
         elif isinstance(stmt.expr, A.VetorLiteral):
             # Mesma lacuna, lado vetor -- 'v = {{nome: "Ana"}}' com 'v' já
@@ -186,9 +171,9 @@ class GeradorCodigoBase:
             expr = self._expr_vetor_literal(stmt.expr, tipo_alvo, tipos)
         else:
             expr = self._coagir_decimal(self._expr(stmt.expr, tipos), tipo_alvo, stmt.expr)
-            # AL-XX/bug#1: semantics.py já rejeita atribuir um vetor
-            # inteiro diretamente (o alvo aqui é sempre dims==0), por
-            # isso só 'estrutura' importa neste caminho.
+            # semantics.py já rejeita atribuir um vetor inteiro diretamente
+            # (o alvo aqui é sempre dims==0), por isso só 'estrutura'
+            # importa neste caminho.
             expr = self._copiar_se_necessario(expr, tipo_alvo, 0)
         self.emit(f"{alvo} = {expr}", nivel)
 
@@ -238,11 +223,9 @@ class GeradorCodigoBase:
             primeiro = False
         if stmt.contrario is not None:
             if primeiro:
-                # bug #24: 'stmt.casos' está vazio -- nenhum 'if' foi
-                # emitido acima, por isso não há nada a que um 'else:'
-                # se possa juntar (seria um 'else' sem 'if', Python
-                # inválido). O 'contrario' executa sempre neste caso, sem
-                # condição nenhuma.
+                # 'stmt.casos' vazio -- nenhum 'if' foi emitido, por isso
+                # não há nada a que um 'else:' se possa juntar. 'contrario'
+                # executa sempre neste caso, sem condição nenhuma.
                 self._gerar_corpo(stmt.contrario, nivel, tipos)
             else:
                 self.emit("else:", nivel)
@@ -258,10 +241,9 @@ class GeradorCodigoBase:
 
     # -------- lvalue / expressões --------
     def _lvalue(self, lv: A.LValue, tipos):
-        # Bug #31: '_algo_indice' rejeita índices negativos em runtime
-        # (ver codegen.py) -- aplicado aqui para leitura E escrita,
-        # cada nível de indexação (1D, 2D+), porque este é o único
-        # sítio que constrói o texto Python de um acesso indexado.
+        # '_algo_indice' rejeita índices negativos em runtime; aplicado
+        # aqui para leitura E escrita, porque este é o único sítio que
+        # constrói o texto Python de um acesso indexado.
         base = lv.nome
         for tag, valor in lv.acessos:
             if tag == "indice":
@@ -312,13 +294,10 @@ class GeradorCodigoBase:
             self._gerar_stmt(stmt, 1, tipos_locais)
 
         if f.eh_procedimento and self.refs_atuais:
-            # AL-68/B28: NÃO reatribuir _linha_algo_atual = f.linha aqui --
-            # isso mapeava este 'return' sintético para a linha da
-            # ASSINATURA do procedimento (mais cedo no ficheiro do que a
-            # última instrução real gerada), fazendo o número de linha no
-            # trace "saltar para trás" num procedimento só com parâmetros
-            # 'ref' (ex.: 3, 4, 5, 2). Mantém o valor já deixado pela
-            # última instrução real do corpo, gerada no laço acima.
+            # NÃO reatribuir _linha_algo_atual = f.linha aqui -- isso faria
+            # o número de linha no trace "saltar para trás" num
+            # procedimento só com parâmetros 'ref'. Mantém o valor já
+            # deixado pela última instrução real do corpo.
             self.emit(f"return {', '.join(self.refs_atuais)}", 1)
 
         self.refs_atuais = []

@@ -103,7 +103,7 @@
     },
     "keywords-control": {
       "name": "keyword.control.algo",
-      "match": "\\b(se|entao|senao|para|de|ate|passo|fazer|enquanto|escolher|caso|contrario|devolver)\\b"
+      "match": "\\b(se|entao|senao|para|de|ate|passo|fazer|enquanto|escolher|caso|contrario|devolver|sair|continuar)\\b"
     },
     "keywords-other": {
       "name": "keyword.other.algo",

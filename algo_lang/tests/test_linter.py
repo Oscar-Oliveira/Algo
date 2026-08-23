@@ -628,6 +628,67 @@ def test_literal_de_estrutura_com_todos_os_campos_nao_da_aviso():
     assert not any("não define o(s) campo(s)" in a.mensagem for a in avisos)
 
 
+# ---------- AUDITORIA_2026-08-22 ronda 14: literal de estrutura com campos
+# em falta dentro de um literal de VETOR (o padrão mais natural de "lista
+# de registos") escapava completamente ao aviso acima ----------
+
+def test_campo_em_falta_em_literal_de_estrutura_dentro_de_vetor_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        inicio
+            pontos:Ponto[2] = {{x: 1}, {x: 2, y: 3}}
+            escrever(pontos[0].x)
+    """)
+    relevantes = [a for a in avisos if "não define o(s) campo(s)" in a.mensagem]
+    assert len(relevantes) == 1
+    assert "'y'" in relevantes[0].mensagem
+
+
+def test_campo_em_falta_em_vetor_2d_de_estruturas_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        inicio
+            grelha:Ponto[1][2] = {{{x: 1}, {x: 2, y: 3}}}
+            escrever(grelha[0][0].x)
+    """)
+    relevantes = [a for a in avisos if "não define o(s) campo(s)" in a.mensagem]
+    assert len(relevantes) == 1
+
+
+def test_campo_em_falta_em_vetor_de_estruturas_passado_a_chamada_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        procedimento mostra(pontos:Ponto[])
+            escrever(pontos[0].x)
+        inicio
+            mostra({{x: 1}, {x: 2, y: 3}})
+    """)
+    relevantes = [a for a in avisos if "não define o(s) campo(s)" in a.mensagem]
+    assert len(relevantes) == 1
+
+
+def test_vetor_de_estruturas_com_todos_os_campos_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        inicio
+            pontos:Ponto[2] = {{x: 1, y: 9}, {x: 2, y: 3}}
+            escrever(pontos[0].x)
+    """)
+    assert not any("não define o(s) campo(s)" in a.mensagem for a in avisos)
+
+
 def test_comparacao_com_literal_nao_e_assinalada():
     """x == 5 -- um dos lados não é sequer uma variável simples (é um
     literal), por isso nunca pode ser tratado como 'a mesma variável'."""
@@ -645,37 +706,37 @@ def test_ciclo_enquanto_bandeira_nunca_alterada_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         inicio
-            continuar:booleano = verdadeiro
-            enquanto continuar fazer
+            ativo:booleano = verdadeiro
+            enquanto ativo fazer
                 escrever("ola")
     """)
     relevantes = [a for a in avisos if "nunca termina" in a.mensagem]
     assert len(relevantes) == 1
-    assert "continuar" in relevantes[0].mensagem
+    assert "ativo" in relevantes[0].mensagem
 
 
 def test_ciclo_faz_enquanto_bandeira_nunca_alterada_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         inicio
-            continuar:booleano = verdadeiro
+            ativo:booleano = verdadeiro
             fazer
                 escrever("ola")
-            enquanto continuar
+            enquanto ativo
     """)
-    assert any("nunca termina" in a.mensagem and "continuar" in a.mensagem for a in avisos)
+    assert any("nunca termina" in a.mensagem and "ativo" in a.mensagem for a in avisos)
 
 
 def test_ciclo_enquanto_bandeira_alterada_no_corpo_nao_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         inicio
-            continuar:booleano = verdadeiro
+            ativo:booleano = verdadeiro
             x:inteiro = 0
-            enquanto continuar fazer
+            enquanto ativo fazer
                 x = x + 1
                 se x > 10 entao
-                    continuar = falso
+                    ativo = falso
     """)
     assert not any("nunca termina" in a.mensagem for a in avisos)
 
@@ -684,9 +745,9 @@ def test_ciclo_enquanto_bandeira_alterada_por_ler_no_corpo_nao_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
         inicio
-            continuar:booleano = verdadeiro
-            enquanto continuar fazer
-                ler(continuar)
+            ativo:booleano = verdadeiro
+            enquanto ativo fazer
+                ler(ativo)
     """)
     assert not any("nunca termina" in a.mensagem for a in avisos)
 
@@ -700,9 +761,9 @@ def test_ciclo_enquanto_bandeira_passada_a_chamada_nao_da_aviso():
         procedimento atualizar(ref c:booleano)
             c = falso
         inicio
-            continuar:booleano = verdadeiro
-            enquanto continuar fazer
-                atualizar(continuar)
+            ativo:booleano = verdadeiro
+            enquanto ativo fazer
+                atualizar(ativo)
     """)
     assert not any("nunca termina" in a.mensagem for a in avisos)
 
@@ -714,14 +775,114 @@ def test_ciclo_enquanto_dentro_de_funcao_com_devolver_nao_da_aviso_de_bandeira()
     avisos = _avisos("""
         algoritmo "T"
         funcao f():inteiro
-            continuar:booleano = verdadeiro
-            enquanto continuar fazer
+            ativo:booleano = verdadeiro
+            enquanto ativo fazer
                 devolver 1
             devolver 0
         inicio
             escrever(f())
     """)
     assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+# ---------- AUDITORIA_2026-08-22 ronda 14 (bug #6): bandeira alterada
+# dentro do corpo de um PROCEDIMENTO chamado (não atribuição inline) ----------
+
+def test_ciclo_bandeira_alterada_em_procedimento_sem_argumentos_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        ativo:booleano = verdadeiro
+
+        procedimento pararCiclo()
+            ativo = falso
+
+        inicio
+            enquanto ativo fazer
+                escrever("a")
+                pararCiclo()
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_ciclo_bandeira_alterada_em_procedimento_com_argumentos_nao_da_aviso():
+    """As globais em ALGO são visíveis a qualquer função/procedimento
+    independentemente dos parâmetros -- a correção do bug #6 não deve
+    depender do procedimento não ter argumentos."""
+    avisos = _avisos("""
+        algoritmo "T"
+        ativo:booleano = verdadeiro
+
+        procedimento pararCiclo(motivo:cadeia)
+            ativo = falso
+
+        inicio
+            enquanto ativo fazer
+                escrever("a")
+                pararCiclo("cancelado")
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_ciclo_procedimento_chamado_que_nao_altera_bandeira_continua_a_dar_aviso():
+    """Não regressão: chamar QUALQUER procedimento não deve suprimir o
+    aviso -- só um que realmente altera a bandeira no seu próprio corpo."""
+    avisos = _avisos("""
+        algoritmo "T"
+        ativo:booleano = verdadeiro
+
+        procedimento outraCoisa()
+            escrever("nada a ver com a bandeira")
+
+        inicio
+            enquanto ativo fazer
+                escrever("a")
+                outraCoisa()
+    """)
+    relevantes = [a for a in avisos if "nunca termina" in a.mensagem]
+    assert len(relevantes) == 1
+
+
+# ---------- AUDITORIA_2026-08-22 ronda 14: 'sair' alcançável também é
+# uma forma válida de terminar um ciclo ----------
+
+def test_ciclo_enquanto_verdadeiro_com_sair_alcancavel_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            enquanto verdadeiro fazer
+                se verdadeiro entao
+                    sair
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_ciclo_enquanto_verdadeiro_com_sair_dentro_de_escolher_nao_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            x:inteiro = 1
+            enquanto verdadeiro fazer
+                escolher x
+                    caso 1
+                        sair
+    """)
+    assert not any("nunca termina" in a.mensagem for a in avisos)
+
+
+def test_ciclo_com_sair_so_em_ciclo_interior_continua_a_dar_aviso_no_exterior():
+    """Um 'sair' num ciclo INTERIOR só sai desse ciclo -- não deve
+    suprimir o aviso do ciclo EXTERIOR (confirma que _tem_sair_alcancavel
+    para em 'para'/'enquanto'/'fazer...enquanto' aninhados)."""
+    avisos = _avisos("""
+        algoritmo "T"
+        inicio
+            i:inteiro
+            enquanto verdadeiro fazer
+                para i de 1 ate 10 fazer
+                    se i == 5 entao
+                        sair
+    """)
+    assert any("nunca termina" in a.mensagem for a in avisos)
 
 
 def test_recursao_sem_condicao_da_aviso():
