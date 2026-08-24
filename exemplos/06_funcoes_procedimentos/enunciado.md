@@ -31,6 +31,6 @@ o tamanho de um vetor dentro da função; `ref` num parâmetro vetor
 `fatorial` e `fibonacci`, ambas recursivas.
 
 Demonstra: uma função a chamar-se a si própria com um caso base que não
-recursa (sem isso seria recursão infinita — erro de execução, ver
-`DecisoesELimitacoesConhecidas.md`), e reaproveita `para` (assunto 04)
-para chamar `fibonacci` repetidamente e imprimir os primeiros N termos.
+recursa (sem isso seria recursão infinita — erro de execução), e
+reaproveita `para` (assunto 04) para chamar `fibonacci` repetidamente e
+imprimir os primeiros N termos.

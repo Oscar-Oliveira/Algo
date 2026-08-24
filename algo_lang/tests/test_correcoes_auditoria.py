@@ -158,8 +158,9 @@ def test_raiz_de_negativo_da_erro_amigavel_nao_traceback(tmp_path):
     algo_path.write_text(
         'algoritmo "T"\nimportar Matematica\ninicio\n    escrever(matematica.raiz(-4.0))\n',
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
-        ["algo", "executa", str(algo_path)], capture_output=True, text=True)
+        ["algo", "executa", str(algo_path)], capture_output=True, encoding="utf-8", env=env)
     assert "Traceback" not in resultado.stdout
     assert "Erro em tempo de execução" in resultado.stdout
 
@@ -169,8 +170,9 @@ def test_aleatorio_com_limites_invertidos_da_erro_amigavel(tmp_path):
     algo_path.write_text(
         'algoritmo "T"\nimportar Matematica\ninicio\n    escrever(matematica.aleatorio(10, 1))\n',
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
-        ["algo", "executa", str(algo_path)], capture_output=True, text=True)
+        ["algo", "executa", str(algo_path)], capture_output=True, encoding="utf-8", env=env)
     assert "Traceback" not in resultado.stdout
     assert "Erro em tempo de execução" in resultado.stdout
 
@@ -196,8 +198,10 @@ def test_recursao_infinita_da_mensagem_amigavel_via_cli(tmp_path):
     algo_path.write_text(
         'algoritmo "T"\nfuncao semFim(n:inteiro):inteiro\n    retornar semFim(n + 1)\n'
         'inicio\n    escrever(semFim(1))\n', encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
-        ["algo", "executa", str(algo_path)], capture_output=True, text=True, timeout=20)
+        ["algo", "executa", str(algo_path)], capture_output=True, encoding="utf-8",
+        timeout=20, env=env)
     assert "recursão infinita" in resultado.stdout
     assert "Traceback" not in resultado.stdout
 
@@ -1235,8 +1239,9 @@ def test_cadeia_caracter_indice_fora_dos_limites_da_erro_amigavel(tmp_path):
     algo_path.write_text(
         'algoritmo "T"\nimportar Cadeia\ninicio\n    escrever(cadeia.caracter("abc", 10))\n',
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
-        ["algo", "executa", str(algo_path)], capture_output=True, text=True)
+        ["algo", "executa", str(algo_path)], capture_output=True, encoding="utf-8", env=env)
     assert "Traceback" not in resultado.stdout
     assert "índice fora dos limites" in resultado.stdout
 
@@ -1704,9 +1709,10 @@ def test_incluir_ficheiro_inexistente_da_erro(tmp_path):
         "inicio\n"
         "    escrever(1)\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "não encontrado" in resultado.stdout
 
@@ -1721,9 +1727,10 @@ def test_incluir_estrutura_duplicada_da_erro(tmp_path):
         "inicio\n"
         "    escrever(1)\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "colide" in resultado.stdout
 
@@ -1738,9 +1745,10 @@ def test_incluir_funcao_duplicada_da_erro(tmp_path):
         "inicio\n"
         "    escrever(f())\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "colide" in resultado.stdout
 
@@ -1755,9 +1763,10 @@ def test_incluir_variavel_global_duplicada_da_erro(tmp_path):
         "inicio\n"
         "    escrever(total)\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "colide" in resultado.stdout
 
@@ -1812,9 +1821,10 @@ def test_incluir_com_alias_funcao_sem_alias_deixa_de_existir(tmp_path):
         "inicio\n"
         "    escrever(areaCirculo(2.0))\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "areaCirculo" in resultado.stdout
 
@@ -1851,9 +1861,10 @@ def test_incluir_alias_reutilizado_para_ficheiro_diferente_da_erro(tmp_path):
         "inicio\n"
         "    escrever(1)\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "alias" in resultado.stdout.lower()
 
@@ -1868,9 +1879,10 @@ def test_incluir_alias_colide_com_biblioteca_importada_da_erro(tmp_path):
         "inicio\n"
         "    escrever(1)\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "biblioteca" in resultado.stdout.lower()
 
@@ -1884,9 +1896,10 @@ def test_incluir_alias_metodo_inexistente_da_erro(tmp_path):
         "inicio\n"
         "    escrever(m.g())\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "'g'" in resultado.stdout
 
@@ -1909,9 +1922,10 @@ def test_incluir_mesmo_ficheiro_duas_vezes_com_aliases_diferentes_da_erro(tmp_pa
         "    escrever(a.f())\n"
         "    escrever(b.f())\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "já foi" in resultado.stdout
 
@@ -1951,9 +1965,10 @@ def test_alias_de_incluir_colide_com_nome_de_variavel_da_erro(tmp_path):
         "    c.valor = 7\n"
         "    escrever(c.valor())\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "alias" in resultado.stdout.lower()
 
@@ -1976,9 +1991,10 @@ def test_funcao_incluida_com_alias_e_parametro_ref_nao_pode_ser_usada_em_express
         "    n:inteiro = 5\n"
         "    escrever(L.incrementaEDevolve(n) + 1)\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "Traceback" not in resultado.stdout
     assert "dentro de uma expressão" in resultado.stdout
@@ -2002,9 +2018,10 @@ def test_funcao_incluida_com_alias_que_le_global_antecipada_e_detetada(tmp_path)
         "inicio\n"
         "    escrever(x)\n",
         encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "Traceback" not in resultado.stdout
     assert "segredo" in resultado.stdout
@@ -4516,6 +4533,99 @@ def test_comando_com_limite_cpu_sem_alteracao_fora_de_posix():
     assert comando == [sys.executable, "prog.py"]
 
 
+# ---------- flags de override dos limites (só CLI local, nunca online/) ----------
+
+def test_comando_com_limite_cpu_aceita_override_via_flag():
+    """'algo executa --limite-cpu N' passa N até ao bootstrap gerado, em
+    vez de sempre LIMITE_CPU_SEGUNDOS -- sem argumento, comportamento
+    inalterado (ver test_comando_com_limite_cpu_usa_bootstrap_valido_em_posix)."""
+    from algo_lang.cli import _comando_com_limite_cpu, _bootstrap_limite_cpu
+    import algo_lang.cli as cli_mod
+    bootstrap = _bootstrap_limite_cpu(30)
+    compile(bootstrap, "<bootstrap>", "exec")
+    assert "(30, 30)" in bootstrap
+    original = cli_mod.os.name
+    cli_mod.os.name = "posix"
+    try:
+        comando = _comando_com_limite_cpu("prog.py", 30)
+    finally:
+        cli_mod.os.name = original
+    assert comando == [sys.executable, "-c", bootstrap, "prog.py"]
+
+
+def test_cmd_executa_com_flag_limite_cpu_usa_o_valor_passado(tmp_path):
+    """'cmd_executa' lê 'args.limite_cpu' (via getattr, para não rebentar
+    quando um Namespace construído à mão -- ex.: o teste acima disto na
+    auditoria original -- não tem esse atributo) e propaga-o ao comando
+    real, em vez de LIMITE_CPU_SEGUNDOS."""
+    import argparse
+    import algo_lang.cli as cli_mod
+    chamadas = {}
+
+    def _fake_comando(caminho_py, limite=None):
+        chamadas["limite"] = limite
+        return [sys.executable, "-c", "pass"]
+
+    original = cli_mod._comando_com_limite_cpu
+    cli_mod._comando_com_limite_cpu = _fake_comando
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text('algoritmo "T"\ninicio\n    escrever(1)\n', encoding="utf-8")
+    args = argparse.Namespace(
+        ficheiro=str(algo_path), debug=False, json=False, mostrar_python=False,
+        limite_cpu=5)
+    try:
+        cli_mod.cmd_executa(args)
+    finally:
+        cli_mod._comando_com_limite_cpu = original
+    assert chamadas["limite"] == 5
+
+
+def test_gerar_trace_max_passos_aceita_override():
+    """'gerar_trace(max_passos=N)' usa N em vez do MAX_PASSOS do módulo --
+    permite a 'algo executa --debug --max-passos N' alargar/apertar o
+    limite sem editar tools/tracer.py. Sem o argumento (None), continua a
+    usar MAX_PASSOS (ver os outros testes de gerar_trace nesta suite)."""
+    from algo_lang.compilador.codegen import gerar_python_com_mapa
+    from algo_lang.tools.tracer import gerar_trace
+    programa = parse(textwrap.dedent("""\
+        algoritmo "T"
+        inicio
+            x:inteiro = 0
+            enquanto x < 20 fazer
+                x = x + 1
+    """))
+    verificar(programa)
+    dados = gerar_python_com_mapa(programa)
+    resultado = gerar_trace(
+        dados["codigo"], "<mem>", dados["mapa_linhas"],
+        dados["nomes_globais"], dados["nomes_funcoes"], max_passos=3)
+    assert resultado["limiteExcedido"] is True
+    assert resultado["limiteTipo"] == "passos"
+    assert len(resultado["passos"]) == 3
+
+
+def test_gerar_trace_limite_tempo_aceita_override():
+    """Mesma ideia que o teste acima, para 'limite_tempo_segundos' -- um
+    valor muito baixo interrompe o trace por tempo antes de atingir
+    MAX_PASSOS, mesmo num programa com poucas linhas."""
+    from algo_lang.compilador.codegen import gerar_python_com_mapa
+    from algo_lang.tools.tracer import gerar_trace
+    programa = parse(textwrap.dedent("""\
+        algoritmo "T"
+        inicio
+            x:inteiro = 0
+            enquanto x < 1000000 fazer
+                x = x + 1
+    """))
+    verificar(programa)
+    dados = gerar_python_com_mapa(programa)
+    resultado = gerar_trace(
+        dados["codigo"], "<mem>", dados["mapa_linhas"],
+        dados["nomes_globais"], dados["nomes_funcoes"], limite_tempo_segundos=0)
+    assert resultado["limiteExcedido"] is True
+    assert resultado["limiteTipo"] == "tempo"
+
+
 @pytest.mark.skipif(os.name != "posix", reason="resource.RLIMIT_CPU só existe em POSIX")
 def test_ciclo_infinito_cpu_bound_e_interrompido_com_aviso_amigavel(tmp_path, capfd, monkeypatch):
     """Fim-a-fim real (não mockado): um programa que nunca termina (ciclo
@@ -5856,7 +5966,7 @@ inicio
 """)
     assert resultado.returncode == 1
     assert "Traceback" not in resultado.stdout
-    assert "valor inválido" in resultado.stdout
+    assert "não é possível converter 'nan'" in resultado.stdout
 
 
 def test_matematica_potencia_com_expoente_grande_calcula_e_imprime_sem_overflow():
@@ -6953,8 +7063,11 @@ def test_tamanho_de_vetor_dentro_do_limite_continua_a_funcionar():
     assert saida.strip() == "1"
 
 
-# ---------- AUDITORIA_2026-08-19 ronda 12 (reauditoria): bugs #2/#9/#39
-# -- fusão de âmbito entre ramos irmãos 'se'/'senao' ----------
+# ---------- AUDITORIA_2026-08-19 ronda 12 (reauditoria): bugs #2/#39 --
+# âmbito entre ramos irmãos 'se'/'senao' (a fusão de âmbito para ramos
+# exaustivos concordantes, ex-bug #9, foi revertida -- ver
+# test_variavel_declarada_em_ambos_os_ramos_de_se_senao_continua_indisponivel_depois)
+# ----------
 
 def test_constante_com_eh_constante_diferente_em_ramos_irmaos_da_erro_em_compilacao():
     """bug #2 (histórico): 'x' era declarada dentro de 'inicio', só num
@@ -6981,27 +7094,33 @@ def test_constante_com_eh_constante_diferente_em_ramos_irmaos_da_erro_em_compila
         """)
 
 
-def test_variavel_declarada_em_ambos_os_ramos_de_se_senao_fica_disponivel_depois():
-    """bug #9: 'x' declarada com o mesmo tipo em AMBOS os ramos de um
-    'se'/'senao' exaustivo tem sempre um valor a seguir ao 'se' --
-    antes, dava (incorretamente) 'a variável x não foi declarada'."""
-    saida = executar("""
-        algoritmo "T"
-        inicio
-            se verdadeiro entao
-                x: inteiro = 1
-            senao
-                x: inteiro = 2
-            escrever(x)
-    """)
-    assert saida.strip() == "1"
+def test_variavel_declarada_em_ambos_os_ramos_de_se_senao_continua_indisponivel_depois():
+    """'x' declarada com o mesmo tipo em AMBOS os ramos de um 'se'/'senao'
+    exaustivo NÃO fica disponível a seguir ao 'se' -- o âmbito de uma
+    declaração é sempre local ao ramo onde aparece, independentemente de
+    o mesmo nome (e tipo) aparecer em todos os ramos irmãos. Decisão
+    revertida deliberadamente: uma versão anterior do compilador
+    propagava esse nome para o âmbito pai quando os ramos eram
+    exaustivos e concordavam em tipo -- decidido que isso confundia mais
+    do que ajudava (o âmbito deixa de ser previsível só de olhar para
+    onde a variável foi declarada)."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                se verdadeiro entao
+                    x: inteiro = 1
+                senao
+                    x: inteiro = 2
+                escrever(x)
+        """)
 
 
 def test_variavel_com_tipos_diferentes_em_ramos_irmaos_continua_indisponivel_depois_do_se():
-    """Não regressão da correção do bug #9: quando os ramos NÃO
-    concordam em tipo, o nome continua por declarar depois do 'se' --
-    sem propagação, mas também sem erro nenhum na própria declaração
-    (só ao tentar usar 'y' depois). Usa um procedimento (em vez de
+    """Quando os ramos NÃO concordam em tipo, o nome continua por
+    declarar depois do 'se' -- sem erro nenhum na própria declaração (só
+    ao tentar usar 'y' depois), mesmo resultado que ramos concordantes
+    dão agora (ver o teste acima). Usa um procedimento (em vez de
     'inicio' diretamente) só para exercitar o mesmo cenário dentro do
     corpo de uma função -- desde que 'inicio' deixou de ter um
     pré-registo eager de globais para funções, o comportamento é
@@ -7274,19 +7393,23 @@ def test_conversao_paradecimal_continua_a_aceitar_infinito():
 # 'caso' + 'contrario' de um 'escolher' exaustivo fica disponível depois
 # dele (mesma classe do bug #9, mas em 'escolher') ----------
 
-def test_variavel_declarada_em_todos_os_casos_e_contrario_fica_disponivel_depois_do_escolher():
-    saida = executar("""
-        algoritmo "T"
-        inicio
-            x:inteiro = 1
-            escolher x
-                caso 1
-                    y:inteiro = 10
-                contrario
-                    y:inteiro = 20
-            escrever(y)
-    """)
-    assert saida.strip() == "10"
+def test_variavel_declarada_em_todos_os_casos_e_contrario_continua_indisponivel_depois_do_escolher():
+    """Mesma decisão do 'se'/'senao' (ver
+    test_variavel_declarada_em_ambos_os_ramos_de_se_senao_continua_indisponivel_depois):
+    o âmbito de uma declaração é sempre local ao 'caso'/'contrario' onde
+    aparece, mesmo que o mesmo nome (e tipo) apareça em todos eles."""
+    with pytest.raises(ErroSemantico, match="não foi declarada"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                x:inteiro = 1
+                escolher x
+                    caso 1
+                        y:inteiro = 10
+                    contrario
+                        y:inteiro = 20
+                escrever(y)
+        """)
 
 
 def test_variavel_com_tipos_diferentes_entre_casos_continua_indisponivel_depois_do_escolher():

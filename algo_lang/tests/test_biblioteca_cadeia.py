@@ -144,6 +144,21 @@ inicio
     assert "espera 5" in resultado.stdout
 
 
+def test_indexar_cadeia_diretamente_da_erro_com_sugestao_de_cadeia_caracter():
+    """'s[0]' é sintaxe legal na gramática (indexação em geral), mas
+    'cadeia' não é um vetor -- sempre rejeitada em compilação. A mensagem
+    é dedicada (não a genérica de "não é um vetor") porque tentar '[0]'
+    numa cadeia é um erro comum vindo doutras linguagens; sem apontar
+    para 'cadeia.caracter', o aluno não saberia o que fazer a seguir."""
+    with pytest.raises(ErroSemantico, match="usa 'cadeia.caracter"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                s:cadeia = "abc"
+                escrever(s[0])
+        """)
+
+
 def test_dividir_usado_como_valor_escalar_da_erro_semantico():
     """'cadeia.dividir' devolve um vetor -- primeira função de biblioteca
     a fazê-lo (ver dims_retorno em bibliotecas/cadeia.py) -- por isso tem

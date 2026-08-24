@@ -105,7 +105,9 @@ programa).
 ## 3.3 Âmbito de uma variável declarada dentro de um ramo
 
 Uma variável declarada dentro de um ramo de `se`/`escolher` só existe
-**dentro** desse ramo — normalmente desaparece depois do bloco:
+**dentro** desse ramo — sempre desaparece depois do bloco, mesmo que a
+MESMA variável (mesmo nome, tipo e número de dimensões) seja declarada
+em todos os ramos irmãos:
 
 ```algo
 inicio
@@ -114,27 +116,29 @@ inicio
         sinal:cadeia = "positivo"
         escrever(sinal)
     // escrever(sinal)          // ERRO: 'sinal' não existe aqui fora
-```
 
-**Exceção**: se a MESMA variável (mesmo nome, tipo e número de
-dimensões) for declarada em **todos** os ramos de um `se`/`senao` ou
-`escolher`/`contrario` **exaustivo** (ou seja, com `senao`/`contrario`
-presente, cobrindo todos os casos), essa variável fica visível depois
-do bloco, com o valor do ramo que de facto executou:
-
-```algo
-inicio
     idade:inteiro = 20
     se idade >= 18 entao
         estado:cadeia = "adulto"
     senao
         estado:cadeia = "menor"
-    escrever(estado)            // válido: 'estado' existe nos dois ramos
+    // escrever(estado)         // ERRO: 'estado' não existe aqui fora,
+                                 // mesmo declarada nos dois ramos
 ```
 
-Sem o `senao` (ou sem `estado` declarado em todos os ramos), a
-propagação não acontece — não dá erro, `estado` simplesmente não fica
-disponível a seguir ao bloco.
+Para usar o valor depois do bloco, declara a variável ANTES do `se` e
+atribui dentro de cada ramo:
+
+```algo
+inicio
+    idade:inteiro = 20
+    estado:cadeia
+    se idade >= 18 entao
+        estado = "adulto"
+    senao
+        estado = "menor"
+    escrever(estado)            // válido: 'estado' foi declarada antes do 'se'
+```
 
 ## Exemplo completo
 

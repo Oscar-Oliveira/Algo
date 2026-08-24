@@ -60,7 +60,6 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 | Ficheiro | Para quem |
 |---|---|
 | `ManualCLI.md` | Manual do estudante: consola interativa, extensão do VS Code, e (por fim) instalar Python e usar a linha de comandos |
-| `DecisoesELimitacoesConhecidas.md` | Decisões de design e limitações conhecidas do compilador |
 | `bin/` | Material arquivado — versões supersedidas ou não atualizadas (manual de instalação anterior, roteiro de testes manuais, sebenta de exercícios, guia do docente, referência completa da linguagem em Word e em Markdown) |
 
 ## Sub-projetos com o seu próprio README

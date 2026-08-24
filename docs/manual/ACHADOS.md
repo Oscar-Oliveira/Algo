@@ -9,6 +9,14 @@ Estado de cada achado: 🟢 confirmado só por leitura do código · 🟡
 confirmado a correr o compilador · ⚪ por decidir (só uma observação,
 pode ser intencional).
 
+> **Nota**: vários achados abaixo citam `docs/DecisoesELimitacoesConhecidas.md`
+> como estava na altura em que cada achado foi investigado/corrigido —
+> esse ficheiro foi entretanto revisto item a item com o maintainer e
+> removido (cada decisão nele confirmada como comportamento correto, ou
+> corrigida na origem quando não era). As citações ficam como registo
+> histórico do que era verdade nesse momento, não como referência a um
+> ficheiro que continua a existir.
+
 ---
 
 ## Capítulo 1 — Introdução e tipos

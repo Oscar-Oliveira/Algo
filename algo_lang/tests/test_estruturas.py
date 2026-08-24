@@ -183,8 +183,7 @@ def test_estrutura_auto_referenciada_nao_recursa_infinitamente():
 
 
 def test_lista_ligada_construida_e_percorrida_com_nulo():
-    """Atribuição de estrutura copia por valor (ver 'Cópia por valor e
-    ref' em DecisoesELimitacoesConhecidas.md) -- por isso 'b' tem de
+    """Atribuição de estrutura copia por valor -- por isso 'b' tem de
     estar com os seus campos finais ANTES de 'a.seguinte = b', senão
     'a.seguinte' fica com a cópia de 'b' como estava nesse momento
     (valor=0), não com o valor atribuído depois. Constrói-se sempre de
@@ -307,8 +306,10 @@ def test_aceder_a_campo_vetor_recursivo_vazio_da_erro_amigavel_nao_traceback(tmp
         '    x:No\n'
         '    escrever(x.filhos[0].valor)\n',
         encoding="utf-8")
+    import os
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
-        ["algo", "executa", str(algo_path)], capture_output=True, text=True)
+        ["algo", "executa", str(algo_path)], capture_output=True, encoding="utf-8", env=env)
     assert "Traceback" not in resultado.stdout
     assert "posição de vetor" in resultado.stdout
 
@@ -461,3 +462,37 @@ def test_ciclo_de_dois_nos_via_ref_sobrevive_a_copia_por_valor():
             imprimir(a)
     """)
     assert saida.strip() == "1"
+
+
+def test_comparar_dois_ciclos_de_dois_nos_via_ref_nao_rebenta_e_da_igual():
+    """Mesmo cenário do teste acima, mas para '==' em vez de cópia: sem
+    deteção de ciclo no '__eq__' gerado, comparar dois nós que formam um
+    ciclo via 'ref' entrava em RecursionError (o 'memo' do __deepcopy__
+    não protegia '__eq__')."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+            seguinte:ref No
+
+        inicio
+            a1:No
+            a1.valor = 1
+            b1:No
+            b1.valor = 2
+            a1.seguinte = b1
+            b1.seguinte = a1
+
+            a2:No
+            a2.valor = 1
+            b2:No
+            b2.valor = 2
+            a2.seguinte = b2
+            b2.seguinte = a2
+
+            escrever(a1 == a1)
+            escrever(a1 == a2)
+            b2.valor = 99
+            escrever(a1 == a2)
+    """)
+    assert saida.strip() == "verdadeiro\nverdadeiro\nfalso"

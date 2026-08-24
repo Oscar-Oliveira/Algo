@@ -320,9 +320,10 @@ quiseres perceber porque é que um programa foi interrompido.
   fim de **10s de tempo de CPU** — não de relógio, por isso não
   interrompe um programa à espera de `ler()`. Serve para apanhar
   ciclos infinitos. Com `--debug`/`--json`, o limite é de 4000 passos
-  executados ou 10s de CPU acumulado, o que vier primeiro.
-
-Detalhe completo em `DecisoesELimitacoesConhecidas.md`.
+  executados ou 10s de CPU acumulado, o que vier primeiro. Estes
+  limites podem ser ajustados por invocação com `--limite-cpu SEGUNDOS`
+  (sem `--debug`/`--json`) ou `--max-passos N`/`--limite-tempo SEGUNDOS`
+  (com `--debug`/`--json`), sem editar o compilador.
 
 ---
 

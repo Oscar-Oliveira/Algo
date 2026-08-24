@@ -53,7 +53,7 @@ def _correr_consola(entrada, timeout=15, tmp_path=None):
 def test_consola_abre_com_algo_sem_argumentos(tmp_path):
     resultado = _correr_consola("sair\n")
     assert resultado.returncode == 0
-    assert "Consola ALGO" in resultado.stdout
+    assert "Escreve um comando e prime Enter" in resultado.stdout
 
 
 def test_consola_mostra_logo_ascii_no_banner(tmp_path):
@@ -203,9 +203,10 @@ def test_consola_ordem_do_output_nao_fica_baralhada_pelo_buffering(tmp_path):
 def test_executa_mostrar_python(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(algo_path), "--mostrar-python"],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode == 0
     assert "Código Python gerado" in resultado.stdout
     assert "def _algo_programa" in resultado.stdout
@@ -214,9 +215,10 @@ def test_executa_mostrar_python(tmp_path):
 def test_executa_json_com_entradas_nao_encontrado(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(algo_path), "--json", "--entradas", "/tmp/nao_existe_ent.txt"],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "não encontrado" in resultado.stdout
 
@@ -225,9 +227,10 @@ def test_executa_json_com_erro_em_tempo_de_execucao(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
         'algoritmo "T"\ninicio\n    v:inteiro[3]\n    escrever(v[10])\n', encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(algo_path), "--json"],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert "Erro em tempo de execução" in resultado.stdout
     assert (tmp_path / "prog" / "prog_trace.json").exists()
 
@@ -246,9 +249,10 @@ def test_executa_json_limite_de_passos_excedido(tmp_path):
 def test_fluxograma_funcao_inexistente(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
         ["algo", "fluxograma", str(algo_path), "--funcao", "naoExiste"],
-        capture_output=True, text=True)
+        capture_output=True, encoding="utf-8", env=env)
     assert resultado.returncode != 0
     assert "não existe nenhuma função" in resultado.stdout
 

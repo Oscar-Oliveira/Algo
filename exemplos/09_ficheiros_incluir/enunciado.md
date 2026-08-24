@@ -30,8 +30,7 @@ global `contadorProdutosCriados` no ficheiro incluído.
 
 Demonstra: o alias só se aplica a **funções** (`inv.criarProduto(...)`)
 — a estrutura `Produto` usa-se diretamente (`p1:Produto`) e a variável
-global lê-se diretamente (`contadorProdutosCriados`), ambas sem `inv.`,
-tal como documentado em `DecisoesELimitacoesConhecidas.md`
-("incluir ... como alias"). Confirmado em runtime: o contador acumula
+global lê-se diretamente (`contadorProdutosCriados`), ambas sem `inv.`.
+Confirmado em runtime: o contador acumula
 corretamente entre as duas chamadas a `criarProduto`, feitas a partir do
 programa principal mas a mutar a global do ficheiro incluído.

@@ -32,9 +32,8 @@ Uma lista ligada de tamanho fixo (3 nós), construída de trás para a
 frente e percorrida com `enquanto no <> nulo fazer`.
 
 Demonstra: um campo de estrutura do **próprio tipo** (`seguinte:No`),
-válido por ficar `nulo` por omissão em vez de recursão infinita (ver
-"Estruturas" em `DecisoesELimitacoesConhecidas.md`); como ALGO não tem
-alocação dinâmica, cada `nó.seguinte = outroNo` é uma **cópia** do resto
+válido por ficar `nulo` por omissão em vez de recursão infinita; como
+ALGO não tem alocação dinâmica, cada `nó.seguinte = outroNo` é uma **cópia** do resto
 da cadeia (não um ponteiro partilhado), por isso a lista tem de ser
 montada de trás para a frente — testado e confirma-se que soma/conta os
 3 nós corretamente.

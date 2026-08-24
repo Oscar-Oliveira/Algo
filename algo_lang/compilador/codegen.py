@@ -171,6 +171,8 @@ def _algo_traduzir_valueerro(msg):
         return "o 'passo' do ciclo 'para' não pode ser zero (o ciclo nunca avançaria)."
     if "cannot convert float infinity to integer" in msg_min:
         return "não é possível converter 'infinito' para um número inteiro."
+    if "cannot convert float nan to integer" in msg_min:
+        return "não é possível converter 'nan' (não é um número) para um número inteiro."
     if "int too large to convert to float" in msg_min:
         return "este número é grande demais para ser convertido para decimal."
     if "exceeds the limit" in msg_min and "integer string conversion" in msg_min:
@@ -329,6 +331,26 @@ def _algo_verificar_tamanho_vetor_resultado(lista, tamanho_esperado):
             f"esta chamada devolveu um vetor com {len(lista)} elemento(s), "
             f"mas a declaração espera {tamanho_esperado}")
     return lista
+
+
+def _algo_eq_estrutura(a, b, visitados):
+    """Comparação de valor usada pelo '__eq__' gerado para 'estrutura',
+    campo a campo -- com deteção de ciclo. Um campo 'ref' permite duas
+    instâncias apontarem uma para a outra (ou um ciclo maior), o que faria
+    '==' recursar para sempre sem isto. 'visitados' regista pares
+    (id(a), id(b)) já em comparação: reencontrar o mesmo par fecha o
+    ciclo e conta como igual, sem descer mais fundo -- mesma técnica que o
+    'memo' de '__deepcopy__' usa para o problema irmão (copiar, em vez de
+    comparar, um grafo cíclico). Recursa também em listas (campos-vetor,
+    de qualquer dimensão), para um vetor de 'estrutura' com um campo 'ref'
+    ficar igualmente protegido."""
+    if isinstance(a, list):
+        if not isinstance(b, list) or len(a) != len(b):
+            return False
+        return all(_algo_eq_estrutura(x, y, visitados) for x, y in zip(a, b))
+    if hasattr(a, "_algo_eq"):
+        return a._algo_eq(b, visitados)
+    return a == b
 
 '''
 
@@ -568,8 +590,25 @@ class GeradorCodigo(GeradorCodigoBase):
         self.emit("def __eq__(self, outro):", 1)
         self.emit(f"if not isinstance(outro, {e.nome}):", 2)
         self.emit("return NotImplemented", 3)
+        self.emit("return self._algo_eq(outro, set())", 2)
+        # '_algo_eq' (não '__eq__' diretamente) é o que recursa em campos
+        # de tipo 'estrutura': 'visitados' só sobrevive à recursão porque é
+        # passado explicitamente de instância em instância -- usar '=='
+        # nos campos, como '__eq__' faz para si próprio, chamaria de novo
+        # '__eq__' com um 'set()' NOVO a cada campo, perdendo o registo de
+        # ciclo mal desce um nível. Ver '_algo_eq_estrutura' no cabeçalho
+        # gerado, que decide entre recursar numa lista, chamar '_algo_eq'
+        # (campo de tipo 'estrutura') ou cair para '==' (escalar).
+        self.emit("def _algo_eq(self, outro, visitados):", 1)
+        self.emit(f"if not isinstance(outro, {e.nome}):", 2)
+        self.emit("return False", 3)
+        self.emit("par = (id(self), id(outro))", 2)
+        self.emit("if par in visitados:", 2)
+        self.emit("return True", 3)
+        self.emit("visitados.add(par)", 2)
         if e.campos:
-            condicoes = " and ".join(f"self.{c.nome} == outro.{c.nome}" for c in e.campos)
+            condicoes = " and ".join(
+                f"_algo_eq_estrutura(self.{c.nome}, outro.{c.nome}, visitados)" for c in e.campos)
         else:  # pragma: no cover -- o parser exige >=1 campo em 'estrutura'
             condicoes = "True"
         self.emit(f"return {condicoes}", 2)

@@ -927,28 +927,6 @@ class VerificadorTipos:
     def _descricao_dims(dims):
         return "um valor escalar" if dims == 0 else f"um vetor de {dims} dimensão(ões)"
 
-    @staticmethod
-    def _propagar_declaracoes_comuns(escopo, escopos_ramos):
-        """Quando um conjunto de ramos EXAUSTIVO (cobre todos os casos
-        possíveis -- só deve ser chamado quando há 'senao'/'contrario')
-        declara o MESMO nome, com a MESMA tupla
-        (tipo, dims, eh_constante, valor_resolvido), em TODOS os ramos,
-        esse nome fica disponível no escopo pai, tal como uma declaração
-        normal. Se os ramos não concordarem (tipos diferentes, ou um ramo
-        em falta), o nome fica por declarar -- sem erro, só sem
-        propagação.
-
-        Partilhado entre 'A.Se' e 'A.Escolha' de propósito, para evitar
-        duplicação (e divergência) se um terceiro tipo de instrução com
-        ramos exaustivos aparecer no futuro."""
-        nomes_comuns = set(escopos_ramos[0].locais)
-        for esc in escopos_ramos[1:]:
-            nomes_comuns &= set(esc.locais)
-        for nome in nomes_comuns:
-            valores = [esc.locais[nome] for esc in escopos_ramos]
-            if all(v == valores[0] for v in valores):
-                escopo[nome] = valores[0]
-
     def _verificar_stmt(self, s, escopo, ctx_funcao, dentro_de_ciclo=False):
         if isinstance(s, A.Declaracao):
             self._registar_decl(escopo, s)
@@ -1037,24 +1015,15 @@ class VerificadorTipos:
                         f"ex: '{A.texto_expr(e)}.campo'", s.linha)
 
         elif isinstance(s, A.Se):
-            escopos_ramos = []
             for cond, corpo in s.ramos:
                 tipo, _ = self._tipo_expr(cond, escopo)
                 if tipo != "booleano":
                     raise ErroSemantico(
                         f"a condição de 'se' tem de ser booleana (é '{tipo}')",
                         getattr(cond, "linha", s.linha))
-                escopo_ramo = Escopo(escopo)
-                self._verificar_bloco(corpo, escopo_ramo, ctx_funcao, dentro_de_ciclo)
-                escopos_ramos.append(escopo_ramo)
+                self._verificar_bloco(corpo, Escopo(escopo), ctx_funcao, dentro_de_ciclo)
             if s.senao is not None:
-                escopo_senao = Escopo(escopo)
-                self._verificar_bloco(s.senao, escopo_senao, ctx_funcao, dentro_de_ciclo)
-                escopos_ramos.append(escopo_senao)
-                # Um 'se'/'senao' exaustivo que declara o MESMO nome em
-                # TODOS os ramos garante que esse nome tem sempre um valor
-                # a seguir ao 'se' -- ver _propagar_declaracoes_comuns.
-                self._propagar_declaracoes_comuns(escopo, escopos_ramos)
+                self._verificar_bloco(s.senao, Escopo(escopo), ctx_funcao, dentro_de_ciclo)
 
         elif isinstance(s, A.Para):
             escopo_corpo = Escopo(escopo)
@@ -1106,7 +1075,6 @@ class VerificadorTipos:
         elif isinstance(s, A.Escolha):
             tipo_base, _ = self._tipo_expr(s.expr, escopo)
             valores_vistos = set()
-            escopos_ramos = []
             for valores, corpo in s.casos:
                 for v in valores:
                     tipo_v, _ = self._tipo_expr(v, escopo)
@@ -1129,16 +1097,9 @@ class VerificadorTipos:
                                 f"'escolher' -- este ramo nunca seria alcançado",
                                 getattr(v, "linha", s.linha))
                         valores_vistos.add(chave)
-                escopo_caso = Escopo(escopo)
-                self._verificar_bloco(corpo, escopo_caso, ctx_funcao, dentro_de_ciclo)
-                escopos_ramos.append(escopo_caso)
+                self._verificar_bloco(corpo, Escopo(escopo), ctx_funcao, dentro_de_ciclo)
             if s.contrario is not None:
-                escopo_contrario = Escopo(escopo)
-                self._verificar_bloco(s.contrario, escopo_contrario, ctx_funcao, dentro_de_ciclo)
-                escopos_ramos.append(escopo_contrario)
-                # Mesma lógica que 'A.Se' já tem -- ver
-                # _propagar_declaracoes_comuns.
-                self._propagar_declaracoes_comuns(escopo, escopos_ramos)
+                self._verificar_bloco(s.contrario, Escopo(escopo), ctx_funcao, dentro_de_ciclo)
 
         elif isinstance(s, A.Retornar):
             if ctx_funcao is None:
@@ -1238,6 +1199,16 @@ class VerificadorTipos:
         for tag, valor in acessos:
             if tag == "indice":
                 if dims <= 0:
+                    if tipo in ("cadeia", "caracter"):
+                        # Caso comum o suficiente (tentar 's[0]' para obter
+                        # um caracter, como noutras linguagens) para merecer
+                        # uma mensagem dedicada em vez da genérica de "não é
+                        # um vetor" -- essa mensagem não diz o que fazer a
+                        # seguir.
+                        raise ErroSemantico(
+                            f"'{caminho}' é do tipo '{tipo}'; não pode ser indexado "
+                            f"com '[...]' -- usa 'cadeia.caracter({caminho}, indice)'",
+                            linha)
                     raise ErroSemantico(
                         f"'{caminho}' não é um vetor; não pode ser indexado", linha)
                 tipo_idx, _ = self._tipo_expr(valor, escopo)

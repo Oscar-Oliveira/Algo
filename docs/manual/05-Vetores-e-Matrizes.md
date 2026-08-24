@@ -160,13 +160,6 @@ inicio
     escrever(v1[0], " ", v2[0])    // 1 99 -- independentes
 ```
 
-> **Nota / achado**: `docs/DecisoesELimitacoesConhecidas.md` (secção
-> "Cópia por valor e `ref`") diz que "atribuição, declaração, retornar,
-> e literais `{...}` copiam structs/vetores por valor" — verdade para
-> `estrutura`, mas **não** para vetor: `atribuição`/`declaração` a
-> partir de uma variável são rejeitadas em compilação para um vetor,
-> nunca chegam a copiar nada. Ver [`ACHADOS.md`](ACHADOS.md).
-
 ## Exemplo completo
 
 ```algo

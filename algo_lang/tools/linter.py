@@ -522,9 +522,8 @@ class Linter:
     def _verificar_atribuicao_a_parametro_por_valor(self, f: A.FuncaoDef):
         """Atribuir diretamente a um parâmetro que não é 'por referência'
         (ou a um campo/elemento seu, já que struct/vetor são copiados por
-        valor -- ver docs/DecisoesELimitacoesConhecidas.md) só muda a
-        cópia local -- confusão clássica entre passagem por valor e por
-        referência."""
+        valor) só muda a cópia local -- confusão clássica entre passagem
+        por valor e por referência."""
         nomes_por_valor = {p.nome for p in f.parametros if not p.por_referencia}
         for s in self._todas_as_stmts(f.corpo):
             if isinstance(s, A.Atribuicao) and s.alvo.nome in nomes_por_valor:

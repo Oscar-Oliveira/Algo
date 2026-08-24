@@ -197,11 +197,10 @@ escrever("Idade: ", idade)         // certo: argumentos separados por vírgula
 ```
 
 Isto é deliberado (nenhum outro operador da linguagem faz conversão
-implícita entre tipos incompatíveis) — ver mais em
-[`docs/DecisoesELimitacoesConhecidas.md`](../DecisoesELimitacoesConhecidas.md).
-A forma correta de misturar texto e números é `escrever` com vários
-argumentos, como acima; para construir uma única `cadeia` com um número
-lá dentro, converte-o primeiro (`conversao.paraTexto`, capítulo 8).
+implícita entre tipos incompatíveis). A forma correta de misturar
+texto e números é `escrever` com vários argumentos, como acima; para
+construir uma única `cadeia` com um número lá dentro, converte-o
+primeiro (`conversao.paraTexto`, capítulo 8).
 
 ## Exemplo completo
 

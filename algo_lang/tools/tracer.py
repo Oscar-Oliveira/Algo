@@ -120,7 +120,8 @@ def formatar_consola_com_debug(resultado):
 
 
 def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
-                 nomes_globais: list, nomes_funcoes: list, entradas=None):
+                 nomes_globais: list, nomes_funcoes: list, entradas=None,
+                 max_passos=None, limite_tempo_segundos=None):
     """Executa 'codigo_py' (o Python gerado a partir de um .algo) sob
     sys.settrace(), devolvendo um dicionário pronto a converter em JSON:
     {
@@ -134,7 +135,19 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
 
     'entradas': lista de strings para alimentar ler(), ou None para usar
     o stdin real do processo (permite entrada interativa).
-    """
+
+    'max_passos'/'limite_tempo_segundos': None (omitido) usa os valores
+    por omissão do módulo (MAX_PASSOS/LIMITE_TEMPO_SEGUNDOS) -- só a CLI
+    local (`algo executa --debug/--json --max-passos/--limite-tempo`)
+    passa um valor explícito, para um programa legitimamente maior não
+    bater no limite sem precisar editar este ficheiro. online/executor.py
+    nunca passa estes argumentos de propósito (vários estudantes partilham
+    a mesma VM; deixar cada um alargar o seu próprio limite enfraquecia a
+    proteção contra um programa a monopolizar CPU partilhada)."""
+    max_passos = MAX_PASSOS if max_passos is None else max_passos
+    limite_tempo_segundos = (
+        LIMITE_TEMPO_SEGUNDOS if limite_tempo_segundos is None else limite_tempo_segundos
+    )
     nomes_funcoes_conhecidas = set(nomes_funcoes) | {NOME_FUNCAO_PRINCIPAL}
     passos = []
     limite_excedido = {"valor": False, "tipo": None}
@@ -290,11 +303,11 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                 "variaveis": {k: _valor_serializavel(v) for k, v in frame.f_globals.items()
                               if k in nomes_globais},
             }
-        if len(passos) >= MAX_PASSOS:
+        if len(passos) >= max_passos:
             limite_excedido["valor"] = True
             limite_excedido["tipo"] = "passos"
             raise LimiteDePassosExcedido()
-        if time.process_time() - tempo_inicio > LIMITE_TEMPO_SEGUNDOS:
+        if time.process_time() - tempo_inicio > limite_tempo_segundos:
             limite_excedido["valor"] = True
             limite_excedido["tipo"] = "tempo"
             raise LimiteDeTempoExcedido()

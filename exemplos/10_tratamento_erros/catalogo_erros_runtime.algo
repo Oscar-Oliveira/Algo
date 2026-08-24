@@ -2,10 +2,9 @@ algoritmo "CatalogoDeErrosRuntime"
 
 // Menu para provocar, um de cada vez, cada categoria de erro de
 // execução reconhecida pelo compilador (ver "Erros de execução" no
-// manual e DecisoesELimitacoesConhecidas.md) -- cada opção pára o
-// programa com uma mensagem amigável em português, nunca um traceback
-// do Python. Reaproveita 'escolher/caso' (03), estruturas recursivas
-// (07) e as bibliotecas Matematica/Conversao (08).
+// manual) -- cada opção pára o programa com uma mensagem amigável em
+// português, nunca um traceback do Python. Reaproveita 'escolher/caso'
+// (03), estruturas recursivas (07) e as bibliotecas Matematica/Conversao (08).
 
 importar Matematica
 importar Conversao

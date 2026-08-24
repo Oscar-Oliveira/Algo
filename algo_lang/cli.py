@@ -17,6 +17,7 @@ from .compilador.codegen import gerar_python, ErroInternoCompilador
 from .compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
 from .tools.flowchart import gerar_dot
 from .tools import linter as linter_modulo
+from .tools.tracer import MAX_PASSOS, LIMITE_TEMPO_SEGUNDOS
 
 
 def _pasta_saida(caminho_algo: str):
@@ -213,22 +214,26 @@ LIMITE_CPU_SEGUNDOS = 10
 # ler() à espera do estudante -- E/S bloqueante não consome CPU. Mesma
 # técnica que online/executor.py usa para o serviço web. 'resource' é
 # só-POSIX -- no Windows (algo.bat), o programa corre sem este guarda.
-def _bootstrap_limite_cpu() -> str:
+def _bootstrap_limite_cpu(limite=None) -> str:
     """Construído a cada chamada (não pré-calculado num literal de módulo)
     para ler sempre o valor ATUAL de LIMITE_CPU_SEGUNDOS -- permite a um
     teste baixar o limite via monkeypatch e confirmar o comportamento
     real do 'resource.setrlimit' de ponta a ponta, sem esperar os 10s do
-    valor por omissão."""
+    valor por omissão. 'limite' (None usa LIMITE_CPU_SEGUNDOS) só é
+    passado pela CLI local (`algo executa --limite-cpu`) -- online/
+    executor.py nunca o passa, de propósito (ver 'gerar_trace' em
+    tools/tracer.py para a mesma decisão do lado do --debug/--json)."""
+    limite = LIMITE_CPU_SEGUNDOS if limite is None else limite
     return (
         "import resource, os, sys\n"
-        f"resource.setrlimit(resource.RLIMIT_CPU, ({LIMITE_CPU_SEGUNDOS}, {LIMITE_CPU_SEGUNDOS}))\n"
+        f"resource.setrlimit(resource.RLIMIT_CPU, ({limite}, {limite}))\n"
         "os.execv(sys.executable, [sys.executable, sys.argv[1]])\n"
     )
 
 
-def _comando_com_limite_cpu(caminho_py: str) -> list:
+def _comando_com_limite_cpu(caminho_py: str, limite=None) -> list:
     if os.name == "posix":
-        return [sys.executable, "-c", _bootstrap_limite_cpu(), caminho_py]
+        return [sys.executable, "-c", _bootstrap_limite_cpu(limite), caminho_py]
     return [sys.executable, caminho_py]  # pragma: no cover -- ambiente de desenvolvimento é sempre Windows aqui, mas mantém o código correto para POSIX
 
 
@@ -246,10 +251,12 @@ def cmd_executa(args):
         print("---------------------------------\n")
     print("----- Execução -----")
     sys.stdout.flush()
-    resultado = subprocess.run(_comando_com_limite_cpu(caminho_py))
+    limite_cpu = getattr(args, "limite_cpu", None)
+    resultado = subprocess.run(_comando_com_limite_cpu(caminho_py, limite_cpu))
     if os.name == "posix" and resultado.returncode == -signal.SIGXCPU:
         print(
-            f"\n⚠ O programa foi interrompido por exceder {LIMITE_CPU_SEGUNDOS}s de "
+            f"\n⚠ O programa foi interrompido por exceder "
+            f"{LIMITE_CPU_SEGUNDOS if limite_cpu is None else limite_cpu}s de "
             "tempo de CPU (possível ciclo infinito ou recursão sem fim)."
         )
     if resultado.returncode != 0:
@@ -308,6 +315,8 @@ def cmd_executa_com_trace(args):
         dados["nomes_globais"],
         dados["nomes_funcoes"],
         entradas=entradas,
+        max_passos=getattr(args, "max_passos", None),
+        limite_tempo_segundos=getattr(args, "limite_tempo", None),
     )
 
     print("\n----- Execução -----")
@@ -720,6 +729,32 @@ def main():
         metavar="FICHEIRO",
         help="ficheiro de texto com os valores para ler() (um por linha), usado com "
         "--debug/--json; sem isto, usa o stdin normal (podes escrever à mão)",
+    )
+    p_executa.add_argument(
+        "--limite-cpu",
+        type=int,
+        default=None,
+        metavar="SEGUNDOS",
+        help=f"substitui o limite de tempo de CPU do caminho sem --debug/--json "
+        f"(omitido usa {LIMITE_CPU_SEGUNDOS}s) -- só POSIX, sem efeito no Windows",
+    )
+    p_executa.add_argument(
+        "--max-passos",
+        type=int,
+        default=None,
+        dest="max_passos",
+        metavar="N",
+        help=f"usado com --debug/--json: substitui o limite de linhas do trace "
+        f"(omitido usa {MAX_PASSOS})",
+    )
+    p_executa.add_argument(
+        "--limite-tempo",
+        type=int,
+        default=None,
+        dest="limite_tempo",
+        metavar="SEGUNDOS",
+        help=f"usado com --debug/--json: substitui o limite de tempo de CPU do "
+        f"trace (omitido usa {LIMITE_TEMPO_SEGUNDOS}s)",
     )
     p_executa.set_defaults(func=cmd_executa)
 
