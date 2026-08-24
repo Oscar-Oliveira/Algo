@@ -1891,6 +1891,125 @@ def test_incluir_alias_metodo_inexistente_da_erro(tmp_path):
     assert "'g'" in resultado.stdout
 
 
+# ---------- ronda 15: buracos deixados pela funcionalidade de alias ('incluir
+# ... como <alias>') na ronda anterior ----------
+
+def test_incluir_mesmo_ficheiro_duas_vezes_com_aliases_diferentes_da_erro(tmp_path):
+    """Antes, o deduplicar por caminho absoluto ignorava o 'incluir'
+    inteiro (incluindo o alias) na segunda ocorrência -- 'como b' ficava
+    invisível em silêncio, e usar 'b.f()' dava um erro enganador
+    ('biblioteca não importada') em vez de apontar para a causa real."""
+    (tmp_path / "lib.algo").write_text(
+        "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo" como a\n'
+        'incluir "lib.algo" como b\n'
+        "inicio\n"
+        "    escrever(a.f())\n"
+        "    escrever(b.f())\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode != 0
+    assert "já foi" in resultado.stdout
+
+
+def test_incluir_mesmo_ficheiro_duas_vezes_com_mesmo_alias_continua_a_funcionar(tmp_path):
+    (tmp_path / "lib.algo").write_text(
+        "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
+    (tmp_path / "a.algo").write_text('incluir "lib.algo" como m\n', encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo" como m\n'
+        'incluir "a.algo"\n'
+        "inicio\n"
+        "    escrever(m.f())\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode == 0, resultado.stderr
+    assert "1" in resultado.stdout
+
+
+def test_alias_de_incluir_colide_com_nome_de_variavel_da_erro(tmp_path):
+    """Um alias ('incluir ... como c') nunca era validado contra nomes
+    de variável/parâmetro -- uma variável local com o mesmo nome do
+    alias fazia 'c.metodo()' resolver silenciosamente para a função
+    incluída em vez do campo da variável, sem erro nenhum."""
+    (tmp_path / "lib.algo").write_text(
+        "funcao valor():inteiro\n    retornar 42\n", encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo" como c\n'
+        "estrutura Caixa\n"
+        "    valor: inteiro\n"
+        "inicio\n"
+        "    c: Caixa\n"
+        "    c.valor = 7\n"
+        "    escrever(c.valor())\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode != 0
+    assert "alias" in resultado.stdout.lower()
+
+
+def test_funcao_incluida_com_alias_e_parametro_ref_nao_pode_ser_usada_em_expressao(tmp_path):
+    """'_tem_ref' tratava toda chamada com '.' como biblioteca (nunca tem
+    'ref'), mas uma função incluída com alias É uma função ALGO normal e
+    PODE ter 'ref' -- sem a deteção, usá-la dentro de uma expressão
+    compilava e crashava em runtime com um TypeError cru do Python (a
+    função gerada devolve um tuplo (retorno, valor_ref), não um escalar)."""
+    (tmp_path / "lib.algo").write_text(
+        "funcao incrementaEDevolve(ref v:inteiro):inteiro\n"
+        "    v = v + 1\n"
+        "    retornar v\n",
+        encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo" como L\n'
+        "inicio\n"
+        "    n:inteiro = 5\n"
+        "    escrever(L.incrementaEDevolve(n) + 1)\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode != 0
+    assert "Traceback" not in resultado.stdout
+    assert "dentro de uma expressão" in resultado.stdout
+
+
+def test_funcao_incluida_com_alias_que_le_global_antecipada_e_detetada(tmp_path):
+    """'_registar_decl' só seguia chamadas SEM '.' para verificar
+    referência antecipada a uma global -- uma função incluída com alias
+    também é do próprio ficheiro incluído e pode ler uma global dele,
+    mas ficava invisível a esta verificação, deixando passar em
+    compilação um 'NameError' que só rebentava em runtime."""
+    (tmp_path / "lib.algo").write_text(
+        "segredo:inteiro = 42\n"
+        "funcao pegaValor():inteiro\n"
+        "    retornar segredo\n",
+        encoding="utf-8")
+    (tmp_path / "principal.algo").write_text(
+        'algoritmo "Principal"\n'
+        'incluir "lib.algo" como L\n'
+        "x:inteiro = L.pegaValor()\n"
+        "inicio\n"
+        "    escrever(x)\n",
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(tmp_path / "principal.algo")],
+        capture_output=True, text=True)
+    assert resultado.returncode != 0
+    assert "Traceback" not in resultado.stdout
+    assert "segredo" in resultado.stdout
+
+
 def test_mesclar_biblioteca_com_alias_namespaceia_so_funcoes():
     """'como <alias>' faz mangling do nome de cada função incluída
     (f"{alias}_{nome}"); estruturas/variáveis globais continuam a
@@ -3332,6 +3451,233 @@ def test_caso_duplicado_com_literal_e_erro_de_compilacao():
                     caso 1
                         escrever("outra vez um")
         """)
+
+
+def test_caso_duplicado_com_literal_negativo_e_erro_de_compilacao():
+    """Ronda 15: a deteção só reconhecia A.Literal -- 'caso -1' é
+    UnOp('-', Literal(1)) (o lexer nunca produz um Literal já negativo),
+    por isso ficava invisível, deixando compilar um 'escolher' com
+    código genuinamente morto (o segundo 'caso -1' nunca seria
+    alcançado), ao contrário do caso positivo equivalente."""
+    with pytest.raises(ErroSemantico, match="já apareceu"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                x:inteiro = -1
+                escolher x
+                    caso -1
+                        escrever("primeiro")
+                    caso -1
+                        escrever("segundo")
+        """)
+
+
+# ---------- ronda 15: mensagem de "vírgula a mais" não chegava a todos os
+# sítios do parser que constroem uma lista separada por vírgulas ----------
+
+def test_virgula_a_mais_em_lista_de_ler_da_mensagem_dedicada():
+    with pytest.raises(ErroSintatico, match="vírgula a mais"):
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            inicio
+                a:inteiro
+                b:inteiro
+                ler(a, b,)
+        """))
+
+
+def test_virgula_a_mais_em_parametros_de_funcao_da_mensagem_dedicada():
+    with pytest.raises(ErroSintatico, match="vírgula a mais"):
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            funcao foo(a:inteiro, b:inteiro,):inteiro
+                retornar a
+            inicio
+                escrever(foo(1, 2))
+        """))
+
+
+def test_virgula_a_mais_em_literal_de_estrutura_da_mensagem_dedicada():
+    with pytest.raises(ErroSintatico, match="vírgula a mais"):
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            estrutura P
+                x:inteiro
+                y:inteiro
+            inicio
+                p:P = {x: 1, y: 2,}
+        """))
+
+
+def test_virgula_a_mais_em_lista_de_nomes_de_declaracao_da_mensagem_dedicada():
+    with pytest.raises(ErroSintatico, match="vírgula a mais"):
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            inicio
+                a, b,: inteiro
+        """))
+
+
+# ---------- ronda 15: o resultado de uma chamada pode ser indexado/aceder a
+# um campo diretamente ('foo()[i]', 'foo().campo'), sem variável intermédia
+# -- A.Chamada ganhou um campo 'acessos', tal como A.LValue já tinha ----------
+
+def test_indexar_vetor_devolvido_por_funcao_sem_variavel_intermedia():
+    saida = executar("""
+        algoritmo "T"
+        funcao vet(): inteiro[]
+            v:inteiro[3] = {10, 20, 30}
+            retornar v
+        inicio
+            escrever(vet()[1])
+    """)
+    assert saida.strip() == "20"
+
+
+def test_aceder_a_campo_de_estrutura_devolvida_por_funcao_sem_variavel_intermedia():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+            y:inteiro
+        funcao cria(): Ponto
+            p:Ponto = {x: 5, y: 9}
+            retornar p
+        inicio
+            escrever(cria().x)
+    """)
+    assert saida.strip() == "5"
+
+
+def test_encadear_indice_e_campo_apos_chamada():
+    saida = executar("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+        funcao vet(): No[]
+            v:No[2]
+            v[0].valor = 42
+            retornar v
+        inicio
+            escrever(vet()[0].valor)
+    """)
+    assert saida.strip() == "42"
+
+
+def test_vetor_nu_devolvido_por_chamada_continua_a_exigir_indexacao():
+    """Não regressão: sem acessos, continua rejeitado -- só ganhou a
+    CAPACIDADE de indexar/aceder a campo inline, não deixou de exigi-lo."""
+    with pytest.raises(ErroSemantico, match="devolve um vetor"):
+        compilar("""
+            algoritmo "T"
+            funcao vet(): inteiro[]
+                v:inteiro[3] = {1, 2, 3}
+                retornar v
+            inicio
+                escrever(vet())
+        """)
+
+
+def test_indexar_chamada_que_devolve_escalar_e_erro():
+    with pytest.raises(ErroSemantico, match="não é um vetor"):
+        compilar("""
+            algoritmo "T"
+            funcao soma(a:inteiro, b:inteiro):inteiro
+                retornar a + b
+            inicio
+                escrever(soma(1, 2)[0])
+        """)
+
+
+def test_aceder_a_campo_de_vetor_devolvido_por_chamada_sem_indexar_primeiro_e_erro():
+    with pytest.raises(ErroSemantico, match="falta indexá-lo"):
+        compilar("""
+            algoritmo "T"
+            estrutura P
+                x:inteiro
+            funcao vet(): P[]
+                v:P[2]
+                retornar v
+            inicio
+                escrever(vet().x)
+        """)
+
+
+def test_campo_inexistente_em_estrutura_devolvida_por_chamada_e_erro():
+    with pytest.raises(ErroSemantico, match="não tem nenhum campo 'y'"):
+        compilar("""
+            algoritmo "T"
+            estrutura P
+                x:inteiro
+            funcao cria(): P
+                p:P
+                retornar p
+            inicio
+                escrever(cria().y)
+        """)
+
+
+def test_chamada_com_ref_continua_rejeitada_em_expressao_mesmo_com_acessos():
+    with pytest.raises(ErroSemantico, match="não pode ser usada dentro de uma expressão"):
+        compilar("""
+            algoritmo "T"
+            funcao fooRef(ref v:inteiro): inteiro[]
+                r:inteiro[1] = {v}
+                retornar r
+            inicio
+                x:inteiro = 5
+                escrever(fooRef(x)[0])
+        """)
+
+
+def test_resultado_de_chamada_indexado_nao_pode_ser_alvo_de_atribuicao():
+    """'foo()[0] = 5' nunca chega a ser uma A.Atribuicao válida -- o alvo
+    de uma atribuição só pode começar por um identificador
+    (_parse_lvalue), nunca por uma chamada."""
+    with pytest.raises(ErroSintatico):
+        parse(textwrap.dedent("""\
+            algoritmo "T"
+            funcao vet(): inteiro[]
+                v:inteiro[3] = {1, 2, 3}
+                retornar v
+            inicio
+                vet()[0] = 5
+        """))
+
+
+def test_declaracao_inicializada_com_indice_de_chamada_com_ref():
+    """Caso mais delicado: o valor PRINCIPAL de uma chamada com 'ref' vai
+    para uma variável temporária antes de aplicar o acesso (ver
+    _gerar_declaracao, codegen.py) -- não pode ir direto para 'd.nome',
+    que só quer o elemento indexado, não o vetor inteiro devolvido."""
+    saida = executar("""
+        algoritmo "T"
+        funcao dobraETrio(ref v:inteiro): inteiro[]
+            v = v * 2
+            r:inteiro[3] = {v, v + 1, v + 2}
+            retornar r
+        inicio
+            n:inteiro = 5
+            x:inteiro = dobraETrio(n)[1]
+            escrever(x, "-", n)
+    """)
+    assert saida.strip() == "11-10"
+
+
+def test_atribuicao_com_indice_de_chamada_com_ref():
+    saida = executar("""
+        algoritmo "T"
+        funcao dobraETrio(ref v:inteiro): inteiro[]
+            v = v * 2
+            r:inteiro[3] = {v, v + 1, v + 2}
+            retornar r
+        inicio
+            n:inteiro = 5
+            x:inteiro
+            x = dobraETrio(n)[2]
+            escrever(x, "-", n)
+    """)
+    assert saida.strip() == "12-10"
 
 
 # ---------- B16 (AL-57): base ^ expoente negativa/fracionária vira complex ----------

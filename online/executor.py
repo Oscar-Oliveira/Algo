@@ -164,7 +164,7 @@ def _resolver_inclusoes(programa, pasta_base) -> None:
     muda o comportamento prático, só evita alargar por engano o
     perímetro de segurança se essa suposição alguma vez deixar de ser
     verdade."""
-    ja_incluidos = set()
+    ja_incluidos = {}
     pasta_base_real = os.path.realpath(pasta_base)
     _resolver_lista_de_inclusoes(programa, programa.inclusoes, pasta_base, pasta_base_real, ja_incluidos)
 
@@ -177,13 +177,22 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, pasta_base_rea
         except ValueError:  # caminhos em unidades/discos diferentes (Windows)
             dentro_da_pasta = False
         if caminho_real in ja_incluidos:
+            alias_anterior = ja_incluidos[caminho_real]
+            if inc.como != alias_anterior:
+                descricao_anterior = f"com o alias '{alias_anterior}'" if alias_anterior else "sem alias"
+                descricao_nova = f"com o alias '{inc.como}'" if inc.como else "sem alias"
+                raise ErroCompilacao(
+                    f"Erro na linha {inc.linha}: ficheiro incluído '{inc.caminho}' já foi "
+                    f"incluído antes {descricao_anterior}; não pode ser incluído outra vez "
+                    f"{descricao_nova}."
+                )
             continue
         if not dentro_da_pasta or not os.path.isfile(caminho_real):
             raise ErroCompilacao(
                 f"Erro na linha {inc.linha}: ficheiro incluído '{inc.caminho}' não encontrado "
                 f"-- confirma que criaste esse ficheiro antes de o executares."
             )
-        ja_incluidos.add(caminho_real)
+        ja_incluidos[caminho_real] = inc.como
         with open(caminho_real, "r", encoding="utf-8") as f:
             codigo = f.read()
         try:

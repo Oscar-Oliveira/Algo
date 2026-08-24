@@ -439,3 +439,36 @@ def test_recursao_moderadamente_profunda_gera_trace_rapidamente(tmp_path):
     assert resultado["erro"] is None
     assert resultado["consolaFinal"].strip() == "1990"
     assert duracao < 5
+
+
+def test_global_mutada_dentro_de_um_procedimento_aparece_atualizada_no_passo_seguinte(tmp_path):
+    """Ronda 15: só a entrada do TOPO da pilha incremental era
+    recalculada a cada passo -- '(Principal)' ficava com o valor que
+    tinha da ÚLTIMA VEZ que esteve no topo, mesmo depois de um
+    procedimento chamado mutar uma global. Ao contrário de locais
+    (só existem dentro da própria frame), globais são um único
+    namespace partilhado por TODAS as frames, por isso 'total' já
+    devia aparecer atualizado assim que 'acumular' o mutasse, não só
+    depois de 'acumular' regressar."""
+    resultado = _trace("""
+        algoritmo "T"
+        total:inteiro = 0
+        procedimento acumular(x:inteiro)
+            total = total + x
+            escrever("dentro:", total)
+        inicio
+            acumular(5)
+            escrever(total)
+    """, tmp_path=tmp_path)
+    assert resultado["erro"] is None
+    # O primeiro passo DENTRO de 'acumular' é a própria linha
+    # 'total = total + x' prestes a correr (o evento 'line' dispara ANTES
+    # da linha executar) -- 'total' só fica 5 depois dela, por isso
+    # precisa do passo SEGUINTE (o 'escrever' a seguir), não do primeiro.
+    passos_dentro_do_procedimento = [
+        p for p in resultado["passos"]
+        if any(frame["nome"] == "acumular" for frame in p["pilha"])]
+    passo_apos_mutacao = passos_dentro_do_procedimento[1]
+    principal = next(frame for frame in passo_apos_mutacao["pilha"]
+                      if frame["nome"] == "(Principal)")
+    assert principal["variaveis"]["total"] == 5

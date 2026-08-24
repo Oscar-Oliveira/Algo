@@ -193,10 +193,15 @@ class UnOp(No):
 
 
 class Chamada(No):
-    def __init__(self, nome, args, linha):
+    def __init__(self, nome, args, linha, acessos=None):
         self.nome = nome    # pode conter '.' para chamadas de biblioteca (ex: "matematica.raiz")
         self.args = args
         self.linha = linha
+        # lista de ('indice', expr) ou ('campo', nome_str), tal como
+        # A.LValue.acessos -- indexa/acede a um campo do RESULTADO da
+        # chamada (ex.: 'foo()[0]', 'cadeia.dividir(...)[0]',
+        # 'foo().campo'), sem precisar de uma variável intermédia.
+        self.acessos = acessos or []
 
 
 class VetorLiteral(No):
@@ -329,7 +334,10 @@ def texto_expr(expr):
         return f"{expr.op} {texto_expr(expr.operando)}"
     if isinstance(expr, Chamada):
         args = ", ".join(texto_expr(a) for a in expr.args)
-        return f"{expr.nome}({args})"
+        base = f"{expr.nome}({args})"
+        for tag, valor in expr.acessos:
+            base += f"[{texto_expr(valor)}]" if tag == "indice" else f".{valor}"
+        return base
     if isinstance(expr, VetorLiteral):
         return "{" + ", ".join(texto_expr(e) for e in expr.elementos) + "}"
     if isinstance(expr, EstruturaLiteral):

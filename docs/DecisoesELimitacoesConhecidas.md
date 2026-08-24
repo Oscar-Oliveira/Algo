@@ -65,6 +65,27 @@ enterrada num comentário.
 - **Funções de biblioteca podem devolver vetores** (ex.: `cadeia.dividir`)
   através do 4º elemento opcional do tuplo em `FUNCOES`
   (`dims_retorno=1`, ver `bibliotecas/__init__.py`).
+- **O tamanho REAL de um vetor devolvido por uma chamada (biblioteca ou
+  do próprio programa) é validado em runtime contra o tamanho
+  declarado** (`_algo_verificar_tamanho_vetor_resultado`, `codegen.py`)
+  quando inicializa uma declaração de tamanho fixo (ex.: `partes:cadeia[3]
+  = cadeia.dividir(...)`) — ao contrário de um literal `{...}`, cujo
+  tamanho `semantics.py` já valida em compilação, o tamanho de uma
+  chamada só é conhecido ao correr o programa. Sem esta verificação, um
+  resultado maior do que o declarado ficava silenciosamente legível além
+  do tamanho declarado.
+- **O resultado de uma chamada pode ser indexado/aceder a um campo
+  diretamente** (`foo()[0]`, `foo().campo`, `cadeia.dividir(...)[0]`),
+  sem precisar de uma variável intermédia — `A.Chamada` tem um campo
+  `acessos`, tal como `A.LValue` (`_parse_acessos`, `parser.py`, chamado
+  depois de reconhecer uma chamada em `_parse_primario`). A validação de
+  tipo/dims é partilhada com `A.LValue` via `_percorrer_acessos`
+  (`semantics.py`); a geração de código é a mesma ideia de `_lvalue`
+  (`gerador_base.py`), aplicada ao texto Python da chamada. Uma chamada
+  com `ref` continua proibida dentro de uma expressão (`_tem_ref`),
+  independentemente de ter `acessos` — e não pode ser alvo de atribuição
+  (`foo()[0] = 5`), porque o alvo de uma atribuição só pode começar por
+  um identificador (`_parse_lvalue`), nunca por uma chamada.
 
 ## Estruturas
 
@@ -81,6 +102,15 @@ enterrada num comentário.
 - Structs mutuamente recursivas (`A↔B`, ciclos de 3+) são aceites; o campo
   do ciclo fica `nulo` em runtime em vez de recursão infinita no próprio
   compilador.
+- **Um campo-vetor do próprio tipo (direta ou mutuamente recursivo)**
+  (ex.: `estrutura No: filhos:No[2]`, uma árvore) **fica vazio (`[]`) por
+  omissão**, em vez de tentar construir eagerly os N elementos
+  declarados — `_estruturas_recursivas` (`gerador_base.py`) inclui
+  campos-vetor no grafo de recursão (não só escalares), e
+  `_gerar_estrutura` (`codegen.py`) usa `[]` em vez de
+  `_construir_vetor_aninhado` quando o tipo do campo é recursivo. Mesma
+  ideia que um campo escalar recursivo (ex.: `seguinte:No`) já ficava
+  `nulo`; sem isto, a construção nunca terminava (`RecursionError`).
 
 ## `retornar` e caminhos de execução
 
@@ -141,6 +171,26 @@ enterrada num comentário.
   isso não há valor "perigoso" a escapar sem tratamento — só sem
   validação na entrada. Investigado como possível bug, rejeitado depois
   de quebrar 2 testes que dependem deste comportamento de propósito.
+- **`matematica.piso`/`teto`/`conversao.paraInteiro` de `nan` dão o
+  fallback GENÉRICO de `_algo_traduzir_valueerro`** ("valor inválido
+  (cannot convert float NaN to integer).", em vez de uma mensagem
+  específica como a que existe para infinito) — investigado, não é um
+  traceback cru (o critério que importa: `ValueError` sempre traduzido
+  para português, mesmo que o texto entre parênteses fique em inglês
+  para uma causa sem tradução dedicada). Ver
+  `test_matematica_teto_de_nan_da_erro_amigavel`.
+- **`matematica.potencia` devolve o `int` em bruto (não `float`) quando o
+  resultado é grande demais para caber num `float`** (`OverflowError`) —
+  em vez de propagar o erro. Réplica deliberada do comportamento do
+  operador `^` usado FORA de um contexto `decimal` (ex.:
+  `escrever(10^1000)`, que também nunca força `float()` e por isso
+  também nunca rebenta para o mesmo valor extremo) — não do `^` DENTRO
+  de um contexto `decimal` (`x:decimal = 10^1000`, que força `float()` e
+  por isso pode rebentar). Ver
+  `test_matematica_potencia_com_expoente_grande_calcula_e_imprime_sem_overflow`
+  (bug #35 da auditoria original). Quebra, de propósito, a invariante de
+  que `decimal` nunca aparece sem `.0` — julgado preferível a rejeitar um
+  cálculo exato só porque não cabe num `float`.
 
 ## `cadeia`
 
@@ -148,6 +198,35 @@ enterrada num comentário.
   alfabética portuguesa** — limitação inerente e esperada, não um bug.
 - Indexação direta de `cadeia` com `[]` (`s[0]`) é sintaxe legal na
   gramática mas sempre rejeitada em compilação — usa `cadeia.caracter`.
+- **`cadeia.procurar`/`substituir`/`dividir` rejeitam todos um texto
+  vazio no argumento relevante** (o texto a procurar/substituir/o
+  separador) com uma mensagem amigável dedicada — `str.find`/`replace`/
+  `split` do Python com um texto vazio dão resultados surpreendentes sem
+  valor pedagógico (`find("")` "encontra" em toda a posição, `split("")`
+  rebenta, `replace("", x)` insere `x` entre cada caracter).
+
+## `incluir ... como <alias>`
+
+- **Um alias é validado como qualquer outro identificador** — colide com
+  nome de função/estrutura/biblioteca importada/variável/parâmetro, tal
+  como `matematica`/`cadeia`/etc. já colidiam (`_verificar_nome_
+  disponivel`, `semantics.py`). Sem isto, uma variável local com o mesmo
+  nome do alias fazia `alias.metodo()` resolver silenciosamente para a
+  função incluída em vez do campo da variável, sem erro nenhum.
+- **Incluir o MESMO ficheiro duas vezes exige o MESMO alias (ou nenhum)
+  nas duas vezes** — a deduplicação por caminho absoluto (`cli.py`/
+  `online/executor.py`) compara o alias da ocorrência atual com o da
+  primeira; um alias diferente (incluindo "sem alias" vs "com alias") dá
+  um erro dedicado em vez de a segunda ocorrência ser silenciosamente
+  ignorada.
+- **Uma função incluída com alias é tratada como uma função ALGO normal
+  do próprio ficheiro** para todos os efeitos que dependem disso — pode
+  ter parâmetros `ref` (`_tem_ref` resolve o alias antes de decidir) e
+  pode ler uma variável global do próprio ficheiro incluído, com a
+  mesma verificação de referência-antecipada que uma função local
+  (`_resolver_nome_funcao_local`, `semantics.py`) — ao contrário de uma
+  biblioteca embutida verdadeira (`matematica`, `cadeia`, ...), que
+  nunca tem `ref` nem lê globais ALGO.
 
 ## Linter
 
@@ -159,6 +238,13 @@ enterrada num comentário.
   função chamada" só olha 1 nível (não segue chamadas transitivas) — a
   mesma filosofia conservadora de "prefere um falso negativo a um falso
   positivo".
+- **Atribuir a um parâmetro por valor é assinalado tanto para o
+  parâmetro inteiro (`p = ...`) como para um campo/elemento seu
+  (`p.campo = ...`, `v[i] = ...`)** — struct/vetor são copiados por
+  valor (ver "Cópia por valor e `ref`" acima), por isso mutar um
+  campo/elemento é exatamente a mesma confusão passagem-por-valor-vs-
+  referência que reatribuir o parâmetro inteiro, só que mais idiomática
+  (é a forma natural de tentar "modificar" uma struct/vetor por valor).
 
 ## Limites de recursos
 

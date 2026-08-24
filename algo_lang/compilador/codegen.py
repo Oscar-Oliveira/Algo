@@ -313,6 +313,23 @@ def _algo_verificar_tamanho_vetor_agregado(*dims):
             f"o vetor pedido tem {produto} elementos no total, mais do que "
             f"o limite permitido ({_ALGO_LIMITE_TAMANHO_VETOR})")
 
+
+def _algo_verificar_tamanho_vetor_resultado(lista, tamanho_esperado):
+    """Uma função (biblioteca, ex. cadeia.dividir, ou do próprio programa)
+    que devolve um vetor para inicializar uma declaração de tamanho fixo
+    (ex.: 'partes:cadeia[3] = cadeia.dividir(...)') só tem o tamanho REAL
+    conhecido em runtime -- ao contrário de um literal '{...}', cujo
+    tamanho semantics.py já valida em compilação. Sem isto, um resultado
+    maior do que o declarado ficava silenciosamente legível além do
+    tamanho declarado, e um resultado menor só falhava (com a mensagem
+    genérica de índice fora dos limites) quando de facto se tentasse ler
+    além dele, nunca já na própria inicialização."""
+    if len(lista) != tamanho_esperado:
+        raise _AlgoErroAmigavel(
+            f"esta chamada devolveu um vetor com {len(lista)} elemento(s), "
+            f"mas a declaração espera {tamanho_esperado}")
+    return lista
+
 '''
 
 OPS_BIN = {
@@ -525,7 +542,16 @@ class GeradorCodigo(GeradorCodigoBase):
         for c in e.campos:
             if c.dims is not None:
                 self.emit(f"if {c.nome} is None:", 2)
-                valor_default = self._construir_vetor_aninhado(c.tipo, c.dims, {}, 3)
+                # Se 'c.tipo' é (direta ou mutuamente) recursivo, construir
+                # os N elementos por omissão nunca terminaria (cada
+                # elemento tentaria construir o seu próprio campo do
+                # mesmo tipo, ad infinitum) -- fica vazio, tal como um
+                # campo escalar recursivo fica 'None' (ver 'recursivas'
+                # acima/_estruturas_recursivas).
+                if c.tipo in recursivas:
+                    valor_default = "[]"
+                else:
+                    valor_default = self._construir_vetor_aninhado(c.tipo, c.dims, {}, 3)
                 self.emit(f"{c.nome} = {valor_default}", 3)
                 self.emit(f"self.{c.nome} = {c.nome}", 2)
             elif c.tipo not in DEFAULT_POR_TIPO:
@@ -738,7 +764,23 @@ class GeradorCodigo(GeradorCodigoBase):
                 ]
                 args_str = self._gerar_lista_args(args_hoisted, f_def, tipos)
                 nome_py = d.inicial.nome.replace(".", "_")
-                self.emit(f"{d.nome}, {', '.join(out_vars)} = {nome_py}({args_str})", nivel)
+                if d.inicial.acessos:
+                    # 'x:inteiro = fooRef(...)[0]' -- o valor principal
+                    # devolvido não pode ir direto para 'd.nome' (é o
+                    # vetor/estrutura inteiro, não o elemento/campo
+                    # pedido); passa por uma variável temporária primeiro,
+                    # tal como _lvalue já faz para uma variável normal.
+                    tmp = "_algo_tmp_retorno"
+                    self.emit(f"{tmp}, {', '.join(out_vars)} = {nome_py}({args_str})", nivel)
+                    acesso_py = tmp
+                    for tag, valor in d.inicial.acessos:
+                        if tag == "indice":
+                            acesso_py = f"{acesso_py}[_algo_indice({self._expr(valor, tipos)})]"
+                        else:
+                            acesso_py = f"{acesso_py}.{valor}"
+                    self.emit(f"{d.nome} = {acesso_py}", nivel)
+                else:
+                    self.emit(f"{d.nome}, {', '.join(out_vars)} = {nome_py}({args_str})", nivel)
                 valor_coagido = self._coagir_decimal(d.nome, d.tipo, d.inicial)
                 if valor_coagido != d.nome:
                     self.emit(f"{d.nome} = {valor_coagido}", nivel)
@@ -747,6 +789,14 @@ class GeradorCodigo(GeradorCodigoBase):
             expr_py = self._coagir_decimal(self._expr(d.inicial, tipos), d.tipo, d.inicial)
             dims_n = 0 if d.dims is None else len(d.dims)
             expr_py = self._copiar_se_necessario(expr_py, d.tipo, dims_n)
+            if dims_n == 1 and isinstance(d.inicial, A.Chamada):
+                # O tamanho devolvido por uma chamada (biblioteca ou do
+                # próprio programa) só é conhecido em runtime -- ao
+                # contrário de um literal '{...}', que semantics.py já
+                # validou em compilação (ver _algo_verificar_tamanho_
+                # vetor_resultado, no cabeçalho gerado).
+                tamanho_py = self._expr(d.dims[0], tipos)
+                expr_py = f"_algo_verificar_tamanho_vetor_resultado({expr_py}, {tamanho_py})"
             self.emit(f"{d.nome} = {expr_py}", nivel)
         elif d.dims is None:
             self.emit(f"{d.nome} = {self._valor_default(d.tipo)}", nivel)
@@ -774,7 +824,21 @@ class GeradorCodigo(GeradorCodigoBase):
                 args_str = self._gerar_lista_args(args_hoisted, f_def, tipos)
                 alvo = self._lvalue(stmt.alvo, tipos)
                 nome_py = stmt.expr.nome.replace(".", "_")
-                self.emit(f"{alvo}, {', '.join(out_vars)} = {nome_py}({args_str})", nivel)
+                if stmt.expr.acessos:
+                    # Mesma ideia que _gerar_declaracao: o valor principal
+                    # devolvido tem de passar por uma variável temporária
+                    # antes de aplicar '[indice]'/'.campo'.
+                    tmp = "_algo_tmp_retorno"
+                    self.emit(f"{tmp}, {', '.join(out_vars)} = {nome_py}({args_str})", nivel)
+                    acesso_py = tmp
+                    for tag, valor in stmt.expr.acessos:
+                        if tag == "indice":
+                            acesso_py = f"{acesso_py}[_algo_indice({self._expr(valor, tipos)})]"
+                        else:
+                            acesso_py = f"{acesso_py}.{valor}"
+                    self.emit(f"{alvo} = {acesso_py}", nivel)
+                else:
+                    self.emit(f"{alvo}, {', '.join(out_vars)} = {nome_py}({args_str})", nivel)
                 tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
                 valor_coagido = self._coagir_decimal(alvo, tipo_alvo, stmt.expr)
                 if valor_coagido != alvo:
@@ -1006,7 +1070,16 @@ class GeradorCodigo(GeradorCodigoBase):
         if isinstance(expr, A.Chamada):
             args = self._gerar_lista_args(expr.args, self._encontrar_funcao(expr.nome), tipos)
             nome_py = expr.nome.replace(".", "_") if "." in expr.nome else expr.nome
-            return f"{nome_py}({args})"
+            base = f"{nome_py}({args})"
+            # 'foo()[0]'/'foo().campo' -- mesmo padrão de _lvalue
+            # (gerador_base.py), aplicado ao resultado da chamada em vez
+            # de a uma variável.
+            for tag, valor in expr.acessos:
+                if tag == "indice":
+                    base = f"{base}[_algo_indice({self._expr(valor, tipos)})]"
+                else:
+                    base = f"{base}.{valor}"
+            return base
         if isinstance(expr, A.VetorLiteral):  # pragma: no cover -- semantics.py (_tipo_expr) já rejeita um VetorLiteral fora dos dois contextos tratados por _gerar_declaracao/_expr_vetor_literal e _expr_estrutura_literal antes de chegar aqui
             elementos = ", ".join(self._expr(e, tipos) for e in expr.elementos)
             return f"[{elementos}]"

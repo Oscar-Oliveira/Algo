@@ -275,6 +275,21 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
             variaveis_atuais = {k: _valor_serializavel(v) for k, v in frame.f_locals.items()
                                  if not k.startswith("_algo_") and k != "_"}
         pilha_incremental[-1] = {"nome": nome_atual, "variaveis": variaveis_atuais}
+        # Ao contrário de locais (só existem dentro da própria frame),
+        # globais são um único namespace partilhado por TODAS as frames
+        # -- 'frame.f_globals' é o MESMO dicionário seja qual for a frame
+        # atual. Por isso, se '(Principal)' está na pilha mas não é a
+        # entrada que acabou de ser recalculada acima, também pode estar
+        # desatualizada (ex.: um procedimento chamado mutou uma global) --
+        # recalcula-a também, sem precisar do frame original de
+        # '(Principal)' (que pilha_incremental[0] representa, sempre a
+        # mais funda). Custo O(nº de globais), não O(profundidade).
+        if pilha_incremental[0]["nome"] == NOME_VISIVEL_PRINCIPAL and nome_atual != NOME_VISIVEL_PRINCIPAL:
+            pilha_incremental[0] = {
+                "nome": NOME_VISIVEL_PRINCIPAL,
+                "variaveis": {k: _valor_serializavel(v) for k, v in frame.f_globals.items()
+                              if k in nomes_globais},
+            }
         if len(passos) >= MAX_PASSOS:
             limite_excedido["valor"] = True
             limite_excedido["tipo"] = "passos"

@@ -214,10 +214,7 @@ class Parser:
         seguido de ':' e do tipo. Já confirmado pelo chamador via lookahead."""
         linha = self.atual().linha
         coluna = self.atual().coluna
-        nomes = [self.esperar("ID").valor]
-        while self.ver("COMMA"):
-            self.avancar()
-            nomes.append(self.esperar("ID").valor)
+        nomes = self._parse_lista_virgulas(lambda: self.esperar("ID").valor, "COLON")
         self.esperar("COLON")
         tipo = self._parse_tipo()
         dims = None
@@ -281,10 +278,7 @@ class Parser:
         self.esperar("LBRACE")
         campos = []
         if not self.ver("RBRACE"):
-            campos.append(self._parse_campo_literal())
-            while self.ver("COMMA"):
-                self.avancar()
-                campos.append(self._parse_campo_literal())
+            campos = self._parse_lista_virgulas(self._parse_campo_literal, "RBRACE")
         self.esperar("RBRACE")
         return A.EstruturaLiteral(campos, linha)
 
@@ -327,10 +321,7 @@ class Parser:
         self.esperar("LPAREN")
         params = []
         if not self.ver("RPAREN"):
-            params.append(self._parse_param())
-            while self.ver("COMMA"):
-                self.avancar()
-                params.append(self._parse_param())
+            params = self._parse_lista_virgulas(self._parse_param, "RPAREN")
         self.esperar("RPAREN")
         tipo_retorno = None
         dims_retorno = 0
@@ -471,10 +462,7 @@ class Parser:
         linha = self.atual().linha
         self.esperar("LER")
         self.esperar("LPAREN")
-        alvos = [self._parse_lvalue()]
-        while self.ver("COMMA"):
-            self.avancar()
-            alvos.append(self._parse_lvalue())
+        alvos = self._parse_lista_virgulas(self._parse_lvalue, "RPAREN")
         self.esperar("RPAREN")
         self.esperar("NEWLINE")
         return A.Ler(alvos, linha)
@@ -830,6 +818,13 @@ class Parser:
         if tok.tipo == "ID":
             chamada = self._parse_chamada_biblioteca_ou_none()
             if chamada is not None:
+                # 'biblioteca.metodo(...)' pode ser seguido de '[indice]'/
+                # '.campo' quando o resultado é um vetor/estrutura (ex.:
+                # 'cadeia.dividir(...)[0]') -- só faz sentido aqui (dentro
+                # de uma expressão), não como instrução solta, por isso
+                # não entra em _parse_chamada_biblioteca_ou_none em si
+                # (partilhado com _parse_atribuicao_ou_chamada).
+                chamada.acessos = self._parse_acessos()
                 return chamada
             nome_tok = self.esperar("ID")
             if self.ver("LPAREN"):
@@ -838,7 +833,8 @@ class Parser:
                 if not self.ver("RPAREN"):
                     args = self._parse_lista_virgulas(self._parse_expr, "RPAREN")
                 self.esperar("RPAREN")
-                return A.Chamada(nome_tok.valor, args, nome_tok.linha)
+                acessos = self._parse_acessos()
+                return A.Chamada(nome_tok.valor, args, nome_tok.linha, acessos)
             acessos = self._parse_acessos()
             return A.LValue(nome_tok.valor, acessos, nome_tok.linha)
         raise ErroSintatico(

@@ -521,24 +521,28 @@ class Linter:
 
     def _verificar_atribuicao_a_parametro_por_valor(self, f: A.FuncaoDef):
         """Atribuir diretamente a um parâmetro que não é 'por referência'
-        só muda a cópia local -- confusão clássica entre passagem por
-        valor e por referência."""
+        (ou a um campo/elemento seu, já que struct/vetor são copiados por
+        valor -- ver docs/DecisoesELimitacoesConhecidas.md) só muda a
+        cópia local -- confusão clássica entre passagem por valor e por
+        referência."""
         nomes_por_valor = {p.nome for p in f.parametros if not p.por_referencia}
         for s in self._todas_as_stmts(f.corpo):
-            if isinstance(s, A.Atribuicao) and not s.alvo.acessos and s.alvo.nome in nomes_por_valor:
+            if isinstance(s, A.Atribuicao) and s.alvo.nome in nomes_por_valor:
+                sufixo = " (aqui, um campo/elemento seu)" if s.alvo.acessos else ""
                 self.avisos.append(Aviso(
                     f"o parâmetro '{s.alvo.nome}' de '{f.nome}' não é 'por referência' -- "
-                    f"atribuir-lhe aqui um novo valor não é visto por quem chamou a função",
+                    f"atribuir-lhe{sufixo} um novo valor não é visto por quem chamou a função",
                     s.linha))
             elif isinstance(s, A.Ler):
                 # 'ler(x)' sobre um parâmetro por valor também só escreve
                 # na cópia local -- mesmo aviso que A.Atribuicao, mais
                 # específico do que o genérico "nunca é usado".
                 for alvo in s.alvos:
-                    if not alvo.acessos and alvo.nome in nomes_por_valor:
+                    if alvo.nome in nomes_por_valor:
+                        sufixo = " (aqui, um campo/elemento seu)" if alvo.acessos else ""
                         self.avisos.append(Aviso(
                             f"o parâmetro '{alvo.nome}' de '{f.nome}' não é 'por referência' "
-                            f"-- 'ler' para ele aqui não é visto por quem chamou a função",
+                            f"-- 'ler' para ele{sufixo} aqui não é visto por quem chamou a função",
                             s.linha))
 
     def _verificar_resultado_de_funcao_descartado(self):

@@ -453,3 +453,25 @@ def test_chamada_solta_a_biblioteca_nao_tem_contorno_duplo():
     """)
     assert 'cadeia.maiusculas' in dot
     assert "peripheries=2" not in dot
+
+
+def test_retornar_dentro_de_um_se_liga_diretamente_a_fim():
+    """Ronda 15: 'retornar' era desenhado como uma caixa normal, sem
+    nenhuma aresta para "Fim" -- dentro de um 'se' sem 'senao', ficava
+    ligado só ao ponto de junção do 'se', e daí em sequência ao código a
+    seguir ao bloco, como se a execução continuasse depois de retornar.
+    Agora tem sempre uma aresta explícita até "Fim", tal como
+    'sair'/'continuar' já tinham até o alvo real do ciclo."""
+    dot = _dot_para("""
+        algoritmo "T"
+        funcao f(x:inteiro):inteiro
+            se x > 0 entao
+                retornar 1
+            retornar 0
+        inicio
+            escrever(f(1))
+    """, nome_funcao="f")
+    linhas = dot.splitlines()
+    id_fim = next(l for l in linhas if 'label="Fim"' in l).split()[0]
+    id_retornar_1 = next(l for l in linhas if 'label="retornar 1"' in l).split()[0]
+    assert f"{id_retornar_1} -> {id_fim};" in dot

@@ -69,7 +69,7 @@ def _resolver_inclusoes(programa, pasta_base, ja_incluidos=None):
     processar o mesmo ficheiro duas vezes nem entrar em ciclo infinito
     (ex.: A inclui B, B inclui A)."""
     if ja_incluidos is None:
-        ja_incluidos = set()
+        ja_incluidos = {}
     _resolver_lista_de_inclusoes(programa, programa.inclusoes, pasta_base, ja_incluidos)
 
 
@@ -83,8 +83,18 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
         # MESMO ficheiro, mas normpath sozinho não normaliza capitalização.
         caminho = os.path.normcase(os.path.normpath(caminho))
         if caminho in ja_incluidos:
+            alias_anterior = ja_incluidos[caminho]
+            if inc.como != alias_anterior:
+                descricao_anterior = f"com o alias '{alias_anterior}'" if alias_anterior else "sem alias"
+                descricao_nova = f"com o alias '{inc.como}'" if inc.como else "sem alias"
+                print(
+                    f"❌ Erro na linha {inc.linha}: ficheiro incluído '{inc.caminho}' já foi "
+                    f"incluído antes {descricao_anterior}; não pode ser incluído outra vez "
+                    f"{descricao_nova}"
+                )
+                sys.exit(1)
             continue
-        ja_incluidos.add(caminho)
+        ja_incluidos[caminho] = inc.como
         if not os.path.isfile(caminho):
             print(
                 f"❌ Erro na linha {inc.linha}: ficheiro incluído '{inc.caminho}' não encontrado"

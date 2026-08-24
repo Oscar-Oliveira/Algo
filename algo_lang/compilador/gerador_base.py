@@ -79,19 +79,20 @@ class GeradorCodigoBase:
 
     def _estruturas_recursivas(self):
         """Nomes de estrutura que são (direta ou mutuamente) recursivas --
-        ex.: 'No' com um campo 'seguinte: No' (lista ligada), ou duas
-        estruturas com campos cruzados. self._valor_default(tipo) para
-        um desses nomes nunca termina (o valor por omissão de um campo
-        do próprio tipo seria outra instância, com outro campo do
-        próprio tipo, ad infinitum) -- por isso os SEUS campos desse
-        tipo têm de ficar 'None' (nulo) em vez de construídos eagerly;
-        ver o uso em _gerar_estrutura (codegen.py / codegen_minimo.py).
-        Percorre só campos escalares (dims_n == 0); um campo vetor
-        nunca recursa porque começa vazio (o elemento nunca chega a ser
-        construído em compilação nem em runtime)."""
+        ex.: 'No' com um campo 'seguinte: No' (lista ligada), 'No' com um
+        campo 'filhos: No[2]' (árvore), ou duas estruturas com campos
+        cruzados. self._valor_default(tipo) para um desses nomes nunca
+        termina (o valor por omissão de um campo do próprio tipo seria
+        outra instância, com outro campo do próprio tipo, ad infinitum)
+        -- por isso os SEUS campos desse tipo têm de ficar 'None' (nulo,
+        campo escalar) ou '[]' (vazio, campo vetor) em vez de construídos
+        eagerly; ver o uso em _gerar_estrutura (codegen.py). Um campo
+        vetor entra no grafo tal como um campo escalar -- 'filhos: No[2]'
+        também recursaria infinitamente se construído eagerly (cada 'No'
+        tentaria construir os seus próprios 'filhos', ad infinitum)."""
         grafo = {
             nome: [tipo for tipo, dims_n in campos.values()
-                   if dims_n == 0 and tipo in self.estruturas]
+                   if tipo in self.estruturas]
             for nome, campos in self.estruturas.items()
         }
         recursivas = set()

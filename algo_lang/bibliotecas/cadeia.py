@@ -48,9 +48,16 @@ FUNCOES = {
         # Devolve o índice (0-baseado) da primeira ocorrência de 'sub' em
         # 's', ou -1 se não encontrado -- convenção comum (ex.: 'indexOf'),
         # não um erro: "não encontrado" é um resultado normal, não uma
-        # situação excecional.
+        # situação excecional. 'sub' vazio é rejeitado explicitamente --
+        # str.find do Python com um texto vazio "encontra-o" em toda a
+        # posição (devolve sempre 0), um resultado surpreendente sem
+        # valor pedagógico, mesma cautela que 'substituir'/'dividir' já
+        # têm para o caso análogo.
         ["cadeia", "cadeia"], "inteiro",
-        "def cadeia_procurar(s, sub):\n    return s.find(sub)\n",
+        "def cadeia_procurar(s, sub):\n"
+        "    if sub == \"\":\n"
+        "        raise _AlgoErroAmigavel(\"o texto a procurar não pode ser vazio\")\n"
+        "    return s.find(sub)\n",
     ),
     "substituir": (
         ["cadeia", "cadeia", "cadeia"], "cadeia",

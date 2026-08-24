@@ -35,89 +35,103 @@ def _nomes_importados_no_cabecalho(cabecalho):
     return nomes
 
 
-def _nomes_lidos_em_expr(expr, nomes, chamadas):
+def _nomes_lidos_em_expr(expr, nomes, chamadas, aliases=None):
     """Percorre uma expressão recolhendo todo nome de variável LIDO
     (A.LValue.nome) em 'nomes', e todo nome de função/procedimento do
-    PRÓPRIO ficheiro chamado (A.Chamada.nome, sem '.') em 'chamadas' --
-    usado por _globais_lidas_transitivamente para saber que globais o
-    CORPO de uma função lê, direta ou indiretamente. Espelha a forma de
-    despacho já usada em codegen.py/tools/linter.py, mas não pode
-    importar de tools/ (ver ARCH-02)."""
+    PRÓPRIO ficheiro chamado em 'chamadas' -- usado por
+    _globais_lidas_transitivamente para saber que globais o CORPO de uma
+    função lê, direta ou indiretamente. Uma chamada sem '.' é sempre do
+    próprio ficheiro. Uma chamada 'alias.metodo' de um 'incluir ... como
+    alias' TAMBÉM é (é uma função ALGO normal, só com nome mangled) --
+    'aliases' (self.aliases_inclusao, alias -> {metodo: nome_mangled})
+    resolve-a para essa chave em self.funcoes; None ou alias
+    desconhecido (biblioteca real, nunca lê globais ALGO) não entra em
+    'chamadas'. Espelha a forma de despacho já usada em
+    codegen.py/tools/linter.py, mas não pode importar de tools/ (ver
+    ARCH-02)."""
     if expr is None:
         return
     if isinstance(expr, A.LValue):
         nomes.add(expr.nome)
         for tag, valor in expr.acessos:
             if tag == "indice":
-                _nomes_lidos_em_expr(valor, nomes, chamadas)
+                _nomes_lidos_em_expr(valor, nomes, chamadas, aliases)
     elif isinstance(expr, A.BinOp):
-        _nomes_lidos_em_expr(expr.esq, nomes, chamadas)
-        _nomes_lidos_em_expr(expr.dire, nomes, chamadas)
+        _nomes_lidos_em_expr(expr.esq, nomes, chamadas, aliases)
+        _nomes_lidos_em_expr(expr.dire, nomes, chamadas, aliases)
     elif isinstance(expr, A.UnOp):
-        _nomes_lidos_em_expr(expr.operando, nomes, chamadas)
+        _nomes_lidos_em_expr(expr.operando, nomes, chamadas, aliases)
     elif isinstance(expr, A.Chamada):
         if "." not in expr.nome:
             chamadas.add(expr.nome)
+        elif aliases:
+            alias, metodo = expr.nome.split(".", 1)
+            mapa = aliases.get(alias)
+            if mapa and metodo in mapa:
+                chamadas.add(mapa[metodo])
         for a in expr.args:
-            _nomes_lidos_em_expr(a, nomes, chamadas)
+            _nomes_lidos_em_expr(a, nomes, chamadas, aliases)
+        for tag, valor in expr.acessos:
+            if tag == "indice":
+                _nomes_lidos_em_expr(valor, nomes, chamadas, aliases)
     elif isinstance(expr, A.VetorLiteral):
         for e in expr.elementos:
-            _nomes_lidos_em_expr(e, nomes, chamadas)
+            _nomes_lidos_em_expr(e, nomes, chamadas, aliases)
     elif isinstance(expr, A.EstruturaLiteral):
         for _nome, valor in expr.campos:
-            _nomes_lidos_em_expr(valor, nomes, chamadas)
+            _nomes_lidos_em_expr(valor, nomes, chamadas, aliases)
     # A.Literal: nada a fazer (não lê nenhum nome)
 
 
-def _nomes_lidos_em_stmts(stmts, nomes, chamadas):
+def _nomes_lidos_em_stmts(stmts, nomes, chamadas, aliases=None):
     """Mesma ideia que _nomes_lidos_em_expr, para uma lista de
     instruções (incluindo dentro de blocos aninhados, via
     A.subblocos)."""
     for s in stmts:
         if isinstance(s, A.Declaracao):
-            _nomes_lidos_em_expr(s.inicial, nomes, chamadas)
+            _nomes_lidos_em_expr(s.inicial, nomes, chamadas, aliases)
             if s.dims:
                 for dim in s.dims:
-                    _nomes_lidos_em_expr(dim, nomes, chamadas)
+                    _nomes_lidos_em_expr(dim, nomes, chamadas, aliases)
         elif isinstance(s, A.Atribuicao):
             for tag, valor in s.alvo.acessos:
                 if tag == "indice":
-                    _nomes_lidos_em_expr(valor, nomes, chamadas)
-            _nomes_lidos_em_expr(s.expr, nomes, chamadas)
+                    _nomes_lidos_em_expr(valor, nomes, chamadas, aliases)
+            _nomes_lidos_em_expr(s.expr, nomes, chamadas, aliases)
         elif isinstance(s, A.Ler):
             for alvo in s.alvos:
                 for tag, valor in alvo.acessos:
                     if tag == "indice":
-                        _nomes_lidos_em_expr(valor, nomes, chamadas)
+                        _nomes_lidos_em_expr(valor, nomes, chamadas, aliases)
         elif isinstance(s, A.Escrever):
             for e in s.exprs:
-                _nomes_lidos_em_expr(e, nomes, chamadas)
+                _nomes_lidos_em_expr(e, nomes, chamadas, aliases)
         elif isinstance(s, A.Se):
             for cond, _corpo in s.ramos:
-                _nomes_lidos_em_expr(cond, nomes, chamadas)
+                _nomes_lidos_em_expr(cond, nomes, chamadas, aliases)
         elif isinstance(s, A.Para):
-            _nomes_lidos_em_expr(s.ini, nomes, chamadas)
-            _nomes_lidos_em_expr(s.fim, nomes, chamadas)
-            _nomes_lidos_em_expr(s.passo, nomes, chamadas)
+            _nomes_lidos_em_expr(s.ini, nomes, chamadas, aliases)
+            _nomes_lidos_em_expr(s.fim, nomes, chamadas, aliases)
+            _nomes_lidos_em_expr(s.passo, nomes, chamadas, aliases)
         elif isinstance(s, A.Enquanto):
-            _nomes_lidos_em_expr(s.condicao, nomes, chamadas)
+            _nomes_lidos_em_expr(s.condicao, nomes, chamadas, aliases)
         elif isinstance(s, A.FazEnquanto):
-            _nomes_lidos_em_expr(s.condicao, nomes, chamadas)
+            _nomes_lidos_em_expr(s.condicao, nomes, chamadas, aliases)
         elif isinstance(s, A.Escolha):
-            _nomes_lidos_em_expr(s.expr, nomes, chamadas)
+            _nomes_lidos_em_expr(s.expr, nomes, chamadas, aliases)
             for valores, _corpo in s.casos:
                 for v in valores:
-                    _nomes_lidos_em_expr(v, nomes, chamadas)
+                    _nomes_lidos_em_expr(v, nomes, chamadas, aliases)
         elif isinstance(s, A.Retornar):
             if s.expr is not None:
-                _nomes_lidos_em_expr(s.expr, nomes, chamadas)
+                _nomes_lidos_em_expr(s.expr, nomes, chamadas, aliases)
         elif isinstance(s, A.ChamadaStmt):
-            _nomes_lidos_em_expr(s.chamada, nomes, chamadas)
+            _nomes_lidos_em_expr(s.chamada, nomes, chamadas, aliases)
         elif isinstance(s, A.Afirmar):
-            _nomes_lidos_em_expr(s.condicao, nomes, chamadas)
-            _nomes_lidos_em_expr(s.mensagem, nomes, chamadas)
+            _nomes_lidos_em_expr(s.condicao, nomes, chamadas, aliases)
+            _nomes_lidos_em_expr(s.mensagem, nomes, chamadas, aliases)
         for bloco in A.subblocos(s):
-            _nomes_lidos_em_stmts(bloco, nomes, chamadas)
+            _nomes_lidos_em_stmts(bloco, nomes, chamadas, aliases)
 
 
 class ErroSemantico(Exception):
@@ -477,6 +491,10 @@ class VerificadorTipos:
             raise ErroSemantico(
                 f"'{nome}' já é o nome de uma biblioteca importada; escolhe "
                 f"outro nome para {o_que_e}", linha)
+        if nome in self.aliases_inclusao:
+            raise ErroSemantico(
+                f"'{nome}' já é o alias de um 'incluir'; escolhe outro nome "
+                f"para {o_que_e}", linha)
         if nome in self.nomes_reservados_codegen:
             raise ErroSemantico(
                 f"'{nome}' colide com um nome interno usado pelo código "
@@ -495,6 +513,21 @@ class VerificadorTipos:
             raise ErroSemantico(
                 f"'{nome}' é o nome de um tipo primitivo; escolhe outro nome "
                 f"para {o_que_e}", linha)
+
+    def _resolver_nome_funcao_local(self, nome):
+        """Traduz o nome de uma chamada (bare, ou 'alias.metodo' de um
+        'incluir ... como alias') para a chave correspondente em
+        self.funcoes -- devolve None para uma chamada de biblioteca
+        verdadeira (nunca lê globais ALGO, ver _globais_lidas_
+        transitivamente). Uma função incluída com alias É uma função
+        ALGO normal do próprio ficheiro incluído, só com nome mangled."""
+        if "." not in nome:
+            return nome
+        alias, metodo = nome.split(".", 1)
+        mapa = self.aliases_inclusao.get(alias)
+        if mapa and metodo in mapa:
+            return mapa[metodo]
+        return None
 
     def _globais_lidas_transitivamente(self, nome_funcao, vistas=None):
         """'_verificar_chamada' só valida os ARGUMENTOS de uma chamada
@@ -522,7 +555,7 @@ class VerificadorTipos:
         if f_def is None:  # pragma: no cover -- só chamado depois de confirmar que a função existe
             return set()
         nomes_lidos, chamadas = set(), set()
-        _nomes_lidos_em_stmts(f_def.corpo, nomes_lidos, chamadas)
+        _nomes_lidos_em_stmts(f_def.corpo, nomes_lidos, chamadas, self.aliases_inclusao)
         locais = {p.nome for p in f_def.parametros}
         locais_dict = {}
         A.coletar_declaracoes_tipadas(f_def.corpo, locais_dict)
@@ -580,11 +613,13 @@ class VerificadorTipos:
                 if tipo_inicial is None:
                     raise ErroSemantico(
                         f"'{d.inicial.nome}' é um procedimento e não devolve valor", d.linha)
-                if "." not in d.inicial.nome:
-                    # Só funções do PRÓPRIO ficheiro (não bibliotecas)
+                nome_funcao_local = self._resolver_nome_funcao_local(d.inicial.nome)
+                if nome_funcao_local is not None:
+                    # Só funções do PRÓPRIO ficheiro, incluindo as
+                    # incluídas com alias (não bibliotecas verdadeiras)
                     # podem ler uma global ALGO -- ver
                     # _globais_lidas_transitivamente.
-                    for nome_global in sorted(self._globais_lidas_transitivamente(d.inicial.nome)):
+                    for nome_global in sorted(self._globais_lidas_transitivamente(nome_funcao_local)):
                         if nome_global not in escopo:
                             raise ErroSemantico(
                                 f"'{d.inicial.nome}' lê a variável global '{nome_global}', que "
@@ -593,6 +628,9 @@ class VerificadorTipos:
                                 f"para depois", d.linha)
                 dims_n = 0 if d.dims is None else len(d.dims)
                 dims_inicial = self._dims_retorno_de_chamada(d.inicial)
+                tipo_inicial, dims_inicial, _ = self._percorrer_acessos(
+                    tipo_inicial, dims_inicial, d.inicial.acessos,
+                    f"{d.inicial.nome}(...)", d.inicial.linha, escopo)
                 if dims_inicial != dims_n:
                     # Mesmo gate "dimensões antes de tipo" usado em
                     # _verificar_chamada/'retornar' -- sem ele um vetor
@@ -717,6 +755,32 @@ class VerificadorTipos:
             return -expr.operando.valor
         return None
 
+    def _chave_valor_caso(self, v):
+        """Devolve uma chave normalizada (para deteção de 'caso'
+        duplicado num 'escolher') se 'v' for um valor estático
+        reconhecível, ou None se não for. Reconhece tanto A.Literal como
+        um literal numérico negado ('caso -1'), que o parser produz como
+        UnOp('-', Literal(1)) já que o lexer nunca produz um Literal já
+        negativo (mesma forma que _valor_literal_negativo reconhece) --
+        sem isto, 'caso -1' repetido duas vezes não era detetado como
+        código morto, ao contrário de 'caso 1' repetido. A chave
+        normaliza por FAMÍLIA de tipo, não pelo tipo exato -- 'caso "a"'
+        e 'caso \'a\'' (cadeia vs caracter), ou 'caso 1' e 'caso 1.0'
+        (inteiro vs decimal), são o MESMO valor em runtime (Python:
+        "a" == 'a' e 1 == 1.0)."""
+        if (isinstance(v, A.UnOp) and v.op == "-" and isinstance(v.operando, A.Literal)
+                and v.operando.tipo in NUMERICOS):
+            tipo, valor = v.operando.tipo, -v.operando.valor
+        elif isinstance(v, A.Literal):
+            tipo, valor = v.tipo, v.valor
+        else:
+            return None
+        if tipo in NUMERICOS:
+            return ("numero", valor)
+        if tipo in TEXTUAIS:
+            return ("texto", valor)
+        return (tipo, valor)
+
     def _verificar_estrutura_literal(self, lit: A.EstruturaLiteral, tipo_esperado, escopo):
         if tipo_esperado not in self.estruturas:
             raise ErroSemantico(
@@ -814,9 +878,14 @@ class VerificadorTipos:
             self._verificar_stmt(s, escopo, ctx_funcao, dentro_de_ciclo)
 
     def _tem_ref(self, chamada: A.Chamada):
-        if "." in chamada.nome:
+        # Uma chamada de biblioteca verdadeira nunca tem 'ref' -- mas uma
+        # função incluída com alias ('incluir "x.algo" como L') é uma
+        # função ALGO normal e PODE ter, por isso resolve o alias antes
+        # de decidir (ver _resolver_nome_funcao_local).
+        nome_local = self._resolver_nome_funcao_local(chamada.nome)
+        if nome_local is None:
             return False
-        f_def = self.funcoes.get(chamada.nome)
+        f_def = self.funcoes.get(nome_local)
         return f_def is not None and any(p.por_referencia for p in f_def.parametros)
 
     def _dims_retorno_de_chamada(self, chamada: A.Chamada):
@@ -887,9 +956,12 @@ class VerificadorTipos:
                 # (partilharia o mesmo 'tipo' que um escalar, ignorando
                 # dims, se não fosse este gate).
                 dims_retorno = self._dims_retorno_de_chamada(s.expr)
+                tipo_retorno, dims_retorno, caminho = self._percorrer_acessos(
+                    tipo_retorno, dims_retorno, s.expr.acessos, f"{s.expr.nome}(...)",
+                    s.linha, escopo)
                 if dims_retorno > 0:
                     raise ErroSemantico(
-                        f"'{s.expr.nome}' devolve {self._descricao_dims(dims_retorno)} "
+                        f"'{caminho}' devolve {self._descricao_dims(dims_retorno)} "
                         f"mas '{s.alvo.nome}' é {self._descricao_dims(dims_alvo)}",
                         s.linha)
                 if not self._compativel(tipo_alvo, tipo_retorno):
@@ -1025,25 +1097,20 @@ class VerificadorTipos:
                         raise ErroSemantico(
                             f"o valor de 'caso' é do tipo '{tipo_v}', incompatível com "
                             f"'{tipo_base}' de 'escolher'", getattr(v, "linha", s.linha))
-                    if isinstance(v, A.Literal):
+                    chave = self._chave_valor_caso(v)
+                    if chave is not None:
                         # Um valor de 'caso' repetido faz o segundo ramo
                         # nunca ser alcançado. A chave normaliza por
                         # FAMÍLIA de tipo, não pelo tipo exato -- 'caso
                         # "a"' e 'caso \'a\'' (cadeia vs caracter), ou
                         # 'caso 1' e 'caso 1.0' (inteiro vs decimal), são
                         # o MESMO valor em runtime (Python: "a" == 'a' e
-                        # 1 == 1.0).
-                        if v.tipo in NUMERICOS:
-                            chave = ("numero", v.valor)
-                        elif v.tipo in TEXTUAIS:
-                            chave = ("texto", v.valor)
-                        else:
-                            chave = (v.tipo, v.valor)
+                        # 1 == 1.0) -- ver _chave_valor_caso.
                         if chave in valores_vistos:
                             raise ErroSemantico(
                                 f"o valor '{A.texto_expr(v)}' já apareceu antes neste "
                                 f"'escolher' -- este ramo nunca seria alcançado",
-                                v.linha)
+                                getattr(v, "linha", s.linha))
                         valores_vistos.add(chave)
                 escopo_caso = Escopo(escopo)
                 self._verificar_bloco(corpo, escopo_caso, ctx_funcao, dentro_de_ciclo)
@@ -1141,42 +1208,52 @@ class VerificadorTipos:
             raise ErroSemantico(
                 f"não é possível {acao} '{lv.nome}': é uma constante", lv.linha)
 
-    def _tipo_lvalue(self, lv: A.LValue, escopo):
-        if lv.nome not in escopo:
-            raise ErroSemantico(f"a variável '{lv.nome}' não foi declarada", lv.linha)
-        tipo, dims = escopo[lv.nome][0], escopo[lv.nome][1]
-        # Constrói o caminho textual real (ex.: "c.valores") à medida que
-        # percorremos os acessos, para as mensagens de erro abaixo
-        # referirem o campo/índice exato, não só a variável base.
-        caminho = lv.nome
-        for tag, valor in lv.acessos:
+    def _percorrer_acessos(self, tipo, dims, acessos, caminho, linha, escopo):
+        """Aplica uma lista de acessos ('indice'/'campo') a partir de um
+        (tipo, dims) inicial -- partilhado entre _tipo_lvalue (a partir de
+        uma variável do escopo) e o ramo A.Chamada de _tipo_expr (a partir
+        do TIPO/DIMS DEVOLVIDOS por uma chamada, ex.: 'cadeia.dividir(...)
+        [0]'), já que indexar/aceder a um campo é validado da mesma forma
+        nos dois casos. 'caminho' é o texto já acumulado (variável ou
+        'nome(...)'), estendido a cada passo para as mensagens de erro
+        referirem o campo/índice exato. Devolve (tipo, dims, caminho)
+        finais."""
+        for tag, valor in acessos:
             if tag == "indice":
                 if dims <= 0:
                     raise ErroSemantico(
-                        f"'{caminho}' não é um vetor; não pode ser indexado", lv.linha)
+                        f"'{caminho}' não é um vetor; não pode ser indexado", linha)
                 tipo_idx, _ = self._tipo_expr(valor, escopo)
                 if tipo_idx != "inteiro":
                     raise ErroSemantico(
                         f"o índice de '{caminho}' tem de ser inteiro (é '{tipo_idx}')",
-                        lv.linha)
+                        linha)
                 dims -= 1
                 caminho = f"{caminho}[{A.texto_expr(valor)}]"
             else:  # "campo"
                 if dims > 0:
                     raise ErroSemantico(
                         f"'{caminho}' é um vetor; falta indexá-lo antes de aceder a "
-                        f"'.{valor}'", lv.linha)
+                        f"'.{valor}'", linha)
                 if tipo not in self.estruturas:
                     raise ErroSemantico(
-                        f"'{tipo}' não é uma estrutura; não tem campo '{valor}'", lv.linha)
+                        f"'{tipo}' não é uma estrutura; não tem campo '{valor}'", linha)
                 campos = self.estruturas[tipo]
                 if valor not in campos:
                     disponiveis = ", ".join(sorted(campos))
                     raise ErroSemantico(
                         f"a estrutura '{tipo}' não tem nenhum campo '{valor}'. "
-                        f"Campos disponíveis: {disponiveis}", lv.linha)
+                        f"Campos disponíveis: {disponiveis}", linha)
                 tipo, dims, _ = campos[valor]
                 caminho = f"{caminho}.{valor}"
+        return tipo, dims, caminho
+
+    def _tipo_lvalue(self, lv: A.LValue, escopo):
+        if lv.nome not in escopo:
+            raise ErroSemantico(f"a variável '{lv.nome}' não foi declarada", lv.linha)
+        tipo, dims = escopo[lv.nome][0], escopo[lv.nome][1]
+        tipo, dims, _ = self._percorrer_acessos(
+            tipo, dims, lv.acessos, lv.nome, lv.linha, escopo)
         return tipo, dims
 
     def _tipo_expr(self, expr, escopo, permitir_vetor=False):
@@ -1232,10 +1309,13 @@ class VerificadorTipos:
                     f"'{expr.nome}' é um procedimento e não devolve valor; não pode "
                     f"ser usado dentro de uma expressão", expr.linha)
             dims_retorno = self._dims_retorno_de_chamada(expr)
+            tipo_retorno, dims_retorno, caminho = self._percorrer_acessos(
+                tipo_retorno, dims_retorno, expr.acessos, f"{expr.nome}(...)",
+                expr.linha, escopo)
             if dims_retorno > 0 and not permitir_vetor:
                 raise ErroSemantico(
-                    f"'{expr.nome}' devolve um vetor; falta indexá-lo (ex: "
-                    f"{expr.nome}(...)[i])", expr.linha)
+                    f"'{caminho}' devolve um vetor; falta indexá-lo (ex: "
+                    f"{caminho}[i])", expr.linha)
             expr._tipo_inferido = tipo_retorno
             return tipo_retorno, dims_retorno
         if isinstance(expr, (A.VetorLiteral, A.EstruturaLiteral)):

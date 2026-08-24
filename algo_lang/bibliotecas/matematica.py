@@ -17,8 +17,14 @@ FUNCOES = {
         # Python fica 'int' quando base e exp são ambos inteiros -- float()
         # garante que o valor devolvido corresponde ao tipo declarado. Se
         # float() rebentar com OverflowError (resultado grande demais para
-        # caber num float), devolve o inteiro em bruto, replicando o
-        # comportamento do operador '^' nesse caso extremo.
+        # caber num float, mas exato como int), devolve o inteiro em
+        # bruto em vez de erro -- decisão deliberada (bug #35): '^' usado
+        # FORA de um contexto 'decimal' (ex.: 'escrever(10^1000)') também
+        # nunca força float() e por isso também nunca rebenta, mesmo para
+        # o mesmo valor extremo; potencia() replica esse comportamento em
+        # vez do de '^' DENTRO de um contexto 'decimal' (que força
+        # float() e por isso pode rebentar) -- ver
+        # test_matematica_potencia_com_expoente_grande_calcula_e_imprime_sem_overflow.
         "def matematica_potencia(base, exp):\n"
         "    if base < 0 and not float(exp).is_integer():\n"
         "        raise ValueError(\"negative number cannot be raised to a fractional power\")\n"

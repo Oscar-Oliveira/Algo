@@ -253,3 +253,54 @@ def test_mutuamente_recursivas_tambem_nao_recursam_infinitamente():
             escrever(x.b == nulo)
     """)
     assert saida.strip() == "verdadeiro"
+
+
+def test_campo_vetor_do_proprio_tipo_nao_recursa_infinitamente():
+    """Ronda 15: 'estrutura No: filhos:No[2]' (uma árvore, campo-vetor do
+    PRÓPRIO tipo) compilava, mas construir a instância por omissão
+    tentava eagerly popular os 2 elementos de 'filhos', cada um dos quais
+    tentava construir os seus próprios 2 elementos, ad infinitum --
+    RecursionError em runtime, sem workaround nenhum. Um campo-vetor
+    recursivo agora fica vazio por omissão, tal como um campo escalar
+    recursivo (ex.: 'seguinte:No') já ficava 'nulo'."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+            filhos:No[2]
+        inicio
+            x:No
+            escrever(x.valor)
+    """)
+    assert saida.strip() == "0"
+
+
+def test_campo_vetor_mutuamente_recursivo_tambem_nao_recursa_infinitamente():
+    saida = executar("""
+        algoritmo "T"
+        estrutura A
+            filhosB:B[1]
+        estrutura B
+            filhosA:A[1]
+        inicio
+            x:A
+            escrever("ok")
+    """)
+    assert saida.strip() == "ok"
+
+
+def test_aceder_a_campo_vetor_recursivo_vazio_da_erro_amigavel_nao_traceback(tmp_path):
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\n'
+        'estrutura No\n'
+        '    valor:inteiro\n'
+        '    filhos:No[2]\n'
+        'inicio\n'
+        '    x:No\n'
+        '    escrever(x.filhos[0].valor)\n',
+        encoding="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(algo_path)], capture_output=True, text=True)
+    assert "Traceback" not in resultado.stdout
+    assert "posição de vetor" in resultado.stdout

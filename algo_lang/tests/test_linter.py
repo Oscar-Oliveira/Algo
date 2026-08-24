@@ -537,6 +537,38 @@ def test_atribuicao_a_parametro_por_referencia_nao_da_aviso():
     assert not any("não é 'por referência'" in a.mensagem for a in avisos)
 
 
+def test_atribuicao_a_campo_de_parametro_estrutura_por_valor_da_aviso():
+    """Ronda 15: o aviso só disparava para reatribuir o parâmetro
+    INTEIRO ('p = ...'), não para mutar um CAMPO seu ('p.x = ...') --
+    exatamente a forma idiomática de tentar "modificar" uma estrutura
+    passada por valor, com o mesmo problema (a cópia local, não o
+    original do chamador, é que muda)."""
+    avisos = _avisos("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento mexe(p:Ponto)
+            p.x = 99
+        inicio
+            pt:Ponto
+            mexe(pt)
+            escrever(pt.x)
+    """)
+    assert any("não é 'por referência'" in a.mensagem for a in avisos)
+
+
+def test_atribuicao_a_elemento_de_parametro_vetor_por_valor_da_aviso():
+    avisos = _avisos("""
+        algoritmo "T"
+        procedimento mexe(v:inteiro[])
+            v[0] = 99
+        inicio
+            vv:inteiro[3]
+            mexe(vv)
+    """)
+    assert any("não é 'por referência'" in a.mensagem for a in avisos)
+
+
 def test_resultado_de_funcao_descartado_da_aviso():
     avisos = _avisos("""
         algoritmo "T"

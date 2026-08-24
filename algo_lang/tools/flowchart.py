@@ -59,6 +59,10 @@ class GeradorFluxograma:
         self.no(inicio, "Início", "oval")
         fim = self.novo_id()
         self.no(fim, "Fim", "oval")
+        # Guardado para A.Retornar (_gerar_stmt) desenhar uma aresta
+        # explícita até aqui -- mesma ideia que self.pilha_ciclos dá a
+        # A.Sair/A.Continuar o seu alvo real de salto.
+        self.fim_id = fim
 
         saida = self.gerar_bloco(corpo, inicio)
         self.aresta(saida, fim)
@@ -137,6 +141,12 @@ class GeradorFluxograma:
             rotulo_no = "retornar" if stmt.expr is None else f"retornar {texto_expr(stmt.expr)}"
             self.no(id_, rotulo_no, "box", extra=', peripheries=2')
             self.aresta(anterior, id_, rotulo)
+            # 'retornar' sai imediatamente da rotina -- liga direto a
+            # "Fim", tal como A.Sair/A.Continuar ligam ao alvo real do
+            # ciclo (ver comentário abaixo). Sem isto, código morto a
+            # seguir (ex.: dentro de um 'se' sem 'senao') aparecia ligado
+            # em sequência como se ainda fosse alcançável.
+            self.aresta(id_, self.fim_id)
             return id_
 
         if isinstance(stmt, A.Afirmar):
