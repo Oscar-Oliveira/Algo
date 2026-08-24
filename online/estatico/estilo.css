@@ -841,7 +841,7 @@ button {
   flex: 1;
   min-height: 0;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.92rem;
+  font-size: var(--fonte-editor-tamanho, 0.92rem);
 }
 
 .painel-codigo .cm-scroller {

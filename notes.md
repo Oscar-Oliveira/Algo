@@ -13,13 +13,9 @@ online
 - deixar estudande visivel
 - grupos
 
-- exemplos no manual em anexo
-
 - report error
 - trace de pois de executar doawload?
 
-- increase decrease font
-- theme
 
 - admin atica deeactiva alguem
 
