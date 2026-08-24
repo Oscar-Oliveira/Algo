@@ -124,12 +124,22 @@
     <section class="painel painel-terminal">
       <div class="painel-cabecalho">
         <span id="titulo-painel-execucao">Execução</span>
-        <button id="botao-voltar-execucao" class="botao-icone escondido" title="Voltar à execução normal"><svg
-            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg></button>
+        <div class="acoes-codigo">
+          <a id="ligacao-abrir-visualizador" class="botao-icone escondido" title="Visualizador"
+            href="/estatico/visualizador/algo-trace-viewer.html" rel="noopener"><svg class="icone-botao"
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg><span class="rotulo-botao">Visualizador</span></a>
+          <button id="botao-voltar-execucao" class="botao-icone escondido" title="Voltar à execução normal"><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg></button>
+        </div>
       </div>
 
       <div id="vista-execucao">
@@ -150,27 +160,13 @@
         </form>
         <div id="conteudo-rasto" class="conteudo-rasto escondido">
           <p>Rasto gerado com <span id="rasto-num-passos"></span> passos.</p>
-          <div class="acoes-rasto-geradas">
-            <a id="ligacao-descarregar-rasto" class="botao-primario botao-com-icone" download="rasto.json"><svg
-                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg><span>Descarregar rasto (.json)</span></a>
-            <a id="ligacao-abrir-visualizador" class="botao-secundario botao-com-icone"
-              href="/estatico/visualizador/algo-trace-viewer.html" target="_blank" rel="noopener"><span>Abrir no
-                visualizador</span><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg></a>
-          </div>
-          <p class="ajuda-campo">No visualizador, carrega o ficheiro que acabaste de descarregar (o visualizador não
-            recebe o ficheiro automaticamente — é a mesma ferramenta autónoma usada com
-            <code>algo executa --json</code>).
-          </p>
+          <a id="ligacao-descarregar-rasto" class="botao-primario botao-com-icone" download="rasto.json"><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg><span>Descarregar rasto (.json)</span></a>
         </div>
       </div>
 

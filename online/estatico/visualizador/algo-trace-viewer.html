@@ -13,12 +13,27 @@
 <script src="../vendor/tracer/react-dom.development.js" crossorigin></script>
 <script src="../vendor/tracer/babel.min.js" crossorigin></script>
 <script src="../vendor/tracer/tailwind.js"></script>
+<!-- Mesmas variáveis de cor/tipografia do editor (../estilo.css), para o
+     visualizador ter o mesmo look and feel -- sem tema.js: fica sempre no
+     tema escuro (valores por omissão de :root), sem alternador. -->
+<link rel="stylesheet" href="../estilo.css">
 <style>
-  html, body { margin: 0; height: 100%; background: #16181D; overflow: hidden; }
-  #root { height: 100%; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--tinta); color: var(--texto-claro); display: flex; flex-direction: column; }
+  #root { flex: 1; min-height: 0; }
 </style>
 </head>
 <body>
+<header class="barra-topo">
+  <span class="marca marca-pequena"><img src="/estatico/algo-logo.svg" alt="" class="marca-simbolo"> Algo —
+    visualizador</span>
+  <div class="acoes-topo">
+    <a href="/editor" class="botao-icone" title="Voltar ao editor"><svg class="icone-botao" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12" />
+        <polyline points="12 19 5 12 12 5" />
+      </svg></a>
+  </div>
+</header>
 <div id="root"></div>
 
 <script type="text/plain" id="codigo-fonte">
@@ -69,7 +84,7 @@ function AlgoLogo({ size = 24 }) {
    inline (as classes Tailwind predefinidas não conhecem estes
    nomes de fonte / cores específicas do projeto).
    ============================================================ */
-const FONT_DISPLAY = "'Space Grotesk', ui-sans-serif, sans-serif";
+const FONT_TITULO = "'Fraunces', serif";
 const FONT_MONO = "'JetBrains Mono', ui-monospace, 'Courier New', monospace";
 
 const FRAME_PALETTE = [
@@ -146,52 +161,52 @@ function EcraInicial({ onFicheiro, erro }) {
   }, [onFicheiro]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: "#16181D" }}>
+    <div className="h-full flex items-center justify-center px-6" style={{ background: "var(--tinta)" }}>
       <div
         onDragOver={(e) => { e.preventDefault(); setArrastar(true); }}
         onDragLeave={() => setArrastar(false)}
         onDrop={(e) => { e.preventDefault(); setArrastar(false); processar(e.dataTransfer.files[0]); }}
         className="w-full max-w-xl rounded-2xl p-10 text-center transition-colors"
         style={{
-          background: "#1E2128",
-          border: `2px dashed ${aArrastar ? "#E3B341" : "#33363F"}`,
+          background: "var(--tinta-clara)",
+          border: `2px dashed ${aArrastar ? "var(--ambar)" : "var(--tinta-borda)"}`,
         }}
       >
         <div className="mx-auto mb-5 w-14 h-14 rounded-xl flex items-center justify-center"
-             style={{ background: "#24272F", border: "1px solid #33363F" }}>
+             style={{ background: "var(--tinta)", border: "1px solid var(--tinta-borda)" }}>
           <AlgoLogo size={26} />
         </div>
-        <h1 className="text-2xl mb-2" style={{ fontFamily: FONT_DISPLAY, color: "#EDEEF1", fontWeight: 600 }}>
+        <h1 className="text-2xl mb-2" style={{ fontFamily: FONT_TITULO, color: "var(--texto-claro)", fontWeight: 600 }}>
           Visualizador de Execução ALGO
         </h1>
-        <p className="text-sm mb-7 leading-relaxed" style={{ color: "#8B8F99" }}>
-          Carrega um ficheiro <code style={{ fontFamily: FONT_MONO, color: "#B6A6E6" }}>_trace.json</code> para
+        <p className="text-sm mb-7 leading-relaxed" style={{ color: "var(--texto-esmaecido)" }}>
+          Carrega um ficheiro <code style={{ fontFamily: FONT_MONO, color: "var(--ambar)" }}>_trace.json</code> para
           navegar, passo a passo, pela pilha de chamadas e pelas variáveis de um programa ALGO em execução.
         </p>
 
         <button
           onClick={() => inputRef.current?.click()}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-transform hover:scale-[1.02]"
-          style={{ background: "#E3B341", color: "#16181D" }}
+          style={{ background: "var(--ambar-forte)", color: "#fff" }}
         >
           <Upload size={16} /> Carregar ficheiro .json
         </button>
         <input ref={inputRef} type="file" accept=".json,application/json" className="hidden"
                onChange={(e) => processar(e.target.files[0])} />
 
-        <p className="text-xs mt-4" style={{ color: "#5B5F69" }}>ou arrasta o ficheiro para aqui</p>
+        <p className="text-xs mt-4" style={{ color: "var(--texto-esmaecido)" }}>ou arrasta o ficheiro para aqui</p>
 
         {erro && (
           <div className="mt-6 flex items-start gap-2 text-left text-sm rounded-lg px-3 py-2.5"
-               style={{ background: "#2A1A18", color: "#E3A98D", border: "1px solid #4A2A24" }}>
+               style={{ background: "#2A1A18", color: "var(--erro)", border: "1px solid #4A2A24" }}>
             <AlertTriangle size={16} className="shrink-0 mt-0.5" />
             <span>{erro}</span>
           </div>
         )}
 
-        <div className="mt-8 pt-6 text-left text-xs leading-relaxed" style={{ borderTop: "1px solid #2A2D35", color: "#6B7280" }}>
-          <p className="mb-2 font-medium" style={{ color: "#9CA0AA" }}>Como gerar um ficheiro de trace:</p>
-          <pre className="rounded-lg px-3 py-2 overflow-x-auto" style={{ background: "#101216", fontFamily: FONT_MONO, color: "#9FCAC3" }}>
+        <div className="mt-8 pt-6 text-left text-xs leading-relaxed" style={{ borderTop: "1px solid var(--tinta-borda)", color: "var(--texto-esmaecido)" }}>
+          <p className="mb-2 font-medium" style={{ color: "var(--texto-esmaecido)" }}>Como gerar um ficheiro de trace:</p>
+          <pre className="rounded-lg px-3 py-2 overflow-x-auto" style={{ background: "var(--tinta)", fontFamily: FONT_MONO, color: "var(--sucesso)" }}>
 algo executa o-teu-programa.algo --debug --json
           </pre>
         </div>
@@ -211,10 +226,10 @@ function PainelCodigo({ linhas, linhaAtual, tituloFicheiro, erroLinha }) {
   }, [linhaAtual]);
 
   return (
-    <div className="flex flex-col rounded-xl overflow-hidden h-full" style={{ background: "#1E2128", border: "1px solid #2A2D35" }}>
-      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid #2A2D35" }}>
-        <FileCode2 size={15} color="#8B8F99" />
-        <span className="text-sm truncate" style={{ color: "#C7C9D1", fontFamily: FONT_MONO }}>{tituloFicheiro}</span>
+    <div className="flex flex-col rounded-xl overflow-hidden h-full" style={{ background: "var(--tinta-clara)", border: "1px solid var(--tinta-borda)" }}>
+      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid var(--tinta-borda)" }}>
+        <FileCode2 size={15} color="var(--texto-esmaecido)" />
+        <span className="text-sm truncate" style={{ color: "var(--texto-claro)", fontFamily: FONT_MONO }}>{tituloFicheiro}</span>
       </div>
       <div className="flex-1 overflow-auto py-2" style={{ fontFamily: FONT_MONO, fontSize: 13.5, lineHeight: "1.7rem" }}>
         {linhas.map((linha, i) => {
@@ -228,17 +243,17 @@ function PainelCodigo({ linhas, linhaAtual, tituloFicheiro, erroLinha }) {
               className="flex px-3"
               style={
                 comErro
-                  ? { background: "#2A1A18", boxShadow: "inset 3px 0 0 #D9694F" }
+                  ? { background: "#2A1A18", boxShadow: "inset 3px 0 0 var(--erro)" }
                   : ativa
-                  ? { background: "#332B14", boxShadow: "inset 3px 0 0 #E3B341" }
+                  ? { background: "#332B14", boxShadow: "inset 3px 0 0 var(--ambar)" }
                   : undefined
               }
             >
-              <span className="w-5 shrink-0 text-center select-none" style={{ color: comErro ? "#D9694F" : ativa ? "#E3B341" : "transparent" }}>
+              <span className="w-5 shrink-0 text-center select-none" style={{ color: comErro ? "var(--erro)" : ativa ? "var(--ambar)" : "transparent" }}>
                 {ativa ? (comErro ? "✕" : "▶") : "·"}
               </span>
-              <span className="w-9 shrink-0 text-right pr-3 select-none" style={{ color: "#4A4E58" }}>{numLinha}</span>
-              <span className="whitespace-pre" style={{ color: "#D7D9E0" }}>
+              <span className="w-9 shrink-0 text-right pr-3 select-none" style={{ color: "var(--texto-esmaecido)" }}>{numLinha}</span>
+              <span className="whitespace-pre" style={{ color: "var(--texto-claro)" }}>
                 <LinhaRealcada texto={linha} />
               </span>
             </div>
@@ -261,11 +276,11 @@ function PainelPilha({ pilha, pilhaAnterior }) {
   }
 
   return (
-    <div className="flex flex-col rounded-xl overflow-hidden h-full" style={{ background: "#1E2128", border: "1px solid #2A2D35" }}>
-      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid #2A2D35" }}>
-        <Layers size={15} color="#8B8F99" />
-        <span className="text-sm" style={{ color: "#C7C9D1", fontFamily: FONT_DISPLAY, fontWeight: 500 }}>Pilha de memória</span>
-        <span className="ml-auto text-xs" style={{ color: "#5B5F69", fontFamily: FONT_MONO }}>
+    <div className="flex flex-col rounded-xl overflow-hidden h-full" style={{ background: "var(--tinta-clara)", border: "1px solid var(--tinta-borda)" }}>
+      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid var(--tinta-borda)" }}>
+        <Layers size={15} color="var(--texto-esmaecido)" />
+        <span className="text-sm uppercase tracking-wide" style={{ color: "var(--texto-esmaecido)", fontWeight: 600, fontSize: "0.78rem" }}>Pilha de memória</span>
+        <span className="ml-auto text-xs" style={{ color: "var(--texto-esmaecido)", fontFamily: FONT_MONO }}>
           {pilha.length} nível{pilha.length !== 1 ? "eis" : ""}
         </span>
       </div>
@@ -285,12 +300,12 @@ function PainelPilha({ pilha, pilhaAnterior }) {
             >
               <div className="flex items-center gap-1.5 mb-2">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: cor.linha }} />
-                <span className="text-xs font-semibold tracking-wide" style={{ color: cor.texto, fontFamily: FONT_DISPLAY }}>
+                <span className="text-xs font-semibold tracking-wide" style={{ color: cor.texto }}>
                   {frame.nome}
                 </span>
               </div>
               {entradas.length === 0 ? (
-                <p className="text-xs italic" style={{ color: "#5B5F69" }}>sem variáveis ainda</p>
+                <p className="text-xs italic" style={{ color: "var(--texto-esmaecido)" }}>sem variáveis ainda</p>
               ) : (
                 <div className="grid gap-1">
                   {entradas.map(([nome, valor]) => (
@@ -302,9 +317,9 @@ function PainelPilha({ pilha, pilhaAnterior }) {
                         background: valorMudou(i, nome) ? "rgba(227,179,65,0.16)" : "transparent",
                       }}
                     >
-                      <span style={{ color: "#8B8F99" }}>{nome}</span>
-                      <span style={{ color: "#5B5F69" }}>=</span>
-                      <span className="truncate" style={{ color: valorMudou(i, nome) ? "#E3B341" : "#D7D9E0" }}>
+                      <span style={{ color: "var(--texto-esmaecido)" }}>{nome}</span>
+                      <span style={{ color: "var(--texto-esmaecido)" }}>=</span>
+                      <span className="truncate" style={{ color: valorMudou(i, nome) ? "var(--ambar)" : "var(--texto-claro)" }}>
                         {formatarValor(valor)}
                       </span>
                     </div>
@@ -327,15 +342,15 @@ function PainelConsola({ texto, erro, aMostrarErro }) {
   useEffect(() => { fimRef.current?.scrollIntoView({ behavior: "smooth" }); }, [texto]);
 
   return (
-    <div className="rounded-xl overflow-hidden shrink-0" style={{ background: "#101216", border: "1px solid #2A2D35", height: 168 }}>
-      <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid #22252C" }}>
-        <Terminal size={14} color="#6B7280" />
-        <span className="text-xs" style={{ color: "#8B8F99", fontFamily: FONT_DISPLAY }}>Consola</span>
+    <div className="rounded-xl overflow-hidden shrink-0" style={{ background: "var(--tinta)", border: "1px solid var(--tinta-borda)", height: 168 }}>
+      <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid var(--tinta-borda)" }}>
+        <Terminal size={14} color="var(--texto-esmaecido)" />
+        <span className="text-xs uppercase tracking-wide" style={{ color: "var(--texto-esmaecido)", fontWeight: 600, fontSize: "0.78rem" }}>Consola</span>
       </div>
       <div className="overflow-auto px-4 py-3" style={{ height: 118, fontFamily: FONT_MONO, fontSize: 13 }}>
-        <pre className="whitespace-pre-wrap break-words" style={{ color: "#9FCAC3", margin: 0 }}>{texto}</pre>
+        <pre className="whitespace-pre-wrap break-words" style={{ color: "var(--sucesso)", margin: 0 }}>{texto}</pre>
         {aMostrarErro && erro && (
-          <div className="flex items-start gap-1.5 mt-1" style={{ color: "#E3A98D" }}>
+          <div className="flex items-start gap-1.5 mt-1" style={{ color: "var(--erro)" }}>
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
             <span>{erro.mensagem}</span>
           </div>
@@ -357,15 +372,6 @@ function VisualizadorTraceAlgo() {
   const [aReproduzir, setAReproduzir] = useState(false);
   const [velocidade, setVelocidade] = useState(450);
   const timerRef = useRef(null);
-
-  useEffect(() => {
-    if (document.getElementById("algo-trace-fontes")) return;
-    const link = document.createElement("link");
-    link.id = "algo-trace-fontes";
-    link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap";
-    document.head.appendChild(link);
-  }, []);
 
   const carregarFicheiro = useCallback((texto, nome) => {
     try {
@@ -420,29 +426,29 @@ function VisualizadorTraceAlgo() {
   const mostrarErroAgora = noFim && !!trace.erro;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#16181D" }}>
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: "var(--tinta)" }}>
       {/* Cabeçalho */}
-      <header className="shrink-0 flex flex-wrap items-center gap-4 px-6 py-4" style={{ borderBottom: "1px solid #2A2D35" }}>
+      <header className="shrink-0 flex flex-wrap items-center gap-4 px-6 py-4" style={{ borderBottom: "1px solid var(--tinta-borda)" }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#24272F", border: "1px solid #33363F" }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--tinta-clara)", border: "1px solid var(--tinta-borda)" }}>
             <AlgoLogo size={16} />
           </div>
           <div>
-            <h1 className="text-base leading-tight" style={{ fontFamily: FONT_DISPLAY, color: "#EDEEF1", fontWeight: 600 }}>
+            <h1 className="text-base leading-tight" style={{ fontFamily: FONT_TITULO, color: "var(--texto-claro)", fontWeight: 600 }}>
               {trace.titulo || "Programa ALGO"}
             </h1>
-            <p className="text-xs leading-tight" style={{ color: "#5B5F69" }}>{nomeFicheiro}</p>
+            <p className="text-xs leading-tight" style={{ color: "var(--texto-esmaecido)" }}>{nomeFicheiro}</p>
           </div>
         </div>
         <div className="flex-1" />
         {trace.limiteExcedido && (
           <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
-                style={{ background: "#2A2213", color: "#E3B341" }}>
+                style={{ background: "#2A2213", color: "var(--ambar)" }}>
             <Info size={12} /> trace truncado (limite de passos)
           </span>
         )}
         <label className="flex items-center gap-2 text-xs cursor-pointer px-3 py-1.5 rounded-lg transition-colors"
-               style={{ color: "#8B8F99", border: "1px solid #33363F" }}>
+               style={{ color: "var(--texto-esmaecido)", border: "1px solid var(--tinta-borda)" }}>
           <Upload size={13} /> Trocar ficheiro
           <input type="file" accept=".json" className="hidden" onChange={(e) => {
             const f = e.target.files[0];
@@ -473,26 +479,26 @@ function VisualizadorTraceAlgo() {
       </main>
 
       {/* Controlos */}
-      <footer className="shrink-0 px-6 py-3.5 flex items-center gap-3" style={{ borderTop: "1px solid #2A2D35" }}>
-        <button onClick={() => irPara(0)} className="p-2 rounded-lg transition-colors hover:opacity-80" style={{ color: "#8B8F99" }} title="Início">
+      <footer className="shrink-0 px-6 py-3.5 flex items-center gap-3" style={{ borderTop: "1px solid var(--tinta-borda)" }}>
+        <button onClick={() => irPara(0)} className="p-2 rounded-lg transition-colors hover:opacity-80" style={{ color: "var(--texto-esmaecido)" }} title="Início">
           <SkipBack size={16} />
         </button>
-        <button onClick={() => irPara(passo - 1)} disabled={passo === 0} className="p-2 rounded-lg transition-colors hover:opacity-80 disabled:opacity-30" style={{ color: "#C7C9D1" }} title="Passo anterior (←)">
+        <button onClick={() => irPara(passo - 1)} disabled={passo === 0} className="p-2 rounded-lg transition-colors hover:opacity-80 disabled:opacity-30" style={{ color: "var(--texto-claro)" }} title="Passo anterior (←)">
           <ChevronLeft size={18} />
         </button>
         <button
           onClick={() => setAReproduzir((r) => !r)}
           disabled={noFim && !aReproduzir}
           className="w-9 h-9 rounded-full flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-30"
-          style={{ background: "#E3B341", color: "#16181D" }}
+          style={{ background: "var(--ambar-forte)", color: "#fff" }}
           title="Reproduzir/Pausar (espaço)"
         >
           {aReproduzir ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
         </button>
-        <button onClick={() => irPara(passo + 1)} disabled={noFim} className="p-2 rounded-lg transition-colors hover:opacity-80 disabled:opacity-30" style={{ color: "#C7C9D1" }} title="Passo seguinte (→)">
+        <button onClick={() => irPara(passo + 1)} disabled={noFim} className="p-2 rounded-lg transition-colors hover:opacity-80 disabled:opacity-30" style={{ color: "var(--texto-claro)" }} title="Passo seguinte (→)">
           <ChevronRight size={18} />
         </button>
-        <button onClick={() => irPara(trace.passos.length - 1)} className="p-2 rounded-lg transition-colors hover:opacity-80" style={{ color: "#8B8F99" }} title="Fim">
+        <button onClick={() => irPara(trace.passos.length - 1)} className="p-2 rounded-lg transition-colors hover:opacity-80" style={{ color: "var(--texto-esmaecido)" }} title="Fim">
           <SkipForward size={16} />
         </button>
 
@@ -500,20 +506,20 @@ function VisualizadorTraceAlgo() {
           type="range" min={0} max={trace.passos.length - 1} value={passo}
           onChange={(e) => irPara(Number(e.target.value))}
           className="flex-1 mx-2"
-          style={{ accentColor: "#E3B341" }}
+          style={{ accentColor: "var(--ambar)" }}
         />
 
-        <span className="text-xs shrink-0 tabular-nums" style={{ color: "#8B8F99", fontFamily: FONT_MONO }}>
+        <span className="text-xs shrink-0 tabular-nums" style={{ color: "var(--texto-esmaecido)", fontFamily: FONT_MONO }}>
           {passo + 1} / {trace.passos.length}
         </span>
 
-        <div className="flex items-center gap-1.5 pl-3 ml-1" style={{ borderLeft: "1px solid #2A2D35" }}>
-          <Gauge size={13} color="#5B5F69" />
+        <div className="flex items-center gap-1.5 pl-3 ml-1" style={{ borderLeft: "1px solid var(--tinta-borda)" }}>
+          <Gauge size={13} color="var(--texto-esmaecido)" />
           <select
             value={velocidade}
             onChange={(e) => setVelocidade(Number(e.target.value))}
             className="text-xs rounded px-1.5 py-1"
-            style={{ background: "#1E2128", color: "#8B8F99", border: "1px solid #33363F" }}
+            style={{ background: "var(--tinta-clara)", color: "var(--texto-esmaecido)", border: "1px solid var(--tinta-borda)" }}
           >
             <option value={900}>lento</option>
             <option value={450}>normal</option>

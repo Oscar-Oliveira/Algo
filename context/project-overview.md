@@ -71,7 +71,7 @@ lexer.py (tokenizar) → parser.py (parse/parse_biblioteca, recursive-descent)
 * `credenciais.py` and `cifragem.py`: each student brings their own LLM API key, encrypted at rest (Fernet) under `ONLINE_CHAVE_CIFRAGEM`, which is never stored in the DB or code.
 * No code persistence. Each session is scratch space, with no `programs` table.
 * `modo_codemirror.py` generates the CodeMirror syntax mode dynamically from the compiler's real keyword list, so it cannot drift out of date.
-* The trace viewer at `/estatico/visualizador/` is the same standalone `visualizador/algo-trace-viewer.html` used by the CLI (`algo executa --json`), not a second implementation.
+* The trace viewer lives only in `online/estatico/visualizador/algo-trace-viewer.html`, served at `/estatico/visualizador/`. The CLI's `algo executa --json` generates the `_trace.json` file the viewer loads, but no longer ships its own copy of the viewer — it's online-only. `algo-trace-viewer.jsx` next to it is the same app's React source, kept for editing.
 * Every exception handler returns JSON (`main.py`'s global exception handler). The frontend always expects `response.json()`, so an unhandled error must never fall back to a plaintext error page.
 
 ## Testing conventions

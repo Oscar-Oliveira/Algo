@@ -194,6 +194,7 @@ button {
   padding: 0.75rem;
   border-radius: 8px;
   font-weight: 600;
+  text-decoration: none;
   transition: background 0.15s;
 }
 
@@ -209,6 +210,7 @@ button {
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
   font-weight: 500;
+  text-decoration: none;
 }
 
 .botao-secundario:hover {
@@ -238,6 +240,7 @@ button {
   align-items: center;
   justify-content: center;
   line-height: 1;
+  text-decoration: none;
 }
 
 .botao-icone:hover {
@@ -578,6 +581,130 @@ button {
   border-top: 1px solid var(--tinta-borda);
 }
 
+.corpo-exemplos {
+  display: flex;
+  gap: 2.5rem;
+  align-items: flex-start;
+}
+
+.indice-exemplos {
+  flex: 0 0 220px;
+  position: sticky;
+  top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  font-size: 0.85rem;
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+}
+
+.item-tema-exemplo {
+  background: transparent;
+  border: none;
+  color: var(--texto-esmaecido);
+  text-align: left;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.item-tema-exemplo:hover {
+  color: var(--texto-claro);
+  background: var(--tinta-clara);
+}
+
+.item-tema-exemplo.ativo {
+  color: var(--texto-claro);
+  background: var(--tinta-clara);
+  font-weight: 500;
+}
+
+.conteudo-exemplo {
+  flex: 1;
+  min-width: 0;
+}
+
+.conteudo-exemplo h2 {
+  font-size: 1.4rem;
+  margin: 0 0 0.8rem;
+}
+
+.conteudo-exemplo h3 {
+  font-size: 1.05rem;
+  margin: 1.4rem 0 0.6rem;
+  color: var(--texto-claro);
+}
+
+.conteudo-exemplo p {
+  line-height: 1.6;
+  color: var(--texto-claro);
+}
+
+.conteudo-exemplo pre {
+  background: var(--tinta-clara);
+  border: 1px solid var(--tinta-borda);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  overflow-x: auto;
+  margin: 0.8rem 0;
+}
+
+.conteudo-exemplo code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+}
+
+.intro-exemplo {
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--tinta-borda);
+}
+
+.lista-ficheiros-exemplo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.lista-ficheiros-exemplo a {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--ambar);
+  background: var(--tinta-clara);
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+}
+
+.lista-ficheiros-exemplo a:hover {
+  color: var(--texto-claro);
+}
+
+.cartao-exemplo {
+  margin-top: 1.8rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--tinta-borda);
+}
+
+.cartao-exemplo:first-of-type {
+  margin-top: 1rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+.nome-ficheiro-exemplo {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--texto-esmaecido);
+  margin: 0.8rem 0 -0.4rem;
+}
+
+.aviso-exemplo,
+.carregando-exemplos {
+  color: var(--texto-esmaecido);
+  font-size: 0.9rem;
+}
+
 /* ---------- página do editor ---------- */
 
 .pagina-editor {
@@ -631,6 +758,7 @@ button {
   gap: 0.4rem;
   font-size: 0.82rem;
   font-weight: 500;
+  text-transform: none;
 }
 
 .rotulo-botao {
@@ -1213,15 +1341,4 @@ button {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
-}
-
-.acoes-rasto-geradas {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
-.acoes-rasto-geradas a {
-  text-decoration: none;
-  text-align: center;
 }

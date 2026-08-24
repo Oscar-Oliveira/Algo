@@ -8,32 +8,22 @@ docker compose up -d --build
 ---
 
 
-Documentacao -> em readme...
-- compilador
-    - instalação,
-- liguagem online + readme
-- linter improve
-
-
-criar pacote local
--compilador
--exemplos
--docs
-
-
 online
 - bd?
 - deixar estudande visivel
 - grupos
+
 - exemplos no manual em anexo
-- visualizador so no online. + link
+
 - report error
 - trace de pois de executar doawload?
-- manual
+
 - increase decrease font
 - theme
 
 - admin atica deeactiva alguem
+
+visualizador nao precisa de barra o trocar ficheiro por ir para a barra de topo
 
 update -> db
 

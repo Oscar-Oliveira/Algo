@@ -187,6 +187,48 @@ def test_ajuda_explica_os_tres_tipos_de_erro_de_compilacao(cliente):
     assert "semântico" in conteudo
 
 
+def test_exemplos_sem_sessao_da_nao_autenticado(cliente):
+    r = cliente.get("/api/exemplos")
+    assert r.status_code == 401
+
+
+def test_exemplos_devolve_pastas_com_ficheiros_algo(cliente):
+    """A aba 'Exemplos' da ajuda lê exemplos/ diretamente do disco --
+    confirma que a rota devolve pelo menos uma pasta, com pelo menos um
+    ficheiro .algo com código lá dentro."""
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.get("/api/exemplos")
+    assert r.status_code == 200
+    pastas = r.json()
+    assert len(pastas) > 0
+    primeira = pastas[0]
+    assert primeira["pasta"]
+    assert len(primeira["ficheiros"]) > 0
+    ficheiro = primeira["ficheiros"][0]
+    assert ficheiro["nome"].endswith(".algo")
+    assert len(ficheiro["codigo"]) > 0
+
+
+def test_exemplos_junta_titulo_de_bloco_partido_em_duas_linhas(cliente):
+    """exemplos/09_ficheiros_incluir/enunciado.md tem um cabeçalho '##'
+    partido em duas linhas físicas no ficheiro fonte -- confirma que
+    _analisar_enunciado (main.py) junta as linhas antes de procurar os
+    nomes de ficheiro entre crases, para não perder o 3º nome
+    (biblioteca_estatistica.algo, que está só na linha seguinte)."""
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.get("/api/exemplos")
+    assert r.status_code == 200
+    pastas = {p["pasta"]: p for p in r.json()}
+    assert "09_ficheiros_incluir" in pastas
+    blocos = pastas["09_ficheiros_incluir"]["blocos"]
+    bloco = next(b for b in blocos if "principal_calculos.algo" in b["ficheiros"])
+    assert set(bloco["ficheiros"]) == {
+        "principal_calculos.algo",
+        "biblioteca_financas.algo",
+        "biblioteca_estatistica.algo",
+    }
+
+
 def test_registar_email_duplicado_da_400(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     r = cliente.post("/api/registar", json={"email": "a@b.com", "password": "outrapass"})
@@ -636,6 +678,7 @@ def test_ws_alguem_sem_autenticacao(cliente):
         assert m["tipo"] == "erro"
 
 
+@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
 def test_ws_alguem_sem_credencial_configurada(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     with cliente.websocket_connect("/ws/alguem") as ws:
@@ -644,6 +687,7 @@ def test_ws_alguem_sem_credencial_configurada(cliente):
         assert "configuraste" in m["mensagem"]
 
 
+@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
 def test_ws_alguem_conversa_completa(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
@@ -685,6 +729,7 @@ class _TutorFalsoQueRebenta:
         self.fechado = True
 
 
+@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
 def test_ws_alguem_fecha_sessao_mesmo_com_excecao_inesperada(cliente, monkeypatch):
     """ARCH-09: antes, fechar_sessao() só corria dentro do 'except
     WebSocketDisconnect' -- qualquer outra exceção no loop deixava o
@@ -704,6 +749,7 @@ def test_ws_alguem_fecha_sessao_mesmo_com_excecao_inesperada(cliente, monkeypatc
     assert tutor_falso.fechado is True
 
 
+@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
 def test_ws_alguem_logs_usam_pseudonimo_nao_email(cliente, tmp_path):
     cliente.post("/api/registar", json={"email": "privacidade@b.com", "password": "password123"})
     cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
@@ -757,7 +803,7 @@ def test_rasto_com_entradas_antecipadas(cliente):
     assert dados["consolaFinal"] == "10\n"
     assert dados["erro"] is None
     assert len(dados["passos"]) > 0
-    # o visualizador (visualizador/algo-trace-viewer.html) exige estas
+    # o visualizador (estatico/visualizador/algo-trace-viewer.html) exige estas
     # três chaves no ficheiro descarregado -- ver executor.gerar_rasto
     assert dados["titulo"] == "T"
     assert dados["ficheiro"] == "principal.algo"
@@ -893,6 +939,7 @@ def test_ws_executar_incluir_ficheiro_em_falta(cliente):
         assert "não encontrado" in m["mensagem"]
 
 
+@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
 def test_ws_alguem_recebe_varios_ficheiros(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})

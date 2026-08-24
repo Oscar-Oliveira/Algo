@@ -419,6 +419,11 @@ formEntradaTerminal.addEventListener("submit", (evento) => {
 
 // ---------- Alguem ----------
 
+// TEMP: alguem desativado enquanto se corrige o editor -- reativar
+// trocando para true (o backend também tem de reativar ALGUEM_ATIVO
+// em online/main.py).
+const ALGUEM_ATIVO = false;
+
 const conversaAlguem = document.getElementById("conversa-alguem");
 const entradaAlguem = document.getElementById("entrada-alguem");
 const botaoEnviarAlguem = document.querySelector("#form-alguem button[type=submit]");
@@ -511,7 +516,7 @@ document.getElementById("botao-mostrar-ficheiro").addEventListener("click", () =
   adicionarMensagem(`(mostrei-te o meu código atual: ${nomes})`, "mensagem-estudante");
 });
 
-ligarAlguem();
+if (ALGUEM_ATIVO) ligarAlguem();
 
 // ---------- definições do LLM (vivem dentro do painel do Alguem) ----------
 
@@ -569,7 +574,7 @@ document.getElementById("form-definicoes").addEventListener("submit", async (eve
       return;
     }
     fecharDefinicoes();
-    ligarAlguem();
+    if (ALGUEM_ATIVO) ligarAlguem();
   } catch (erro) {
     console.error(erro);
     mensagemErro.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
@@ -606,6 +611,7 @@ const vistaFluxograma = document.getElementById("vista-fluxograma");
 const vistaLinter = document.getElementById("vista-linter");
 const tituloPainelExecucao = document.getElementById("titulo-painel-execucao");
 const botaoVoltarExecucao = document.getElementById("botao-voltar-execucao");
+const ligacaoAbrirVisualizador = document.getElementById("ligacao-abrir-visualizador");
 
 const TITULOS_VISTA_PAINEL_TERMINAL = { execucao: "Execução", rasto: "Rasto", fluxograma: "Fluxograma", linter: "Verificador" };
 
@@ -616,6 +622,7 @@ function mostrarVistaPainelTerminal(nome) {
   vistaLinter.classList.toggle("escondido", nome !== "linter");
   tituloPainelExecucao.textContent = TITULOS_VISTA_PAINEL_TERMINAL[nome];
   botaoVoltarExecucao.classList.toggle("escondido", nome === "execucao");
+  ligacaoAbrirVisualizador.classList.toggle("escondido", nome !== "rasto");
   if (nome === "rasto") {
     document.getElementById("conteudo-rasto").classList.add("escondido");
     document.getElementById("form-entradas-rasto").classList.remove("escondido");
@@ -811,7 +818,12 @@ function alternarPainelAlguem() {
   if (editor.refresh) editor.refresh();
 }
 
-botaoAlternarAlguem.addEventListener("click", alternarPainelAlguem);
+if (ALGUEM_ATIVO) {
+  botaoAlternarAlguem.addEventListener("click", alternarPainelAlguem);
+} else {
+  // TEMP: sem botão para abrir um painel que não liga a lado nenhum.
+  botaoAlternarAlguem.classList.add("escondido");
+}
 // painel do Alguem escondido por omissão: editor e terminal a 50/50;
 // ao mostrar o Alguem, os três painéis passam a dividir o espaço
 // em partes iguais (ver alternarPainelAlguem).

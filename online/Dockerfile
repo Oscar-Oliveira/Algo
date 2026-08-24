@@ -25,6 +25,10 @@ WORKDIR /app
 COPY --chown=algo:algo algo_lang /app/algo_lang
 COPY --chown=algo:algo alguem /app/alguem
 COPY --chown=algo:algo online /app/online
+# irmã de online/, não dentro -- é lida diretamente do disco pela rota
+# /api/exemplos (ver online/main.py:PASTA_EXEMPLOS); sem esta linha a
+# pasta fica ausente na imagem e a aba "Exemplos" da ajuda fica vazia.
+COPY --chown=algo:algo exemplos /app/exemplos
 
 RUN pip install --no-cache-dir -r /app/online/requerimentos.txt
 

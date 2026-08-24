@@ -207,10 +207,9 @@ soma/
 ```
 
 O `..._trace.json` gerado por `--json` abre-se no **visualizador
-web**, em `visualizador/algo-trace-viewer.html` (duplo-clique — não
-precisa de instalação): arrasta o `.json` para dentro da janela e usa
-as setas ← → para andares passo a passo pela execução, com o valor de
-cada variável à vista.
+web**, disponível apenas na versão online do Algo (`/estatico/visualizador/`):
+arrasta o `.json` para dentro da janela e usa as setas ← → para andares
+passo a passo pela execução, com o valor de cada variável à vista.
 
 ---
 

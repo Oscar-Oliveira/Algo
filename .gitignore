@@ -8,3 +8,4 @@ venv/
 *.db
 .estudante_id
 .env
+/dist/

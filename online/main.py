@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import tempfile
 
 from datetime import datetime, timezone
@@ -46,6 +47,13 @@ PASTA_ESTATICO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estat
 # quebra isso, já que o browser resolve os recursos a partir do URL do
 # pedido (/editor), não da localização física do ficheiro.
 PASTA_PAGINAS_PRIVADAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paginas_privadas")
+
+# exemplos/ vive na raiz do repositório (irmã de algo_lang/, alguem/,
+# online/), não dentro de online/ -- por isso não pode ser montada como
+# PASTA_ESTATICO. A rota /api/exemplos lê-a diretamente do disco a cada
+# pedido (tal como /modo-algo.js lê o lexer a cada pedido), para nunca
+# divergir do conteúdo real da pasta.
+PASTA_EXEMPLOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "exemplos")
 
 _logger = logging.getLogger("online")
 
@@ -368,6 +376,113 @@ async def pagina_ajuda(request: Request):
     return FileResponse(os.path.join(PASTA_PAGINAS_PRIVADAS, "ajuda.html"))
 
 
+def _analisar_enunciado(texto: str, nomes_ficheiros_validos: list[str]) -> tuple[str, list[dict]]:
+    """Corta um enunciado.md em (intro, blocos) -- um bloco por
+    cabeçalho '## ...', na ordem em que aparecem. Um cabeçalho pode
+    estar partido em mais do que uma linha física no ficheiro fonte
+    (quebra "suave", não markdown ATX estrito -- ver
+    exemplos/09_ficheiros_incluir/enunciado.md) -- linhas não vazias
+    logo a seguir ao '##' são juntadas ao título até à primeira linha
+    em branco, antes de se procurarem os nomes de ficheiro entre
+    crases. Qualquer ficheiro de 'nomes_ficheiros_validos' que nenhum
+    bloco referencie ganha um bloco próprio no fim, sem descrição, para
+    nunca desaparecer da UI."""
+    linhas = texto.splitlines()
+    if linhas and linhas[0].strip().startswith("# "):
+        linhas = linhas[1:]  # já usado para o 'titulo' da pasta, fora desta função
+
+    secoes: list[tuple[str | None, list[str]]] = []
+    titulo_atual = None
+    corpo_atual: list[str] = []
+    i = 0
+    while i < len(linhas):
+        linha = linhas[i]
+        if linha.strip().startswith("## "):
+            secoes.append((titulo_atual, corpo_atual))
+            partes_titulo = [linha.strip()[3:].strip()]
+            i += 1
+            while i < len(linhas) and linhas[i].strip() != "":
+                partes_titulo.append(linhas[i].strip())
+                i += 1
+            titulo_atual = " ".join(partes_titulo)
+            corpo_atual = []
+            continue
+        corpo_atual.append(linha)
+        i += 1
+    secoes.append((titulo_atual, corpo_atual))
+
+    intro = "\n".join(secoes[0][1]).strip()
+    blocos = []
+    cobertos = set()
+    for titulo_bloco, linhas_corpo in secoes[1:]:
+        ficheiros_bloco = [
+            nome for nome in re.findall(r"`([^`]+\.algo)`", titulo_bloco)
+            if nome in nomes_ficheiros_validos
+        ]
+        cobertos.update(ficheiros_bloco)
+        blocos.append({
+            "titulo": titulo_bloco,
+            "ficheiros": ficheiros_bloco,
+            "descricao": "\n".join(linhas_corpo).strip(),
+        })
+
+    for nome in nomes_ficheiros_validos:
+        if nome not in cobertos:
+            blocos.append({"titulo": nome, "ficheiros": [nome], "descricao": ""})
+
+    return intro, blocos
+
+
+def _listar_exemplos() -> list[dict]:
+    """Lê exemplos/ do disco: uma entrada por subpasta numerada, com o
+    enunciado (se existir, já cortado em intro+blocos por
+    _analisar_enunciado) e o código de cada ficheiro .algo, por ordem
+    alfabética. Nenhum caminho vem do pedido -- só se lê dentro da
+    própria pasta exemplos/, sem risco de traversal."""
+    pastas = []
+    if not os.path.isdir(PASTA_EXEMPLOS):
+        return pastas
+    for nome_pasta in sorted(os.listdir(PASTA_EXEMPLOS)):
+        caminho_pasta = os.path.join(PASTA_EXEMPLOS, nome_pasta)
+        if not os.path.isdir(caminho_pasta):
+            continue
+        enunciado = None
+        caminho_enunciado = os.path.join(caminho_pasta, "enunciado.md")
+        if os.path.isfile(caminho_enunciado):
+            with open(caminho_enunciado, "r", encoding="utf-8") as f:
+                enunciado = f.read()
+        ficheiros = []
+        for nome_ficheiro in sorted(os.listdir(caminho_pasta)):
+            if not nome_ficheiro.endswith(".algo"):
+                continue
+            with open(os.path.join(caminho_pasta, nome_ficheiro), "r", encoding="utf-8") as f:
+                codigo = f.read()
+            ficheiros.append({"nome": nome_ficheiro, "codigo": codigo})
+        if not ficheiros:
+            continue
+        titulo = nome_pasta
+        intro = ""
+        blocos: list[dict] = []
+        if enunciado:
+            primeira_linha = enunciado.splitlines()[0].strip()
+            if primeira_linha.startswith("#"):
+                titulo = primeira_linha.lstrip("#").strip()
+            intro, blocos = _analisar_enunciado(enunciado, [f["nome"] for f in ficheiros])
+        pastas.append({
+            "pasta": nome_pasta,
+            "titulo": titulo,
+            "intro": intro,
+            "blocos": blocos,
+            "ficheiros": ficheiros,
+        })
+    return pastas
+
+
+@app.get("/api/exemplos")
+async def rota_exemplos(id_estudante: int = Depends(estudante_atual)):
+    return await run_in_threadpool(_listar_exemplos)
+
+
 @app.get("/admin")
 async def pagina_admin(request: Request):
     id_estudante = request.session.get("id_estudante")
@@ -387,6 +502,11 @@ async def rota_modo_algo():
 
 
 app.mount("/estatico", StaticFiles(directory=PASTA_ESTATICO), name="estatico")
+
+# TEMP: alguem desativado enquanto se corrige o editor -- reativar
+# trocando para True (o frontend também tem de reativar ALGUEM_ATIVO
+# em online/estatico/app.js).
+ALGUEM_ATIVO = False
 
 
 # ---------- WebSocket: execução interativa ----------
@@ -494,6 +614,10 @@ async def ws_executar(websocket: WebSocket):
 @app.websocket("/ws/alguem")
 async def ws_alguem(websocket: WebSocket):
     await websocket.accept()
+    if not ALGUEM_ATIVO:
+        await websocket.send_json({"tipo": "erro", "mensagem": "O Alguem está temporariamente desativado."})
+        await websocket.close()
+        return
     id_estudante = _id_estudante_do_websocket(websocket)
     if id_estudante is None:
         await websocket.send_json({"tipo": "erro", "mensagem": "Não autenticado."})

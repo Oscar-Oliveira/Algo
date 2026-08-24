@@ -2871,21 +2871,6 @@ def test_ficheiro_nao_encontrado_usa_o_prefixo_de_erro_padrao(tmp_path, capsys):
     assert "❌" in saida
 
 
-# ---------- UX-11: visualizador de rasto standalone sem dependência de CDN ----------
-
-def test_visualizador_standalone_nao_depende_de_cdn_externo():
-    """O visualizador standalone (aberto localmente com duplo-clique,
-    sem servidor -- ver visualizador/LEIA-ME.md) tem de funcionar sem
-    rede nenhuma: React/Babel/Tailwind vêm embutidos no próprio
-    ficheiro, não de um CDN externo."""
-    import pathlib
-    caminho = pathlib.Path(__file__).resolve().parent.parent.parent / "visualizador" / "algo-trace-viewer.html"
-    conteudo = caminho.read_text(encoding="utf-8")
-    assert "unpkg.com" not in conteudo
-    assert "<script src=" not in conteudo
-    assert "ReactDOM.createRoot" in conteudo
-    assert "Babel.transform" in conteudo
-
 
 # ---------- ARCH-03: ErroInternoCompilador distinto de ErroSemantico ----------
 

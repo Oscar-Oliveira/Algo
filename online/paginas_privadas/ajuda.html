@@ -27,6 +27,7 @@
     <nav class="abas-admin">
       <button type="button" class="aba-ajuda ativa" data-aba="sobre">Sobre</button>
       <button type="button" class="aba-ajuda" data-aba="manual">Manual</button>
+      <button type="button" class="aba-ajuda" data-aba="exemplos">Exemplos</button>
     </nav>
 
     <section id="aba-conteudo-sobre" class="conteudo-aba-ajuda">
@@ -58,7 +59,9 @@
         A secção <strong>Manual</strong> desta página constitui a referência
         da linguagem Algo. Aí são descritos a sintaxe, os tipos de dados, as
         estruturas de controlo e as restantes construções da linguagem,
-        acompanhados de exemplos de utilização.
+        acompanhados de exemplos de utilização. A secção <strong>Exemplos</strong>
+        mostra programas completos, organizados por tema, retirados da pasta
+        <code>exemplos/</code> do projeto.
       </p>
 
     </section>
@@ -67,205 +70,158 @@
       <p class="subtitulo">Referência da linguagem Algo: sintaxe, semântica e exemplos.</p>
       <div class="corpo-manual">
         <nav class="indice-manual">
-          <a href="#1-introducao">1. Introdução</a>
-          <a href="#2-estrutura-de-um-programa">2. Estrutura de um programa</a>
-          <a href="#3-tipos-de-dados">3. Tipos de dados</a>
-          <a href="#4-variaveis">4. Variáveis</a>
-          <a href="#5-constantes">5. Constantes</a>
-          <a href="#6-operadores">6. Operadores</a>
-          <a href="#7-entrada-e-saida">7. Entrada e saída</a>
-          <a href="#8-estruturas-de-decisao">8. Estruturas de decisão</a>
-          <a href="#9-ciclos">9. Ciclos</a>
-          <a href="#10-arrays">10. Arrays</a>
-          <a href="#11-estruturas-registos">11. Estruturas (registos)</a>
-          <a href="#12-funcoes-e-procedimentos">12. Funções e procedimentos</a>
-          <a href="#13-bibliotecas">13. Bibliotecas</a>
-          <a href="#14-incluir">14. incluir</a>
-          <a href="#15-comentarios">15. Comentários</a>
-          <a href="#16-afirmar">16. afirmar</a>
-          <a href="#17-verificacao-de-tipos">17. Verificação de tipos</a>
-          <a href="#18-tipos-de-erro">18. Os três tipos de erro de compilação</a>
+          <a href="#1-introducao-e-tipos">1. Introdução e tipos</a>
+          <a href="#2-operadores">2. Operadores</a>
+          <a href="#3-condicionais">3. Condicionais</a>
+          <a href="#4-ciclos">4. Ciclos</a>
+          <a href="#5-vetores-e-matrizes">5. Vetores e matrizes</a>
+          <a href="#6-funcoes-e-procedimentos">6. Funções e procedimentos</a>
+          <a href="#7-estruturas">7. Estruturas</a>
+          <a href="#8-bibliotecas">8. Bibliotecas</a>
+          <a href="#9-ficheiros-e-incluir">9. Ficheiros e incluir</a>
+          <a href="#10-afirmar-e-tratamento-de-erros">10. afirmar e tratamento de erros</a>
+          <a href="#11-tipos-de-erro">11. Os três tipos de erro de compilação</a>
           <a href="#anexo-a">Anexo A — Sintaxe rápida</a>
           <a href="#anexo-b">Anexo B — Palavras reservadas</a>
         </nav>
 
         <div class="texto-manual">
-          <h2 id="1-introducao">1. Introdução</h2>
-          <p>ALGO é uma linguagem algorítmica: uma notação formal, mas próxima da linguagem natural em
-            português, para descrever algoritmos de forma precisa o suficiente para serem executados.
-            Nasceu para ensino de programação, e por isso os seus princípios de desenho são:</p>
+          <h2 id="1-introducao-e-tipos">1. Introdução e tipos</h2>
+          <h3>1.1 A forma de um programa</h3>
+          <p>Todo o programa ALGO começa com um cabeçalho e tem um único bloco <code>inicio</code>, que é
+            onde a execução começa:</p>
+          <pre><code>algoritmo "OlaMundo"
+
+inicio
+    escrever("Olá, mundo!")</code></pre>
           <ul>
-            <li>Tudo o que se escreve tem de ter um tipo explícito — nunca há inferência de tipos, para
-              não haver ambiguidade sobre o que uma variável guarda</li>
-            <li>A gramática é pequena: poucas construções, cada uma a fazer uma coisa só</li>
-            <li>Os erros de tipo são detetados antes da execução (ver capítulo 17), não durante</li>
-            <li>Os índices de arrays começam em 0, os mesmos que a generalidade das linguagens de
-              programação atuais</li>
+            <li><code>algoritmo "Nome"</code> é sempre a primeira linha. O nome é só uma etiqueta (aparece
+              em mensagens/ferramentas), não afeta a execução.</li>
+            <li><code>inicio</code> marca o início do programa principal. <strong>Não existe
+                <code>fim</code></strong> — o bloco termina onde a indentação volta a descer, tal como
+              qualquer outro bloco da linguagem (<code>se</code>, <code>para</code>, <code>funcao</code>,
+              ...).
+            </li>
+            <li>Só pode haver um <code>inicio</code>, e tem de ser a última coisa do ficheiro: nada pode
+              vir depois dele.</li>
+          </ul>
+          <p>Antes de <code>inicio</code> pode haver, por esta ordem quando presentes, <code>importar</code>
+            (bibliotecas — capítulo 8), <code>incluir</code> (outros ficheiros — capítulo 9),
+            <code>estrutura</code> (capítulo 7), <code>funcao</code>/<code>procedimento</code> (capítulo 6) e
+            <code>constante</code>/variáveis globais (secção 1.5).
+          </p>
+
+          <h3>Blocos por indentação</h3>
+          <p>Não há chavetas nem <code>begin</code>/<code>end</code>: um bloco é tudo o que está indentado
+            um nível a mais do que a linha que o abre.</p>
+          <pre><code>algoritmo "Indentacao"
+
+inicio
+    x:inteiro = 5
+    escrever("antes")
+    escrever("depois")</code></pre>
+          <p>Regras da indentação (aplicadas por igual a todo o ficheiro):</p>
+          <ul>
+            <li>Cada nível é <strong>1 tab OU 4 espaços</strong> — nunca misturados na mesma linha, e o
+              ficheiro inteiro tem de escolher um dos dois estilos (a primeira linha indentada decide; uma
+              linha seguinte com o outro estilo é erro de compilação).</li>
+            <li>Um bloco novo só pode aumentar <strong>exatamente 1 nível</strong> em relação ao bloco à
+              volta — saltar 2 níveis de uma vez é erro.</li>
+            <li>Uma linha em branco não conta para a indentação.</li>
           </ul>
 
-          <h3>1.1 Um primeiro programa</h3>
-          <pre><code>algoritmo "Saudacao"
+          <h3>1.2 Comentários</h3>
+          <pre><code>// comentário até ao fim da linha
 
-inicio
-    nome:cadeia
-    escrever("Como te chamas? ")
-    ler(nome)
-    escrever("Olá, ", nome, "!")</code></pre>
-          <p>Um programa tem sempre um nome (entre aspas, depois de <code>algoritmo</code>) e um bloco
-            <code>inicio</code> com as instruções a executar. Os blocos delimitam-se por indentação:
-            cada nível é um tab OU um grupo de 4 espaços (nunca uma mistura dos dois na mesma linha).
-          </p>
+/* comentário
+   de várias
+   linhas */</code></pre>
+          <p><code>//</code> esconde o resto da linha, mesmo que essa linha contenha o que pareceria abrir
+            um comentário de bloco. <code>/* ... */</code> pode abranger várias linhas; um <code>/*</code>
+            sem <code>*/</code> a fechar é erro de compilação (não fica silenciosamente por fechar até ao
+            fim do ficheiro).</p>
 
-          <h3>1.2 Palavras-chave, de relance</h3>
-          <p>Todas as palavras-chave da linguagem estão listadas por referência no <a href="#anexo-b">Anexo
-              B</a>; aqui fica uma visão geral agrupada por função, para ires ganhando intuição antes dos
-            capítulos detalhados:</p>
-          <table>
-            <thead>
-              <tr>
-                <th>Grupo</th>
-                <th>Palavras-chave</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Estrutura do programa</td>
-                <td><code>algoritmo</code>, <code>inicio</code>,
-                  <code>importar</code>, <code>incluir</code>
-                </td>
-              </tr>
-              <tr>
-                <td>Tipos compostos</td>
-                <td><code>estrutura</code></td>
-              </tr>
-              <tr>
-                <td>Entrada / saída</td>
-                <td><code>escrever</code>, <code>ler</code></td>
-              </tr>
-              <tr>
-                <td>Decisão</td>
-                <td><code>se</code>, <code>entao</code>, <code>senao</code>,
-                  <code>escolher</code>, <code>caso</code>, <code>contrario</code>
-                </td>
-              </tr>
-              <tr>
-                <td>Ciclos</td>
-                <td><code>para</code>, <code>de</code>, <code>ate</code>,
-                  <code>passo</code>, <code>fazer</code>, <code>enquanto</code>
-                </td>
-              </tr>
-              <tr>
-                <td>Funções e procedimentos</td>
-                <td><code>funcao</code>, <code>procedimento</code>,
-                  <code>retornar</code>, <code>ref</code>
-                </td>
-              </tr>
-              <tr>
-                <td>Declarações</td>
-                <td><code>constante</code></td>
-              </tr>
-              <tr>
-                <td>Validação</td>
-                <td><code>afirmar</code></td>
-              </tr>
-              <tr>
-                <td>Valores e operadores lógicos</td>
-                <td><code>verdadeiro</code>, <code>falso</code>,
-                  <code>e</code>, <code>ou</code>, <code>nao</code>
-                </td>
-              </tr>
-              <tr>
-                <td>Operadores aritméticos por extenso</td>
-                <td><code>div</code>, <code>mod</code></td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="nota">Nota: Os tipos primitivos (<code>inteiro</code>, <code>decimal</code>,
-            <code>booleano</code>, <code>cadeia</code>, <code>caracter</code>) NÃO são palavras-chave —
-            são reconhecidos pela posição na frase, o que permite, por exemplo, criares uma <code>estrutura</code>
-            com o mesmo nome de um tipo. Ainda assim, não podes dar a uma <em>variável</em> o nome de um tipo
-            primitivo nem de uma biblioteca importada (<code>cadeia</code>, <code>matematica</code>, ...) — é
-            rejeitado em tempo de compilação. Ver <a href="#3-tipos-de-dados">capítulo 3</a>.
-          </p>
-
-          <h2 id="2-estrutura-de-um-programa">2. Estrutura de um programa</h2>
-          <pre><code>algoritmo "NomeDoPrograma"
-
-importar Matematica
-incluir "outroficheiro.algo"
-
-constante PI:decimal = 3.14159
-total:inteiro = 0            // variável global
-
-estrutura Ponto
-    x:inteiro
-    y:inteiro
-
-funcao dobro(x:inteiro):inteiro
-    retornar x * 2
-
-inicio
-    y:inteiro = dobro(5)     // variáveis locais: declara-se onde for preciso
-    escrever(y)</code></pre>
-          <p>Não existe uma zona fixa de "declaração de variáveis": uma variável declara-se onde for
-            necessária, com a forma <code>nome:tipo</code>. As secções (<code>importar</code>,
-            <code>incluir</code>, constantes/variáveis globais, <code>estrutura</code>,
-            <code>funcao</code>/<code>procedimento</code>) podem aparecer em qualquer ordem antes do
-            <code>inicio</code>, que é sempre o último bloco e o ponto de entrada do programa.
-          </p>
-          <p class="nota">Nota: Só as variáveis declaradas fora de qualquer
-            <code>funcao</code>/<code>procedimento</code>
-            (antes ou dentro do <code>inicio</code>) são globais — visíveis e alteráveis a partir de
-            qualquer função. As restantes são locais à função onde são declaradas.</p>
-
-          <h2 id="3-tipos-de-dados">3. Tipos de dados</h2>
+          <h3>1.3 Os cinco tipos primitivos</h3>
           <table>
             <thead>
               <tr>
                 <th>Tipo</th>
-                <th>Representa</th>
-                <th>Exemplo de literal</th>
+                <th>Guarda</th>
+                <th>Literal</th>
+                <th>Exemplo</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td><code>inteiro</code></td>
-                <td>números inteiros</td>
-                <td><code>42, -7, 0</code></td>
+                <td>um número inteiro</td>
+                <td>dígitos, sem ponto</td>
+                <td><code>42, -7</code></td>
               </tr>
               <tr>
                 <td><code>decimal</code></td>
-                <td>números com casas decimais</td>
-                <td><code>3.14, -0.5</code></td>
+                <td>um número com casas decimais</td>
+                <td>dígitos com <code>.</code></td>
+                <td><code>3.14, .5, 2.</code></td>
               </tr>
               <tr>
                 <td><code>booleano</code></td>
                 <td>verdadeiro ou falso</td>
-                <td><code>verdadeiro, falso</code></td>
+                <td><code>verdadeiro</code> / <code>falso</code></td>
+                <td><code>verdadeiro</code></td>
               </tr>
               <tr>
                 <td><code>cadeia</code></td>
                 <td>texto</td>
-                <td><code>"Bom dia"</code> (aspas duplas)</td>
+                <td>entre aspas duplas</td>
+                <td><code>"Bom dia"</code></td>
               </tr>
               <tr>
                 <td><code>caracter</code></td>
-                <td>um único símbolo</td>
-                <td><code>'a'</code> (aspas simples)</td>
+                <td>exatamente 1 símbolo</td>
+                <td>entre aspas simples</td>
+                <td><code>'a'</code></td>
               </tr>
             </tbody>
           </table>
-          <p>Além destes cinco tipos primitivos, um programa pode definir os seus próprios tipos
-            compostos com <code>estrutura</code> (<a href="#11-estruturas-registos">capítulo 11</a>). Não
-            há conversões implícitas entre tipos: um <code>decimal</code> aceita um <code>inteiro</code>
-            (promoção natural, sem perda de informação), mas o contrário não é automático.</p>
+          <p>Notas por tipo:</p>
+          <ul>
+            <li><strong><code>inteiro</code></strong> não tem limite de grandeza (nem overflow) — ao
+              contrário de C/Java, onde um <code>int</code> tem um tamanho fixo em bits.
+              <code>factorial(30)</code> calcula-se sem problema.
+            </li>
+            <li><strong><code>decimal</code></strong> é o <code>float</code> habitual (vírgula flutuante de
+              dupla precisão) — tem os mesmos limites e arredondamentos que qualquer outra linguagem com
+              este tipo de número.</li>
+            <li><strong><code>caracter</code></strong> é sempre exatamente 1 símbolo — <code>'ab'</code> ou
+              <code>''</code> são erro de compilação. O valor por omissão (sem inicializador) também
+              respeita isto: é <code>' '</code> (espaço).
+            </li>
+            <li>Em <code>cadeia</code>/<code>caracter</code>, <code>\"</code>, <code>\'</code>,
+              <code>\\</code> e <code>\n</code> são reconhecidos como escapes dentro do literal
+              correspondente; qualquer outra barra invertida fica tal-e-qual.
+            </li>
+          </ul>
+          <p>Não existe um tipo "sem valor"/<code>void</code> para variáveis — só <code>procedimento</code>
+            (capítulo 6) não devolve nada.</p>
 
-          <h2 id="4-variaveis">4. Variáveis</h2>
-          <h3>4.1 Declaração</h3>
-          <pre><code>idade:inteiro                    // valor por omissão: 0
-nome:cadeia = "Rita"             // com valor inicial
-a, b, c:inteiro                  // três variáveis do mesmo tipo</code></pre>
-          <p>Os valores por omissão de cada tipo, quando não se dá um valor inicial:</p>
+          <h3>1.4 Declarar e atribuir variáveis</h3>
+          <pre><code>idade:inteiro                  // sem valor inicial
+nome:cadeia = "Rita"           // com valor inicial
+
+idade = 20                     // atribuição, sempre com '='</code></pre>
+          <ul>
+            <li>A declaração é sempre <code>nome:tipo</code>, com o tipo depois dos dois pontos — nunca
+              <code>tipo nome</code> como em C/Java.
+            </li>
+            <li>Várias variáveis do mesmo tipo podem ser declaradas juntas, <strong>separadas por vírgula,
+                só sem valor inicial</strong>: <code>a, b, c:inteiro</code> é válido;
+              <code>a, b:inteiro = 0</code> é erro de sintaxe (não é possível inicializar mais que uma
+              variável na mesma linha).
+            </li>
+            <li>Uma variável não pode ser lida antes de existir — declarar sem valor inicial dá-lhe logo um
+              valor por omissão (nunca fica "indefinida"):</li>
+          </ul>
           <table>
             <thead>
               <tr>
@@ -292,409 +248,1494 @@ a, b, c:inteiro                  // três variáveis do mesmo tipo</code></pre>
               </tr>
               <tr>
                 <td><code>caracter</code></td>
-                <td><code>""</code></td>
+                <td><code>' '</code> (um espaço)</td>
               </tr>
             </tbody>
           </table>
+          <p>Um nome de variável começa por letra ou <code>_</code>, seguido de letras/dígitos/<code>_</code>
+            (letras acentuadas são aceites: <code>preço</code> é um nome válido). Não pode coincidir com uma
+            palavra reservada (<a href="#anexo-b">Anexo B</a>).</p>
 
-          <h3>4.2 Atribuição</h3>
-          <pre><code>idade = 20</code></pre>
-          <p>O sinal <code>=</code> é sempre atribuição. Para comparar dois valores usa-se <code>==</code>
-            (<a href="#6-operadores">capítulo 6</a>).</p>
-
-          <h3>4.3 Regras para nomes</h3>
-          <ul>
-            <li>Começam por uma letra ou underscore (<code>_</code>)</li>
-            <li>Podem conter letras, números e underscores</li>
-            <li>Não podem ser uma palavra reservada (ver <a href="#anexo-b">Anexo B</a>)</li>
-            <li>Não podem ser um tipo primitivo (<code>inteiro</code>, <code>decimal</code>,
-              <code>booleano</code>, <code>cadeia</code>, <code>caracter</code>) nem o nome de uma
-              biblioteca que importaste (<code>matematica</code>, <code>cadeia</code>, ...)</li>
-          </ul>
-
-          <h3>4.4 Âmbito (visibilidade)</h3>
-          <p>Uma variável local (declarada dentro de uma função) só existe dentro dessa função. Uma
-            variável global (declarada fora de qualquer função) é visível e alterável a partir de
-            qualquer função do programa, sem ser preciso passá-la como parâmetro. Um parâmetro ou uma
-            variável local pode ter o mesmo nome de uma global: dentro dessa função, o nome refere-se
-            sempre à variável local (ela "sombreia" a global).</p>
-          <pre><code>total:inteiro = 0
-
-procedimento acumular(x:inteiro)
-    total = total + x         // refere-se à global 'total'
-
-inicio
-    acumular(5)
-    escrever(total)           // 5</code></pre>
-
-          <h2 id="5-constantes">5. Constantes</h2>
-          <p><code>constante</code> declara um valor que não pode voltar a ser alterado — nem por
-            atribuição, nem por <code>ler()</code>, nem passado por <code>ref</code>. Tem sempre de ter
-            um valor inicial, e não pode ser um array. Pode ser global ou local a uma função:</p>
+          <h3>1.5 <code>constante</code></h3>
           <pre><code>constante IVA:decimal = 1.23
 
-funcao precoComIva(preco:decimal):decimal
-    retornar preco * IVA</code></pre>
+inicio
+    precoFinal:decimal = 10.0 * IVA</code></pre>
+          <ul>
+            <li>Tem sempre de ter um valor inicial — <code>constante X:inteiro</code> sem <code>=</code> é
+              erro de sintaxe.</li>
+            <li>Não pode ser reatribuída depois (nem por <code>=</code>, nem por <code>ler</code>, nem
+              passada como argumento <code>ref</code> — capítulo 6).</li>
+            <li>Pode ser declarada <strong>fora</strong> de qualquer função (constante global, visível em
+              todo o programa) ou <strong>dentro</strong> de <code>inicio</code>/de uma função (só visível
+              aí).</li>
+            <li>Ao contrário de uma declaração normal, não aceita vários nomes separados por vírgula nem é
+              um vetor.</li>
+          </ul>
 
-          <h2 id="6-operadores">6. Operadores</h2>
+          <h3>Variáveis globais vs. locais</h3>
+          <p>Só o que é declarado <strong>antes de <code>inicio</code></strong>, diretamente no programa
+            (fora de qualquer <code>funcao</code>/<code>procedimento</code>), é global e fica visível dentro
+            das funções. Uma variável declarada dentro de <code>inicio</code> é local ao programa principal
+            — não é visível dentro de nenhuma função, mesmo que <code>inicio</code> venha depois dela no
+            ficheiro:</p>
+          <pre><code>algoritmo "Escopo"
+
+total:inteiro = 0        // global -- visível em toda a parte
+
+funcao dobroDoTotal():inteiro
+    retornar total * 2   // lê a global
+
+inicio
+    y:inteiro = 10        // local a 'inicio', não visível em funções
+    escrever(dobroDoTotal())</code></pre>
+
+          <h3>1.6 <code>escrever</code> e <code>ler</code></h3>
+          <pre><code>nome:cadeia
+escrever("Como te chamas? ")
+ler(nome)
+escrever("Olá, ", nome, "!")</code></pre>
+          <ul>
+            <li><code>escrever</code> aceita vários argumentos separados por vírgula, de tipos diferentes, e
+              <strong>não insere nenhum separador entre eles</strong> — a linha acima mostra
+              <code>Olá, Rita!</code> porque o espaço depois da vírgula já está no próprio literal
+              <code>"Olá, "</code>.
+            </li>
+            <li><code>ler(variavel)</code> bloqueia à espera de uma linha de input e converte-a para o tipo
+              declarado da variável; se a conversão falhar (ex. escrever letras onde se espera
+              <code>inteiro</code>), pede o valor outra vez em vez de rebentar o programa.
+              <code>booleano</code> aceita <code>verdadeiro</code>/<code>v</code>/<code>true</code> ou
+              <code>falso</code>/<code>f</code>/<code>false</code> (outra coisa qualquer é pedida de novo);
+              <code>caracter</code> só aceita exatamente 1 símbolo.
+            </li>
+          </ul>
+
+          <h3>1.7 <code>+</code> não converte números para texto</h3>
+          <p>Uma armadilha comum a evitar desde já: <code>+</code> exige os dois lados numéricos (soma) OU os
+            dois lados texto (<code>cadeia</code>/<code>caracter</code>, concatenação) — nunca um de cada:</p>
+          <pre><code>idade:inteiro = 20
+// escrever("Idade: " + idade)     // ERRO de compilação: cadeia + inteiro
+escrever("Idade: ", idade)         // certo: argumentos separados por vírgula</code></pre>
+          <p>Isto é deliberado (nenhum outro operador da linguagem faz conversão implícita entre tipos
+            incompatíveis). A forma correta de misturar texto e números é <code>escrever</code> com vários
+            argumentos, como acima; para construir uma única <code>cadeia</code> com um número lá dentro,
+            converte-o primeiro (<code>conversao.paraTexto</code>, capítulo 8).</p>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>algoritmo "FichaSimples"
+
+constante ANO_LETIVO:inteiro = 2026
+
+inicio
+    nome:cadeia
+    escrever("Nome: ")
+    ler(nome)
+
+    nota:decimal
+    escrever("Nota (0 a 20): ")
+    ler(nota)
+
+    aprovado:booleano = nota >= 9.5
+
+    escrever("Ano letivo: ", ANO_LETIVO)
+    escrever(nome, " -- nota ", nota, " -- aprovado: ", aprovado)</code></pre>
+
+          <h2 id="2-operadores">2. Operadores</h2>
+          <h3>2.1 Aritméticos</h3>
           <table>
             <thead>
               <tr>
-                <th>Categoria</th>
-                <th>Operadores</th>
-                <th>Exemplo</th>
+                <th>Operador</th>
+                <th>Significado</th>
+                <th>Exige</th>
+                <th>Resultado</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>Atribuição</td>
-                <td><code>=</code></td>
-                <td><code>x = 5</code></td>
-              </tr>
-              <tr>
-                <td>Igualdade / diferença</td>
-                <td><code>==</code> &nbsp; <code>&lt;&gt;</code></td>
-                <td><code>x == 5</code> &nbsp; <code>x &lt;&gt; 5</code></td>
-              </tr>
-              <tr>
-                <td>Relacionais</td>
-                <td><code>&lt; &gt; &lt;= &gt;=</code></td>
-                <td><code>x &lt; 10</code></td>
-              </tr>
-              <tr>
-                <td>Lógicos</td>
-                <td><code>e ou nao</code></td>
-                <td><code>(x &gt; 0) e (x &lt; 10)</code></td>
-              </tr>
-              <tr>
-                <td>Aritméticos</td>
-                <td><code>+ - * / div mod ^</code></td>
-                <td><code>7 div 2 -&gt; 3</code> &nbsp; <code>7 mod 2 -&gt; 1</code> &nbsp; <code>2 ^ 3 -&gt; 8</code>
+                <td><code>+</code></td>
+                <td>soma</td>
+                <td>ambos numéricos</td>
+                <td><code>decimal</code> se um dos lados for <code>decimal</code>, senão <code>inteiro</code>
                 </td>
+              </tr>
+              <tr>
+                <td><code>+</code></td>
+                <td>concatenação</td>
+                <td>ambos texto (<code>cadeia</code>/<code>caracter</code>)</td>
+                <td><code>cadeia</code></td>
+              </tr>
+              <tr>
+                <td><code>-</code> <code>*</code></td>
+                <td>subtração / multiplicação</td>
+                <td>ambos numéricos</td>
+                <td><code>decimal</code> se um dos lados for <code>decimal</code>, senão <code>inteiro</code>
+                </td>
+              </tr>
+              <tr>
+                <td><code>/</code></td>
+                <td>divisão</td>
+                <td>ambos numéricos</td>
+                <td>sempre <code>decimal</code>, mesmo <code>4 / 2</code></td>
+              </tr>
+              <tr>
+                <td><code>div</code></td>
+                <td>divisão inteira</td>
+                <td>ambos <code>inteiro</code></td>
+                <td><code>inteiro</code></td>
+              </tr>
+              <tr>
+                <td><code>mod</code></td>
+                <td>resto da divisão inteira</td>
+                <td>ambos <code>inteiro</code></td>
+                <td><code>inteiro</code></td>
+              </tr>
+              <tr>
+                <td><code>^</code></td>
+                <td>potência</td>
+                <td>ambos numéricos</td>
+                <td>ver 2.4</td>
               </tr>
             </tbody>
           </table>
-          <p>O operador <code>+</code> também concatena texto quando os dois lados são
-            <code>cadeia</code>/<code>caracter</code>:
-          </p>
-          <pre><code>escrever("Olá, " + nome + "!")</code></pre>
-          <p class="nota">Nota: <code>div</code> e <code>mod</code> arredondam sempre em direção a
-            zero (divisão <em>truncada</em>), não para baixo — <code>-7 div 2</code> dá
-            <code>-3</code> (não <code>-4</code>), e <code>-7 mod 2</code> dá <code>-1</code>
-            (o resto tem sempre o mesmo sinal que o primeiro operando).
-          </p>
-          <p class="nota">Nota: Precedência, da maior para a menor: parênteses; potência <code>^</code>;
-            menos unário; <code>* / div mod</code>; <code>+ -</code>; operadores relacionais;
-            <code>nao</code>; <code>e</code>; <code>ou</code>. Na dúvida, usa parênteses — tornam o
-            código mais claro.
+          <pre><code>escrever(7 / 2)        // 3.5  -- '/' é sempre decimal
+escrever(7 div 2)      // 3
+escrever(7 mod 2)      // 1</code></pre>
+          <p><code>+</code>/<code>-</code>/<code>*</code>/<code>/</code> não existem entre
+            <code>cadeia</code>/<code>caracter</code> e um número — ver <a href="#1-introducao-e-tipos">capítulo
+              1</a>. <code>div</code>/<code>mod</code> só aceitam <code>inteiro</code> dos dois lados (não há
+            "divisão inteira de decimais" na linguagem).
           </p>
 
-          <h2 id="7-entrada-e-saida">7. Entrada e saída</h2>
-          <pre><code>escrever("O valor é: ", x, " e o dobro é: ", x * 2)
-ler(x)</code></pre>
-          <p><code>escrever</code> aceita vários valores separados por vírgula, e escreve-os todos
-            seguidos, sem espaços automáticos entre eles. <code>ler()</code> lê um valor do teclado e
-            converte-o para o tipo declarado da variável.</p>
+          <h3><code>div</code>/<code>mod</code> com operandos negativos</h3>
+          <p><code>div</code>/<code>mod</code> truncam em direção a zero (como a divisão inteira ensinada em
+            C/Java/a maioria dos cursos introdutórios) — <strong>não</strong> como <code>//</code>/<code>%</code>
+            do Python, que arredondam para menos infinito:</p>
+          <pre><code>escrever(-7 div 2)     // -3   (Python -7 // 2 daria -4)
+escrever(-7 mod 2)     // -1   (Python -7 % 2 daria 1)
+escrever(7 div -2)     // -3
+escrever(7 mod -2)     // 1</code></pre>
+          <p>O sinal de <code>mod</code> acompanha sempre o sinal do primeiro operando (do dividendo), e vale
+            sempre <code>a == (a div b) * b + (a mod b)</code>.</p>
 
-          <h2 id="8-estruturas-de-decisao">8. Estruturas de decisão</h2>
-          <h3>8.1 se / entao / senao</h3>
-          <pre><code>se nota &gt;= 18 entao
+          <h3>2.2 Relacionais e igualdade</h3>
+          <p><code>==</code> &nbsp; <code>&lt;&gt;</code> &nbsp; <code>&lt;</code> &nbsp; <code>&gt;</code>
+            &nbsp; <code>&lt;=</code> &nbsp; <code>&gt;=</code> — todos devolvem <code>booleano</code>.</p>
+          <ul>
+            <li><code>==</code>/<code>&lt;&gt;</code> comparam dois numéricos (<code>inteiro</code>/<code>decimal</code>
+              cruzados incluídos: <code>1 == 1.0</code> é <code>verdadeiro</code>), dois textos
+              (<code>cadeia</code>/<code>caracter</code> cruzados incluídos), ou <code>nulo</code> com uma
+              variável de tipo <code>estrutura</code> (capítulo 7). Comparar tipos incompatíveis (<code>5 ==
+                "5"</code>, por exemplo) é erro de compilação.</li>
+            <li><code>&lt;</code>/<code>&gt;</code>/<code>&lt;=</code>/<code>&gt;=</code> aceitam dois
+              numéricos ou dois textos — texto compara por ordem de código Unicode, não ordem alfabética
+              portuguesa (ex.: <code>"Z" &lt; "a"</code> é <code>verdadeiro</code>, porque maiúsculas vêm
+              antes de minúsculas em Unicode).</li>
+            <li>Duas <code>estrutura</code> comparam-se campo a campo com <code>==</code>/<code>&lt;&gt;</code>
+              (não por identidade) — ver capítulo 7.</li>
+          </ul>
+          <p><strong>Não é possível encadear comparações</strong>: <code>a &lt; b &lt; c</code> é erro de
+            compilação (a maioria dos alunos espera "a &lt; b e b &lt; c"; a linguagem recusa em vez de
+            calcular silenciosamente <code>(a &lt; b) &lt; c</code>, que compararia um <code>booleano</code>
+            com <code>c</code>). Escreve-o por extenso:</p>
+          <pre><code>a:inteiro = 1
+b:inteiro = 5
+c:inteiro = 10
+// se a < b < c entao         // ERRO de compilação
+se a < b e b < c entao
+    escrever("está entre")</code></pre>
+
+          <h3>2.3 Lógicos</h3>
+          <p><code>e</code> &nbsp; <code>ou</code> &nbsp; <code>nao</code> — só operam sobre
+            <code>booleano</code>, devolvem <code>booleano</code>. <code>e</code>/<code>ou</code> têm
+            curto-circuito: o lado direito só é avaliado se o esquerdo não decidir já o resultado
+            (<code>falso e X</code> nunca avalia <code>X</code>; <code>verdadeiro ou X</code> nunca avalia
+            <code>X</code>). Útil para evitar um erro em runtime:
+          </p>
+          <pre><code>v:inteiro[5] = {1, 2, 3, 4, 5}
+i:inteiro = 7
+se i < 5 e v[i] > 0 entao      // 'v[i]' só é avaliado se 'i < 5'
+    escrever("dentro dos limites")
+senao
+    escrever("fora dos limites, ou índice inválido")</code></pre>
+          <p><code>nao</code> aplica-se a toda a comparação seguinte, não só ao valor imediatamente a seguir:
+            <code>nao a == b</code> é <code>nao (a == b)</code>, não <code>(nao a) == b</code> (que nem
+            compilaria, já que <code>nao</code> só aceita <code>booleano</code>).
+          </p>
+
+          <h3>2.4 Potência (<code>^</code>)</h3>
+          <p><code>^</code> é associativo <strong>à direita</strong>: <code>2^3^2</code> calcula-se como
+            <code>2^(3^2)</code>, não <code>(2^3)^2</code>.
+          </p>
+          <p>O tipo do resultado de <code>^</code> só é <code>inteiro</code> quando o compilador consegue
+            provar, só a partir do próprio código-fonte, que o expoente nunca é negativo — caso contrário
+            fica <code>decimal</code> (razão: <code>**</code> do Python devolve <code>float</code> quando a
+            base é <code>int</code> e o expoente é negativo, e a linguagem tem de decidir o tipo do resultado
+            em compilação, antes de saber o valor do expoente em runtime). Isto acontece quando o expoente é
+            um literal não-negativo ou uma expressão feita só de literais/<code>constante</code> combinados
+            com <code>+</code>/<code>-</code>/<code>*</code>/<code>^</code> (incluindo encadeado, ex.:
+            <code>2^3^2</code> — o expoente <code>3^2</code> também é dobrado em compilação):
+          </p>
+          <pre><code>escrever(2^10)          // 1024      (inteiro -- expoente é literal)
+escrever(2^3^2)         // 512       (inteiro -- expoente '3^2' também é literal)
+
+n:inteiro = 3
+escrever(2^n)           // decimal, mesmo sabendo 'n' positivo
+// x:inteiro = 2^n      // ERRO de compilação: 'decimal' não cabe em 'inteiro'
+x:decimal = 2^n         // certo</code></pre>
+          <p>Se precisares de um resultado <code>inteiro</code> a partir de uma potência com expoente
+            não-literal (e souberes que o expoente nunca é negativo), passa por
+            <code>conversao.paraInteiro(2^n)</code> (capítulo 8) — o valor já é numericamente inteiro nesse
+            caso, só o <em>tipo</em> declarado em ALGO é que fica <code>decimal</code>.
+          </p>
+
+          <h3>2.5 Precedência (do que liga primeiro para o que liga por último)</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Nível</th>
+                <th>Operadores</th>
+                <th>Associatividade</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1 (mais apertado)</td>
+                <td><code>^</code></td>
+                <td>direita</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td><code>-</code> unário</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td><code>* / div mod</code></td>
+                <td>esquerda</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td><code>+ -</code> (binários)</td>
+                <td>esquerda</td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td><code>== &lt;&gt; &lt; &gt; &lt;= &gt;=</code></td>
+                <td>não encadeável</td>
+              </tr>
+              <tr>
+                <td>6</td>
+                <td><code>nao</code></td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td>7</td>
+                <td><code>e</code></td>
+                <td>esquerda</td>
+              </tr>
+              <tr>
+                <td>8 (mais solto)</td>
+                <td><code>ou</code></td>
+                <td>esquerda</td>
+              </tr>
+            </tbody>
+          </table>
+          <p><code>-</code> unário liga mais apertado que <code>*</code>/<code>/</code> mas mais solto que
+            <code>^</code>:
+          </p>
+          <pre><code>escrever(-2^2)          // -4   -- '^' primeiro: -(2^2), não (-2)^2
+escrever(-2 * 3)        // -6   -- '-' unário antes de '*'</code></pre>
+          <p>Usa parênteses sempre que a ordem não for óbvia à primeira leitura — não há penalização por
+            parênteses a mais, só por dúvida a mais.</p>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>algoritmo "MediaEClassificacao"
+
+inicio
+    n1:decimal
+    n2:decimal
+    escrever("Nota 1: ")
+    ler(n1)
+    escrever("Nota 2: ")
+    ler(n2)
+
+    media:decimal = (n1 + n2) / 2
+    aprovado:booleano = media >= 9.5 e n1 >= 5.0 e n2 >= 5.0
+
+    escrever("Média: ", media)
+    escrever("Aprovado: ", aprovado)</code></pre>
+
+          <h2 id="3-condicionais">3. Condicionais</h2>
+          <h3>3.1 <code>se</code> / <code>senao</code></h3>
+          <pre><code>idade:inteiro
+escrever("Idade: ")
+ler(idade)
+
+se idade >= 18 entao
+    escrever("Maior de idade")
+senao
+    escrever("Menor de idade")</code></pre>
+          <ul>
+            <li>A condição depois de <code>se</code> tem de ser <code>booleano</code> —
+              <code>se idade entao</code> (um <code>inteiro</code> usado diretamente como condição, como em
+              C/Python) é erro de compilação, não "0 é falso, o resto é verdadeiro". Escreve sempre a
+              comparação por extenso: <code>se idade &lt;&gt; 0 entao</code>.
+            </li>
+            <li><code>senao</code> é opcional.</li>
+          </ul>
+
+          <h3><code>senao se</code> — várias condições em cadeia</h3>
+          <pre><code>nota:decimal
+escrever("Nota: ")
+ler(nota)
+
+se nota >= 18.0 entao
     escrever("Excelente")
-senao se nota &gt;= 10 entao
-    escrever("Aprovado")
+senao se nota >= 14.0 entao
+    escrever("Bom")
+senao se nota >= 9.5 entao
+    escrever("Suficiente")
 senao
     escrever("Reprovado")</code></pre>
-          <p>Podem existir vários <code>senao se</code> em sequência; o <code>senao</code> final é
-            opcional.</p>
+          <p>As condições são testadas por ordem, de cima para baixo, e só o <strong>primeiro</strong> ramo
+            verdadeiro executa (mesmo que uma condição mais abaixo também fosse verdadeira) — tal como
+            <code>if</code>/<code>elif</code>/<code>else</code> em Python ou <code>else if</code> em C/Java.
+          </p>
 
-          <h3>8.2 escolher / caso</h3>
-          <pre><code>escolher diaSemana
+          <h3>3.2 <code>escolher</code> / <code>caso</code> / <code>contrario</code></h3>
+          <p>Alternativa a uma cadeia longa de <code>senao se</code> quando se está a comparar sempre a
+            <strong>mesma</strong> expressão contra vários valores possíveis:
+          </p>
+          <pre><code>diaSemana:inteiro
+escrever("Dia da semana (1-7): ")
+ler(diaSemana)
+
+escolher diaSemana
     caso 1
-        escrever("Segunda-feira")
+        escrever("Segunda")
+    caso 2
+        escrever("Terça")
     caso 6, 7
         escrever("Fim de semana")
     contrario
-        escrever("Dia útil")</code></pre>
+        escrever("Dia inválido")</code></pre>
+          <ul>
+            <li>Um <code>caso</code> pode ter <strong>vários valores separados por vírgula</strong>
+              (<code>caso 6, 7</code> acima) — executa se a expressão de <code>escolher</code> for igual a
+              <strong>qualquer um</strong> deles.
+            </li>
+            <li><strong>Não há fallthrough</strong>: ao contrário de <code>switch</code> em C/Java, um
+              <code>caso</code> nunca "cai" para o seguinte — não precisa de <code>sair</code>/<code>break</code>
+              no fim de cada um. Só um ramo executa (o primeiro cujo valor bate certo), tal como numa cadeia
+              <code>senao se</code>.
+            </li>
+            <li><code>contrario</code> é opcional, tal como <code>senao</code> em <code>se</code>.</li>
+            <li>Os valores de <code>caso</code> não têm de ser literais — podem ser qualquer expressão do
+              mesmo tipo (ou de um tipo comparável) que a expressão de <code>escolher</code>; são comparados
+              com <code>==</code>, um a um, por ordem.</li>
+          </ul>
 
-          <h2 id="9-ciclos">9. Ciclos</h2>
-          <h3>9.1 para — número de repetições conhecido</h3>
-          <p>A variável de controlo tem de estar declarada <strong>antes</strong> do ciclo, tal como
-            qualquer outra variável — o <code>para</code> não a declara por si. E só existe dentro do
-            corpo do ciclo: usá-la depois de o ciclo terminar é um erro de compilação.</p>
+          <h3>Deteção de <code>caso</code> repetido</h3>
+          <p>O compilador rejeita um <code>caso</code> cujo valor já apareceu num <code>caso</code> anterior
+            do mesmo <code>escolher</code> — esse ramo nunca seria alcançado. A deteção compara por
+            <strong>valor</strong>, não por tipo exato: <code>caso 1</code> e <code>caso 1.0</code>, ou
+            <code>caso "a"</code> e <code>caso 'a'</code>, contam como o mesmo valor (tal como
+            <code>1 == 1.0</code> e <code>"a" == 'a'</code> são <code>verdadeiro</code> na linguagem):
+          </p>
+          <pre><code>x:decimal = 2.0
+escolher x
+    caso 1
+        escrever("um")
+    caso 2
+    // caso 2.0             // ERRO de compilação: '2.0' já apareceu (é o mesmo que '2')
+        escrever("dois")</code></pre>
+          <p class="nota">Nota: Só é detetado quando o valor do <code>caso</code> é reconhecível em
+            compilação (um literal, incluindo um literal numérico negado como <code>caso -1</code>) — dois
+            <code>caso</code> com a mesma variável ou expressão calculada não são comparados entre si.
+          </p>
+
+          <h3>3.3 Âmbito de uma variável declarada dentro de um ramo</h3>
+          <p>Uma variável declarada dentro de um ramo de <code>se</code>/<code>escolher</code> só existe
+            <strong>dentro</strong> desse ramo — sempre desaparece depois do bloco, mesmo que a MESMA
+            variável (mesmo nome, tipo e número de dimensões) seja declarada em todos os ramos irmãos:
+          </p>
+          <pre><code>x:inteiro = 5
+se x > 0 entao
+    sinal:cadeia = "positivo"
+    escrever(sinal)
+// escrever(sinal)          // ERRO: 'sinal' não existe aqui fora
+
+idade:inteiro = 20
+se idade >= 18 entao
+    estado:cadeia = "adulto"
+senao
+    estado:cadeia = "menor"
+// escrever(estado)         // ERRO: 'estado' não existe aqui fora,
+                             // mesmo declarada nos dois ramos</code></pre>
+          <p>Para usar o valor depois do bloco, declara a variável ANTES do <code>se</code> e atribui dentro
+            de cada ramo:</p>
+          <pre><code>idade:inteiro = 20
+estado:cadeia
+se idade >= 18 entao
+    estado = "adulto"
+senao
+    estado = "menor"
+escrever(estado)            // válido: 'estado' foi declarada antes do 'se'</code></pre>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>algoritmo "ClassificadorTriangulo"
+
+inicio
+    a:decimal
+    b:decimal
+    c:decimal
+    escrever("Lado a: ")
+    ler(a)
+    escrever("Lado b: ")
+    ler(b)
+    escrever("Lado c: ")
+    ler(c)
+
+    se a + b <= c ou a + c <= b ou b + c <= a entao
+        escrever("Não é um triângulo válido")
+    senao se a == b e b == c entao
+        escrever("Equilátero")
+    senao se a == b ou b == c ou a == c entao
+        escrever("Isósceles")
+    senao
+        escrever("Escaleno")</code></pre>
+
+          <h2 id="4-ciclos">4. Ciclos</h2>
+          <h3>4.1 <code>para</code></h3>
           <pre><code>i:inteiro
-para i de 0 ate 9 fazer
-    escrever(i)
-
-para i de 10 ate 1 passo -1 fazer
+para i de 1 ate 5 fazer
     escrever(i)</code></pre>
+          <p>Saída: <code>1 2 3 4 5</code> (<code>ate</code> é <strong>inclusivo</strong> — inclui o
+            <code>5</code>, ao contrário de <code>range</code>/<code>for</code> em Python, onde o limite
+            superior fica de fora).
+          </p>
+          <p class="nota">Nota: A variável de controlo tem de ser declarada ANTES do ciclo.
+            <code>para i de 1 ate 5 fazer</code> sem <code>i:inteiro</code> numa linha anterior é erro de
+            compilação — ao contrário de pseudocódigo tradicional (ou de Python/JavaScript), onde
+            <code>para</code>/<code>for</code> costuma declarar a variável implicitamente. Depois do ciclo
+            terminar, <code>i</code> continua a existir, com o último valor que teve dentro do ciclo
+            (<code>5</code> no exemplo acima, não <code>6</code>).
+          </p>
 
-          <h3>9.2 enquanto — verifica a condição antes</h3>
-          <pre><code>enquanto saldo &gt; 0 fazer
-    saldo = saldo - mensalidade</code></pre>
+          <h3><code>passo</code></h3>
+          <pre><code>i:inteiro
+para i de 10 ate 2 passo -2 fazer
+    escrever(i)</code></pre>
+          <p>Saída: <code>10 8 6 4 2</code>. Sem <code>passo</code>, o valor por omissão é <code>1</code>
+            (sempre ascendente). Com <code>passo</code> negativo, <code>de</code>/<code>ate</code> continuam
+            ambos inclusivos, agora a descer. Um ciclo cujo sentido de <code>de</code>/<code>ate</code> não
+            combina com o sinal do <code>passo</code> (ex.: <code>de 1 ate 10 passo -1</code>) não corre
+            nenhuma vez — não é erro, só um ciclo vazio. <code>passo</code> igual a <code>0</code> é sempre
+            erro (o ciclo nunca avançaria) — detetado em compilação quando é um literal, e em runtime (com
+            mensagem amigável) quando só se conhece o valor ao correr o programa.</p>
+          <p><code>de</code>, <code>ate</code> e <code>passo</code> só aceitam <code>inteiro</code> — não há
+            <code>para</code> sobre <code>decimal</code>.
+          </p>
 
-          <h3>9.3 fazer ... enquanto — verifica a condição depois</h3>
-          <pre><code>fazer
+          <h3>4.2 <code>enquanto</code></h3>
+          <pre><code>n:inteiro = 10
+enquanto n > 0 fazer
+    escrever(n)
+    n = n - 1</code></pre>
+          <p>Testa a condição <strong>antes</strong> de cada iteração (incluindo a primeira) — se começar
+            falsa, o corpo nunca corre nenhuma vez.</p>
+
+          <h3>4.3 <code>fazer ... enquanto</code></h3>
+          <pre><code>opcao:inteiro
+fazer
+    escrever("1) Somar  2) Sair -- escolhe: ")
     ler(opcao)
-enquanto opcao &lt;&gt; 0</code></pre>
-          <p class="nota">Nota: O corpo do <code>fazer...enquanto</code> executa sempre pelo menos uma
-            vez, ao contrário do <code>enquanto</code>.</p>
+enquanto opcao <> 1 e opcao <> 2
 
-          <h2 id="10-arrays">10. Arrays</h2>
-          <p>Um array guarda vários valores do mesmo tipo, acedidos por índice. Os índices começam em 0
-            (tal como em Python, Java, C, C#...): um array de tamanho N tem posições válidas de 0 a N-1.
-            Suporta-se qualquer número de dimensões:</p>
-          <pre><code>notas:decimal[30]                // vetor de 30 posições: notas[0] .. notas[29]
-tabuleiro:inteiro[8][8]          // matriz
-cubo:inteiro[3][3][3]            // 3 dimensões -- ou mais, se precisares
+escrever("Escolheste ", opcao)</code></pre>
+          <p>Testa a condição <strong>depois</strong> de cada iteração — o corpo corre sempre <strong>pelo
+              menos uma vez</strong>, mesmo que a condição já comece falsa. É o padrão certo para "pede um
+            valor até ser válido" (como acima), onde não há nada para testar antes da primeira leitura.</p>
 
-i:inteiro
-para i de 0 ate 29 fazer
-    soma = soma + notas[i]</code></pre>
-          <p>Um array pode ser inicializado com uma lista de valores entre <code>{ }</code>:</p>
+          <h3>4.4 <code>sair</code> e <code>continuar</code></h3>
+          <p><code>sair</code> termina o ciclo mais interior imediatamente (equivalente a <code>break</code>);
+            <code>continuar</code> salta logo para a próxima iteração desse mesmo ciclo, sem executar o resto
+            do corpo (equivalente a <code>continue</code>). Os dois só são válidos dentro de
+            <code>para</code>/<code>enquanto</code>/<code>fazer...enquanto</code> — usados fora de um ciclo
+            são erro de compilação — e afetam sempre só o ciclo <strong>mais interior</strong> que os contém.
+          </p>
+          <pre><code>i:inteiro
+para i de 1 ate 20 fazer
+    se i mod 2 <> 0 entao
+        continuar          // ímpares: salta já para o próximo i
+    se i > 10 entao
+        sair               // para de todo o ciclo aqui
+    escrever(i)</code></pre>
+          <p>Saída: <code>2 4 6 8 10</code> — os ímpares nunca chegam ao <code>escrever</code>
+            (<code>continuar</code>), e o ciclo para de vez assim que <code>i</code> passa de <code>10</code>
+            (<code>sair</code>).</p>
+          <p><code>sair</code>/<code>continuar</code> dentro de um <code>escolher</code> (que não é, por si,
+            um ciclo) continuam a afetar o ciclo em torno do <code>escolher</code>, não têm nenhum efeito
+            especial sobre o <code>escolher</code> em si (não existe "sair de um <code>caso</code>" — não
+            faria sentido, já que não há fallthrough a evitar):</p>
+          <pre><code>i:inteiro
+para i de 1 ate 5 fazer
+    escolher i
+        caso 3
+            sair            // sai do 'para', não só do 'caso'
+        contrario
+            escrever(i)</code></pre>
+          <p>Saída: <code>1 2</code> — ao chegar a <code>i == 3</code>, <code>sair</code> termina o
+            <code>para</code> (o <code>escolher</code> não tem nenhuma noção própria de "sair").
+          </p>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>algoritmo "TabuadaComParagem"
+
+inicio
+    base:inteiro
+    escrever("Tabuada de: ")
+    ler(base)
+
+    i:inteiro
+    para i de 1 ate 10 fazer
+        resultado:inteiro = base * i
+        se resultado > 50 entao
+            escrever("(parado -- resultado passou de 50)")
+            sair
+        escrever(base, " x ", i, " = ", resultado)</code></pre>
+
+          <h2 id="5-vetores-e-matrizes">5. Vetores e matrizes</h2>
+          <h3>5.1 Declarar e indexar</h3>
+          <pre><code>notas:decimal[5]              // vetor de 5 posições, todas 0.0
+notas[0] = 18.5
+escrever(notas[0])</code></pre>
+          <ul>
+            <li>Um vetor de 1 dimensão declara-se <code>nome:tipo[tamanho]</code>.</li>
+            <li>Os índices vão de <code>0</code> a <code>tamanho - 1</code> — tal como em Python, Java, C#
+              (não começam em 1).</li>
+            <li>Sem inicializador, cada posição fica com o valor por omissão do tipo (capítulo 1) —
+              <code>0</code> para <code>inteiro</code>, <code>0.0</code> para <code>decimal</code>, etc.
+            </li>
+          </ul>
+
+          <h3>Literal <code>{ }</code></h3>
           <pre><code>primos:inteiro[5] = {2, 3, 5, 7, 11}
-tabuleiro:inteiro[2][2] = {{1, 2}, {3, 4}}</code></pre>
+escrever(primos[0], primos[4])</code></pre>
+          <p>O literal tem de ter exatamente o número de elementos do tamanho declarado — nem a mais, nem a
+            menos (erro de compilação, não preenchimento/corte silencioso).</p>
 
-          <h2 id="11-estruturas-registos">11. Estruturas (registos)</h2>
-          <p><code>estrutura</code> agrupa vários campos com nome sob um único tipo. Os campos
-            acedem-se com <code>.</code>:</p>
-          <pre><code>estrutura Ponto
+          <h3>Percorrer um vetor</h3>
+          <pre><code>notas:decimal[5] = {14.0, 9.5, 18.0, 12.5, 16.0}
+i:inteiro
+soma:decimal = 0.0
+para i de 0 ate 4 fazer
+    soma = soma + notas[i]
+escrever("Média: ", soma / 5)</code></pre>
+          <p>Um padrão comum é guardar o tamanho numa <code>constante</code> e usar <code>tamanho - 1</code>
+            no <code>ate</code>, para não repetir o número:</p>
+          <pre><code>constante TAMANHO:inteiro = 5
+notas:decimal[TAMANHO] = {14.0, 9.5, 18.0, 12.5, 16.0}
+i:inteiro
+para i de 0 ate TAMANHO - 1 fazer
+    escrever(notas[i])</code></pre>
+
+          <h3>Índices inválidos</h3>
+          <p>Um índice fora de <code>0 .. tamanho-1</code> é sempre erro em <strong>runtime</strong>, nunca
+            em compilação (o compilador não segue os valores das variáveis) — inclui índices negativos, que
+            <strong>não</strong> "contam a partir do fim" como em Python:
+          </p>
+          <pre><code>v:inteiro[5] = {1, 2, 3, 4, 5}
+escrever(v[-1])       // erro em runtime, NÃO devolve o último elemento
+escrever(v[5])        // erro em runtime -- só 0..4 são válidos</code></pre>
+
+          <h3>5.2 Matrizes (2+ dimensões)</h3>
+          <pre><code>tabuleiro:inteiro[3][3]
+tabuleiro[0][0] = 1
+tabuleiro[1][1] = 1
+tabuleiro[2][2] = 1</code></pre>
+          <p>Uma matriz <code>inteiro[8][8]</code> pode ter tantas dimensões quantas precisares
+            (<code>[3][3][3]</code>, ...); cada par de colchetes indexa mais um nível. Um literal aninhado
+            usa o mesmo número de níveis de <code>{ }</code> que dimensões:</p>
+          <pre><code>m:inteiro[2][2] = {{1, 2}, {3, 4}}
+escrever(m[0][1], " ", m[1][0])     // 2 3</code></pre>
+          <p>Percorre-se com <code>para</code> aninhados, um por dimensão:</p>
+          <pre><code>m:inteiro[2][3] = {{1, 2, 3}, {4, 5, 6}}
+i:inteiro
+j:inteiro
+para i de 0 ate 1 fazer
+    para j de 0 ate 2 fazer
+        escrever(m[i][j])</code></pre>
+          <p>Cada linha de uma matriz não inicializada é a sua própria cópia independente — mudar
+            <code>m[0][0]</code> nunca afeta <code>m[1][0]</code>, ao contrário do erro clássico em Python de
+            construir uma matriz com <code>[[0]*n]*n</code> (onde as <code>n</code> linhas seriam todas o
+            MESMO objeto por baixo).
+          </p>
+
+          <h3>5.3 Tamanho calculado em runtime</h3>
+          <p>O tamanho de um vetor não precisa de ser um literal — pode ser qualquer expressão
+            <code>inteiro</code>, incluindo uma variável, avaliada quando a declaração corre:
+          </p>
+          <pre><code>n:inteiro
+escrever("Quantos números? ")
+ler(n)
+
+v:inteiro[n]
+i:inteiro
+para i de 0 ate n - 1 fazer
+    v[i] = i * i</code></pre>
+          <p>Um tamanho negativo, ou maior do que <strong>10 milhões de elementos no total</strong> (produto
+            de todas as dimensões, para uma matriz), é erro em runtime com mensagem amigável, não um
+            <code>MemoryError</code>/travamento cru.
+          </p>
+
+          <h3>5.4 Um vetor não se copia com <code>=</code></h3>
+          <p>Ao contrário de <code>estrutura</code> (capítulo 7), que copia por valor tanto com
+            <code>=</code> como ao declarar <code>p2:Ponto = p1</code>, um vetor <strong>não pode ser o valor
+              de uma atribuição nem de uma declaração</strong> — nenhuma das duas formas abaixo compila:
+          </p>
+          <pre><code>v1:inteiro[3] = {1, 2, 3}
+v2:inteiro[3]
+// v2 = v1                    // ERRO: 'v2' é um vetor; não pode ser atribuído diretamente
+// v3:inteiro[3] = v1         // ERRO: 'v1' é um vetor; falta indexá-lo</code></pre>
+          <p>As únicas formas de obter uma cópia independente de um vetor são: uma <strong>função que o
+              devolve</strong> (<code>retornar</code>), um <strong>literal</strong> <code>{...}</code>, ou
+            passá-lo como argumento normal (sem <code>ref</code>) a uma função/procedimento — os três copiam
+            por valor (capítulo 6). Sem nenhuma dessas, a única alternativa é copiar elemento a elemento:</p>
+          <pre><code>algoritmo "CopiaDeVetor"
+
+inicio
+    v1:inteiro[3] = {1, 2, 3}
+    v2:inteiro[3]
+    i:inteiro
+    para i de 0 ate 2 fazer
+        v2[i] = v1[i]
+
+    v2[0] = 99
+    escrever(v1[0], " ", v2[0])    // 1 99 -- independentes</code></pre>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>algoritmo "NotasDaTurma"
+
+inicio
+    n:inteiro
+    escrever("Quantos alunos? ")
+    ler(n)
+
+    notas:decimal[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nota do aluno ", i + 1, ": ")
+        ler(notas[i])
+
+    soma:decimal = 0.0
+    maior:decimal = notas[0]
+    para i de 0 ate n - 1 fazer
+        soma = soma + notas[i]
+        se notas[i] > maior entao
+            maior = notas[i]
+
+    escrever("Média da turma: ", soma / n)
+    escrever("Nota mais alta: ", maior)</code></pre>
+
+          <h2 id="6-funcoes-e-procedimentos">6. Funções e procedimentos</h2>
+          <h3>6.1 <code>funcao</code> vs. <code>procedimento</code></h3>
+          <ul>
+            <li><code>funcao</code> devolve sempre um valor — declara o tipo depois dos parâmetros, e todo
+              caminho de execução tem de acabar num <code>retornar &lt;expressão&gt;</code>.</li>
+            <li><code>procedimento</code> não devolve valor nenhum — sem tipo de retorno, e
+              <code>retornar</code> (sem expressão) é opcional, só para sair mais cedo.
+            </li>
+          </ul>
+          <pre><code>algoritmo "Exemplo"
+
+funcao dobro(x:inteiro):inteiro
+    retornar x * 2
+
+procedimento saudar(nome:cadeia)
+    escrever("Olá, ", nome, "!")
+
+inicio
+    escrever(dobro(21))
+    saudar("Rita")</code></pre>
+          <p>Ambos são declarados fora de <code>inicio</code>, antes do bloco principal, e podem ser
+            chamados de qualquer sítio do programa (incluindo antes de onde estão definidos no ficheiro, e
+            umas dentro das outras recursivamente — ver 6.5).</p>
+
+          <h3>6.2 Parâmetros por valor (padrão)</h3>
+          <p>Sem <code>ref</code>, um parâmetro é uma <strong>cópia</strong> — alterar o parâmetro dentro da
+            função nunca afeta a variável do chamador (mesma regra de cópia por valor que uma atribuição
+            normal, capítulo 5). O tipo do argumento só precisa de ser <em>compatível</em> com o do
+            parâmetro, não exatamente igual — as mesmas promoções de sempre (<code>inteiro</code> →
+            <code>decimal</code>, <code>caracter</code> → <code>cadeia</code>):
+          </p>
+          <pre><code>funcao meio(x:decimal):decimal
+    retornar x / 2
+
+inicio
+    escrever(meio(5))     // 2.5 -- '5' (inteiro) promovido a 'decimal'</code></pre>
+
+          <h3>6.3 Parâmetros por referência (<code>ref</code>)</h3>
+          <p><code>ref</code> faz o parâmetro apontar para a MESMA variável do chamador — uma alteração
+            dentro da função é visível fora dela depois da chamada terminar. É a única forma de uma função
+            "devolver" mais do que um valor, ou de mudar diretamente uma variável do chamador:</p>
+          <pre><code>procedimento trocar(ref a:inteiro, ref b:inteiro)
+    tmp:inteiro = a
+    a = b
+    b = tmp
+
+inicio
+    x:inteiro = 1
+    y:inteiro = 2
+    trocar(x, y)
+    escrever(x, " ", y)        // 2 1</code></pre>
+          <p>Regras específicas de <code>ref</code>, mais estritas do que um parâmetro normal:</p>
+          <ul>
+            <li>O argumento tem de ser <strong>uma variável, um elemento de vetor, ou um campo de
+                estrutura</strong> — nunca uma expressão calculada (<code>inc(x + 1)</code> é erro de
+              compilação) nem uma <code>constante</code>.</li>
+            <li>O tipo do argumento tem de ser <strong>exatamente igual</strong> ao do parâmetro — sem
+              promoção nenhuma (passar um <code>inteiro</code> a um <code>ref x:decimal</code> é erro, ao
+              contrário de um parâmetro por valor).</li>
+            <li>A mesma variável não pode ser passada por <code>ref</code> duas vezes na mesma chamada (ex.:
+              <code>trocar(x, x)</code>) — ficaria ambíguo qual das duas escritas "ganha".
+            </li>
+            <li>Uma chamada a uma função/procedimento com <strong>algum</strong> parâmetro <code>ref</code>
+              só pode ser usada como instrução isolada (<code>inc(x)</code>) ou do lado direito de uma
+              atribuição/declaração (<code>y = inc(x)</code>) — nunca dentro de uma expressão maior
+              (<code>escrever(inc(x))</code> é erro de compilação; usa <code>inc(x)</code> numa linha e
+              <code>escrever(x)</code> na seguinte).
+            </li>
+          </ul>
+
+          <h3>6.4 Variáveis globais dentro de uma função</h3>
+          <p>Uma função pode <strong>ler e escrever diretamente</strong> uma variável global (declarada
+            antes de <code>inicio</code>, fora de qualquer função), sem precisar de <code>ref</code> nem de
+            nenhuma sintaxe especial:</p>
+          <pre><code>algoritmo "Contador"
+
+contador:inteiro = 0
+
+procedimento incrementaContador()
+    contador = contador + 1
+
+inicio
+    incrementaContador()
+    incrementaContador()
+    escrever(contador)    // 2</code></pre>
+          <p>Uma variável local (parâmetro, ou declarada dentro do corpo da função) com o mesmo nome de uma
+            global <strong>sombreia-a</strong> dentro dessa função — deixa de ser possível lá dentro aceder
+            à global com esse nome. Uma <code>constante</code> global continua imutável mesmo lida de dentro
+            de uma função (não pode ser reatribuída, só lida).</p>
+
+          <h3>6.5 Recursão</h3>
+          <pre><code>funcao fatorial(n:inteiro):inteiro
+    se n <= 1 entao
+        retornar 1
+    retornar n * fatorial(n - 1)</code></pre>
+
+          <h3>6.6 Nem todo o caminho pode "esquecer-se" de <code>retornar</code></h3>
+          <p>O compilador rejeita uma <code>funcao</code> em que algum caminho de execução chegue ao fim sem
+            passar por <code>retornar</code> — mas essa verificação é <strong>deliberadamente
+              conservadora</strong>: um <code>se</code> sem <code>senao</code> nunca conta como
+            garantidamente terminando em <code>retornar</code>, mesmo que, olhando para a lógica, os casos
+            cobertos esgotem todos os valores possíveis:</p>
+          <pre><code>funcao sinal(x:inteiro):inteiro
+    se x > 0 entao
+        retornar 1
+    senao se x < 0 entao
+        retornar -1
+    // ERRO de compilação: falta o caso x == 0</code></pre>
+          <p>O compilador não sabe (nem tenta provar) que não existe nenhum outro valor de <code>x</code> —
+            só sabe que não há <code>senao</code>. A correção é sempre explícita: acrescenta um
+            <code>senao</code>/<code>contrario</code> que cubra o resto.
+          </p>
+
+          <h3>6.7 Vetor como parâmetro</h3>
+          <p>Um parâmetro do tipo vetor usa colchetes <strong>vazios</strong> — <code>v:tipo[]</code> — e
+            aceita um vetor de qualquer tamanho (por isso é comum passar também o tamanho, ou o próprio vetor
+            incluir uma posição-sentinela, consoante o problema):</p>
+          <pre><code>funcao soma(v:inteiro[], tamanho:inteiro):inteiro
+    total:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        total = total + v[i]
+    retornar total
+
+inicio
+    numeros:inteiro[4] = {1, 2, 3, 4}
+    escrever(soma(numeros, 4))     // 10</code></pre>
+          <p>O tipo do elemento tem de ser <strong>exatamente igual</strong> ao declarado no parâmetro (sem
+            promoção <code>inteiro</code>→<code>decimal</code>, nem por valor nem por <code>ref</code>) — um
+            vetor não é alargado elemento a elemento só para caber noutro parâmetro. Um vetor passado por
+            valor (sem <code>ref</code>) continua a ser copiado inteiro para dentro da função (capítulo 5).
+          </p>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>algoritmo "MaiorDivisorComum"
+
+funcao mdc(a:inteiro, b:inteiro):inteiro
+    se b == 0 entao
+        retornar a
+    retornar mdc(b, a mod b)
+
+procedimento mostrarFracaoSimplificada(ref numerador:inteiro, ref denominador:inteiro)
+    d:inteiro = mdc(numerador, denominador)
+    numerador = numerador div d
+    denominador = denominador div d
+
+inicio
+    n:inteiro
+    d:inteiro
+    escrever("Numerador: ")
+    ler(n)
+    escrever("Denominador: ")
+    ler(d)
+
+    mostrarFracaoSimplificada(n, d)
+    escrever("Fração simplificada: ", n, "/", d)</code></pre>
+
+          <h2 id="7-estruturas">7. Estruturas</h2>
+          <h3>7.1 Definir e usar</h3>
+          <pre><code>algoritmo "Exemplo"
+
+estrutura Ponto
     x:inteiro
     y:inteiro
 
-estrutura Retangulo
-    canto:Ponto            // uma estrutura pode conter outra
-    largura:inteiro
-    altura:inteiro
-
 inicio
-    p1:Ponto
-    p1.x = 3
-    p1.y = 4
+    p:Ponto = {x: 3, y: 4}
+    escrever(p.x, ", ", p.y)</code></pre>
+          <ul>
+            <li><code>estrutura Nome</code> é declarada fora de <code>inicio</code>, com um ou mais campos
+              <code>nome:tipo</code>, um por linha, tal como uma declaração normal.
+            </li>
+            <li>Um valor constrói-se com um literal <code>{campo: valor, ...}</code> — os nomes não têm de
+              vir pela ordem da definição.</li>
+            <li>Um campo lê-se e atribui-se com <code>.</code>: <code>p.x</code>, <code>p.x = 10</code>.</li>
+          </ul>
 
-    pontos:Ponto[10]       // array de estruturas: cada posição é independente
-    pontos[0].x = 100</code></pre>
-          <p>Também é possível inicializar com um literal <code>{ campo: valor, ... }</code> — campos
-            omitidos ficam com o valor por omissão do seu tipo:</p>
-          <pre><code>p1:Ponto = {x: 3, y: 4}
-p2:Ponto = {x: 10}          // y fica 0</code></pre>
+          <h3>Campos omitidos ficam com o valor por omissão</h3>
+          <pre><code>p:Ponto = {x: 3}
+escrever(p.x, ", ", p.y)      // 3, 0 -- 'y' não foi dado, fica 0</code></pre>
 
-          <h2 id="12-funcoes-e-procedimentos">12. Funções e procedimentos</h2>
-          <p>Uma função devolve um valor (com <code>retornar</code>); um procedimento não devolve nada,
-            serve para executar uma ação — pode usar <code>retornar</code> sozinho, sem expressão, para
-            sair mais cedo. Os parâmetros usam sempre a forma <code>nome:tipo</code>, e
-            podem ser passados por valor (por omissão — o parâmetro recebe uma cópia) ou por referência
-            (<code>ref</code> — o parâmetro partilha a variável do chamador, e alterações dentro da
-            função são visíveis fora dela). <code>ref</code> pode ser usado tanto em funções como em
-            procedimentos.</p>
-          <pre><code>procedimento trocar(ref a:inteiro, ref b:inteiro)
-    temp:inteiro = a
-    a = b
-    b = temp
+          <h3>7.2 Igualdade compara campo a campo</h3>
+          <p><code>==</code>/<code>&lt;&gt;</code> entre dois valores do mesmo tipo <code>estrutura</code>
+            comparam todos os campos, não a identidade do objeto:</p>
+          <pre><code>a:Ponto = {x: 1, y: 2}
+b:Ponto = {x: 1, y: 2}
+escrever(a == b)              // verdadeiro -- mesmos valores, variáveis diferentes</code></pre>
 
-funcao incrementar(ref x:inteiro):inteiro
-    x = x + 1
-    retornar x
-
-inicio
-    p:inteiro = 3
-    q:inteiro = 9
-    trocar(p, q)                    // p passa a 9, q passa a 3
-    novo:inteiro = incrementar(p)   // p também é alterado; novo recebe o valor devolvido</code></pre>
-          <p class="nota">Nota: Uma chamada com parâmetros <code>ref</code> só pode ser usada como
-            instrução isolada, ou diretamente à direita de uma atribuição (<code>x = f(...)</code>) —
-            nunca dentro de outra expressão maior, porque precisa de atualizar as variáveis originais
-            depois de a função terminar.</p>
-
-          <h3>12.1 Recursividade</h3>
-          <pre><code>funcao fibonacci(n:inteiro):inteiro
-    se n &lt;= 1 entao
-        retornar n
-    senao
-        retornar fibonacci(n - 1) + fibonacci(n - 2)</code></pre>
-          <p>Uma função pode chamar-se a si própria. Não há limite explícito na linguagem, mas a
-            recursão infinita é sempre um erro de lógica do programa.</p>
-
-          <h2 id="13-bibliotecas">13. Bibliotecas</h2>
-          <p>As funções auxiliares da linguagem estão agrupadas em bibliotecas com namespace —
-            <code>matematica.raiz(x)</code>, <code>cadeia.comprimento(s)</code>. É preciso importar a
-            biblioteca antes de a usar:
+          <h3>7.3 <code>estrutura</code> é sempre copiada por valor</h3>
+          <p>Ao contrário de <code>vetor</code> (capítulo 5), <code>estrutura</code> copia normalmente com
+            <code>=</code> e com uma declaração a partir de outra variável — as duas variáveis ficam
+            completamente independentes a seguir:
           </p>
-          <pre><code>importar Matematica
-importar Cadeia
+          <pre><code>a:Ponto = {x: 1, y: 2}
+b:Ponto = a
+b.x = 99
+escrever(a.x, " ", b.x)       // 1 99 -- independentes</code></pre>
+          <p>Isto vale em <strong>todo</strong> o sítio onde um valor <code>estrutura</code> circula:
+            atribuição, declaração, <code>retornar</code>, passar como argumento por valor (sem
+            <code>ref</code>), e <strong>atribuir a um campo</strong> — <code>no.seguinte = outroNo</code>
+            copia <code>outroNo</code> para dentro do campo, não guarda uma referência a ele (mais em 7.5).
+            Só um parâmetro <code>ref</code> (7.4) ou um campo <code>ref</code> (7.5) evita a cópia.
+          </p>
+
+          <h3>7.4 Passar por referência</h3>
+          <p>Tal como um parâmetro escalar, um parâmetro <code>estrutura</code> pode ser <code>ref</code> —
+            a função passa a mutar diretamente a variável do chamador, sem devolver nada:</p>
+          <pre><code>procedimento deslocar(ref p:Ponto, dx:inteiro, dy:inteiro)
+    p.x = p.x + dx
+    p.y = p.y + dy
 
 inicio
-    escrever(matematica.raiz(16.0))    // 4.0
-    escrever(cadeia.maiusculas("ola")) // OLA</code></pre>
+    p:Ponto = {x: 0, y: 0}
+    deslocar(p, 5, 3)
+    escrever(p.x, " ", p.y)       // 5 3</code></pre>
 
-          <h3>13.1 Matematica</h3>
+          <h3>7.5 Estruturas recursivas (árvores, listas)</h3>
+          <p>Um campo pode ter o tipo da própria estrutura (ou de outra que aponte de volta para ela) — útil
+            para árvores e listas ligadas:</p>
+          <pre><code>estrutura No
+    valor:inteiro
+    seguinte:No</code></pre>
+          <p>Um campo desse tipo, se omitido no literal, fica <code>nulo</code> por omissão — nunca tenta
+            construir-se a si próprio infinitamente. <code>nulo</code> é o único valor que se pode comparar
+            com <code>==</code>/<code>&lt;&gt;</code> contra qualquer tipo <code>estrutura</code>, o que dá o
+            idioma habitual de percorrer até ao fim:</p>
+          <pre><code>procedimento imprimir(lista:No)
+    n:No = lista
+    enquanto n <> nulo fazer
+        escrever(n.valor)
+        n = n.seguinte</code></pre>
+
+          <h3>Constrói-se de uma vez, não por "apontadores" a mutar depois</h3>
+          <p>Como todo o valor <code>estrutura</code> copia por valor (7.3) — <strong>incluindo ao atribuir a
+              um campo</strong> — não há forma de duas variáveis partilharem o "mesmo" nó, ao contrário de
+            listas ligadas em Java/C/Python (onde um campo guarda uma referência real, e mutar o nó original
+            propaga a quem já apontava para ele) — a menos que o campo seja <code>ref</code> (ver abaixo):</p>
+          <pre><code>b:No = {valor: 2, seguinte: nulo}
+a:No = {valor: 1, seguinte: b}    // copia 'b' para dentro de a.seguinte
+b.valor = 99                      // só muda a variável 'b'
+escrever(a.seguinte.valor)        // 2 -- NÃO 99: a.seguinte já era outra cópia</code></pre>
+
+          <h3>Campo <code>ref</code>: ligar sem copiar</h3>
+          <p>Um campo pode ser marcado <code>ref</code> — tal como um parâmetro <code>ref</code> (7.4),
+            guarda um alias para OUTRA instância já existente em vez de copiar o valor para dentro de si:</p>
+          <pre><code>estrutura No
+    valor:inteiro
+    seguinte:ref No</code></pre>
+          <p>Com isto, já é possível ligar um nó já existente e mutá-lo depois, ao contrário do exemplo
+            anterior:</p>
+          <pre><code>b:No
+b.valor = 2
+
+a:No
+a.valor = 1
+a.seguinte = b               // agora ALIAS, não cópia
+
+b.valor = 99
+escrever(a.seguinte.valor)   // 99 -- reflete a mutação de 'b'</code></pre>
+          <p><code>ref</code> só é permitido num campo escalar (sem <code>[]</code>) cujo tipo seja outra
+            <code>estrutura</code> — não num campo de tipo primitivo, nem num campo-vetor. Uma cópia por
+            valor da estrutura inteira (<code>c:No = a</code>, passar por valor, <code>retornar</code>)
+            continua a preservar esse aliasing — só o valor do próprio campo <code>ref</code> nunca é
+            copiado.
+          </p>
+          <p>A forma correta de construir uma lista/árvore com campos SIMPLES (sem <code>ref</code>) em ALGO
+            é <strong>de uma vez, de baixo para cima</strong> (o último nó primeiro, ou recursivamente) —
+            nunca ligar um nó já existente e mutá-lo depois à espera que isso se reflita por onde já passou:
+          </p>
+          <pre><code>algoritmo "ListaLigada"
+
+estrutura No
+    valor:inteiro
+    seguinte:No
+
+funcao construir(v:inteiro[], i:inteiro, tamanho:inteiro):No
+    se i == tamanho entao
+        retornar nulo
+    retornar {valor: v[i], seguinte: construir(v, i + 1, tamanho)}
+
+procedimento imprimir(lista:No)
+    n:No = lista
+    enquanto n <> nulo fazer
+        escrever(n.valor)
+        n = n.seguinte
+
+inicio
+    v:inteiro[3] = {10, 20, 30}
+    lista:No = construir(v, 0, 3)
+    imprimir(lista)</code></pre>
+          <p>Para ligar nós dinamicamente (inserir/remover num nó já ligado, percorrer e reatribuir
+            livremente quem aponta para quem), um campo <code>ref</code> já resolve a maior parte dos casos.
+            Para cenários que precisem de enumerar/gerir muitos nós por posição, o padrão alternativo
+            continua a ser representá-los num <strong>vetor</strong> de nós, em que <code>seguinte</code> é
+            um <strong>índice</strong> (<code>inteiro</code>) para outra posição do vetor, não outra
+            <code>estrutura</code>.
+          </p>
+
+          <h3>7.6 Vetor de estruturas, estrutura com campo vetor</h3>
+          <pre><code>pontos:Ponto[2] = {{x: 1, y: 1}, {x: 2, y: 2}}
+escrever(pontos[0].x, ", ", pontos[1].y)</code></pre>
+          <pre><code>estrutura Poligono
+    lados:inteiro[3]
+
+inicio
+    p:Poligono = {lados: {3, 4, 5}}
+    escrever(p.lados[0], " ", p.lados[1], " ", p.lados[2])</code></pre>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>algoritmo "CatalogoDeLivros"
+
+estrutura Livro
+    titulo:cadeia
+    ano:inteiro
+    lido:booleano
+
+inicio
+    livros:Livro[3]
+    i:inteiro
+    para i de 0 ate 2 fazer
+        escrever("Título do livro ", i + 1, ": ")
+        ler(livros[i].titulo)
+        escrever("Ano: ")
+        ler(livros[i].ano)
+        livros[i].lido = falso
+
+    livros[1].lido = verdadeiro
+
+    para i de 0 ate 2 fazer
+        estado:cadeia = "por ler"
+        se livros[i].lido entao
+            estado = "lido"
+        escrever(livros[i].titulo, " (", livros[i].ano, ") -- ", estado)</code></pre>
+
+          <h2 id="8-bibliotecas">8. Bibliotecas</h2>
+          <p>A linguagem tem três bibliotecas embutidas: <code>Matematica</code>, <code>Cadeia</code>,
+            <code>Conversao</code>. Cada uma só fica disponível depois de <code>importar</code>, no topo do
+            ficheiro (antes de qualquer <code>funcao</code>/<code>procedimento</code>/<code>inicio</code>):
+          </p>
+          <pre><code>algoritmo "Exemplo"
+
+importar Matematica
+
+inicio
+    escrever(matematica.raiz(16))</code></pre>
+          <ul>
+            <li><code>importar</code> usa o nome capitalizado por convenção (<code>Matematica</code>), mas
+              não é sensível a maiúsculas/minúsculas (<code>importar matematica</code> funciona também).
+            </li>
+            <li>Chamar uma função é sempre <code>nome_em_minusculas.funcao(...)</code>, independentemente de
+              como escreveste o <code>importar</code>.</li>
+            <li>Usar <code>matematica.raiz(...)</code> sem <code>importar Matematica</code> primeiro é erro
+              de compilação, não erro em runtime.</li>
+          </ul>
+          <p><code>importar</code> (biblioteca embutida) é uma coisa diferente de <code>incluir</code> (outro
+            ficheiro <code>.algo</code> teu) — capítulo 9.</p>
+
+          <h3>8.1 <code>Matematica</code></h3>
           <table>
             <thead>
               <tr>
                 <th>Função</th>
-                <th>Descrição</th>
+                <th>Assinatura</th>
+                <th>Nota</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td><code>matematica.raiz(x)</code></td>
+                <td><code>(numérico):decimal</code></td>
                 <td>raiz quadrada</td>
               </tr>
               <tr>
                 <td><code>matematica.potencia(b, e)</code></td>
-                <td>b elevado a e</td>
+                <td><code>(numérico, numérico):decimal</code></td>
+                <td>sempre <code>decimal</code>, mesmo <code>matematica.potencia(2, 10)</code></td>
               </tr>
               <tr>
                 <td><code>matematica.absoluto(x)</code></td>
-                <td>valor absoluto</td>
+                <td><code>(numérico):mesmo tipo do argumento</code></td>
+                <td><code>absoluto(-5)</code> é <code>inteiro</code>; <code>absoluto(-5.5)</code> é
+                  <code>decimal</code>
+                </td>
               </tr>
               <tr>
                 <td><code>matematica.piso(x)</code></td>
-                <td>arredonda por baixo</td>
+                <td><code>(numérico):inteiro</code></td>
+                <td>arredonda para baixo</td>
               </tr>
               <tr>
                 <td><code>matematica.teto(x)</code></td>
-                <td>arredonda por cima</td>
+                <td><code>(numérico):inteiro</code></td>
+                <td>arredonda para cima</td>
               </tr>
               <tr>
                 <td><code>matematica.aleatorio(a, b)</code></td>
-                <td>inteiro aleatório entre a e b</td>
+                <td><code>(inteiro, inteiro):inteiro</code></td>
+                <td>inteiro aleatório, incluindo os dois limites</td>
               </tr>
             </tbody>
           </table>
+          <pre><code>escrever(matematica.raiz(16))          // 4.0
+escrever(matematica.absoluto(-5))      // 5       -- inteiro
+escrever(matematica.absoluto(-5.5))    // 5.5     -- decimal
+escrever(matematica.piso(3.9))         // 3
+escrever(matematica.teto(3.1))         // 4
 
-          <h3>13.2 Cadeia</h3>
+dado:inteiro = matematica.aleatorio(1, 6)   // 1 a 6, ambos possíveis</code></pre>
+          <p class="nota">Nota: <code>matematica.aleatorio(a, b)</code> com <code>a &gt; b</code> é erro em
+            runtime (mensagem amigável), não um resultado silenciosamente vazio ou trocado.</p>
+
+          <h3>8.2 <code>Cadeia</code></h3>
           <table>
             <thead>
               <tr>
                 <th>Função</th>
-                <th>Descrição</th>
+                <th>Assinatura</th>
+                <th>Nota</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td><code>cadeia.comprimento(s)</code></td>
+                <td><code>(cadeia):inteiro</code></td>
                 <td>número de caracteres</td>
               </tr>
               <tr>
-                <td><code>cadeia.maiusculas(s)</code></td>
-                <td>converte para maiúsculas</td>
-              </tr>
-              <tr>
-                <td><code>cadeia.minusculas(s)</code></td>
-                <td>converte para minúsculas</td>
+                <td><code>cadeia.maiusculas(s)</code> / <code>cadeia.minusculas(s)</code></td>
+                <td><code>(cadeia):cadeia</code></td>
+                <td></td>
               </tr>
               <tr>
                 <td><code>cadeia.inverter(s)</code></td>
-                <td>inverte a cadeia</td>
+                <td><code>(cadeia):cadeia</code></td>
+                <td></td>
               </tr>
               <tr>
                 <td><code>cadeia.subcadeia(s, ini, fim)</code></td>
-                <td>sub-cadeia entre índices
-                  (0-baseado; fim exclusivo)</td>
+                <td><code>(cadeia, inteiro, inteiro):cadeia</code></td>
+                <td>0-baseado, <code>fim</code> exclusivo</td>
               </tr>
               <tr>
                 <td><code>cadeia.caracter(s, i)</code></td>
-                <td>o caracter na posição i (0-baseado, tal
-                  como os arrays)</td>
+                <td><code>(cadeia, inteiro):caracter</code></td>
+                <td>posição 0-baseada</td>
+              </tr>
+              <tr>
+                <td><code>cadeia.procurar(s, sub)</code></td>
+                <td><code>(cadeia, cadeia):inteiro</code></td>
+                <td>posição da 1ª ocorrência, ou <code>-1</code> se não encontrar</td>
+              </tr>
+              <tr>
+                <td><code>cadeia.substituir(s, antigo, novo)</code></td>
+                <td><code>(cadeia, cadeia, cadeia):cadeia</code></td>
+                <td>substitui todas as ocorrências</td>
+              </tr>
+              <tr>
+                <td><code>cadeia.dividir(s, sep)</code></td>
+                <td><code>(cadeia, cadeia):cadeia[]</code></td>
+                <td>separa por texto — devolve um vetor</td>
               </tr>
             </tbody>
           </table>
+          <pre><code>s:cadeia = "Ola Mundo"
+escrever(cadeia.comprimento(s))            // 9
+escrever(cadeia.maiusculas(s))             // OLA MUNDO
+escrever(cadeia.subcadeia(s, 0, 3))        // Ola   -- índices 0,1,2 (3 é exclusivo)
+escrever(cadeia.caracter(s, 4))            // M
+escrever(cadeia.procurar(s, "Mundo"))      // 4
+escrever(cadeia.procurar(s, "xyz"))        // -1  -- não encontrado, não é erro</code></pre>
+          <p><code>dividir</code> é a única função de biblioteca que devolve um vetor — o tamanho declarado
+            do lado esquerdo tem de bater certo com o número de partes real, verificado em runtime (capítulo
+            5):</p>
+          <pre><code>partes:cadeia[3] = cadeia.dividir("a,b,c", ",")
+escrever(partes[0], " ", partes[1], " ", partes[2])   // a b c</code></pre>
+          <p class="nota">Nota: <code>procurar</code>/<code>substituir</code>/<code>dividir</code> rejeitam
+            com erro amigável um texto vazio no argumento relevante (o que se procura, o que se substitui, o
+            separador).</p>
 
-          <h3>13.3 Conversao</h3>
-          <p>Converte entre os 5 tipos primitivos (<code>importar Conversao</code>):</p>
+          <h3>8.3 <code>Conversao</code></h3>
+          <p>Converte entre os cinco tipos primitivos. Uma conversão que não faz sentido
+            (<code>conversao.paraInteiro("abc")</code>) dá erro amigável em runtime, nunca um traceback cru
+            do Python.</p>
           <table>
             <thead>
               <tr>
                 <th>Função</th>
-                <th>Descrição</th>
+                <th>Assinatura</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td><code>conversao.paraTexto(x)</code></td>
-                <td>qualquer tipo primitivo → cadeia</td>
+                <td><code>(qualquer primitivo):cadeia</code></td>
               </tr>
               <tr>
                 <td><code>conversao.paraInteiro(x)</code></td>
-                <td>qualquer tipo primitivo → inteiro (booleano vira 0/1,
-                  decimal trunca, texto faz parse)</td>
+                <td><code>(qualquer primitivo):inteiro</code> — trunca um <code>decimal</code> em direção a
+                  zero</td>
               </tr>
               <tr>
                 <td><code>conversao.paraDecimal(x)</code></td>
-                <td>qualquer tipo primitivo → decimal</td>
+                <td><code>(qualquer primitivo):decimal</code></td>
               </tr>
               <tr>
                 <td><code>conversao.paraBooleano(x)</code></td>
-                <td>qualquer tipo primitivo → booleano (0/""/"falso" →
-                  falso, resto → verdadeiro)</td>
+                <td><code>(qualquer primitivo):booleano</code> — ver nota abaixo</td>
               </tr>
               <tr>
                 <td><code>conversao.paraCaracter(t)</code></td>
-                <td>cadeia com exatamente 1 caracter → caracter</td>
+                <td><code>(cadeia):caracter</code> — exige exatamente 1 símbolo</td>
               </tr>
               <tr>
                 <td><code>conversao.paraAscii(c)</code></td>
-                <td>caracter → inteiro (código do caracter)</td>
+                <td><code>(caracter):inteiro</code></td>
               </tr>
               <tr>
                 <td><code>conversao.deAscii(i)</code></td>
-                <td>inteiro → caracter (inverso de paraAscii)</td>
+                <td><code>(inteiro):caracter</code></td>
               </tr>
             </tbody>
           </table>
+          <pre><code>escrever(conversao.paraTexto(42))          // "42"
+escrever(conversao.paraInteiro(3.9))       // 3   -- trunca, não arredonda
+escrever(conversao.paraDecimal("3.14"))    // 3.14
+escrever(conversao.paraAscii('A'))         // 65
+escrever(conversao.deAscii(65))            // A</code></pre>
 
-          <h2 id="14-incluir">14. incluir — múltiplos ficheiros</h2>
-          <p><code>incluir "caminho/ficheiro.algo"</code> junta as funções, procedimentos, estruturas e
-            variáveis globais desse ficheiro ao programa, sem namespace. O ficheiro incluído contém só
-            declarações e <code>funcao</code>/<code>procedimento</code>/<code>estrutura</code> — não tem
-            cabeçalho <code>algoritmo</code> nem bloco <code>inicio</code>.</p>
+          <h3><code>paraBooleano</code> só reconhece um punhado de textos como falso</h3>
+          <pre><code>escrever(conversao.paraBooleano("falso"))     // falso
+escrever(conversao.paraBooleano("nao"))       // falso
+escrever(conversao.paraBooleano(0))           // falso  -- inteiro 0
+escrever(conversao.paraBooleano("0"))         // falso  -- texto "0"
+escrever(conversao.paraBooleano("qualquer coisa"))  // verdadeiro</code></pre>
+          <p>Só o texto <code>"falso"</code>/<code>"f"</code>/<code>"false"</code>/<code>"não"</code>/<code>"nao"</code>/<code>"n"</code>/<code>"0"</code>
+            (sem diferenciar maiúsculas, com espaços à volta ignorados) converte para <code>falso</code>.
+            <strong>Qualquer outro texto não vazio converte para <code>verdadeiro</code></strong>, porque a
+            regra por baixo é a truthiness nativa do Python (<code>bool(x)</code>), e uma cadeia de texto não
+            vazia é sempre truthy, seja qual for o seu conteúdo.
+          </p>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>algoritmo "AnalisadorDeFrase"
+
+importar Cadeia
+importar Matematica
+
+inicio
+    frase:cadeia
+    escrever("Escreve uma frase: ")
+    ler(frase)
+
+    escrever("Maiúsculas: ", cadeia.maiusculas(frase))
+    escrever("Comprimento: ", cadeia.comprimento(frase))
+    escrever("Invertida: ", cadeia.inverter(frase))
+
+    // 'dividir' devolve um vetor cujo tamanho REAL só se conhece em
+    // runtime -- o tamanho declarado aqui tem de bater certo exatamente
+    // com o número de palavras da frase digitada (capítulo 5)
+    palavras:cadeia[3] = cadeia.dividir(frase, " ")
+    escrever("Primeira palavra: ", palavras[0])
+
+    raizComprimento:decimal = matematica.raiz(cadeia.comprimento(frase))
+    escrever("Raiz quadrada do comprimento: ", raizComprimento)</code></pre>
+
+          <h2 id="9-ficheiros-e-incluir">9. Ficheiros e incluir</h2>
+          <p><code>incluir "ficheiro.algo"</code> junta o conteúdo de outro ficheiro <code>.algo</code> teu
+            ao programa principal — diferente de <code>importar</code> (capítulo 8), que só serve para as
+            três bibliotecas embutidas da linguagem.</p>
+
+          <h3>9.1 Um ficheiro incluído não é um programa completo</h3>
+          <p>Um ficheiro pensado para ser incluído <strong>não tem</strong> <code>algoritmo "Nome"</code>
+            nem bloco <code>inicio</code> — só o que pode aparecer antes de <code>inicio</code> num programa
+            normal: <code>constante</code>, variáveis globais, <code>estrutura</code>,
+            <code>funcao</code>/<code>procedimento</code>, e o seu próprio <code>incluir</code> (ver 9.3).
+          </p>
           <pre><code>// geometria.algo
+constante PI:decimal = 3.14159
+
 funcao areaCirculo(raio:decimal):decimal
-    pi:decimal = 3.14159
-    retornar pi * raio * raio</code></pre>
+    retornar PI * raio * raio</code></pre>
           <pre><code>// principal.algo
 algoritmo "Principal"
+
 incluir "geometria.algo"
 
 inicio
-    escrever(areaCirculo(3.0))</code></pre>
+    escrever(areaCirculo(2.0))     // 12.56636</code></pre>
+          <p>As funções/<code>constante</code>/variáveis do ficheiro incluído passam a existir <strong>tal
+              como se estivessem definidas diretamente no programa principal</strong> — chamam-se sem
+            prefixo nenhum (<code>areaCirculo(...)</code>, não <code>geometria.areaCirculo(...)</code>), a
+            não ser que uses <code>como</code> (9.2).</p>
+          <p>O caminho em <code>incluir "..."</code> é relativo à <strong>pasta do ficheiro que tem o
+              <code>incluir</code></strong> — não necessariamente a pasta do programa principal (ver 9.3
+            para inclusões encadeadas).
+          </p>
 
-          <h2 id="15-comentarios">15. Comentários</h2>
-          <pre><code>// comentário até ao fim da linha
+          <h3>9.2 <code>incluir ... como &lt;alias&gt;</code></h3>
+          <p>Junta um prefixo às funções do ficheiro incluído, para evitar colisão de nomes ou só para
+            deixar claro de onde vêm:</p>
+          <pre><code>algoritmo "Principal"
 
-/* comentário
-   que pode ocupar
-   várias linhas */</code></pre>
-
-          <h2 id="16-afirmar">16. afirmar</h2>
-          <p><code>afirmar</code> verifica uma condição; se for falsa, o programa para e mostra uma
-            mensagem. É a forma que a linguagem dá para um programa se autovalidar, sem precisar de um
-            enquadramento de testes à parte:</p>
-          <pre><code>funcao dobro(x:inteiro):inteiro
-    retornar x * 2
+incluir "geometria.algo" como geo
 
 inicio
-    afirmar dobro(5) == 10, "dobro(5) devia ser 10"
-    escrever("passou no teste")</code></pre>
-          <p>Se a condição for verdadeira, <code>afirmar</code> não produz nenhuma saída. A mensagem,
-            depois da vírgula, é opcional.</p>
+    escrever(geo.areaCirculo(2.0))     // 12.56636</code></pre>
+          <p>Com <code>como</code>, o nome <strong>sem</strong> prefixo deixa de existir — só
+            <code>geo.areaCirculo(...)</code> funciona, <code>areaCirculo(...)</code> sozinho já não. O
+            alias namespacea só as <strong>funções</strong>; uma <code>estrutura</code> ou variável global do
+            ficheiro incluído continua a juntar-se sem prefixo, com ou sem <code>como</code>.
+          </p>
 
-          <h2 id="17-verificacao-de-tipos">17. Verificação de tipos</h2>
-          <p>Todo o programa ALGO é verificado antes de correr: a linguagem exige que os tipos batam
-            certo em todo o lado — atribuições, condições, argumentos de funções, índices de arrays.
-            Isto é uma propriedade da própria linguagem (não uma ferramenta à parte): um programa com um
-            erro de tipo simplesmente não é um programa ALGO válido. Exemplos do que não é permitido:</p>
+          <h3>9.3 Colisões e inclusões repetidas</h3>
           <ul>
-            <li>Atribuir um valor de um tipo a uma variável de outro tipo incompatível</li>
-            <li>Uma condição de <code>se</code>/<code>enquanto</code> que não seja <code>booleano</code></li>
-            <li>Os limites de um ciclo <code>para</code> que não sejam <code>inteiro</code></li>
-            <li>Chamar uma função com o número ou tipo de argumentos errado</li>
-            <li>Um índice de array que não seja <code>inteiro</code></li>
-            <li>Usar uma variável que nunca foi declarada</li>
-            <li>Alterar uma constante</li>
+            <li>Um <code>funcao</code>/<code>estrutura</code>/variável global incluído com o mesmo nome de
+              algo que já existe no programa principal (ou noutra inclusão já processada) é erro de
+              compilação — mesmo entre categorias diferentes.</li>
+            <li>Incluir o <strong>mesmo ficheiro duas vezes com o mesmo alias</strong> (ou sem alias nas
+              duas vezes) é inofensivo — a segunda vez é ignorada. Com um alias <strong>diferente</strong> da
+              primeira vez, é erro de compilação.</li>
+            <li>Um ficheiro incluído pode ele próprio ter <code>incluir</code> (inclusão transitiva) — o
+              caminho desse <code>incluir</code> aninhado é relativo à pasta <strong>desse</strong> ficheiro,
+              não à do programa principal. Um ciclo (A inclui B, B inclui A) não trava o compilador — o mesmo
+              caminho já processado nunca é reprocessado.</li>
+            <li>Incluir um ficheiro que não existe é erro de compilação com uma mensagem que nomeia o
+              caminho em falta, não um erro genérico de sistema de ficheiros.</li>
           </ul>
+          <pre><code>algoritmo "Principal"
 
-          <h2 id="18-tipos-de-erro">18. Os três tipos de erro de compilação</h2>
+incluir "geometria.algo"
+
+funcao areaCirculo(raio:decimal):decimal    // ERRO: colide com a incluída
+    retornar 0.0
+
+inicio
+    escrever(areaCirculo(2.0))</code></pre>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>// validacoes.algo
+funcao ehPositivo(x:decimal):booleano
+    retornar x > 0.0
+
+funcao dentroDoIntervalo(x:decimal, minimo:decimal, maximo:decimal):booleano
+    retornar x >= minimo e x <= maximo</code></pre>
+          <pre><code>// principal.algo
+algoritmo "NotaValida"
+
+incluir "validacoes.algo"
+
+inicio
+    nota:decimal
+    escrever("Nota (0 a 20): ")
+    ler(nota)
+
+    se nao ehPositivo(nota) entao
+        escrever("A nota não pode ser negativa")
+    senao se nao dentroDoIntervalo(nota, 0.0, 20.0) entao
+        escrever("A nota tem de estar entre 0 e 20")
+    senao
+        escrever("Nota válida: ", nota)</code></pre>
+
+          <h2 id="10-afirmar-e-tratamento-de-erros">10. <code>afirmar</code> e tratamento de erros</h2>
+          <h3>10.1 <code>afirmar</code></h3>
+          <p><code>afirmar &lt;condição booleana&gt;[, &lt;mensagem de texto&gt;]</code> verifica uma
+            condição enquanto o programa corre — se for falsa, o programa para imediatamente com uma
+            mensagem que mostra a própria condição (e a tua mensagem, se deste uma):</p>
+          <pre><code>idade:inteiro = 5
+afirmar idade >= 18, "idade tem de ser maior ou igual a 18"</code></pre>
+          <p>Saída (e o programa para, código de saída <code>1</code>; <code>N</code> é a linha exata do
+            <code>afirmar</code> no ficheiro <code>.algo</code> completo, incluindo o cabeçalho
+            <code>algoritmo "..."</code>):
+          </p>
+          <pre><code>❌ Afirmação falhou (linha N): idade >= 18 — idade tem de ser maior ou igual a 18</code></pre>
+          <p>Sem mensagem, mostra só a condição:</p>
+          <pre><code>idade:inteiro = 5
+afirmar idade >= 18</code></pre>
+          <pre><code>❌ Afirmação falhou (linha N): idade >= 18</code></pre>
+          <p>Usa-se sobretudo para validar as tuas próprias suposições enquanto escreves/testas um exercício
+            ("isto nunca deveria acontecer, se acontecer quero saber já") — ao contrário de
+            <code>assert</code> em Python, <strong>nunca é desativado/ignorado</strong> (não há um "modo
+            otimizado" que o remova); um <code>afirmar</code> fica sempre ativo no programa final.
+          </p>
+
+          <h3>10.2 Erros em tempo de execução</h3>
+          <p>Um erro que só pode ser detetado ao correr o programa (não em compilação) — índice fora dos
+            limites, divisão por zero, valor inválido para converter, etc. — nunca aparece como um
+            <em>traceback</em> cru do Python. O programa imprime sempre uma mensagem em português no formato
+            <code>Erro em tempo de execução: &lt;explicação&gt;. (linha N)</code> e termina com código de
+            saída <code>1</code>.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Situação</th>
+                <th>Mensagem</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>índice de <strong>vetor</strong> fora dos limites (inclui negativo)</td>
+                <td>"tentaste aceder a uma posição de vetor que não existe (índice fora dos limites)."</td>
+              </tr>
+              <tr>
+                <td>índice de <strong>texto</strong> fora dos limites (<code>cadeia.caracter</code>, etc.)</td>
+                <td>"tentaste aceder a uma posição de texto que não existe (índice fora dos limites)."</td>
+              </tr>
+              <tr>
+                <td>divisão (<code>/</code>, <code>div</code>, <code>mod</code>) por zero</td>
+                <td>"divisão por zero."</td>
+              </tr>
+              <tr>
+                <td>aceder a um campo de um valor <code>nulo</code></td>
+                <td>"tentaste aceder ao campo '&lt;nome&gt;' de um valor nulo."</td>
+              </tr>
+              <tr>
+                <td><code>ler()</code> depois de esgotar o ficheiro/entrada disponível</td>
+                <td>"o programa tentou ler mais valores do que os que o ficheiro de entradas tinha."</td>
+              </tr>
+              <tr>
+                <td>resultado grande demais para representar</td>
+                <td>"o resultado é grande demais para ser representado (overflow numérico)."</td>
+              </tr>
+              <tr>
+                <td>recursão sem caso base (nunca para)</td>
+                <td>"recursão infinita (a função nunca chega ao caso base)."</td>
+              </tr>
+              <tr>
+                <td>pedido de memória grande demais (ex.: vetor enorme)</td>
+                <td>"o programa ficou sem memória (o valor pedido é grande demais)."</td>
+              </tr>
+              <tr>
+                <td>conversão/operação com valor sem sentido (ex.: <code>matematica.raiz(-1)</code>)</td>
+                <td>mensagem específica da biblioteca (capítulo 8), ou "valor inválido (...)" genérico</td>
+              </tr>
+            </tbody>
+          </table>
+          <pre><code>x:inteiro = 5
+y:inteiro = 0
+escrever(x div y)</code></pre>
+          <pre><code>Erro em tempo de execução: divisão por zero. (linha N)</code></pre>
+
+          <h3>10.3 <code>afirmar</code> vs. erro em runtime vs. erro de compilação</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Quando é detetado</th>
+                <th>Exemplo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Erro de <strong>compilação</strong></td>
+                <td>antes de o programa correr, sempre</td>
+                <td><code>idade:inteiro = "vinte"</code> (tipos incompatíveis)</td>
+              </tr>
+              <tr>
+                <td>Erro em <strong>runtime</strong></td>
+                <td>a meio da execução, causado pelos dados concretos</td>
+                <td><code>v[10]</code> num vetor de tamanho 5</td>
+              </tr>
+              <tr>
+                <td><code>afirmar</code> falhado</td>
+                <td>a meio da execução, é uma verificação <strong>tua</strong>, não do compilador</td>
+                <td><code>afirmar idade &gt;= 0</code></td>
+              </tr>
+            </tbody>
+          </table>
+          <p>Um erro de compilação acontece sempre da mesma forma, independentemente da entrada do programa —
+            o compilador não corre nada, só lê o código. Um erro em runtime e um <code>afirmar</code> falhado
+            só acontecem com certos valores concretos; a diferença entre os dois é que um erro em runtime vem
+            de uma operação que a própria linguagem já sabe que pode falhar (divisão, índice, ...), e um
+            <code>afirmar</code> é uma condição que <strong>tu</strong> decidiste que tinha de ser verdadeira
+            naquele ponto do programa.
+          </p>
+
+          <h3>Exemplo completo</h3>
+          <pre><code>algoritmo "DivisorSeguro"
+
+funcao dividir(a:decimal, b:decimal):decimal
+    afirmar b <> 0.0, "não é possível dividir por zero"
+    retornar a / b
+
+inicio
+    a:decimal
+    b:decimal
+    escrever("Numerador: ")
+    ler(a)
+    escrever("Denominador: ")
+    ler(b)
+    escrever(dividir(a, b))</code></pre>
+          <p>Com <code>b = 0</code>, o <code>afirmar</code> dentro de <code>dividir</code> para o programa
+            com uma mensagem clara — antes mesmo de chegar à divisão que geraria o erro em runtime genérico
+            "divisão por zero." Nenhuma das duas formas deixa o programa continuar com um resultado sem
+            sentido.</p>
+
+          <h2 id="11-tipos-de-erro">11. Os três tipos de erro de compilação</h2>
           <p>Uma mensagem de erro do ALGO começa sempre por dizer QUE TIPO de erro é --
             "Erro léxico", "Erro de sintaxe" ou "Erro semântico". Não é preciso saber a
             diferença para corrigir o erro (a mensagem já diz o que fazer), mas ajuda a
@@ -710,7 +1751,7 @@ inicio
             <li><strong>Semântico</strong> — a frase está bem formada (compreensível
               gramaticalmente), mas não faz sentido dado o que já foi declarado antes. Ex:
               usar uma variável nunca declarada, ou tentar somar um <code>booleano</code> com
-              um <code>inteiro</code> (ver secção 17).</li>
+              um <code>inteiro</code> (ver capítulo 6).</li>
           </ul>
           <p>É por esta ordem que o compilador procura erros: primeiro léxico, depois
             sintático, só depois semântico -- por isso nunca vês um erro semântico
@@ -768,6 +1809,10 @@ inicio
                 <td><code>fazer ... enquanto cond</code></td>
               </tr>
               <tr>
+                <td>Sair / continuar de um ciclo</td>
+                <td><code>sair</code> &nbsp; / &nbsp; <code>continuar</code></td>
+              </tr>
+              <tr>
                 <td>Função</td>
                 <td><code>funcao nome(p:tipo, ...):tipo ... retornar expr</code></td>
               </tr>
@@ -780,12 +1825,28 @@ inicio
                 <td><code>estrutura Nome  campo:tipo ...</code></td>
               </tr>
               <tr>
+                <td>Campo por referência</td>
+                <td><code>campo:ref TipoEstrutura</code></td>
+              </tr>
+              <tr>
                 <td>Literal de array</td>
                 <td><code>{valor, valor, ...}</code></td>
               </tr>
               <tr>
                 <td>Literal de estrutura</td>
                 <td><code>{campo: valor, ...}</code></td>
+              </tr>
+              <tr>
+                <td>Valor nulo</td>
+                <td><code>nulo</code> (só comparável com variáveis de tipo <code>estrutura</code>)</td>
+              </tr>
+              <tr>
+                <td>Importar biblioteca</td>
+                <td><code>importar Matematica|Cadeia|Conversao</code></td>
+              </tr>
+              <tr>
+                <td>Incluir ficheiro</td>
+                <td><code>incluir "caminho.algo" [como alias]</code></td>
               </tr>
               <tr>
                 <td>afirmar</td>
@@ -800,15 +1861,29 @@ inicio
 
           <h2 id="anexo-b">Anexo B — Palavras reservadas</h2>
           <p><code>algoritmo, inicio, estrutura, escrever, ler, se, entao, senao, para, de, ate, passo,
-            fazer, enquanto, escolher, caso, contrario, funcao, procedimento, retornar, ref, importar,
-            incluir, constante, afirmar, verdadeiro, falso, e, ou, nao, div, mod</code>.</p>
+            fazer, enquanto, sair, continuar, escolher, caso, contrario, funcao, procedimento, retornar, ref,
+            importar, incluir, como, constante, afirmar, verdadeiro, falso, nulo, e, ou, nao, div, mod</code>.
+          </p>
           <p class="nota">Nota: Os tipos primitivos (<code>inteiro</code>, <code>decimal</code>,
             <code>booleano</code>, <code>cadeia</code>, <code>caracter</code>) não estão nesta lista de
             palavras reservadas do ALGO — são reconhecidos pela posição na frase, não pelo nome, o que
             permite por exemplo definires uma <code>estrutura</code> com o mesmo nome de um tipo. Ainda
             assim, o compilador não deixa dar a uma <em>variável</em> o nome de um tipo primitivo nem de
-            uma biblioteca importada (ver <a href="#4-variaveis">capítulo 4</a>).
+            uma biblioteca importada (ver <a href="#1-introducao-e-tipos">capítulo 1</a>).
           </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="aba-conteudo-exemplos" class="conteudo-aba-ajuda escondido">
+      <p class="subtitulo">Programas completos, organizados por tema, retirados da pasta <code>exemplos/</code>
+        do projeto.</p>
+      <div class="corpo-exemplos">
+        <nav class="indice-exemplos" id="indice-exemplos">
+          <p class="carregando-exemplos">A carregar...</p>
+        </nav>
+        <div class="conteudo-exemplo" id="conteudo-exemplo">
+          <p class="aviso-exemplo">Escolhe um tema à esquerda para veres os exemplos.</p>
         </div>
       </div>
     </section>

@@ -631,7 +631,7 @@ def test_gerar_rasto_simples(tmp_path):
 
 
 def test_gerar_rasto_inclui_as_chaves_que_o_visualizador_exige(tmp_path):
-    """O visualizador (visualizador/algo-trace-viewer.html) recusa
+    """O visualizador (estatico/visualizador/algo-trace-viewer.html) recusa
     ficheiros sem 'passos'/'codigoFonte' -- confirma que o envelope
     devolvido aqui tem exatamente as mesmas chaves que
     algo_lang.cli.cmd_executa_com_trace escreve no '..._trace.json'."""

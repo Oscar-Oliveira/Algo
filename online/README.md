@@ -25,7 +25,7 @@ online/
 ├── modo_codemirror.py    # gera o realce de sintaxe a partir do compilador
 ├── estatico/                 # HTML/CSS/JS -- sem framework de frontend
 │   ├── vendor/codemirror6/      # CodeMirror 6 auto-hospedado (não depende de CDN)
-│   └── visualizador/            # cópia do visualizador de rasto autónomo (não alterado)
+│   └── visualizador/            # visualizador de rasto (algo-trace-viewer.html/.jsx), só existe aqui
 └── tests/                     # 83 testes (pytest)
 ```
 
@@ -186,12 +186,11 @@ escreve na base de dados real nem na pasta `alguem/logs/` real.
 - **Rasto: já não tem navegação passo-a-passo própria**. Gera o
   ficheiro `..._trace.json` (exatamente igual ao que `algo executa
   --json` produz, sem nenhum filtro), dá para descarregar, e há uma
-  ligação para abrir o visualizador autónomo já existente
-  (`visualizador/algo-trace-viewer.html`, agora também servido pelo
-  próprio serviço online em `/estatico/visualizador/`). Decisão
-  deliberada: reaproveitar uma ferramenta já testada em vez de manter
-  uma segunda implementação de navegação de passos só para a versão
-  web.
+  ligação para abrir o visualizador em `/estatico/visualizador/`
+  (`online/estatico/visualizador/algo-trace-viewer.html` -- já não
+  existe cópia nenhuma fora do online). Decisão deliberada:
+  reaproveitar uma ferramenta já testada em vez de manter uma segunda
+  implementação de navegação de passos só para a versão web.
 
 ## O que falta (honestidade, não lista de vergonha)
 

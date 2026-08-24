@@ -356,7 +356,8 @@ def cmd_executa_com_trace(args):
             json.dump(trace_final, f, ensure_ascii=False, indent=1)
         print(f"\n✔ Trace gerado: {caminho_json} ({len(resultado['passos'])} passo(s))")
         print(
-            "  Abre o visualizador web e carrega este ficheiro para navegar passo a passo."
+            "  Carrega este ficheiro no visualizador web (disponível apenas na "
+            "versão online do Algo) para navegar passo a passo."
         )
 
     if resultado["erro"] or resultado["limiteExcedido"]:
