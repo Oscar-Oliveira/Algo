@@ -1,23 +1,19 @@
 # -*- coding: utf-8 -*-
-"""Base partilhada entre compilador/codegen.py e
-compilador/codegen_minimo.py.
+"""Base de codegen.py.
 
-Os dois geradores têm a mesma estrutura de dispatch (mesma sequência
-de isinstance por tipo de instrução/expressão), mas o CÓDIGO PYTHON
-QUE CADA UM EMITE é deliberadamente diferente na maior parte dos
-casos: codegen.py gera código com verificações de tipo/runtime;
-codegen_minimo.py gera código direto, sem rede de segurança nenhuma,
-por desenho (ver CLAUDE.md). Fundir essa parte exigiria parametrizar
-o comportamento de cada emissão -- um redesenho real do gerador de
-código, não uma extração mecânica, com risco de introduzir uma
-regressão subtil.
-
-Esta base contém só os ~11 métodos que já eram bytes idênticos entre
-os dois ficheiros antes desta extração -- percurso de lvalues,
-resolução de funções, e as estruturas de controlo (se/para/escolha)
-cujo código gerado não depende de nenhuma verificação de segurança
-específica de um dos modos. Reduz duplicação real sem tocar em nada
-que seja deliberadamente diferente entre os dois."""
+Extraída em tempos para partilhar dispatch (mesma sequência de
+isinstance por tipo de instrução/expressão) com um segundo gerador,
+compilador/codegen_minimo.py, que dava suporte a um modo `compila
+--minimo` sem verificação de tipos (mapeamentos diretos tipo
+`afirmar`→`assert`). Esse modo e ficheiro foram removidos (commit
+cc78b3d) sem fundir esta base de volta em codegen.py; hoje
+`GeradorCodigo` (codegen.py) é a única subclasse de
+`GeradorCodigoBase`. Alguns comentários abaixo ainda explicam
+decisões em termos do modo `--minimo` que as motivou -- mantidos
+porque continuam a documentar a divisão real entre o que corre
+sempre (esta base) e o que só corre depois de verificar() ter
+validado o programa (codegen.py), mesmo já não havendo um segundo
+consumidor concreto dessa distinção."""
 from __future__ import annotations
 
 from . import ast_nodes as A
@@ -27,24 +23,24 @@ DEFAULT_POR_TIPO = {
     "decimal": "0.0",
     "booleano": "False",
     "cadeia": '""',
-    "caracter": '""',
+    # Um espaço, não "" -- 'caracter' é garantidamente 1 símbolo em todo
+    # o resto da linguagem (literal '...', ler()); "" quebrava essa
+    # invariante para uma declaração sem valor inicial nunca lida.
+    "caracter": '" "',
 }
 
 
 class ErroInternoCompilador(Exception):
-    """ARCH-03: uma falha de invariante do PRÓPRIO gerador de código --
-    partilhada por codegen.py e codegen_minimo.py (antes só existia em
-    codegen.py; codegen_minimo.py reaproveitava ErroSemantico para o
-    mesmo tipo de falha, fazendo um bug do compilador parecer um erro de
-    tipos do estudante). Em codegen.py isto nunca deveria de facto
-    acontecer, porque verificar() (semantics.py) já validou o programa
-    antes de gerar_python() correr -- os sítios que a levantam aí estão
-    marcados '# pragma: no cover' por essa razão. Em codegen_minimo.py
-    (--minimo salta verificar() de propósito) alguns destes pontos SÃO
-    alcançáveis por um programa ALGO sintaticamente válido mas
-    semanticamente inválido; nesses, não está marcada 'no cover'.
-    Distinto de propósito de ErroSemantico, que É esperado (disparado
-    por um erro real no programa do estudante)."""
+    """ARCH-03: uma falha de invariante do PRÓPRIO gerador de código
+    (distinto de propósito de ErroSemantico, que É esperado, disparado
+    por um erro real no programa do estudante). Em codegen.py isto
+    nunca deveria de facto acontecer, porque verificar() (semantics.py)
+    já validou o programa antes de gerar_python() correr -- os sítios
+    que a levantam estão marcados '# pragma: no cover' por essa razão.
+    (Histórico: também usada por um extinto codegen_minimo.py, que
+    saltava verificar() de propósito e por isso conseguia mesmo
+    alcançar alguns destes pontos com um programa ALGO sintaticamente
+    válido mas semanticamente inválido.)"""
     def __init__(self, mensagem):
         super().__init__(f"Erro interno do compilador: {mensagem}")
 
@@ -91,7 +87,7 @@ class GeradorCodigoBase:
         também recursaria infinitamente se construído eagerly (cada 'No'
         tentaria construir os seus próprios 'filhos', ad infinitum)."""
         grafo = {
-            nome: [tipo for tipo, dims_n in campos.values()
+            nome: [tipo for tipo, dims_n, _por_referencia in campos.values()
                    if tipo in self.estruturas]
             for nome, campos in self.estruturas.items()
         }
@@ -117,11 +113,7 @@ class GeradorCodigoBase:
         expressão com o seu tipo inferido (expr._tipo_inferido, ver
         VerificadorTipos._tipo_expr) durante verificar(), que corre
         sempre antes de gerar_python(); reaproveita-se esse tipo aqui em
-        vez de o recalcular. Partilhado, mas inofensivo para
-        codegen_minimo.py: --minimo salta verificar() de propósito, por
-        isso os nós nunca têm '_tipo_inferido' nesse caminho e isto
-        nunca coage nada, consistente com --minimo não ter rede de
-        segurança nenhuma."""
+        vez de o recalcular."""
         if tipo_alvo == "decimal" and getattr(expr_no, "_tipo_inferido", None) == "inteiro":
             return f"float({expr_py})"
         return expr_py
@@ -161,10 +153,12 @@ class GeradorCodigoBase:
         alvo = self._lvalue(stmt.alvo, tipos)
         tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
         if isinstance(stmt.expr, A.EstruturaLiteral):
-            # Um literal de estrutura como valor de uma ATRIBUIÇÃO. Este
-            # ramo só é mesmo alcançado a partir de codegen_minimo.py --
-            # codegen.py sobrepõe este método e trata o caso com
-            # _expr_estrutura_literal antes de chegar aqui.
+            # Um literal de estrutura como valor de uma ATRIBUIÇÃO.
+            # codegen.py (única subclasse) intercepta e trata este caso
+            # com _expr_estrutura_literal antes de chegar aqui (ver
+            # GeradorCodigo._gerar_atribuicao), por isso este ramo é
+            # inatingível no compilador atual -- era o caminho usado pelo
+            # extinto codegen_minimo.py.
             expr = self._expr_estrutura_literal(stmt.expr, tipo_alvo, tipos)
         elif isinstance(stmt.expr, A.VetorLiteral):
             # Mesma lacuna, lado vetor -- 'v = {{nome: "Ana"}}' com 'v' já
@@ -174,8 +168,10 @@ class GeradorCodigoBase:
             expr = self._coagir_decimal(self._expr(stmt.expr, tipos), tipo_alvo, stmt.expr)
             # semantics.py já rejeita atribuir um vetor inteiro diretamente
             # (o alvo aqui é sempre dims==0), por isso só 'estrutura'
-            # importa neste caminho.
-            expr = self._copiar_se_necessario(expr, tipo_alvo, 0)
+            # importa neste caminho -- exceto se o alvo for um campo 'ref',
+            # onde aliasing é intencional (ver _alvo_e_campo_ref).
+            if not self._alvo_e_campo_ref(stmt.alvo, tipos):
+                expr = self._copiar_se_necessario(expr, tipo_alvo, 0)
         self.emit(f"{alvo} = {expr}", nivel)
 
     def _gerar_se(self, stmt: A.Se, nivel, tipos):
@@ -268,8 +264,24 @@ class GeradorCodigoBase:
         for tag, valor in lv.acessos:
             if tag == "campo":
                 campos = self.estruturas.get(tipo_atual, {})
-                tipo_atual = campos.get(valor, ("cadeia", 0))[0]
+                tipo_atual = campos.get(valor, ("cadeia", 0, False))[0]
         return tipo_atual
+
+    def _alvo_e_campo_ref(self, lv: A.LValue, tipos):
+        """True se o ÚLTIMO acesso de 'lv' for um campo 'ref' -- usado para
+        saltar _copiar_se_necessario ao atribuir a um campo 'ref' (aliasing
+        intencional, tal como um parâmetro 'ref'). Mesmo percurso que
+        _tipo_final_lvalue, só que para no penúltimo acesso e olha para o
+        3º elemento (por_referencia) da entrada do campo final."""
+        if not lv.acessos or lv.acessos[-1][0] != "campo":
+            return False
+        tipo_atual = tipos.get(lv.nome, "cadeia")
+        for tag, valor in lv.acessos[:-1]:
+            if tag == "campo":
+                campos = self.estruturas.get(tipo_atual, {})
+                tipo_atual = campos.get(valor, ("cadeia", 0, False))[0]
+        campos = self.estruturas.get(tipo_atual, {})
+        return campos.get(lv.acessos[-1][1], ("cadeia", 0, False))[2]
 
     # -------- funções --------
     def _gerar_funcao(self, f: A.FuncaoDef):
@@ -291,9 +303,9 @@ class GeradorCodigoBase:
             tipos_locais[p.nome] = p.tipo
 
         self.refs_atuais = [p.nome for p in f.parametros if p.por_referencia]
-        # AL-XX: tipo de retorno da função a gerar neste momento -- só
-        # codegen.py o consulta (para coagir 'retornar <inteiro>' de uma
-        # função 'decimal'); irrelevante para codegen_minimo.py.
+        # AL-XX: tipo de retorno da função a gerar neste momento -- usado
+        # por codegen.py para coagir 'retornar <inteiro>' de uma função
+        # 'decimal'.
         self.tipo_retorno_atual = f.tipo_retorno
         self.dims_retorno_atual = f.dims_retorno
 

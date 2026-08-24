@@ -1,0 +1,40 @@
+# 07 — Estruturas
+
+Assunto: `estrutura`, acesso a campo com `.`, estruturas aninhadas,
+estrutura passada por valor vs `ref`, vetor de estruturas, campo do
+próprio tipo (estrutura recursiva) e comparação com `nulo`.
+
+## `catalogo_produtos.algo`
+
+Gere um catálogo de produtos: valor total do inventário, produto mais
+caro, aplicar desconto a todos.
+
+Demonstra: vetor de `estrutura` (`Produto[3]`), acesso a campo por índice
+(`catalogo[i].preco`), e funções/procedimentos sobre vetor de estruturas
+(assunto 06) — incluindo `ref` (`aplicarDesconto`) para mutar os preços
+de todo o catálogo do próprio vetor do chamador.
+
+## `geometria_pontos.algo`
+
+Pontos, segmentos, e distância entre dois pontos.
+
+Demonstra: `estrutura` aninhada dentro de outra (`Segmento` tem dois
+campos `Ponto`), estrutura passada por **valor** como parâmetro (copiada
+— alterar `p1`/`p2` dentro de `distancia` não afetaria os originais) vs
+`ref` (`deslocar` muta o `Ponto` do chamador), e reforça que
+`matematica.raiz` só existe a partir do assunto 08: a raiz quadrada é
+aproximada aqui com o método de Newton, escrito à mão com `para`
+(assunto 04).
+
+## `lista_ligada_fixa.algo`
+
+Uma lista ligada de tamanho fixo (3 nós), construída de trás para a
+frente e percorrida com `enquanto no <> nulo fazer`.
+
+Demonstra: um campo de estrutura do **próprio tipo** (`seguinte:No`),
+válido por ficar `nulo` por omissão em vez de recursão infinita (ver
+"Estruturas" em `DecisoesELimitacoesConhecidas.md`); como ALGO não tem
+alocação dinâmica, cada `nó.seguinte = outroNo` é uma **cópia** do resto
+da cadeia (não um ponteiro partilhado), por isso a lista tem de ser
+montada de trás para a frente — testado e confirma-se que soma/conta os
+3 nós corretamente.

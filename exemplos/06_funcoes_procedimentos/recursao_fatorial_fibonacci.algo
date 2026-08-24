@@ -1,0 +1,32 @@
+algoritmo "RecursaoFatorialFibonacci"
+
+// Duas funções recursivas clássicas.
+// Foco: recursão -- uma função pode chamar-se a si própria, desde que
+// tenha um caso base que não recursa; reaproveita 'para' (assunto 04)
+// para chamar a função recursiva várias vezes.
+
+funcao fatorial(n:inteiro):inteiro
+    se n <= 1 entao
+        retornar 1
+    retornar n * fatorial(n - 1)
+
+funcao fibonacci(n:inteiro):inteiro
+    se n == 0 entao
+        retornar 0
+    senao se n == 1 entao
+        retornar 1
+    retornar fibonacci(n - 1) + fibonacci(n - 2)
+
+inicio
+    numeroTermos:inteiro
+    escrever("Quantos termos de Fibonacci mostrar: ")
+    ler(numeroTermos)
+
+    i:inteiro
+    para i de 0 ate numeroTermos - 1 fazer
+        escrever("fibonacci(", i, ") = ", fibonacci(i))
+
+    valorFatorial:inteiro
+    escrever("Calcular o fatorial de: ")
+    ler(valorFatorial)
+    escrever(valorFatorial, "! = ", fatorial(valorFatorial))

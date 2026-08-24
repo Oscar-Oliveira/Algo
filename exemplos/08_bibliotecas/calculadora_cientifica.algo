@@ -1,0 +1,41 @@
+algoritmo "CalculadoraCientifica"
+
+// Menu de operações matemáticas sobre um número.
+// Foco: toda a biblioteca Matematica -- raiz, absoluto, piso, teto,
+// aleatorio, potencia. Reaproveita 'escolher/caso' (assunto 03).
+
+importar Matematica
+
+inicio
+    x:decimal
+    escrever("Número: ")
+    ler(x)
+
+    opcao:inteiro
+    escrever("1-Raiz quadrada  2-Valor absoluto  3-Arredondar por baixo")
+    escrever("4-Arredondar por cima  5-Aleatório entre 1 e piso(x)")
+    escrever("Escolhe uma opção: ")
+    ler(opcao)
+
+    escolher opcao
+        caso 1
+            se x < 0.0 entao
+                escrever("Não é possível calcular a raiz de um número negativo")
+            senao
+                escrever("Raiz quadrada: ", matematica.raiz(x))
+        caso 2
+            escrever("Valor absoluto: ", matematica.absoluto(x))
+        caso 3
+            escrever("Arredondado por baixo: ", matematica.piso(x))
+        caso 4
+            escrever("Arredondado por cima: ", matematica.teto(x))
+        caso 5
+            limite:inteiro = matematica.piso(x)
+            se limite < 1 entao
+                escrever("x precisa de piso(x) >= 1 para gerar um aleatório entre 1 e ele")
+            senao
+                escrever("Número aleatório entre 1 e ", limite, ": ", matematica.aleatorio(1, limite))
+        contrario
+            escrever("Opção inválida")
+
+    escrever(x, " elevado a 3: ", matematica.potencia(x, 3))

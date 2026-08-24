@@ -23,9 +23,8 @@ algo.bat         # Windows
 ```
 
 Instala tudo o que for preciso na primeira vez (ambiente virtual
-Python) e abre a consola interativa. `algo executa`, `algo compila`,
-`algo fluxograma`, `algo verifica`, e `?` dentro da consola chama o
-Alguem. Referência completa em `docs/ReferenciaCompletaCLI.md`.
+Python) e abre a consola interativa. `algo executa`, `algo fluxograma`,
+`algo verifica`. Referência completa em `docs/ManualCLI.md`.
 
 ### 2. Serviço web (várias pessoas, cada uma com a sua conta)
 
@@ -52,20 +51,17 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 ├── alguem/              # o tutor LLM -- reaproveitado tal e qual pelos dois modos
 ├── online/                # o serviço web (FastAPI) -- ver online/README.md
 ├── visualizador/              # visualizador autónomo do rasto (algo-trace-viewer.html)
-├── exemplos/                    # programas Algo de exemplo
-└── docs/                            # manuais, sebenta, guia do docente
+├── exemplos/                    # programas Algo de exemplo, organizados por assunto (01_variaveis_tipos/, 02_operadores/, ...)
+└── docs/                            # manual da CLI, decisões de design (bin/: material arquivado)
 ```
 
 ## `docs/` — manuais e material de apoio
 
 | Ficheiro | Para quem |
 |---|---|
-| `ManualCompletoALGO.md` | Referência completa da linguagem e das ferramentas |
-| `ManualDaLinguagemALGO.docx` | A mesma referência, em Word |
-| `SebentaExerciciosALGO.docx` | Exercícios práticos |
-| `GuiaSolucoesALGO_Docente.docx` | Soluções dos exercícios, para docentes |
-| `RoteiroTestesManualALGO.md` | Roteiro de testes manuais do compilador |
-| `ReferenciaCompletaCLI.md` | Referência técnica extensa da linha de comandos (sintaxe completa, exemplos, decisões de design) |
+| `ManualCLI.md` | Manual do estudante: consola interativa, extensão do VS Code, e (por fim) instalar Python e usar a linha de comandos |
+| `DecisoesELimitacoesConhecidas.md` | Decisões de design e limitações conhecidas do compilador |
+| `bin/` | Material arquivado — versões supersedidas ou não atualizadas (manual de instalação anterior, roteiro de testes manuais, sebenta de exercícios, guia do docente, referência completa da linguagem em Word e em Markdown) |
 
 ## Sub-projetos com o seu próprio README
 

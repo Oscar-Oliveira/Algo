@@ -1,0 +1,55 @@
+algoritmo "CatalogoDeProdutos"
+
+// Gere um pequeno catálogo de produtos.
+// Foco: 'estrutura', vetor de estruturas, acesso a campo via '.',
+// funções/procedimentos sobre vetor de estruturas (assunto 06),
+// incluindo 'ref' para aplicar um desconto a todo o catálogo de uma vez.
+
+estrutura Produto
+    nome:cadeia
+    preco:decimal
+    quantidade:inteiro
+
+funcao valorTotalInventario(produtos:Produto[], tamanho:inteiro):decimal
+    total:decimal = 0.0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        total = total + produtos[i].preco * produtos[i].quantidade
+    retornar total
+
+funcao indiceMaisCaro(produtos:Produto[], tamanho:inteiro):inteiro
+    indice:inteiro = 0
+    i:inteiro
+    para i de 1 ate tamanho - 1 fazer
+        se produtos[i].preco > produtos[indice].preco entao
+            indice = i
+    retornar indice
+
+procedimento aplicarDesconto(ref produtos:Produto[], tamanho:inteiro, percentagem:decimal)
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        produtos[i].preco = produtos[i].preco - produtos[i].preco * percentagem / 100.0
+
+inicio
+    catalogo:Produto[3]
+    catalogo[0].nome = "Teclado"
+    catalogo[0].preco = 25.0
+    catalogo[0].quantidade = 10
+    catalogo[1].nome = "Rato"
+    catalogo[1].preco = 12.5
+    catalogo[1].quantidade = 20
+    catalogo[2].nome = "Monitor"
+    catalogo[2].preco = 150.0
+    catalogo[2].quantidade = 5
+
+    escrever("Valor total do inventário: ", valorTotalInventario(catalogo, 3))
+
+    indiceCaro:inteiro = indiceMaisCaro(catalogo, 3)
+    escrever("Produto mais caro: ", catalogo[indiceCaro].nome, " (", catalogo[indiceCaro].preco, ")")
+
+    aplicarDesconto(catalogo, 3, 10.0)
+
+    escrever("Preços depois do desconto de 10%:")
+    i:inteiro
+    para i de 0 ate 2 fazer
+        escrever("  ", catalogo[i].nome, ": ", catalogo[i].preco)

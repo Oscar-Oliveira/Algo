@@ -1,0 +1,11 @@
+// Ficheiro incluído com "como financas" em 'principal_calculos.algo'.
+
+funcao jurosSimples(capital:decimal, taxaAnual:decimal, anos:inteiro):decimal
+    retornar capital * taxaAnual * anos / 100.0
+
+funcao jurosCompostos(capital:decimal, taxaAnual:decimal, anos:inteiro):decimal
+    montante:decimal = capital
+    i:inteiro
+    para i de 1 ate anos fazer
+        montante = montante + montante * taxaAnual / 100.0
+    retornar montante - capital

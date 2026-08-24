@@ -20,10 +20,27 @@ enterrada num comentário.
 
 ## Cópia por valor e `ref`
 
-- **Atribuição, declaração, `retornar`, e literais `{...}` copiam
-  structs/vetores por valor** (via `copy.deepcopy`), em vez de partilhar a
-  mesma referência. Só `ref` cria aliasing — e isso é intencional (é o
-  mecanismo de passagem por referência da linguagem).
+- **`estrutura`: atribuição, declaração, `retornar`, e literais `{...}`
+  copiam por valor** (via `copy.deepcopy`), em vez de partilhar a mesma
+  referência. **`vetor`: só `retornar`, literais `{...}`, e passagem
+  como argumento (sem `ref`) copiam por valor** — atribuição
+  (`v2 = v1`) e declaração a partir doutra variável (`v3:T[N] = v1`)
+  nunca chegam a copiar nada, são rejeitadas em compilação
+  (`ErroSemantico`) antes disso: `_tipo_expr` (`semantics.py`) recusa um
+  vetor "nu" fora de `permitir_vetor` (só argumento de chamada e
+  `retornar` passam essa flag), e o alvo de uma atribuição rejeita
+  `dims_alvo > 0` incondicionalmente. Em ambos os casos, só `ref` cria
+  aliasing — e isso é intencional (é o mecanismo de passagem por
+  referência da linguagem).
+- **Um campo de `estrutura` pode ser marcado `ref`** (ex.:
+  `seguinte:ref No`), restrito a um campo escalar cujo tipo seja outra
+  `estrutura` — aliasing em vez de cópia, tal como um parâmetro `ref`,
+  ver `docs/manual/07-Estruturas.md` secção 7.5. `_gerar_estrutura`
+  (`codegen.py`) gera um `__deepcopy__` dedicado para qualquer
+  `estrutura` com pelo menos um campo `ref`, para que esse aliasing
+  sobreviva a uma cópia por valor do contentor inteiro (sem isto, o
+  `copy.deepcopy` por omissão do Python copiaria recursivamente
+  através do campo `ref` também, quebrando a partilha).
 - **Aliasing entre dois parâmetros `ref` da MESMA chamada, com o mesmo
   nome de variável base** (ex.: `ref v[i], ref v[j]` com `i==j` em
   runtime, ou `ref pontos[k].x, ref pontos[m].x` com `k==m`) é detetado —
@@ -57,7 +74,7 @@ enterrada num comentário.
   memória. `MemoryError` também está traduzido (rede de segurança para
   qualquer outra via de esgotar memória).
 - **`constante` usada como tamanho de vetor só é resolvida em compilação
-  através de `+`, `-`, `*`** (ex.: `N = A + B`) — `/` e `%` não são
+  através de `+`, `-`, `*`, `^`** (ex.: `N = A + B`) — `/` e `%` não são
   dobrados por `_resolver_constante` (`semantics.py`). Um tamanho que
   dependa de divisão/módulo de constantes cai para o guarda de runtime em
   vez de ser verificado em compilação. Incompletude conhecida, julgada de
@@ -92,6 +109,16 @@ enterrada num comentário.
 - **Comparação `==`/`<>` entre duas structs compara campo a campo**
   (`__eq__` gerado, recursivo em campos-vetor e structs aninhadas) — não é
   comparação por identidade.
+- **`__eq__` entre duas structs não é seguro contra ciclos formados por
+  campos `ref`** — desde que um campo `ref` permite formar um ciclo de
+  referências real (impossível antes, porque a cópia por valor cortava
+  sempre o ciclo), comparar (`==`/`<>`) duas structs que formem um ciclo
+  através de campos `ref` causa `RecursionError` (o `__eq__` gerado não
+  tem memoização, ao contrário do `__deepcopy__` gerado para o mesmo
+  caso, que usa `memo` e por isso é seguro). Limitação conhecida, de
+  baixo impacto — não corrigida de propósito (ver
+  `test_ciclo_de_dois_nos_via_ref_sobrevive_a_copia_por_valor`, em
+  `test_estruturas.py`, que testa só a cópia, não a igualdade).
 - **Um campo-vetor de uma estrutura pode ser inicializado diretamente num
   literal `{campo: {...}}`** — `semantics.py`, `_verificar_estrutura_
   literal`, reconhece um `A.VetorLiteral` como valor de campo e delega em
@@ -141,8 +168,24 @@ enterrada num comentário.
   fica visível depois do bloco, como uma declaração normal. Um conjunto
   de ramos **não-exaustivo** (sem `senao`/`contrario`) nunca propaga —
   sem erro, só sem disponibilizar o nome a seguir. Isto vale dentro de
-  `inicio` e dentro de uma função/procedimento; ver `ReferenciaCompletaCLI.md`
-  para a regra de âmbito entre `inicio` e as funções.
+  `inicio` e dentro de uma função/procedimento; ver
+  `bin/ReferenciaCompletaCLI.md` para a regra de âmbito entre `inicio`
+  e as funções.
+
+## Operadores e coerção de tipos
+
+- **`+` nunca converte número para texto**: exige os dois lados numéricos
+  (soma) ou os dois lados `cadeia`/`caracter` (concatenação) —
+  `inteiro`/`decimal` + `cadeia` é erro de compilação
+  (`_tipo_binop`, `semantics.py`). Só existe conversão explícita via
+  `conversao.paraTexto` (biblioteca `Conversao`). Avaliado ao escrever os
+  exemplos de `exemplos/01_variaveis_tipos/`: mantido de propósito, por
+  consistência com o resto da linguagem (nenhum outro operador faz
+  coerção implícita entre tipos incompatíveis) — não corrigir sem
+  reavaliar o impacto em toda a gramática de `+` (`booleano`/`caracter`
+  soltos, etc.). Até se chegar a `Conversao`, `escrever` com vários
+  argumentos separados por vírgula é a forma correta de misturar texto e
+  números, em vez de montar uma única `cadeia` concatenada.
 
 ## `escrever` e formatação
 

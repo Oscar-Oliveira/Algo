@@ -1,0 +1,38 @@
+algoritmo "ListaLigadaFixa"
+
+// Uma lista ligada de tamanho fixo, construída de trás para a frente.
+// Foco: campo de uma estrutura do PRÓPRIO tipo ('seguinte:No'),
+// comparação com 'nulo', e o idioma clássico de percurso
+// 'enquanto no <> nulo fazer'. ALGO não tem alocação dinâmica -- cada
+// atribuição de estrutura é uma CÓPIA (ver
+// docs/DecisoesELimitacoesConhecidas.md), por isso esta lista tem de ser
+// montada de trás para a frente: cada nó "seguinte" já leva consigo uma
+// cópia completa do resto da cadeia.
+
+estrutura No
+    valor:inteiro
+    seguinte:No
+
+inicio
+    terceiro:No
+    terceiro.valor = 30
+    terceiro.seguinte = nulo
+
+    segundo:No
+    segundo.valor = 20
+    segundo.seguinte = terceiro
+
+    primeiro:No
+    primeiro.valor = 10
+    primeiro.seguinte = segundo
+
+    atual:No = primeiro
+    soma:inteiro = 0
+    contagem:inteiro = 0
+    enquanto atual <> nulo fazer
+        escrever("Nó: ", atual.valor)
+        soma = soma + atual.valor
+        contagem = contagem + 1
+        atual = atual.seguinte
+
+    escrever("Soma dos ", contagem, " nós: ", soma)

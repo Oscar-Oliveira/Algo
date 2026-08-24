@@ -361,7 +361,7 @@ class GeradorCodigo(GeradorCodigoBase):
             campos = {}
             for c in e.campos:
                 dims_n = 0 if c.dims is None else len(c.dims)
-                campos[c.nome] = (c.tipo, dims_n)
+                campos[c.nome] = (c.tipo, dims_n, c.por_referencia)
             self.estruturas[e.nome] = campos
 
         for imp in self.programa.importares:
@@ -558,8 +558,10 @@ class GeradorCodigo(GeradorCodigoBase):
                 # Se 'c.tipo' é (direta ou mutuamente) recursivo, construir
                 # a instância por omissão nunca terminaria -- fica 'None'
                 # (nulo), tal como o estudante teria de escrever
-                # explicitamente para terminar uma lista ligada.
-                valor_default = "None" if c.tipo in recursivas else self._valor_default(c.tipo)
+                # explicitamente para terminar uma lista ligada. Um campo
+                # 'ref' fica 'None' sempre, mesmo sem recursão -- nunca
+                # possui/constrói eagerly a instância que aponta para ela.
+                valor_default = "None" if (c.tipo in recursivas or c.por_referencia) else self._valor_default(c.tipo)
                 self.emit(f"self.{c.nome} = {c.nome} if {c.nome} is not None else {valor_default}", 2)
             else:
                 self.emit(f"self.{c.nome} = {c.nome}", 2)
@@ -571,6 +573,27 @@ class GeradorCodigo(GeradorCodigoBase):
         else:  # pragma: no cover -- o parser exige >=1 campo em 'estrutura'
             condicoes = "True"
         self.emit(f"return {condicoes}", 2)
+        campos_ref = [c for c in e.campos if c.por_referencia]
+        if campos_ref:
+            # Sem isto, copiar esta estrutura POR VALOR (ex.: 'c:T = a',
+            # devolver, passar por valor) usaria o copy.deepcopy() por
+            # omissão do Python, que não distingue um campo 'ref' de um
+            # campo normal -- copiaria recursivamente através dele também,
+            # quebrando o aliasing em qualquer cópia por valor a jusante da
+            # construção inicial. 'memo' regista a nova instância ANTES de
+            # descer nos campos normais, para o caso de dois nós formarem
+            # um ciclo real através de campos 'ref' (só possível agora que
+            # 'ref' existe -- cópia por valor sozinha cortava sempre
+            # qualquer ciclo).
+            self.emit("def __deepcopy__(self, memo):", 1)
+            self.emit(f"novo = {e.nome}.__new__({e.nome})", 2)
+            self.emit("memo[id(self)] = novo", 2)
+            for c in e.campos:
+                if c.por_referencia:
+                    self.emit(f"novo.{c.nome} = self.{c.nome}", 2)
+                else:
+                    self.emit(f"novo.{c.nome} = copy.deepcopy(self.{c.nome}, memo)", 2)
+            self.emit("return novo", 2)
         self._linha_algo_atual = None
         self.linhas.append("")
 
@@ -702,7 +725,7 @@ class GeradorCodigo(GeradorCodigoBase):
         campos_decl = self.estruturas.get(tipo_nome, {})
         partes = []
         for nome, valor in lit.campos:
-            tipo_campo = campos_decl.get(nome, ("", 0))[0]
+            tipo_campo, _dims_n, campo_e_ref = campos_decl.get(nome, ("", 0, False))
             if isinstance(valor, A.EstruturaLiteral):
                 # Literal de estrutura aninhado dentro doutro -- 'valor'
                 # não tem 'self._expr()' próprio, por isso recursão direta
@@ -716,8 +739,11 @@ class GeradorCodigo(GeradorCodigoBase):
             else:
                 expr_py = self._coagir_decimal(self._expr(valor, tipos), tipo_campo, valor)
                 # Campo de literal de struct a partir de uma variável
-                # existente (ex.: '{canto: p1}').
-                expr_py = self._copiar_se_necessario(expr_py, tipo_campo, 0)
+                # existente (ex.: '{canto: p1}') -- exceto se o campo for
+                # 'ref': aí é aliasing intencional, tal como um parâmetro
+                # 'ref' (ver _copiar_se_necessario).
+                if not campo_e_ref:
+                    expr_py = self._copiar_se_necessario(expr_py, tipo_campo, 0)
             partes.append(f"{nome}={expr_py}")
         return f"{tipo_nome}({', '.join(partes)})"
 
@@ -805,13 +831,11 @@ class GeradorCodigo(GeradorCodigoBase):
             self.emit(f"{d.nome} = {expr}", nivel)
 
     def _gerar_atribuicao(self, stmt: A.Atribuicao, nivel, tipos):
-        """Sobrepõe gerador_base.py só para o caminho de chamada com
+        """Sobrepõe gerador_base.py para o caminho de chamada com
         parâmetros 'ref' -- precisa de _gerar_lista_args (coerção
         inteiro->decimal nos argumentos, cópia de estruturas por valor) e
-        de coagir o valor de retorno principal; nenhum dos dois existe em
-        codegen_minimo.py (fica com o comportamento cru da base
-        partilhada, de propósito -- ver a mesma duplicação já existente
-        em _gerar_chamada_stmt)."""
+        de coagir o valor de retorno principal (ver a mesma duplicação já
+        existente em _gerar_chamada_stmt)."""
         if isinstance(stmt.expr, A.Chamada):
             f_def = self._encontrar_funcao(stmt.expr.nome)
             if f_def and any(p.por_referencia for p in f_def.parametros):
@@ -846,15 +870,14 @@ class GeradorCodigo(GeradorCodigoBase):
                 return
         if isinstance(stmt.expr, A.EstruturaLiteral):
             # Literal de estrutura como valor de uma atribuição (não só de
-            # uma declaração ou argumento de chamada) -- agora alcançável
-            # em modo normal (semantics.py passou a propagar o tipo
-            # esperado também aqui). gerador_base.py já tem um caminho
-            # para este caso (construído para dar suporte a --minimo, que
-            # salta verificar()), mas é uma versão simplificada sem
-            # coerção decimal nem suporte a literais aninhados -- usa-se
-            # aqui a mesma _expr_estrutura_literal já usada por
-            # declaração/argumento de chamada, para os três caminhos
-            # terem exatamente o mesmo comportamento.
+            # uma declaração ou argumento de chamada) -- alcançável desde
+            # que semantics.py passou a propagar o tipo esperado também
+            # aqui. gerador_base.py tem um caminho para este caso (mais
+            # simples, sem coerção decimal nem suporte a literais
+            # aninhados), mas fica inatingível: intercepta-se aqui antes
+            # de chegar lá, usando a mesma _expr_estrutura_literal já
+            # usada por declaração/argumento de chamada, para os três
+            # caminhos terem exatamente o mesmo comportamento.
             alvo = self._lvalue(stmt.alvo, tipos)
             tipo_alvo = self._tipo_final_lvalue(stmt.alvo, tipos)
             self.emit(f"{alvo} = {self._expr_estrutura_literal(stmt.expr, tipo_alvo, tipos)}", nivel)

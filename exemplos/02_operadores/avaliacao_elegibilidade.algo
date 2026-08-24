@@ -1,0 +1,50 @@
+algoritmo "AvaliacaoDeElegibilidade"
+
+// Avaliação de elegibilidade para uma bolsa de estudo.
+// Foco: operadores relacionais (>=, <=, <) e lógicos (e, ou, nao),
+// combinados em condições compostas -- ainda sem 'se', por isso cada
+// critério fica guardado num booleano com nome próprio e é só impresso.
+
+constante IDADE_MINIMA:inteiro = 16
+constante IDADE_MAXIMA:inteiro = 25
+constante MEDIA_MINIMA:decimal = 14.0
+constante RENDIMENTO_LIMITE:decimal = 12000.0
+
+inicio
+    nomeCandidato:cadeia
+    escrever("Nome do candidato: ")
+    ler(nomeCandidato)
+
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    mediaNotas:decimal
+    escrever("Média de notas (0 a 20): ")
+    ler(mediaNotas)
+
+    rendimentoFamiliar:decimal
+    escrever("Rendimento anual do agregado familiar: ")
+    ler(rendimentoFamiliar)
+
+    estudanteTempoInteiro:booleano
+    escrever("É estudante a tempo inteiro? (verdadeiro/falso): ")
+    ler(estudanteTempoInteiro)
+
+    dentroDaFaixaEtaria:booleano = idade >= IDADE_MINIMA e idade <= IDADE_MAXIMA
+    mediaSuficiente:booleano = mediaNotas >= MEDIA_MINIMA
+    rendimentoBaixo:booleano = rendimentoFamiliar < RENDIMENTO_LIMITE
+
+    // critério social: rendimento baixo OU (não sendo baixo) ainda assim
+    // estudante a tempo inteiro
+    cumpreCriterioSocial:booleano = rendimentoBaixo ou estudanteTempoInteiro
+
+    elegivel:booleano = dentroDaFaixaEtaria e mediaSuficiente e cumpreCriterioSocial
+    excluidoSoPelaIdade:booleano = nao dentroDaFaixaEtaria e mediaSuficiente e cumpreCriterioSocial
+
+    escrever("--- Avaliação de ", nomeCandidato, " ---")
+    escrever("Dentro da faixa etária (", IDADE_MINIMA, "-", IDADE_MAXIMA, "): ", dentroDaFaixaEtaria)
+    escrever("Média suficiente (>= ", MEDIA_MINIMA, "): ", mediaSuficiente)
+    escrever("Cumpre critério social: ", cumpreCriterioSocial)
+    escrever("Elegível para a bolsa: ", elegivel)
+    escrever("Excluído só pela idade (apesar do resto cumprido): ", excluidoSoPelaIdade)

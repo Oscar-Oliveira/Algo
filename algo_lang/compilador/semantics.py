@@ -145,10 +145,8 @@ def verificar_nomes_python(programa):
     com as do Python -- por isso um identificador como 'class' ou
     'import' é perfeitamente válido em ALGO, mas geraria Python
     sintaticamente inválido (a variável seria traduzida diretamente para
-    o mesmo nome). Isto corre sempre, em qualquer modo de compilação
-    (incluindo --minimo, que salta a verificação de TIPOS mas não esta
-    verificação -- não é sobre tipos, é sobre o nome sequer poder existir
-    em Python)."""
+    o mesmo nome). Chamada por verificar() -- não é sobre tipos, é sobre
+    o nome sequer poder existir em Python."""
     for nome, linha in A.coletar_identificadores(programa):
         if keyword.iskeyword(nome):
             raise ErroSemantico(
@@ -283,7 +281,7 @@ class VerificadorTipos:
         # antecipada entre declarações de topo fora de ordem).
         self._nomes_globais_eventuais = self._nomes_globais_top_level
 
-        self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims, dims_exprs)}
+        self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims, dims_exprs, por_referencia)}
         linhas_dos_campos = {}   # (nome_estrutura, nome_campo) -> linha (só para mensagens de erro)
         for e in programa.estruturas:
             if e.nome in self.estruturas:
@@ -326,7 +324,7 @@ class VerificadorTipos:
                     # nomes fazem sentido aqui.
                     self._validar_dims(c.dims, {}, c.linha, contexto_campo=True)
                 dims_n = 0 if c.dims is None else len(c.dims)
-                campos[c.nome] = (c.tipo, dims_n, c.dims)
+                campos[c.nome] = (c.tipo, dims_n, c.dims, c.por_referencia)
                 linhas_dos_campos[(e.nome, c.nome)] = c.linha
             self.estruturas[e.nome] = campos
 
@@ -334,12 +332,23 @@ class VerificadorTipos:
         # registadas, para permitir referências cruzadas entre estruturas
         # (ex: 'estrutura A' pode ter um campo do tipo 'B', definida a seguir)
         for nome_estrutura, campos in self.estruturas.items():
-            for nome_campo, (tipo, _dims, _dims_exprs) in campos.items():
+            for nome_campo, (tipo, dims_n, _dims_exprs, por_referencia) in campos.items():
                 if tipo not in PRIMITIVOS and tipo not in self.estruturas:
                     linha = linhas_dos_campos[(nome_estrutura, nome_campo)]
                     raise ErroSemantico(
                         f"o campo '{nome_campo}' da estrutura '{nome_estrutura}' tem tipo "
                         f"desconhecido '{tipo}'", linha)
+                if por_referencia:
+                    linha = linhas_dos_campos[(nome_estrutura, nome_campo)]
+                    if tipo in PRIMITIVOS:
+                        raise ErroSemantico(
+                            f"o campo '{nome_campo}' da estrutura '{nome_estrutura}' é 'ref' "
+                            f"mas '{tipo}' é um tipo primitivo; 'ref' só é permitido num campo "
+                            f"cujo tipo seja outra 'estrutura'", linha)
+                    if dims_n != 0:
+                        raise ErroSemantico(
+                            f"o campo '{nome_campo}' da estrutura '{nome_estrutura}' não pode "
+                            f"ser 'ref' e vetor ao mesmo tempo", linha)
 
     def _validar_tipo(self, tipo, linha):
         if tipo in PRIMITIVOS:
@@ -684,7 +693,7 @@ class VerificadorTipos:
         específicas de tamanho/limites.
 
         Devolve o valor inteiro estático de 'expr' se for um literal,
-        OU uma referência (direta, ou através de '+'/'-'/'*', para
+        OU uma referência (direta, ou através de '+'/'-'/'*'/'^', para
         cobrir 'M = N + 1' com 'N' também 'constante') a uma
         'constante' inteira já registada em 'escopo'. Devolve None se
         não for estaticamente resolúvel desta forma (variável normal,
@@ -700,6 +709,14 @@ class VerificadorTipos:
             if esq is None or dire is None:
                 return None
             return {"+": esq + dire, "-": esq - dire, "*": esq * dire}[expr.op]
+        if isinstance(expr, A.BinOp) and expr.op == "^":
+            esq = self._resolver_constante(expr.esq, escopo)
+            dire = self._resolver_constante(expr.dire, escopo)
+            if esq is None or dire is None or dire < 0:
+                # Expoente negativo dobraria para um valor não-inteiro
+                # (fracionário) -- fora do que esta função promete devolver.
+                return None
+            return esq ** dire
         if isinstance(expr, A.LValue) and not expr.acessos and expr.nome in escopo:
             entrada = escopo[expr.nome]
             if len(entrada) > 3:
@@ -799,7 +816,7 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"a estrutura '{tipo_esperado}' não tem nenhum campo '{nome_campo}'. "
                     f"Campos disponíveis: {disponiveis}", lit.linha)
-            tipo_campo, dims_campo, dims_campo_exprs = campos_da_estrutura[nome_campo]
+            tipo_campo, dims_campo, dims_campo_exprs, _por_referencia = campos_da_estrutura[nome_campo]
             if isinstance(expr, A.VetorLiteral):
                 if dims_campo == 0:
                     raise ErroSemantico(
@@ -1244,7 +1261,7 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"a estrutura '{tipo}' não tem nenhum campo '{valor}'. "
                         f"Campos disponíveis: {disponiveis}", linha)
-                tipo, dims, _ = campos[valor]
+                tipo, dims, _, _ = campos[valor]
                 caminho = f"{caminho}.{valor}"
         return tipo, dims, caminho
 
@@ -1336,10 +1353,10 @@ class VerificadorTipos:
         """Um literal numérico não-negativo é seguro; qualquer outra
         expressão que _resolver_constante consiga "dobrar" em compilação
         (uma referência a 'constante' inteira, ou uma subexpressão só de
-        literais/constantes com '+'/'-'/'*') também é segura se o valor
-        resolvido não for negativo. Uma expressão com sinal genuinamente
-        desconhecido em compilação (variável normal, chamada, etc.) não é
-        considerada não-negativa."""
+        literais/constantes com '+'/'-'/'*'/'^') também é segura se o
+        valor resolvido não for negativo. Uma expressão com sinal
+        genuinamente desconhecido em compilação (variável normal,
+        chamada, etc.) não é considerada não-negativa."""
         valor = self._resolver_constante(expr, escopo)
         return valor is not None and valor >= 0
 
@@ -1416,7 +1433,12 @@ class VerificadorTipos:
         if a in TEXTUAIS and b in TEXTUAIS:
             return True
         # 'nulo' compara-se com qualquer tipo de estrutura (ex.: 'enquanto
-        # no <> nulo fazer ...', o idioma de percurso de uma lista ligada).
+        # no <> nulo fazer ...', o idioma de PERCORRER uma lista ligada já
+        # construída). Não confundir com "apontador mutável": 'estrutura'
+        # copia sempre por valor, mesmo ao atribuir a um campo (ver
+        # docs/manual/07-Estruturas.md, secção 7.5) -- este 'nulo' só
+        # sustenta o percurso, não permite duas variáveis partilharem o
+        # mesmo nó nem construir uma lista ligando/mutando nós já criados.
         if (a == "nulo" and b in self.estruturas) or (b == "nulo" and a in self.estruturas):
             return True
         return a == b

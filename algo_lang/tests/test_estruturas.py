@@ -183,18 +183,25 @@ def test_estrutura_auto_referenciada_nao_recursa_infinitamente():
 
 
 def test_lista_ligada_construida_e_percorrida_com_nulo():
+    """Atribuição de estrutura copia por valor (ver 'Cópia por valor e
+    ref' em DecisoesELimitacoesConhecidas.md) -- por isso 'b' tem de
+    estar com os seus campos finais ANTES de 'a.seguinte = b', senão
+    'a.seguinte' fica com a cópia de 'b' como estava nesse momento
+    (valor=0), não com o valor atribuído depois. Constrói-se sempre de
+    trás para a frente, tal como não há alocação dinâmica em ALGO."""
     saida = executar("""
         algoritmo "T"
         estrutura No
             valor:inteiro
             seguinte:No
         inicio
-            a:No
             b:No
-            a.valor = 1
-            a.seguinte = b
             b.valor = 2
             b.seguinte = nulo
+
+            a:No
+            a.valor = 1
+            a.seguinte = b
 
             atual:No = a
             enquanto atual <> nulo fazer
@@ -304,3 +311,153 @@ def test_aceder_a_campo_vetor_recursivo_vazio_da_erro_amigavel_nao_traceback(tmp
         ["algo", "executa", str(algo_path)], capture_output=True, text=True)
     assert "Traceback" not in resultado.stdout
     assert "posição de vetor" in resultado.stdout
+
+
+# ---------- campo 'ref' (aliasing em vez de cópia por valor) ----------
+
+def test_campo_ref_compila_e_fica_nulo_por_omissao():
+    saida = executar("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+            seguinte:ref No
+        inicio
+            n:No
+            escrever(n.seguinte == nulo)
+    """)
+    assert saida.strip() == "verdadeiro"
+
+
+def test_ref_em_declaracao_local_continua_erro_sintatico():
+    with pytest.raises(ErroSintatico):
+        compilar("""
+            algoritmo "T"
+            inicio
+                x:ref inteiro
+        """)
+
+
+def test_ref_em_declaracao_global_continua_erro_sintatico():
+    with pytest.raises(ErroSintatico):
+        compilar("""
+            algoritmo "T"
+            x:ref inteiro
+            inicio
+                escrever(1)
+        """)
+
+
+def test_campo_ref_de_tipo_primitivo_da_erro_semantico():
+    with pytest.raises(ErroSemantico, match="ref"):
+        compilar("""
+            algoritmo "T"
+            estrutura No
+                valor:ref inteiro
+            inicio
+                n:No
+        """)
+
+
+def test_campo_ref_vetor_da_erro_semantico():
+    with pytest.raises(ErroSemantico, match="ref"):
+        compilar("""
+            algoritmo "T"
+            estrutura No
+                valor:inteiro
+                seguinte:ref No[3]
+            inicio
+                n:No
+        """)
+
+
+def test_lista_ligada_com_ref_permite_ligar_e_mutar_depois():
+    """Ao contrário de test_lista_ligada_construida_e_percorrida_com_nulo
+    (campo simples, cópia por valor, tem de se construir de trás para a
+    frente), um campo 'ref' é um alias -- ligar 'a.seguinte = b' e só
+    depois mutar 'b.valor' propaga através de 'a.seguinte'."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+            seguinte:ref No
+        inicio
+            b:No
+            b.valor = 2
+
+            a:No
+            a.valor = 1
+            a.seguinte = b
+
+            b.valor = 99
+            escrever(a.seguinte.valor)
+    """)
+    assert saida.strip() == "99"
+
+
+def test_copia_por_valor_de_estrutura_preserva_identidade_de_campo_ref():
+    """Copiar 'a' por valor (declaração a partir doutra variável) não deve
+    quebrar o aliasing do seu campo 'ref' -- prova o __deepcopy__ gerado
+    (codegen.py:_gerar_estrutura), não só a atribuição direta ao campo."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+            seguinte:ref No
+        inicio
+            b:No
+            b.valor = 2
+
+            a:No
+            a.seguinte = b
+
+            c:No = a
+            b.valor = 77
+            escrever(c.seguinte.valor)
+    """)
+    assert saida.strip() == "77"
+
+
+def test_campo_normal_continua_copiado_por_valor_mesmo_com_irmao_ref():
+    """Regressão: um campo simples ao lado de um campo 'ref' na mesma
+    estrutura continua a copiar por valor -- só o campo 'ref' faz alias."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura Par
+            a:inteiro
+            seguinte:ref Par
+        inicio
+            x:Par
+            x.a = 1
+
+            y:Par = x
+            x.a = 999
+            escrever(y.a)
+    """)
+    assert saida.strip() == "1"
+
+
+def test_ciclo_de_dois_nos_via_ref_sobrevive_a_copia_por_valor():
+    """Um ciclo de referências real só é possível através de campos 'ref'
+    (cópia por valor sozinha cortava sempre qualquer ciclo antes desta
+    funcionalidade) -- passar um nó do ciclo por valor a um procedimento
+    tem de terminar sem RecursionError, graças ao 'memo' do __deepcopy__
+    gerado."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+            seguinte:ref No
+
+        procedimento imprimir(n:No)
+            escrever(n.valor)
+
+        inicio
+            a:No
+            a.valor = 1
+            b:No
+            b.valor = 2
+            a.seguinte = b
+            b.seguinte = a
+            imprimir(a)
+    """)
+    assert saida.strip() == "1"

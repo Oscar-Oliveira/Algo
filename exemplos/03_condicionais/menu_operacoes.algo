@@ -1,0 +1,41 @@
+algoritmo "MenuDeOperacoes"
+
+// Menu de uma calculadora de dois números inteiros -- uma única
+// passagem (sem ciclo, esse assunto ainda não foi visto).
+// Foco: 'escolher/caso', incluindo vários valores no mesmo 'caso'
+// (separados por vírgula) e um 'contrario' para opção inválida --
+// reaproveita '+','-','*','/','div','mod' do assunto 02.
+
+inicio
+    a:inteiro
+    escrever("Primeiro número: ")
+    ler(a)
+
+    b:inteiro
+    escrever("Segundo número: ")
+    ler(b)
+
+    opcao:inteiro
+    escrever("1-Soma 2-Subtração 3-Multiplicação 4-Divisão 5-Divisão inteira")
+    escrever("6-Resto 7 ou 8-Mostrar os números introduzidos")
+    escrever("Escolhe uma opção: ")
+    ler(opcao)
+
+    escolher opcao
+        caso 1
+            escrever("Soma: ", a + b)
+        caso 2
+            escrever("Subtração: ", a - b)
+        caso 3
+            escrever("Multiplicação: ", a * b)
+        caso 4
+            escrever("Divisão: ", a / b)
+        caso 5
+            escrever("Divisão inteira: ", a div b)
+        caso 6
+            escrever("Resto: ", a mod b)
+        caso 7, 8
+            // dois códigos diferentes chamam a mesma ação
+            escrever("Números introduzidos: ", a, " e ", b)
+        contrario
+            escrever("Opção inválida: ", opcao)

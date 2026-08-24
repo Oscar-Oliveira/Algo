@@ -5545,19 +5545,15 @@ def test_cadeia_de_menos_unario_moderada_continua_a_funcionar():
 
 def test_cadeia_de_potencia_moderada_continua_a_funcionar():
     # 2^(2^2) = 2^4 = 16 (right-associative). O expoente do '^' exterior
-    # não é um literal (é a sub-expressão '2^2'), por isso
-    # _expoente_estaticamente_nao_negativo (semantics.py) não o
-    # consegue provar não-negativo em compilação e tipa a expressão
-    # inteira como 'decimal' -- consistente com '--minimo', que já
-    # aplicava a mesma regra (só salta o float(...) quando o expoente é
-    # um literal inteiro não-negativo, ver codegen_minimo.py) e sempre
-    # produziu 16.0 aqui. Corrigido na Etapa 12 da 4ª auditoria (achado
-    # da segunda passagem independente): o modo normal produzia "16"
-    # (int), divergindo de '--minimo' e do próprio tipo 'decimal' que
-    # semantics.py atribui a esta expressão -- ver _algo_pot em
-    # codegen.py.
+    # é a sub-expressão '2^2', não um literal direto, mas
+    # _resolver_constante (semantics.py) sabe "dobrar" '^' entre valores
+    # já estaticamente conhecidos (achado do manual: antes só '+'/'-'/'*'
+    # eram dobrados, por isso '2^2^2' tipava 'decimal' e imprimia
+    # "16.0" apesar de todo o expoente ser literal) -- por isso
+    # _expoente_estaticamente_nao_negativo consegue hoje provar '2^2'
+    # (=4) não-negativo, e a expressão inteira tipa 'inteiro'.
     saida = executar('algoritmo "T"\ninicio\n    escrever(2^2^2)\n')
-    assert saida.strip() == "16.0"
+    assert saida.strip() == "16"
 
 
 def test_ler_sem_argumentos_e_erro_sintatico_nao_traceback_cru():

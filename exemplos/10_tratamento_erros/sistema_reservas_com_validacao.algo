@@ -1,0 +1,68 @@
+algoritmo "SistemaDeReservasComValidacao"
+
+// Sistema de reservas de hotel: valida as funções auxiliares com
+// 'afirmar' antes de as usar "a sério" -- o contraste com
+// 'catalogo_erros_runtime.algo' é deliberado: aqui nenhuma afirmação
+// falha, é o uso normal e previsto de 'afirmar' no dia a dia.
+// Mistura estruturas (07), vetor de estruturas (05/07), funções (06),
+// ciclos (04) e condicionais (03).
+
+estrutura Reserva
+    nomeCliente:cadeia
+    numeroQuarto:inteiro
+    noites:inteiro
+    precoTotal:decimal
+
+funcao calcularPrecoTotal(precoPorNoite:decimal, noites:inteiro):decimal
+    retornar precoPorNoite * noites
+
+funcao quartoDisponivel(reservas:Reserva[], tamanho:inteiro, numeroQuarto:inteiro):booleano
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se reservas[i].numeroQuarto == numeroQuarto entao
+            retornar falso
+    retornar verdadeiro
+
+inicio
+    // testar as funções auxiliares antes de confiar nelas
+    afirmar calcularPrecoTotal(50.0, 3) == 150.0, "calcularPrecoTotal(50, 3) devia ser 150"
+    afirmar calcularPrecoTotal(0.0, 5) == 0.0, "preço por noite zero devia dar total zero"
+    escrever("Testes de calcularPrecoTotal passaram")
+
+    reservas:Reserva[3]
+    reservas[0].nomeCliente = "Ana"
+    reservas[0].numeroQuarto = 101
+    reservas[0].noites = 2
+    reservas[0].precoTotal = calcularPrecoTotal(60.0, 2)
+
+    reservas[1].nomeCliente = "Bruno"
+    reservas[1].numeroQuarto = 102
+    reservas[1].noites = 1
+    reservas[1].precoTotal = calcularPrecoTotal(60.0, 1)
+
+    reservas[2].nomeCliente = "Carla"
+    reservas[2].numeroQuarto = 103
+    reservas[2].noites = 4
+    reservas[2].precoTotal = calcularPrecoTotal(60.0, 4)
+
+    afirmar quartoDisponivel(reservas, 3, 200), "o quarto 200 não devia estar reservado"
+    afirmar nao quartoDisponivel(reservas, 3, 101), "o quarto 101 já devia estar reservado"
+    escrever("Testes de quartoDisponivel passaram")
+
+    escrever("--- Reservas atuais ---")
+    total:decimal = 0.0
+    i:inteiro
+    para i de 0 ate 2 fazer
+        escrever(reservas[i].nomeCliente, " -- quarto ", reservas[i].numeroQuarto, ", ", reservas[i].noites, " noites, ", reservas[i].precoTotal)
+        total = total + reservas[i].precoTotal
+
+    escrever("Receita total: ", total)
+
+    numeroNovoQuarto:inteiro
+    escrever("Número do quarto a verificar disponibilidade: ")
+    ler(numeroNovoQuarto)
+
+    se quartoDisponivel(reservas, 3, numeroNovoQuarto) entao
+        escrever("Quarto ", numeroNovoQuarto, " está disponível")
+    senao
+        escrever("Quarto ", numeroNovoQuarto, " já está reservado")

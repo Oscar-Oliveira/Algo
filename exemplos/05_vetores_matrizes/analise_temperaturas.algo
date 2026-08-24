@@ -1,0 +1,56 @@
+algoritmo "AnaliseDeTemperaturas"
+
+// Regista até 31 temperaturas diárias e calcula estatísticas.
+// Foco: vetor de capacidade FIXA (o tamanho de um vetor tem de ser
+// conhecido em compilação -- não pode ser o valor de 'numeroDias' lido
+// do utilizador) usado com uma contagem separada de posições ocupadas,
+// vetor literal de texto para os nomes dos dias, e índices 0-baseados.
+
+constante CAPACIDADE_MAXIMA:inteiro = 31
+constante LIMITE_DIA_QUENTE:decimal = 30.0
+
+inicio
+    diasSemana:cadeia[7] = {"Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"}
+    temperaturas:decimal[31]
+
+    numeroDias:inteiro
+    escrever("Quantos dias vais registar (máximo ", CAPACIDADE_MAXIMA, "): ")
+    ler(numeroDias)
+
+    se numeroDias > CAPACIDADE_MAXIMA entao
+        escrever("Excede a capacidade -- vou só registar ", CAPACIDADE_MAXIMA)
+        numeroDias = CAPACIDADE_MAXIMA
+
+    i:inteiro
+    para i de 0 ate numeroDias - 1 fazer
+        // 'i mod 7' faz o nome do dia repetir em ciclo mesmo com mais de
+        // 7 dias registados
+        escrever("Temperatura de ", diasSemana[i mod 7], " (dia ", i, "): ")
+        ler(temperaturas[i])
+
+    soma:decimal = 0.0
+    maior:decimal = 0.0
+    menor:decimal = 0.0
+    diasQuentes:inteiro = 0
+
+    para i de 0 ate numeroDias - 1 fazer
+        soma = soma + temperaturas[i]
+
+        se i == 0 entao
+            maior = temperaturas[0]
+            menor = temperaturas[0]
+        senao
+            se temperaturas[i] > maior entao
+                maior = temperaturas[i]
+            se temperaturas[i] < menor entao
+                menor = temperaturas[i]
+
+        se temperaturas[i] > LIMITE_DIA_QUENTE entao
+            diasQuentes = diasQuentes + 1
+
+    media:decimal = soma / numeroDias
+
+    escrever("--- Estatísticas de ", numeroDias, " dias ---")
+    escrever("Média: ", media)
+    escrever("Máxima: ", maior, "  Mínima: ", menor)
+    escrever("Dias acima de ", LIMITE_DIA_QUENTE, " graus: ", diasQuentes)

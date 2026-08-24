@@ -1,0 +1,41 @@
+algoritmo "ClassificadorDeIMC"
+
+// Calcula o Índice de Massa Corporal e classifica-o.
+// Foco: cadeia 'se / senao se / ... / senao' (várias alternativas
+// exclusivas), reaproveitando aritmética decimal e '^'/'/' do assunto 02.
+
+inicio
+    nome:cadeia
+    escrever("Nome: ")
+    ler(nome)
+
+    pesoKg:decimal
+    escrever("Peso (kg): ")
+    ler(pesoKg)
+
+    alturaMetros:decimal
+    escrever("Altura (m): ")
+    ler(alturaMetros)
+
+    imc:decimal = pesoKg / (alturaMetros ^ 2)
+
+    escrever(nome, " tem um IMC de ", imc)
+
+    se imc < 18.5 entao
+        escrever("Classificação: abaixo do peso")
+    senao se imc < 25.0 entao
+        escrever("Classificação: peso normal")
+    senao se imc < 30.0 entao
+        escrever("Classificação: excesso de peso")
+    senao
+        escrever("Classificação: obesidade")
+
+    // um segundo 'se', independente do primeiro, para reforçar que cada
+    // cadeia 'se/senao se' avalia as suas condições por ordem e para na
+    // primeira que for verdadeira
+    se alturaMetros >= 1.9 entao
+        escrever("Nota: altura pouco comum (>= 1.9 m)")
+    senao se alturaMetros <= 1.5 entao
+        escrever("Nota: altura pouco comum (<= 1.5 m)")
+    senao
+        escrever("Nota: altura dentro do intervalo comum")

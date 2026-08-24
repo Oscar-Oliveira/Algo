@@ -1,6 +1,0 @@
-funcao areaCirculo(raio:decimal):decimal
-    pi:decimal = 3.14159
-    retornar pi * raio * raio
-
-funcao areaRetangulo(largura:decimal, altura:decimal):decimal
-    retornar largura * altura

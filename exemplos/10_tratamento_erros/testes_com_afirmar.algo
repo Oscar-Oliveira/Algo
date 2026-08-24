@@ -1,0 +1,40 @@
+algoritmo "TestesComAfirmar"
+
+// Valida funções próprias com 'afirmar' antes de as dar como corretas.
+// Foco: 'afirmar' não produz nenhuma saída quando a condição é
+// verdadeira -- só o "Todos os testes passaram" final prova que todas
+// as afirmações anteriores passaram. Reaproveita funções (assunto 06),
+// vetores (05), operadores (02, 'mod'/'nao'), 'para ... passo -1'
+// (04) e a biblioteca Cadeia (08) para comparar com a implementação
+// manual.
+
+importar Cadeia
+
+funcao ehPar(n:inteiro):booleano
+    retornar n mod 2 == 0
+
+funcao somaVetor(v:inteiro[], tamanho:inteiro):inteiro
+    soma:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        soma = soma + v[i]
+    retornar soma
+
+funcao inverterTextoManual(s:cadeia):cadeia
+    resultado:cadeia = ""
+    i:inteiro
+    para i de cadeia.comprimento(s) - 1 ate 0 passo -1 fazer
+        resultado = resultado + cadeia.caracter(s, i)
+    retornar resultado
+
+inicio
+    afirmar ehPar(4), "4 devia ser par"
+    afirmar nao ehPar(7), "7 não devia ser par"
+
+    v:inteiro[4] = {10, 20, 30, 40}
+    afirmar somaVetor(v, 4) == 100, "soma de {10,20,30,40} devia ser 100"
+
+    afirmar inverterTextoManual("algo") == "ogla", "inverterTextoManual('algo') devia ser 'ogla'"
+    afirmar inverterTextoManual("algo") == cadeia.inverter("algo"), "devia dar o mesmo que cadeia.inverter"
+
+    escrever("Todos os testes passaram")

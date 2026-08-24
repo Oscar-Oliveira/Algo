@@ -1,0 +1,49 @@
+algoritmo "ComparadorDeOrcamentos"
+
+// Compara dois orçamentos de fornecedores para a mesma encomenda.
+// Foco: bateria completa de operadores relacionais (==, <>, <, >, <=,
+// >=) sobre valores decimais, e 'nao' explícito sobre um resultado já
+// calculado -- mistura ainda com concatenação de texto (+) do assunto 01.
+
+inicio
+    nomeFornecedorA:cadeia
+    escrever("Nome do fornecedor A: ")
+    ler(nomeFornecedorA)
+
+    precoA:decimal
+    escrever("Orçamento do fornecedor A: ")
+    ler(precoA)
+
+    nomeFornecedorB:cadeia
+    escrever("Nome do fornecedor B: ")
+    ler(nomeFornecedorB)
+
+    precoB:decimal
+    escrever("Orçamento do fornecedor B: ")
+    ler(precoB)
+
+    orcamentoMaximo:decimal
+    escrever("Orçamento máximo disponível: ")
+    ler(orcamentoMaximo)
+
+    saoIguais:booleano = precoA == precoB
+    saoDiferentes:booleano = precoA <> precoB
+    aEMaisBarato:booleano = precoA < precoB
+    aDentroDoLimite:booleano = precoA <= orcamentoMaximo
+    bDentroDoLimite:booleano = precoB <= orcamentoMaximo
+
+    // 'nao saoIguais' devia dar sempre o mesmo resultado que 'saoDiferentes'
+    naoSaoIguais:booleano = nao saoIguais
+
+    diferenca:decimal = precoA - precoB
+
+    tituloComparacao:cadeia = "Comparação entre " + nomeFornecedorA + " e " + nomeFornecedorB
+
+    escrever(tituloComparacao)
+    escrever("Preços iguais (==): ", saoIguais)
+    escrever("Preços diferentes (<>): ", saoDiferentes)
+    escrever("'nao' preços iguais == diferentes? ", naoSaoIguais == saoDiferentes)
+    escrever(nomeFornecedorA, " mais barato que ", nomeFornecedorB, ": ", aEMaisBarato)
+    escrever(nomeFornecedorA, " dentro do orçamento máximo: ", aDentroDoLimite)
+    escrever(nomeFornecedorB, " dentro do orçamento máximo: ", bDentroDoLimite)
+    escrever("Diferença (A - B): ", diferenca)

@@ -1,0 +1,16 @@
+// Ficheiro incluído com "como estatistica" em 'principal_calculos.algo'.
+
+funcao mediaVetor(v:inteiro[], tamanho:inteiro):decimal
+    soma:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        soma = soma + v[i]
+    retornar soma / tamanho
+
+funcao maiorDoVetor(v:inteiro[], tamanho:inteiro):inteiro
+    maior:inteiro = v[0]
+    i:inteiro
+    para i de 1 ate tamanho - 1 fazer
+        se v[i] > maior entao
+            maior = v[i]
+    retornar maior

@@ -1,0 +1,42 @@
+algoritmo "FichaDeInscricao"
+
+// Ficha de inscrição de um participante num workshop.
+// Mostra os 5 tipos primitivos, declaração com e sem valor inicial,
+// uma constante global, leitura interativa e concatenação de texto.
+
+constante ANO_ATUAL:inteiro = 2026
+constante PRECO_BASE:decimal = 45.0
+
+inicio
+    nome:cadeia
+    escrever("Nome completo: ")
+    ler(nome)
+
+    inicialCracha:caracter
+    escrever("Inicial para o crachá (1 letra): ")
+    ler(inicialCracha)
+
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    associado:booleano
+    escrever("És sócio do clube? (verdadeiro/falso): ")
+    ler(associado)
+
+    // valor calculado a partir de dados já lidos + uma constante
+    anoNascimentoAproximado:inteiro = ANO_ATUAL - idade
+
+    // desconto de sócio já conhecido no momento da inscrição, guardado
+    // como decimal -- ainda não há "se" disponível para o aplicar
+    descontoSocio:decimal = 5.0
+    precoFinal:decimal = PRECO_BASE - descontoSocio
+
+    cracha:cadeia = inicialCracha + ". " + nome
+    resumo:cadeia = "Inscrição de " + nome + " (crachá: " + cracha + ")"
+
+    escrever(resumo)
+    escrever("Nascimento aproximado: ", anoNascimentoAproximado)
+    escrever("Sócio do clube: ", associado)
+    escrever("Preço base: ", PRECO_BASE)
+    escrever("Preço final (com desconto de sócio já incluído): ", precoFinal)

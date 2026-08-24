@@ -1,0 +1,76 @@
+algoritmo "CatalogoDeErrosRuntime"
+
+// Menu para provocar, um de cada vez, cada categoria de erro de
+// execução reconhecida pelo compilador (ver "Erros de execução" no
+// manual e DecisoesELimitacoesConhecidas.md) -- cada opção pára o
+// programa com uma mensagem amigável em português, nunca um traceback
+// do Python. Reaproveita 'escolher/caso' (03), estruturas recursivas
+// (07) e as bibliotecas Matematica/Conversao (08).
+
+importar Matematica
+importar Conversao
+
+estrutura No
+    valor:inteiro
+    seguinte:No
+
+funcao recursaoSemFim(n:inteiro):inteiro
+    retornar recursaoSemFim(n + 1)
+
+inicio
+    opcao:inteiro
+    escrever("Escolhe um tipo de erro para ver a mensagem traduzida:")
+    escrever("1-Índice de vetor fora dos limites")
+    escrever("2-Divisão por zero")
+    escrever("3-Overflow numérico")
+    escrever("4-Recursão infinita")
+    escrever("5-Aceder campo de um valor nulo")
+    escrever("6-Raiz quadrada de número negativo")
+    escrever("7-Converter texto inválido para número")
+    escrever("8-'afirmar' falhada com mensagem própria")
+    escrever("Opção: ")
+    ler(opcao)
+
+    escolher opcao
+        caso 1
+            v:inteiro[5] = {1, 2, 3, 4, 5}
+            indice:inteiro
+            escrever("Índice a aceder (o vetor só tem posições 0 a 4): ")
+            ler(indice)
+            escrever("v[", indice, "] = ", v[indice])
+        caso 2
+            a:inteiro
+            escrever("Numerador: ")
+            ler(a)
+            b:inteiro
+            escrever("Denominador (experimenta 0): ")
+            ler(b)
+            escrever(a, " / ", b, " = ", a / b)
+        caso 3
+            expoente:inteiro
+            escrever("Expoente de 10.0 (experimenta um valor grande, ex. 400): ")
+            ler(expoente)
+            resultado:decimal = 10.0 ^ expoente
+            escrever("10.0 ^ ", expoente, " = ", resultado)
+        caso 4
+            escrever("A chamar uma função sem caso base...")
+            escrever(recursaoSemFim(0))
+        caso 5
+            no:No
+            no.valor = 1
+            // 'no.seguinte' fica 'nulo' por omissão (estrutura recursiva)
+            escrever(no.seguinte.valor)
+        caso 6
+            x:decimal
+            escrever("Número (experimenta um negativo): ")
+            ler(x)
+            escrever("Raiz quadrada: ", matematica.raiz(x))
+        caso 7
+            texto:cadeia
+            escrever("Texto a converter para inteiro (experimenta 'abc'): ")
+            ler(texto)
+            escrever("Convertido: ", conversao.paraInteiro(texto))
+        caso 8
+            afirmar 1 == 2, "isto falha sempre de propósito, para mostrar a mensagem de 'afirmar'"
+        contrario
+            escrever("Opção inválida")

@@ -1,0 +1,30 @@
+algoritmo "ConversorDeUnidades"
+
+// Converte uma temperatura e uma distância lidas ao utilizador.
+// Foco: várias constantes decimais, vários "ler" seguidos, e valores
+// derivados por aritmética simples guardados em variáveis com nome
+// próprio (em vez de expressões repetidas dentro de 'escrever').
+
+constante FATOR_KM_PARA_MILHAS:decimal = 0.621371
+constante UNIDADE_TEMPERATURA:caracter = 'C'
+
+inicio
+    temperaturaCelsius:decimal
+    escrever("Temperatura em graus Celsius: ")
+    ler(temperaturaCelsius)
+
+    distanciaKm:decimal
+    escrever("Distância em quilómetros: ")
+    ler(distanciaKm)
+
+    numeroViagens:inteiro
+    escrever("Quantas vezes vais percorrer essa distância: ")
+    ler(numeroViagens)
+
+    temperaturaFahrenheit:decimal = temperaturaCelsius * 9.0 / 5.0 + 32.0
+    distanciaMilhas:decimal = distanciaKm * FATOR_KM_PARA_MILHAS
+    distanciaTotalMilhas:decimal = distanciaMilhas * numeroViagens
+
+    escrever(temperaturaCelsius, " graus ", UNIDADE_TEMPERATURA, " equivalem a ", temperaturaFahrenheit, " F")
+    escrever(distanciaKm, " km equivalem a ", distanciaMilhas, " milhas")
+    escrever("Em ", numeroViagens, " viagens, isso são ", distanciaTotalMilhas, " milhas no total")

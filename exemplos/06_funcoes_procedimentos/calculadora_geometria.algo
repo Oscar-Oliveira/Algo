@@ -1,0 +1,48 @@
+algoritmo "CalculadoraDeGeometria"
+
+// Calcula áreas de um retângulo, um círculo e um triângulo.
+// Foco: 'funcao' (devolve valor com 'retornar') vs 'procedimento' (sem
+// valor de retorno, só efeito -- escrever), parâmetros sempre por valor
+// aqui, e chamadas de função dentro de outras expressões.
+
+constante PI:decimal = 3.14159
+
+funcao areaRetangulo(largura:decimal, altura:decimal):decimal
+    retornar largura * altura
+
+funcao areaCirculo(raio:decimal):decimal
+    retornar PI * raio ^ 2
+
+funcao areaTriangulo(base:decimal, altura:decimal):decimal
+    retornar base * altura / 2.0
+
+procedimento mostrarArea(nomeForma:cadeia, area:decimal)
+    escrever("Área do ", nomeForma, ": ", area)
+
+inicio
+    larguraRet:decimal
+    escrever("Largura do retângulo: ")
+    ler(larguraRet)
+    alturaRet:decimal
+    escrever("Altura do retângulo: ")
+    ler(alturaRet)
+
+    raioCirc:decimal
+    escrever("Raio do círculo: ")
+    ler(raioCirc)
+
+    baseTri:decimal
+    escrever("Base do triângulo: ")
+    ler(baseTri)
+    alturaTri:decimal
+    escrever("Altura do triângulo: ")
+    ler(alturaTri)
+
+    mostrarArea("retângulo", areaRetangulo(larguraRet, alturaRet))
+    mostrarArea("círculo", areaCirculo(raioCirc))
+    mostrarArea("triângulo", areaTriangulo(baseTri, alturaTri))
+
+    // chamadas de função dentro de uma soma -- não são 'ref', por isso
+    // podem aparecer livremente dentro de uma expressão maior
+    areaTotal:decimal = areaRetangulo(larguraRet, alturaRet) + areaCirculo(raioCirc) + areaTriangulo(baseTri, alturaTri)
+    escrever("Área total das três formas: ", areaTotal)

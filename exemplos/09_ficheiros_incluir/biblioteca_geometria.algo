@@ -1,0 +1,13 @@
+// Ficheiro incluído: só declarações, 'constante', 'funcao' -- sem
+// 'algoritmo' nem 'inicio'. Usado por 'principal_geometria.algo'.
+
+constante PI:decimal = 3.14159
+
+funcao areaCirculo(raio:decimal):decimal
+    retornar PI * raio ^ 2
+
+funcao perimetroCirculo(raio:decimal):decimal
+    retornar 2.0 * PI * raio
+
+funcao areaRetangulo(largura:decimal, altura:decimal):decimal
+    retornar largura * altura

@@ -1,0 +1,52 @@
+algoritmo "ProcessadorDeTexto"
+
+// Analisa uma frase: maiúsculas/minúsculas, invertida, palíndromo,
+// metades, e separação em palavras.
+// Foco: toda a biblioteca Cadeia -- comprimento, maiusculas, minusculas,
+// inverter, subcadeia, caracter, procurar, substituir, dividir.
+
+importar Cadeia
+
+inicio
+    frase:cadeia
+    escrever("Escreve uma frase: ")
+    ler(frase)
+
+    escrever("Comprimento: ", cadeia.comprimento(frase))
+    escrever("Maiúsculas: ", cadeia.maiusculas(frase))
+    escrever("Minúsculas: ", cadeia.minusculas(frase))
+    escrever("Invertida: ", cadeia.inverter(frase))
+
+    semEspacos:cadeia = cadeia.substituir(frase, " ", "")
+    normalizada:cadeia = cadeia.minusculas(semEspacos)
+    invertida:cadeia = cadeia.inverter(normalizada)
+    se normalizada == invertida entao
+        escrever("É um palíndromo (ignorando espaços e maiúsculas)")
+    senao
+        escrever("Não é um palíndromo")
+
+    primeiraLetra:caracter = cadeia.caracter(frase, 0)
+    escrever("Primeira letra: ", primeiraLetra)
+
+    posicaoDoA:inteiro = cadeia.procurar(normalizada, "a")
+    se posicaoDoA == -1 entao
+        escrever("Não tem nenhum 'a'")
+    senao
+        escrever("Primeiro 'a' na versão normalizada está na posição ", posicaoDoA)
+
+    metade:inteiro = cadeia.comprimento(frase) div 2
+    escrever("Primeira metade: ", cadeia.subcadeia(frase, 0, metade))
+    escrever("Segunda metade: ", cadeia.subcadeia(frase, metade, cadeia.comprimento(frase)))
+
+    // 'dividir' só é conhecida em runtime -- para inicializar um vetor de
+    // tamanho FIXO (assunto 05) o nº de partes tem de bater certo com o
+    // tamanho declarado, senão é erro de execução; por isso aqui pedimos
+    // um nº de palavras conhecido à partida
+    fraseQuatroPalavras:cadeia
+    escrever("Escreve 4 palavras separadas por um espaço: ")
+    ler(fraseQuatroPalavras)
+    palavras:cadeia[4] = cadeia.dividir(fraseQuatroPalavras, " ")
+
+    i:inteiro
+    para i de 0 ate 3 fazer
+        escrever("Palavra ", i, ": ", palavras[i], " (", cadeia.comprimento(palavras[i]), " letras)")

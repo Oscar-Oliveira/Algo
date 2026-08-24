@@ -1,1 +1,0 @@
-❌ Erro em 'lib.algo': Erro de sintaxe na linha 2, coluna 14: expressão inesperada: mais ('+')

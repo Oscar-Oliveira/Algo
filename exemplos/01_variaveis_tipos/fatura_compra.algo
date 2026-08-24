@@ -1,0 +1,42 @@
+algoritmo "FaturaDeCompra"
+
+// Recibo simples de uma compra com um único artigo.
+// Foco: aritmética a misturar inteiro e decimal, constante de taxa,
+// caracter como símbolo de moeda, e formatação da linha final por
+// concatenação de texto.
+
+constante TAXA_IVA:decimal = 0.23
+constante SIMBOLO_MOEDA:caracter = '€'
+
+inicio
+    nomeArtigo:cadeia
+    escrever("Nome do artigo: ")
+    ler(nomeArtigo)
+
+    precoUnitario:decimal
+    escrever("Preço unitário (sem IVA): ")
+    ler(precoUnitario)
+
+    quantidade:inteiro
+    escrever("Quantidade: ")
+    ler(quantidade)
+
+    temCartaoCliente:booleano
+    escrever("Tens cartão de cliente? (verdadeiro/falso): ")
+    ler(temCartaoCliente)
+
+    // 'quantidade' é inteiro e 'precoUnitario' é decimal -- a multiplicação
+    // promove automaticamente o resultado a decimal
+    subtotal:decimal = precoUnitario * quantidade
+    valorIva:decimal = subtotal * TAXA_IVA
+    total:decimal = subtotal + valorIva
+
+    // 'quantidade' é inteiro e "nomeArtigo" é cadeia -- '+' só concatena
+    // texto com texto, por isso a linha do artigo é escrita com vários
+    // argumentos em 'escrever', não por concatenação manual
+    escrever("--- Recibo ---")
+    escrever(quantidade, " x ", nomeArtigo)
+    escrever("Subtotal: ", SIMBOLO_MOEDA, subtotal)
+    escrever("IVA (23%): ", SIMBOLO_MOEDA, valorIva)
+    escrever("Total a pagar: ", SIMBOLO_MOEDA, total)
+    escrever("Cartão de cliente usado: ", temCartaoCliente)

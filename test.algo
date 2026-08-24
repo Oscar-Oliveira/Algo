@@ -17,10 +17,10 @@ inicio
         escrever(primos[0][i])
 
 
-    primos2:inteiro[5] = adcionais(primos, 5)
+    primos2:inteiro[6] = adcionais(primos[0], 5)
     primos2[5] = 6
 
     para i de 0 ate 5 fazer
-        escrever(primos2[1]]
+        escrever(primos2[1])
 
     escrever("ola")

@@ -64,13 +64,20 @@ FUNCOES = {
         "        raise ValueError(str(e)) from None\n",
     ),
     "paraBooleano": (
-        # 'falso'/'f'/'false' (com espaços/maiúsculas à volta) -> falso;
-        # resto segue a truthiness nativa do Python (0/0.0/"" -> falso,
-        # tudo o resto -> verdadeiro), que já cobre 'verdadeiro' e
-        # qualquer outro texto não vazio.
+        # 'falso'/'f'/'false'/'não'/'nao'/'n'/'0' (com espaços/maiúsculas
+        # à volta) -> falso; resto segue a truthiness nativa do Python
+        # (0.0/"" -> falso, tudo o resto -> verdadeiro), que já cobre
+        # 'verdadeiro' e qualquer outro texto não vazio. 'não'/'nao' têm
+        # de estar na lista explicitamente: numa linguagem cujo
+        # código-fonte é todo em português, a própria palavra "não" a
+        # converter para 'verdadeiro' (por ser texto não vazio) era uma
+        # armadilha, não só uma limitação da truthiness genérica. '0'
+        # também está explícito: texto "0" é não-vazio (truthy nativo do
+        # Python), mas é a forma mais comum doutros formatos (JSON,
+        # variáveis de ambiente, CSV) de representar falso.
         ["primitivo"], "booleano",
         "def conversao_paraBooleano(x):\n"
-        "    if isinstance(x, str) and x.strip().lower() in (\"falso\", \"f\", \"false\"):\n"
+        "    if isinstance(x, str) and x.strip().lower() in (\"falso\", \"f\", \"false\", \"não\", \"nao\", \"n\", \"0\"):\n"
         "        return False\n"
         "    return bool(x)\n",
     ),

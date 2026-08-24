@@ -1,0 +1,37 @@
+algoritmo "DistribuicaoDeEquipas"
+
+// Organização de um torneio: distribui jogadores por equipas e calcula
+// medidas do campo quadrado onde vão jogar.
+// Foco: 'div', 'mod', '^', e precedência de operadores (* e / antes de
+// + e -, sem precisar de parênteses extra).
+
+constante PRECO_INSCRICAO_POR_JOGADOR:decimal = 7.5
+
+inicio
+    totalJogadores:inteiro
+    escrever("Número total de jogadores inscritos: ")
+    ler(totalJogadores)
+
+    tamanhoEquipa:inteiro
+    escrever("Jogadores por equipa: ")
+    ler(tamanhoEquipa)
+
+    ladoCampoMetros:decimal
+    escrever("Lado do campo quadrado (metros): ")
+    ler(ladoCampoMetros)
+
+    numeroEquipasCompletas:inteiro = totalJogadores div tamanhoEquipa
+    jogadoresDeFora:inteiro = totalJogadores mod tamanhoEquipa
+
+    areaCampo:decimal = ladoCampoMetros ^ 2
+    perimetroCampo:decimal = ladoCampoMetros * 4.0
+
+    // precedência: '*' calcula-se antes de '+', tal como em matemática --
+    // não precisa de parênteses à volta de cada multiplicação
+    custoTotalInscricoes:decimal = numeroEquipasCompletas * tamanhoEquipa * PRECO_INSCRICAO_POR_JOGADOR + jogadoresDeFora * PRECO_INSCRICAO_POR_JOGADOR
+
+    escrever("Equipas completas: ", numeroEquipasCompletas)
+    escrever("Jogadores que ficam de fora (sem equipa completa): ", jogadoresDeFora)
+    escrever("Área do campo: ", areaCampo, " m2")
+    escrever("Perímetro do campo: ", perimetroCampo, " m")
+    escrever("Custo total de inscrições: ", custoTotalInscricoes)

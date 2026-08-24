@@ -168,7 +168,7 @@ class Parser:
         self.esperar("INDENT")
         campos = []
         while not self.ver("DEDENT"):
-            campos.extend(self._parse_declaracao_comum())
+            campos.extend(self._parse_declaracao_comum(permitir_ref=True))
         self.esperar("DEDENT")
         return A.EstruturaDef(nome_tok.valor, campos, linha)
 
@@ -209,13 +209,28 @@ class Parser:
     def _parse_declaracao_global(self):
         return self._parse_declaracao_comum()
 
-    def _parse_declaracao_comum(self):
+    def _parse_declaracao_comum(self, permitir_ref=False):
         """Assume que o token atual é o primeiro ID de uma lista de nomes,
-        seguido de ':' e do tipo. Já confirmado pelo chamador via lookahead."""
+        seguido de ':' e do tipo. Já confirmado pelo chamador via lookahead.
+
+        'permitir_ref' só é True vindo de _parse_estrutura_def -- um campo
+        de 'estrutura' pode ser marcado 'ref' (nome:ref Tipo, aliasing em
+        vez de cópia por valor, ver docs/manual/07-Estruturas.md). Fora
+        desse contexto (declaração global ou local), 'ref' não é uma
+        palavra-chave válida aqui -- só existe hoje como marcador de
+        parâmetro (_parse_param) ou, agora, de campo."""
         linha = self.atual().linha
         coluna = self.atual().coluna
         nomes = self._parse_lista_virgulas(lambda: self.esperar("ID").valor, "COLON")
         self.esperar("COLON")
+        por_referencia = False
+        if self.ver("REF"):
+            if not permitir_ref:
+                raise ErroSintatico(
+                    "'ref' só é permitido num parâmetro de função/procedimento ou "
+                    "num campo de 'estrutura'", self.atual().linha, self.atual().coluna)
+            self.avancar()
+            por_referencia = True
         tipo = self._parse_tipo()
         dims = None
         if self.ver("LBRACKET"):
@@ -235,7 +250,8 @@ class Parser:
             # corresponder a 'tipo'/'dims', semantics.py dá o erro claro.
             inicial = self._parse_expr()
         self.esperar("NEWLINE")
-        return [A.Declaracao(tipo, nome, dims, linha, inicial) for nome in nomes]
+        return [A.Declaracao(tipo, nome, dims, linha, inicial, por_referencia=por_referencia)
+                for nome in nomes]
 
     def _parse_literal_chaveta(self):
         """Um literal '{...}' -- vetor ('{v1, v2, ...}', possivelmente

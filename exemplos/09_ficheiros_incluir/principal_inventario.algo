@@ -1,0 +1,18 @@
+algoritmo "PrincipalInventario"
+
+// Foco: 'incluir ... como' só afeta FUNÇÕES -- estruturas e variáveis
+// globais do ficheiro incluído continuam visíveis sem prefixo nenhum.
+
+incluir "biblioteca_inventario.algo" como inv
+
+inicio
+    // 'Produto' é uma estrutura -- usa-se diretamente, sem 'inv.'
+    p1:Produto = inv.criarProduto("Teclado", 25.0, 10)
+    p2:Produto = inv.criarProduto("Rato", 12.5, 20)
+
+    escrever(p1.nome, ": ", p1.preco, " (", p1.quantidade, " unid.)")
+    escrever(p2.nome, ": ", p2.preco, " (", p2.quantidade, " unid.)")
+
+    // 'contadorProdutosCriados' é uma variável global do ficheiro
+    // incluído -- também sem prefixo, apesar do 'como inv'
+    escrever("Produtos criados até agora: ", contadorProdutosCriados)

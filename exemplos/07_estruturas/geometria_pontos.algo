@@ -1,0 +1,58 @@
+algoritmo "GeometriaDePontos"
+
+// Pontos, segmentos, e distância entre pontos.
+// Foco: estrutura aninhada dentro de outra (Segmento contém dois Ponto),
+// 'ref' com estrutura (deslocar um Ponto no próprio sítio), e estrutura
+// passada por valor como parâmetro (é copiada -- alterá-la dentro da
+// função não afeta o original). 'matematica.raiz' só chega no assunto
+// 08, por isso a raiz quadrada é aproximada aqui à mão (método de
+// Newton), reaproveitando 'para' (assunto 04).
+
+estrutura Ponto
+    x:decimal
+    y:decimal
+
+estrutura Segmento
+    origem:Ponto
+    destino:Ponto
+
+funcao raizAproximada(valor:decimal):decimal
+    se valor == 0.0 entao
+        retornar 0.0
+    estimativa:decimal = valor
+    i:inteiro
+    para i de 1 ate 20 fazer
+        estimativa = (estimativa + valor / estimativa) / 2.0
+    retornar estimativa
+
+funcao distancia(p1:Ponto, p2:Ponto):decimal
+    dx:decimal = p1.x - p2.x
+    dy:decimal = p1.y - p2.y
+    retornar raizAproximada(dx * dx + dy * dy)
+
+funcao comprimentoSegmento(s:Segmento):decimal
+    retornar distancia(s.origem, s.destino)
+
+procedimento deslocar(ref p:Ponto, dx:decimal, dy:decimal)
+    p.x = p.x + dx
+    p.y = p.y + dy
+
+inicio
+    a:Ponto
+    a.x = 0.0
+    a.y = 0.0
+
+    b:Ponto
+    b.x = 3.0
+    b.y = 4.0
+
+    escrever("Distância entre a e b: ", distancia(a, b))
+
+    deslocar(a, 10.0, 10.0)
+    escrever("a depois de deslocar: (", a.x, ", ", a.y, ")")
+    escrever("b não foi afetado por deslocar 'a': (", b.x, ", ", b.y, ")")
+
+    segmento:Segmento
+    segmento.origem = a
+    segmento.destino = b
+    escrever("Comprimento do segmento origem-destino: ", comprimentoSegmento(segmento))

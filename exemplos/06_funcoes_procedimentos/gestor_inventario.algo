@@ -1,0 +1,51 @@
+algoritmo "GestorDeInventario"
+
+// Processa um pequeno inventário guardado num vetor.
+// Foco: parâmetro vetor usa colchetes VAZIOS ('v:inteiro[]' -- aceita
+// vetor de qualquer tamanho, por isso vem sempre acompanhado de um
+// parâmetro 'tamanho' à parte), 'ref' num vetor para o mutar dentro do
+// procedimento, e 'ref' em dois escalares para uma troca clássica.
+
+funcao somaTotal(v:inteiro[], tamanho:inteiro):inteiro
+    soma:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        soma = soma + v[i]
+    retornar soma
+
+funcao maiorValor(v:inteiro[], tamanho:inteiro):inteiro
+    maior:inteiro = v[0]
+    i:inteiro
+    para i de 1 ate tamanho - 1 fazer
+        se v[i] > maior entao
+            maior = v[i]
+    retornar maior
+
+procedimento duplicarValores(ref v:inteiro[], tamanho:inteiro)
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        v[i] = v[i] * 2
+
+procedimento trocar(ref a:inteiro, ref b:inteiro)
+    temp:inteiro = a
+    a = b
+    b = temp
+
+inicio
+    quantidades:inteiro[5] = {12, 8, 3, 25, 4}
+
+    escrever("Soma total: ", somaTotal(quantidades, 5))
+    escrever("Maior valor: ", maiorValor(quantidades, 5))
+
+    duplicarValores(quantidades, 5)
+
+    escrever("Quantidades depois de duplicar:")
+    i:inteiro
+    para i de 0 ate 4 fazer
+        escrever("  quantidades[", i, "] = ", quantidades[i])
+
+    x:inteiro = 10
+    y:inteiro = 99
+    escrever("Antes de trocar: x=", x, " y=", y)
+    trocar(x, y)
+    escrever("Depois de trocar: x=", x, " y=", y)

@@ -1,0 +1,41 @@
+algoritmo "TabuleiroDeJogoDaVelha"
+
+// Analisa um tabuleiro de jogo do galo (3x3) já preenchido.
+// Foco: matriz 2D com inicialização por literal '{{...}}', índices
+// 'tabuleiro[i][j]', ciclos 'para' aninhados, e 'sair' para parar assim
+// que se encontra uma linha completa.
+
+constante VAZIO:caracter = '-'
+
+inicio
+    tabuleiro:caracter[3][3] = {{'X', 'O', 'X'}, {'O', 'X', 'O'}, {'X', 'O', '-'}}
+
+    contX:inteiro = 0
+    contO:inteiro = 0
+    contVazio:inteiro = 0
+
+    i:inteiro
+    j:inteiro
+    para i de 0 ate 2 fazer
+        linha:cadeia = ""
+        para j de 0 ate 2 fazer
+            linha = linha + tabuleiro[i][j]
+            se tabuleiro[i][j] == 'X' entao
+                contX = contX + 1
+            senao se tabuleiro[i][j] == 'O' entao
+                contO = contO + 1
+            senao
+                contVazio = contVazio + 1
+        escrever(linha)
+
+    escrever("X: ", contX, "  O: ", contO, "  vazio: ", contVazio)
+
+    venceuLinha:booleano = falso
+    para i de 0 ate 2 fazer
+        se tabuleiro[i][0] <> VAZIO e tabuleiro[i][0] == tabuleiro[i][1] e tabuleiro[i][1] == tabuleiro[i][2] entao
+            escrever("Linha ", i, " completa com '", tabuleiro[i][0], "'")
+            venceuLinha = verdadeiro
+            sair
+
+    se nao venceuLinha entao
+        escrever("Nenhuma linha completa")

@@ -1,0 +1,19 @@
+// Ficheiro incluído com "como inv" em 'principal_inventario.algo'.
+// 'Produto' (estrutura) e 'contadorProdutosCriados' (variável global)
+// fundem-se SEM namespace mesmo com 'como' -- só as FUNÇÕES ficam atrás
+// do alias.
+
+estrutura Produto
+    nome:cadeia
+    preco:decimal
+    quantidade:inteiro
+
+contadorProdutosCriados:inteiro = 0
+
+funcao criarProduto(nome:cadeia, preco:decimal, quantidade:inteiro):Produto
+    contadorProdutosCriados = contadorProdutosCriados + 1
+    p:Produto
+    p.nome = nome
+    p.preco = preco
+    p.quantidade = quantidade
+    retornar p

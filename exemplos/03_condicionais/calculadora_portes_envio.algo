@@ -1,0 +1,43 @@
+algoritmo "CalculadoraDePortesDeEnvio"
+
+// Calcula o custo de envio de uma encomenda.
+// Foco: 'se' aninhado dentro de 'se' (não só cadeias 'senao se'), e
+// condições compostas com 'e'/'ou' do assunto 02 dentro da condição do
+// 'se'.
+
+constante PRECO_BASE_LOCAL:decimal = 3.5
+constante PRECO_POR_KG_EXTRA:decimal = 1.2
+constante PRECO_POR_KM:decimal = 0.05
+
+inicio
+    pesoKg:decimal
+    escrever("Peso da encomenda (kg): ")
+    ler(pesoKg)
+
+    distanciaKm:decimal
+    escrever("Distância até ao destino (km): ")
+    ler(distanciaKm)
+
+    ehMembroPremium:booleano
+    escrever("É membro premium? (verdadeiro/falso): ")
+    ler(ehMembroPremium)
+
+    custoEnvio:decimal = 0.0
+
+    se ehMembroPremium entao
+        // membros premium têm portes grátis até 5 kg
+        se pesoKg <= 5.0 entao
+            custoEnvio = 0.0
+        senao
+            custoEnvio = (pesoKg - 5.0) * PRECO_POR_KG_EXTRA
+    senao
+        se pesoKg <= 1.0 e distanciaKm <= 50.0 entao
+            custoEnvio = PRECO_BASE_LOCAL
+        senao se pesoKg <= 1.0 ou distanciaKm <= 50.0 entao
+            custoEnvio = PRECO_BASE_LOCAL + PRECO_POR_KG_EXTRA
+        senao
+            custoEnvio = PRECO_BASE_LOCAL + pesoKg * PRECO_POR_KG_EXTRA + distanciaKm * PRECO_POR_KM
+
+    escrever("Peso: ", pesoKg, " kg, distância: ", distanciaKm, " km")
+    escrever("Membro premium: ", ehMembroPremium)
+    escrever("Custo de envio: ", custoEnvio)

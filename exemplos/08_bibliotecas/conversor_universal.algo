@@ -1,0 +1,54 @@
+algoritmo "ConversorUniversal"
+
+// Converte entre os 5 tipos primitivos e cifra uma letra por código
+// ASCII.
+// Foco: toda a biblioteca Conversao -- paraTexto, paraInteiro,
+// paraDecimal, paraBooleano, paraCaracter, paraAscii, deAscii.
+
+importar Conversao
+
+inicio
+    nome:cadeia
+    escrever("Nome: ")
+    ler(nome)
+
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    // resolve a lacuna do assunto 01: 'inteiro + cadeia' era erro de
+    // compilação -- 'conversao.paraTexto' converte o número primeiro
+    mensagem:cadeia = "Olá " + nome + ", tens " + conversao.paraTexto(idade) + " anos"
+    escrever(mensagem)
+
+    idadeTexto:cadeia = conversao.paraTexto(idade)
+    idadeDeVolta:inteiro = conversao.paraInteiro(idadeTexto)
+    escrever("Ida e volta inteiro->texto->inteiro deu igual? ", idadeDeVolta == idade)
+
+    precoTexto:cadeia
+    escrever("Preço, como texto (ex. 19.99): ")
+    ler(precoTexto)
+    precoDecimal:decimal = conversao.paraDecimal(precoTexto)
+    escrever("Preço convertido para decimal: ", precoDecimal)
+
+    respostaTexto:cadeia
+    escrever("Aceitas os termos? (escreve verdadeiro ou falso): ")
+    ler(respostaTexto)
+    aceite:booleano = conversao.paraBooleano(respostaTexto)
+    escrever("Aceite (convertido): ", aceite)
+
+    letraOriginal:caracter
+    escrever("Uma letra minúscula (a-z) para cifrar: ")
+    ler(letraOriginal)
+    codigo:inteiro = conversao.paraAscii(letraOriginal)
+    codigoCifrado:inteiro = codigo + 3
+    se codigoCifrado > conversao.paraAscii('z') entao
+        codigoCifrado = codigoCifrado - 26
+    letraCifrada:caracter = conversao.deAscii(codigoCifrado)
+    escrever("Letra cifrada (+3, cifra de César): ", letraCifrada)
+
+    umaLetra:cadeia
+    escrever("Escreve exatamente 1 caracter: ")
+    ler(umaLetra)
+    comoCaracter:caracter = conversao.paraCaracter(umaLetra)
+    escrever("Convertido para caracter: ", comoCaracter)

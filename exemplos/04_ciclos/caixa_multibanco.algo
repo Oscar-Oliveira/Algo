@@ -1,0 +1,45 @@
+algoritmo "CaixaMultibanco"
+
+// Simulador simples de caixa multibanco: consultar saldo, depositar,
+// levantar, sair.
+// Foco: 'fazer...enquanto' (corre pelo menos uma vez) a envolver um
+// 'escolher/caso' completo (assunto 03) -- mistura ciclos, condicionais,
+// operadores e tipos de todos os assuntos anteriores.
+
+inicio
+    saldo:decimal = 100.0
+    opcao:inteiro
+
+    fazer
+        escrever("1-Consultar saldo  2-Depositar  3-Levantar  4-Sair")
+        escrever("Escolhe uma opção: ")
+        ler(opcao)
+
+        escolher opcao
+            caso 1
+                escrever("Saldo atual: ", saldo)
+            caso 2
+                valorDeposito:decimal
+                escrever("Valor a depositar: ")
+                ler(valorDeposito)
+                se valorDeposito <= 0.0 entao
+                    escrever("Valor inválido")
+                senao
+                    saldo = saldo + valorDeposito
+                    escrever("Depósito efetuado. Novo saldo: ", saldo)
+            caso 3
+                valorLevantamento:decimal
+                escrever("Valor a levantar: ")
+                ler(valorLevantamento)
+                se valorLevantamento <= 0.0 entao
+                    escrever("Valor inválido")
+                senao se valorLevantamento > saldo entao
+                    escrever("Saldo insuficiente")
+                senao
+                    saldo = saldo - valorLevantamento
+                    escrever("Levantamento efetuado. Novo saldo: ", saldo)
+            caso 4
+                escrever("Até já!")
+            contrario
+                escrever("Opção inválida: ", opcao)
+    enquanto opcao <> 4

@@ -1,0 +1,46 @@
+algoritmo "EstatisticasDeNotas"
+
+// Lê as notas de uma turma e calcula média, máximo, mínimo e nº de
+// aprovados.
+// Foco: 'para' com acumuladores declarados ANTES do ciclo, e 'se' dentro
+// do corpo do 'para' (assunto 03) para atualizar máximo/mínimo.
+
+constante NOTA_APROVACAO:decimal = 9.5
+
+inicio
+    numeroAlunos:inteiro
+    escrever("Quantos alunos tem a turma: ")
+    ler(numeroAlunos)
+
+    soma:decimal = 0.0
+    maior:decimal = 0.0
+    menor:decimal = 0.0
+    aprovados:inteiro = 0
+
+    i:inteiro
+    para i de 1 ate numeroAlunos fazer
+        nota:decimal
+        escrever("Nota do aluno ", i, " (0 a 20): ")
+        ler(nota)
+
+        soma = soma + nota
+
+        se i == 1 entao
+            maior = nota
+            menor = nota
+        senao
+            se nota > maior entao
+                maior = nota
+            se nota < menor entao
+                menor = nota
+
+        se nota >= NOTA_APROVACAO entao
+            aprovados = aprovados + 1
+
+    media:decimal = soma / numeroAlunos
+
+    escrever("--- Estatísticas da turma (", numeroAlunos, " alunos) ---")
+    escrever("Média: ", media)
+    escrever("Nota mais alta: ", maior)
+    escrever("Nota mais baixa: ", menor)
+    escrever("Aprovados (>= ", NOTA_APROVACAO, "): ", aprovados, " de ", numeroAlunos)

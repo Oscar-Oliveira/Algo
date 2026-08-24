@@ -141,6 +141,8 @@ inicio
     ('""', "falso"), ('"falso"', "falso"), ('"Falso"', "falso"), ('"F"', "falso"),
     ('"qualquer coisa"', "verdadeiro"), ('"verdadeiro"', "verdadeiro"),
     ("verdadeiro", "verdadeiro"), ("falso", "falso"),
+    ('"não"', "falso"), ('"Não"', "falso"), ('"nao"', "falso"), ('"N"', "falso"),
+    ('"sim"', "verdadeiro"), ('"0"', "falso"), ('"1"', "verdadeiro"),
 ])
 def test_para_booleano(expr, esperado):
     saida = executar(f"""
@@ -201,21 +203,22 @@ def test_para_ascii_e_de_ascii_sao_inversas():
     assert saida.strip().splitlines() == ["65", "A"]
 
 
-def test_para_ascii_de_caracter_por_omissao_vazio_da_erro_nosso_nao_traceback():
-    """O valor por omissão de 'caracter' não inicializado é "" (0
-    caracteres) -- ord("") é TypeError no Python puro, não ValueError;
-    tem de ser apanhado dentro da própria função de conversão."""
-    resultado = _correr_esperando_erro("""\
-algoritmo "T"
-importar Conversao
-inicio
-    c:caracter
-    escrever(conversao.paraAscii(c))
-""")
-    assert resultado.returncode == 1
-    assert "Traceback" not in resultado.stdout
-    assert "Traceback" not in resultado.stderr
-    assert "não é um caracter válido" in resultado.stdout
+def test_para_ascii_de_caracter_por_omissao_e_um_espaco_valido():
+    """O valor por omissão de 'caracter' não inicializado é ' ' (1
+    espaço) -- ver DEFAULT_POR_TIPO em gerador_base.py. Antes desta
+    correção era "" (0 caracteres), o que quebrava a invariante de que
+    'caracter' é sempre exatamente 1 símbolo; conversao.paraAscii mantém
+    a sua verificação 'len(c) != 1' como defesa em profundidade (nenhum
+    caminho da linguagem consegue hoje produzir um caracter vazio), mas
+    já não é exercitada pelo valor por omissão."""
+    saida = executar("""
+        algoritmo "T"
+        importar Conversao
+        inicio
+            c:caracter
+            escrever(conversao.paraAscii(c))
+    """)
+    assert saida.strip() == str(ord(" "))
 
 
 def test_de_ascii_fora_do_intervalo_valido_da_erro_nosso():

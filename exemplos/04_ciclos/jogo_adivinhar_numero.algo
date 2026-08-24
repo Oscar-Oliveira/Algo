@@ -1,0 +1,36 @@
+algoritmo "JogoDeAdivinharNumero"
+
+// Jogo de adivinhar um número secreto (fixo -- número aleatório fica
+// para o assunto 08, que introduz 'matematica.aleatorio').
+// Foco: 'enquanto verdadeiro fazer' com 'sair' em dois pontos
+// diferentes (venceu / esgotou tentativas), e 'continuar' para não
+// contar um palpite fora do intervalo como tentativa.
+
+constante NUMERO_SECRETO:inteiro = 37
+constante LIMITE_TENTATIVAS:inteiro = 5
+
+inicio
+    tentativas:inteiro = 0
+    palpite:inteiro
+
+    enquanto verdadeiro fazer
+        tentativas = tentativas + 1
+        escrever("Tentativa ", tentativas, " de ", LIMITE_TENTATIVAS, " -- palpite (1-100): ")
+        ler(palpite)
+
+        se palpite < 1 ou palpite > 100 entao
+            escrever("Fora do intervalo 1-100 -- não conta como tentativa")
+            tentativas = tentativas - 1
+            continuar
+
+        se palpite == NUMERO_SECRETO entao
+            escrever("Acertaste! Foram precisas ", tentativas, " tentativas")
+            sair
+        senao se palpite < NUMERO_SECRETO entao
+            escrever("O número secreto é maior")
+        senao
+            escrever("O número secreto é menor")
+
+        se tentativas >= LIMITE_TENTATIVAS entao
+            escrever("Esgotaste as tentativas! O número secreto era ", NUMERO_SECRETO)
+            sair

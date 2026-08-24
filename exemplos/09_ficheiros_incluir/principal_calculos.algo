@@ -1,0 +1,26 @@
+algoritmo "PrincipalCalculos"
+
+// Foco: DOIS 'incluir' COM alias -- evita colisão de nomes entre
+// 'biblioteca_financas.algo' e 'biblioteca_estatistica.algo' (o linter
+// já avisaria a partir do 2º 'incluir' sem alias no mesmo programa).
+
+incluir "biblioteca_financas.algo" como financas
+incluir "biblioteca_estatistica.algo" como estatistica
+
+inicio
+    capital:decimal
+    escrever("Capital inicial: ")
+    ler(capital)
+    taxa:decimal
+    escrever("Taxa de juro anual (%): ")
+    ler(taxa)
+    anos:inteiro
+    escrever("Nº de anos: ")
+    ler(anos)
+
+    escrever("Juros simples: ", financas.jurosSimples(capital, taxa, anos))
+    escrever("Juros compostos: ", financas.jurosCompostos(capital, taxa, anos))
+
+    valores:inteiro[5] = {10, 20, 30, 40, 50}
+    escrever("Média dos valores de teste: ", estatistica.mediaVetor(valores, 5))
+    escrever("Maior valor de teste: ", estatistica.maiorDoVetor(valores, 5))

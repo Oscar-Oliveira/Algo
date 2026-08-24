@@ -48,8 +48,7 @@ lexer.py (tokenizar) → parser.py (parse/parse_biblioteca, recursive-descent)
 → codegen.py (gerar_python) → runnable Python
 ```
 
-* `codegen.py` generates normal Python, with helper functions for safety.
-* `codegen_minimo.py` is a separate, more direct code path for `compila --minimo`: skips type checking, maps `afirmar`→`assert`, `matematica.raiz`→`math.sqrt`, etc. directly. A type error only surfaces when the generated `.py` actually runs, as a native Python error.
+* `codegen.py` generates normal Python, with helper functions for safety. It shares its dispatch structure with `gerador_base.py` (`GeradorCodigoBase`), a leftover split from a since-removed `codegen_minimo.py`/`compila --minimo` fast path (no type checking, direct 1:1 mappings) — `codegen.py`'s `GeradorCodigo` is its only remaining subclass.
 * `algo_lang/tools/tracer.py` adds step-by-step execution tracing (used by `executa --debug`/`--json`) by running the real generated Python under `sys.settrace()`. The compiler itself has no notion of debugging. Codegen only emits code plus a line map (`gerar_python_com_mapa`).
 * `algo_lang/tools/flowchart.py` and `linter.py` operate on the AST, not generated code.
 * `incluir "ficheiro.algo"` (library includes) is resolved by `cli.py:_resolver_inclusoes`, which merges functions/structs/globals into the main `programa` AST. Collisions are a hard error. **`online/executor.py` reimplements this resolution rather than reusing `cli.py`'s version**, because `cli.py`'s helpers call `sys.exit(1)` on error, which would kill the whole web server for every student.
@@ -80,7 +79,7 @@ lexer.py (tokenizar) → parser.py (parse/parse_biblioteca, recursive-descent)
 * `algo_lang/tests/apoio.py` provides `compilar(codigo_algo)` and `executar(codigo_algo, entrada="")` helpers used throughout the compiler suite. They compile/run a string of Algo source and return generated Python or captured stdout.
 * Console integration tests (`algo_lang/tests/test_consola.py`) run the real `algo` command in a subprocess against a temporary copy of `algo_lang/`.
 * `alguem/tests/` and `online/tests/` isolate logs/DB into temporary directories via `monkeypatch` on the relevant module constants (not env vars). No test in the repository writes to the real `alguem/logs/` or a real database.
-* `docs/RoteiroTestesManualALGO.md` is a manual test script for the compiler (not automated).
+* `docs/bin/RoteiroTestesManualALGO.md` is a manual test script for the compiler (not automated, archived).
 
 ## Cross-cutting gotcha
 

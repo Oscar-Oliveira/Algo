@@ -1,0 +1,27 @@
+algoritmo "VerificadorDeStock"
+
+// Consulta o stock de um produto num inventário pequeno e fixo.
+// Foco: dois vetores 1D PARALELOS (mesma posição = mesmo produto),
+// inicializados por literal, e procura linear com 'para' + 'se' + 'sair'.
+
+inicio
+    nomesProdutos:cadeia[5] = {"Arroz", "Feijão", "Azeite", "Massa", "Açúcar"}
+    quantidades:inteiro[5] = {12, 8, 0, 25, 4}
+
+    produtoProcurado:cadeia
+    escrever("Produto a procurar: ")
+    ler(produtoProcurado)
+
+    encontrado:booleano = falso
+    i:inteiro
+    para i de 0 ate 4 fazer
+        se nomesProdutos[i] == produtoProcurado entao
+            encontrado = verdadeiro
+            se quantidades[i] == 0 entao
+                escrever(produtoProcurado, ": esgotado")
+            senao
+                escrever(produtoProcurado, ": ", quantidades[i], " unidades em stock")
+            sair
+
+    se nao encontrado entao
+        escrever(produtoProcurado, " não existe no inventário")
