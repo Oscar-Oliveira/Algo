@@ -10,16 +10,16 @@ docker compose up -d --build
 
 online
 - bd?
+
 - deixar estudande visivel
 - grupos
-
-- report error
-- trace de pois de executar doawload?
-
-
 - admin atica deeactiva alguem
 
-visualizador nao precisa de barra o trocar ficheiro por ir para a barra de topo
+
+
+visualizador
+- retirar botao voltar
+- nao precisa de barra o trocar ficheiro por ir para a barra de topo
 
 update -> db
 

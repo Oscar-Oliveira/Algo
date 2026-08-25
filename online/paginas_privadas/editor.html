@@ -8,7 +8,6 @@
   <link rel="icon" href="/estatico/favicon.ico">
   <link rel="stylesheet" href="/estatico/estilo.css">
   <script src="/estatico/tema.js"></script>
-  <script src="/estatico/fonte.js"></script>
 </head>
 
 <body class="pagina-editor">
@@ -16,35 +15,24 @@
     <a href="/editor" class="marca marca-pequena" title="Reiniciar o editor"><img src="/estatico/algo-logo.svg" alt=""
         class="marca-simbolo"> Algo</a>
     <div class="acoes-topo">
-      <button id="botao-fonte-menos" type="button" class="botao-icone" title="Diminuir a fonte do editor">A−</button>
-      <button id="botao-fonte-mais" type="button" class="botao-icone" title="Aumentar a fonte do editor">A+</button>
-      <button id="botao-tema" type="button" class="botao-icone" title="Alternar tema"><svg
-          class="icone-botao icone-tema-escuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="4.5" />
-          <line x1="12" y1="1.5" x2="12" y2="3.5" />
-          <line x1="12" y1="20.5" x2="12" y2="22.5" />
-          <line x1="4.2" y1="4.2" x2="5.6" y2="5.6" />
-          <line x1="18.4" y1="18.4" x2="19.8" y2="19.8" />
-          <line x1="1.5" y1="12" x2="3.5" y2="12" />
-          <line x1="20.5" y1="12" x2="22.5" y2="12" />
-          <line x1="4.2" y1="19.8" x2="5.6" y2="18.4" />
-          <line x1="18.4" y1="5.6" x2="19.8" y2="4.2" />
-        </svg><svg class="icone-botao icone-tema-claro" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.5 13.5A8.5 8.5 0 1 1 10.5 3.5a6.5 6.5 0 0 0 10 10z" />
-        </svg></button>
-      <a id="botao-admin" href="/admin" class="botao-icone escondido" title="Painel de admin"><svg class="icone-botao"
+      <a id="botao-admin" href="/admin" target="algo-admin" class="botao-icone escondido" title="Painel de admin"><svg class="icone-botao"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
           stroke-linejoin="round">
           <path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6z" />
         </svg></a>
-      <a href="/ajuda" class="botao-icone" title="Ajuda"><svg class="icone-botao" viewBox="0 0 24 24" fill="none"
+      <button id="botao-ajuda" type="button" class="botao-icone" title="Ajuda"><svg class="icone-botao" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10" />
           <path d="M9.1 9a2.9 2.9 0 0 1 5.7.9c0 1.9-2.4 2.1-2.7 3.6" />
           <line x1="12" y1="17.2" x2="12" y2="17.3" />
-        </svg></a>
+        </svg></button>
+      <button id="botao-reportar" type="button" class="botao-icone" title="Reportar um problema"><svg class="icone-botao"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M12 9v4" />
+          <path d="M10.3 3.9 1.8 18.5a1.8 1.8 0 0 0 1.6 2.7h17.2a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" />
+          <line x1="12" y1="16.3" x2="12" y2="16.4" />
+        </svg></button>
       <button id="botao-alternar-alguem" class="botao-icone" title="Mostrar Alguem"><svg class="icone-botao"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
           stroke-linejoin="round">
@@ -118,6 +106,22 @@
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg></button>
+        <button id="botao-tema" type="button" class="botao-icone botao-icone-pequeno" title="Alternar tema"><svg
+            class="icone-botao icone-tema-escuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4.5" />
+            <line x1="12" y1="1.5" x2="12" y2="3.5" />
+            <line x1="12" y1="20.5" x2="12" y2="22.5" />
+            <line x1="4.2" y1="4.2" x2="5.6" y2="5.6" />
+            <line x1="18.4" y1="18.4" x2="19.8" y2="19.8" />
+            <line x1="1.5" y1="12" x2="3.5" y2="12" />
+            <line x1="20.5" y1="12" x2="22.5" y2="12" />
+            <line x1="4.2" y1="19.8" x2="5.6" y2="18.4" />
+            <line x1="18.4" y1="5.6" x2="19.8" y2="4.2" />
+          </svg><svg class="icone-botao icone-tema-claro" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.5 13.5A8.5 8.5 0 1 1 10.5 3.5a6.5 6.5 0 0 0 10 10z" />
+          </svg></button>
       </div>
       <textarea id="area-codigo"></textarea>
     </section>
@@ -128,8 +132,15 @@
       <div class="painel-cabecalho">
         <span id="titulo-painel-execucao">Execução</span>
         <div class="acoes-codigo">
+          <button id="botao-descarregar-rasto-execucao" class="botao-icone escondido"
+            title="Gerar e descarregar o rasto desta execução"><svg class="icone-botao" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg><span class="rotulo-botao">Rasto desta execução</span></button>
           <a id="ligacao-abrir-visualizador" class="botao-icone escondido" title="Visualizador"
-            href="/estatico/visualizador/algo-trace-viewer.html" rel="noopener"><svg class="icone-botao"
+            href="/estatico/visualizador/algo-trace-viewer.html" target="algo-visualizador"><svg class="icone-botao"
               viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
               stroke-linejoin="round">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -253,6 +264,46 @@
       </div>
     </section>
   </main>
+
+  <div id="modal-reportar" class="modal escondido">
+    <div class="modal-caixa modal-caixa-media">
+      <div class="modal-cabecalho">
+        <h2>Reportar um problema</h2>
+        <button id="botao-fechar-reportar" type="button" class="botao-icone" title="Fechar"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg></button>
+      </div>
+      <form id="form-reportar" class="formulario">
+        <label>Descrição
+          <textarea name="descricao" id="campo-descricao-reportar" rows="10" required
+            placeholder="Descreve o que aconteceu..."></textarea>
+        </label>
+        <div class="acoes-modal">
+          <button type="button" id="botao-cancelar-reportar" class="botao-secundario">Cancelar</button>
+          <button type="submit" class="botao-primario">Enviar</button>
+        </div>
+        <p class="mensagem-erro" data-form="reportar"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-ajuda" class="modal escondido">
+    <div class="modal-caixa modal-caixa-larga">
+      <div class="modal-cabecalho">
+        <h2>Ajuda</h2>
+        <button id="botao-fechar-ajuda" type="button" class="botao-icone" title="Fechar"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg></button>
+      </div>
+      <div id="conteudo-ajuda-embutido"></div>
+    </div>
+  </div>
 
   <script src="/estatico/vendor/codemirror6/codemirror6.js"></script>
   <script src="/modo-algo.js"></script>

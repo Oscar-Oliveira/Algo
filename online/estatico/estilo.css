@@ -316,6 +316,44 @@ button {
   white-space: nowrap;
 }
 
+.tabela-relatorios th:nth-child(1),
+.tabela-relatorios td:nth-child(1) {
+  width: 18%;
+  word-break: break-all;
+}
+
+.tabela-relatorios th:nth-child(3),
+.tabela-relatorios td:nth-child(3) {
+  width: 1%;
+}
+
+.tabela-relatorios td {
+  vertical-align: top;
+  padding-top: 0.75rem;
+}
+
+.descricao-relatorio {
+  display: block;
+  width: 100%;
+  min-width: 280px;
+  height: 4rem;
+  resize: vertical;
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--tinta-borda);
+  border-radius: 6px;
+  background: var(--tinta);
+  color: var(--texto-claro);
+}
+
+.descricao-relatorio:focus {
+  outline: 2px solid var(--ambar);
+  outline-offset: 1px;
+  border-color: var(--ambar);
+}
+
 .botao-perigo {
   background: var(--erro);
   color: #fff;
@@ -841,7 +879,7 @@ button {
   flex: 1;
   min-height: 0;
   font-family: 'JetBrains Mono', monospace;
-  font-size: var(--fonte-editor-tamanho, 0.92rem);
+  font-size: 0.92rem;
 }
 
 .painel-codigo .cm-scroller {
@@ -1103,9 +1141,13 @@ button {
 /* ---------- fluxograma e rasto ---------- */
 
 .modal-caixa-larga {
-  width: min(760px, 92vw);
+  width: min(1100px, 95vw);
   max-height: 85vh;
   overflow-y: auto;
+}
+
+.modal-caixa-media {
+  width: min(560px, 92vw);
 }
 
 .modal-cabecalho {

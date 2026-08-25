@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   Play, Pause, SkipBack, SkipForward, ChevronLeft, ChevronRight,
   Upload, AlertTriangle, Terminal, Layers, FileCode2, Gauge, Info,
@@ -143,7 +144,7 @@ algo executa o-teu-programa.algo --debug --json
 /* ============================================================
    Painel de código
    ============================================================ */
-function PainelCodigo({ linhas, linhaAtual, tituloFicheiro, erroLinha }) {
+function PainelCodigo({ linhas, linhaAtual, erroLinha }) {
   const refLinhaAtual = useRef(null);
 
   useEffect(() => {
@@ -152,10 +153,6 @@ function PainelCodigo({ linhas, linhaAtual, tituloFicheiro, erroLinha }) {
 
   return (
     <div className="flex flex-col rounded-xl overflow-hidden h-full" style={{ background: "#1E2128", border: "1px solid #2A2D35" }}>
-      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid #2A2D35" }}>
-        <FileCode2 size={15} color="#8B8F99" />
-        <span className="text-sm truncate" style={{ color: "#C7C9D1", fontFamily: FONT_MONO }}>{tituloFicheiro}</span>
-      </div>
       <div className="flex-1 overflow-auto py-2" style={{ fontFamily: FONT_MONO, fontSize: 13.5, lineHeight: "1.7rem" }}>
         {linhas.map((linha, i) => {
           const numLinha = i + 1;
@@ -361,38 +358,34 @@ export default function VisualizadorTraceAlgo() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#16181D" }}>
-      {/* Cabeçalho */}
-      <header className="shrink-0 flex flex-wrap items-center gap-4 px-6 py-4" style={{ borderBottom: "1px solid #2A2D35" }}>
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#E3B341" }}>
-            <Layers size={16} color="#16181D" />
+      {createPortal(
+        <div className="flex items-center gap-3">
+          <span className="text-sm truncate" style={{ color: "var(--texto-esmaecido)" }}>{nomeFicheiro}</span>
+          <div className="flex items-center gap-2">
+            <FileCode2 size={15} />
+            <span className="text-sm truncate" style={{ fontFamily: FONT_MONO }}>
+              {trace.ficheiro || "programa.algo"}
+            </span>
           </div>
-          <div>
-            <h1 className="text-base leading-tight" style={{ fontFamily: FONT_DISPLAY, color: "#EDEEF1", fontWeight: 600 }}>
-              {trace.titulo || "Programa ALGO"}
-            </h1>
-            <p className="text-xs leading-tight" style={{ color: "#5B5F69" }}>{nomeFicheiro}</p>
-          </div>
+          <label className="botao-secundario botao-com-icone" style={{ cursor: "pointer" }}>
+            <Upload size={13} className="icone-botao" /> Trocar ficheiro
+            <input type="file" accept=".json" className="hidden" onChange={(e) => {
+              const f = e.target.files[0];
+              if (!f) return;
+              const leitor = new FileReader();
+              leitor.onload = (ev) => carregarFicheiro(ev.target.result, f.name);
+              leitor.readAsText(f);
+            }} />
+          </label>
+        </div>,
+        document.getElementById("acoes-topo-visualizador")
+      )}
+      {trace.limiteExcedido && (
+        <div className="shrink-0 flex items-center gap-1.5 text-xs px-6 py-1.5"
+             style={{ background: "#2A2213", color: "#E3B341" }}>
+          <Info size={12} /> trace truncado (limite de passos)
         </div>
-        <div className="flex-1" />
-        {trace.limiteExcedido && (
-          <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
-                style={{ background: "#2A2213", color: "#E3B341" }}>
-            <Info size={12} /> trace truncado (limite de passos)
-          </span>
-        )}
-        <label className="flex items-center gap-2 text-xs cursor-pointer px-3 py-1.5 rounded-lg transition-colors"
-               style={{ color: "#8B8F99", border: "1px solid #33363F" }}>
-          <Upload size={13} /> Trocar ficheiro
-          <input type="file" accept=".json" className="hidden" onChange={(e) => {
-            const f = e.target.files[0];
-            if (!f) return;
-            const leitor = new FileReader();
-            leitor.onload = (ev) => carregarFicheiro(ev.target.result, f.name);
-            leitor.readAsText(f);
-          }} />
-        </label>
-      </header>
+      )}
 
       {/* Corpo */}
       <main className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-5 gap-4 p-4">
@@ -400,7 +393,6 @@ export default function VisualizadorTraceAlgo() {
           <PainelCodigo
             linhas={trace.codigoFonte}
             linhaAtual={estadoAtual.linha}
-            tituloFicheiro={trace.ficheiro || "programa.algo"}
             erroLinha={mostrarErroAgora ? trace.erro.linha : null}
           />
         </div>

@@ -76,7 +76,7 @@ function renderizarIndiceExemplos(pastas) {
     indice.innerHTML = "<p class=\"aviso-exemplo\">Nenhum exemplo disponível.</p>";
     return;
   }
-  pastas.forEach((pasta) => {
+  pastas.forEach((pasta, indiceTema) => {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "item-tema-exemplo";
@@ -87,6 +87,10 @@ function renderizarIndiceExemplos(pastas) {
       mostrarTema(pasta);
     });
     indice.appendChild(item);
+    if (indiceTema === 0) {
+      item.classList.add("ativo");
+      mostrarTema(pasta);
+    }
   });
 }
 

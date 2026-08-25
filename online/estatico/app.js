@@ -367,12 +367,90 @@ function escreverErroCompilacaoNoTerminal(mensagem) {
 
 let wsExecucao = null;
 
+// entradas escritas na execução interativa atual, por ordem -- null enquanto
+// não houver uma execução terminada com sucesso (tipo "fim") para reproduzir
+// em modo batch. Ver botaoDescarregarRastoExecucao mais abaixo.
+let entradasExecucaoAtual = null;
+let execucaoTerminadaComSucesso = false; // só true depois de "fim" -- ver atualizarBotaoDescarregarRastoExecucao
+let rastoExecucaoCache = null; // { chave, url } -- evita gerar de novo o mesmo rasto
+const botaoDescarregarRastoExecucao = document.getElementById("botao-descarregar-rasto-execucao");
+
+function invalidarRastoExecucaoCache() {
+  if (rastoExecucaoCache) URL.revokeObjectURL(rastoExecucaoCache.url);
+  rastoExecucaoCache = null;
+}
+
+function atualizarBotaoDescarregarRastoExecucao() {
+  const naVistaExecucao = !vistaExecucao.classList.contains("escondido");
+  botaoDescarregarRastoExecucao.classList.toggle("escondido", !naVistaExecucao || !execucaoTerminadaComSucesso);
+}
+
+function descarregarUrl(url, nomeFicheiro) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nomeFicheiro;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// Gera o rasto só quando pedido, correndo o programa de novo (em modo batch,
+// com as mesmas entradas já escritas nesta execução interativa) apenas se
+// ainda não tivermos um rasto em cache para essas entradas exatas.
+botaoDescarregarRastoExecucao.addEventListener("click", async () => {
+  if (!entradasExecucaoAtual) return;
+  const chave = JSON.stringify(entradasExecucaoAtual);
+  const nomeFicheiro = ficheiros[0].nome.replace(/\.algo$/, "") + "_trace.json";
+
+  if (rastoExecucaoCache && rastoExecucaoCache.chave === chave) {
+    descarregarUrl(rastoExecucaoCache.url, nomeFicheiro);
+    return;
+  }
+
+  botaoDescarregarRastoExecucao.disabled = true;
+  try {
+    const resposta = await fetch("/api/rasto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...obterTodosOsFicheiros(), entradas: entradasExecucaoAtual }),
+    });
+    const dados = await resposta.json();
+    if (!resposta.ok) {
+      escreverNoTerminal(dados.detail || "Não foi possível gerar o rasto.", "linha-erro");
+      return;
+    }
+    if (dados.erro) {
+      escreverNoTerminal(
+        `Não foi possível gerar o rasto: o programa terminou com um erro` +
+        `${dados.erro.linha ? " na linha " + dados.erro.linha : ""} -- ${dados.erro.mensagem}`,
+        "linha-erro");
+      return;
+    }
+    if (dados.passos.length === 0) {
+      escreverNoTerminal("O rasto não teve nenhum passo para descarregar.", "linha-erro");
+      return;
+    }
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
+    rastoExecucaoCache = { chave, url: URL.createObjectURL(blob) };
+    descarregarUrl(rastoExecucaoCache.url, nomeFicheiro);
+  } catch (erro) {
+    console.error(erro);
+    escreverNoTerminal("Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro), "linha-erro");
+  } finally {
+    botaoDescarregarRastoExecucao.disabled = false;
+  }
+});
+
 document.getElementById("botao-executar").addEventListener("click", () => {
   mostrarVistaPainelTerminal("execucao");
   document.querySelector(".painel-terminal").scrollIntoView({ behavior: "smooth", block: "start" });
   terminal.innerHTML = "";
   limparMarcadorDeErro();
   formEntradaTerminal.classList.add("escondido");
+  entradasExecucaoAtual = [];
+  execucaoTerminadaComSucesso = false;
+  invalidarRastoExecucaoCache();
+  atualizarBotaoDescarregarRastoExecucao();
   if (wsExecucao) wsExecucao.close();
 
   const protocolo = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -396,6 +474,8 @@ document.getElementById("botao-executar").addEventListener("click", () => {
     } else if (dados.tipo === "fim") {
       escreverNoTerminal(`-- terminou (código ${dados.codigo_saida}) --`, "linha-sistema");
       formEntradaTerminal.classList.add("escondido");
+      execucaoTerminadaComSucesso = true;
+      atualizarBotaoDescarregarRastoExecucao();
     } else if (dados.tipo === "erro") {
       escreverNoTerminal(dados.mensagem, "linha-erro");
       formEntradaTerminal.classList.add("escondido");
@@ -414,6 +494,7 @@ formEntradaTerminal.addEventListener("submit", (evento) => {
   if (wsExecucao && wsExecucao.readyState === WebSocket.OPEN) {
     wsExecucao.send(JSON.stringify({ tipo: "entrada", valor }));
   }
+  if (entradasExecucaoAtual) entradasExecucaoAtual.push(valor);
   entradaTerminal.value = "";
 });
 
@@ -623,6 +704,7 @@ function mostrarVistaPainelTerminal(nome) {
   tituloPainelExecucao.textContent = TITULOS_VISTA_PAINEL_TERMINAL[nome];
   botaoVoltarExecucao.classList.toggle("escondido", nome === "execucao");
   ligacaoAbrirVisualizador.classList.toggle("escondido", nome !== "rasto");
+  atualizarBotaoDescarregarRastoExecucao();
   if (nome === "rasto") {
     document.getElementById("conteudo-rasto").classList.add("escondido");
     document.getElementById("form-entradas-rasto").classList.remove("escondido");
@@ -632,6 +714,89 @@ function mostrarVistaPainelTerminal(nome) {
 
 document.getElementById("botao-rasto").addEventListener("click", () => mostrarVistaPainelTerminal("rasto"));
 botaoVoltarExecucao.addEventListener("click", () => mostrarVistaPainelTerminal("execucao"));
+
+// ---------- modal de ajuda: busca /ajuda e injeta só o <main> no modal
+// (sem iframe -- corre no documento principal). Só na primeira abertura
+// (evita um pedido a cada carregamento do editor); um <script> de topo
+// não pode ser declarado duas vezes no mesmo documento, por isso não dá
+// para simplesmente repetir isto em cada abertura ----------
+
+function ligarModalFragmento(botaoId, modalId, containerId, fecharId, url, scriptUrl) {
+  const modal = document.getElementById(modalId);
+  const container = document.getElementById(containerId);
+  let carregado = false;
+  document.getElementById(botaoId).addEventListener("click", async () => {
+    modal.classList.remove("escondido");
+    if (carregado) return;
+    carregado = true;
+    try {
+      const resposta = await fetch(url);
+      const texto = await resposta.text();
+      const doc = new DOMParser().parseFromString(texto, "text/html");
+      const main = doc.querySelector("main");
+      if (!main) throw new Error("resposta sem <main>");
+      container.innerHTML = main.outerHTML;
+      const script = document.createElement("script");
+      script.src = scriptUrl;
+      document.body.appendChild(script);
+    } catch (erro) {
+      console.error(erro);
+      container.innerHTML = '<p class="mensagem-erro">Não foi possível contactar o servidor.</p>';
+    }
+  });
+  document.getElementById(fecharId).addEventListener("click", () => modal.classList.add("escondido"));
+  modal.addEventListener("click", (evento) => {
+    if (evento.target === modal) modal.classList.add("escondido");
+  });
+}
+
+ligarModalFragmento("botao-ajuda", "modal-ajuda", "conteudo-ajuda-embutido", "botao-fechar-ajuda", "/ajuda", "/estatico/ajuda.js");
+
+// ---------- modal de reportar um problema ----------
+
+const modalReportar = document.getElementById("modal-reportar");
+const formReportar = document.getElementById("form-reportar");
+const campoDescricaoReportar = document.getElementById("campo-descricao-reportar");
+const mensagemErroReportar = document.querySelector('.mensagem-erro[data-form="reportar"]');
+
+function abrirReportar() {
+  mensagemErroReportar.textContent = "";
+  modalReportar.classList.remove("escondido");
+}
+
+function fecharReportar() {
+  modalReportar.classList.add("escondido");
+  formReportar.reset();
+  mensagemErroReportar.textContent = "";
+}
+
+document.getElementById("botao-reportar").addEventListener("click", abrirReportar);
+document.getElementById("botao-cancelar-reportar").addEventListener("click", fecharReportar);
+document.getElementById("botao-fechar-reportar").addEventListener("click", fecharReportar);
+modalReportar.addEventListener("click", (evento) => {
+  if (evento.target === modalReportar) fecharReportar();
+});
+
+formReportar.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  mensagemErroReportar.textContent = "";
+  try {
+    const resposta = await fetch("/api/relatorios", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ descricao: campoDescricaoReportar.value }),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErroReportar.textContent = corpo.detail || "Algo correu mal.";
+      return;
+    }
+    fecharReportar();
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroReportar.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+});
 
 // ---------- fluxograma ----------
 
@@ -751,6 +916,7 @@ document.getElementById("form-entradas-rasto").addEventListener("submit", async 
   evento.preventDefault();
   const mensagemErro = document.querySelector('.mensagem-erro[data-form="rasto"]');
   mensagemErro.textContent = "";
+  document.getElementById("conteudo-rasto").classList.add("escondido");
   const entradas = document.getElementById("campo-entradas-rasto").value
     .split(",").map((l) => l.trim()).filter((l) => l !== "");
 
@@ -766,7 +932,10 @@ document.getElementById("form-entradas-rasto").addEventListener("submit", async 
       return;
     }
     if (dados.erro) {
-      mensagemErro.textContent = `${dados.erro.mensagem}${dados.erro.linha ? " (linha " + dados.erro.linha + ")" : ""}`;
+      mensagemErro.textContent =
+        `Não foi possível gerar o rasto: o programa terminou com um erro` +
+        `${dados.erro.linha ? " na linha " + dados.erro.linha : ""} -- ${dados.erro.mensagem}`;
+      return;
     }
     if (dados.passos.length === 0) {
       mensagemErro.textContent = "O programa não chegou a executar nenhum passo.";

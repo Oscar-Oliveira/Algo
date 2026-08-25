@@ -12,6 +12,14 @@ const abas = document.querySelectorAll(".aba-admin");
 const conteudosCarregados = {};
 
 function carregarConteudoDaAba(nomeAba) {
+  // Relatórios fica de fora deste cache: ao contrário de utilizadores/
+  // atividade (que só mudam por ação do próprio admin, já tratada à
+  // parte), novos relatórios podem chegar a qualquer momento de outra
+  // sessão -- sem recarregar sempre, reabrir a aba depois de um
+  // estudante (ou o próprio admin) reportar algo não mostrava o
+  // relatório novo, porque o iframe do admin nunca é recarregado
+  // enquanto o modal só é escondido/mostrado.
+  if (nomeAba === "relatorios") { carregarRelatorios(); return; }
   if (conteudosCarregados[nomeAba]) return;
   conteudosCarregados[nomeAba] = true;
   if (nomeAba === "utilizadores") carregarUtilizadores();
@@ -264,6 +272,116 @@ document.querySelectorAll("th.ordenavel").forEach((cabecalho) => {
     cabecalho.classList.add(estadoAtividade.ordemAscendente ? "ordenado-asc" : "ordenado-desc");
     atualizarTabelaAtividade();
   });
+});
+
+// ---------- relatórios de problemas ----------
+
+const corpoTabelaRelatorios = document.getElementById("corpo-tabela-relatorios");
+const mensagemSemRelatorios = document.getElementById("mensagem-sem-relatorios");
+const mensagemErroRelatorios = document.getElementById("mensagem-erro-relatorios");
+const botaoRelatoriosPaginaAnterior = document.getElementById("relatorios-pagina-anterior");
+const botaoRelatoriosPaginaSeguinte = document.getElementById("relatorios-pagina-seguinte");
+const textoPaginaRelatorios = document.getElementById("relatorios-texto-pagina");
+const relatoriosTotal = document.getElementById("relatorios-total");
+
+const RELATORIOS_POR_PAGINA = 20;
+
+let todosOsRelatorios = [];
+let paginaRelatorios = 1;
+
+async function carregarRelatorios() {
+  mensagemErroRelatorios.textContent = "";
+  try {
+    const resposta = await fetch("/api/admin/relatorios");
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErroRelatorios.textContent = corpo.detail || "Não foi possível carregar os relatórios.";
+      return;
+    }
+    const { relatorios } = await resposta.json();
+    todosOsRelatorios = relatorios;
+    paginaRelatorios = 1;
+    atualizarTabelaRelatorios();
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroRelatorios.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+function atualizarTabelaRelatorios() {
+  const totalPaginas = Math.max(1, Math.ceil(todosOsRelatorios.length / RELATORIOS_POR_PAGINA));
+  paginaRelatorios = Math.min(paginaRelatorios, totalPaginas);
+  const inicio = (paginaRelatorios - 1) * RELATORIOS_POR_PAGINA;
+  const relatoriosDaPagina = todosOsRelatorios.slice(inicio, inicio + RELATORIOS_POR_PAGINA);
+
+  corpoTabelaRelatorios.innerHTML = "";
+  mensagemSemRelatorios.classList.toggle("escondido", relatoriosDaPagina.length > 0);
+  relatoriosDaPagina.forEach((relatorio) => {
+    const linha = document.createElement("tr");
+
+    const celulaEmail = document.createElement("td");
+    celulaEmail.appendChild(document.createTextNode(relatorio.email));
+    celulaEmail.appendChild(document.createElement("br"));
+    const dataRelatorio = document.createElement("span");
+    dataRelatorio.className = "ajuda-campo";
+    dataRelatorio.textContent = formatarData(relatorio.criado_em);
+    celulaEmail.appendChild(dataRelatorio);
+
+    const celulaDescricao = document.createElement("td");
+    const areaDescricao = document.createElement("textarea");
+    areaDescricao.className = "descricao-relatorio";
+    areaDescricao.readOnly = true;
+    areaDescricao.value = relatorio.descricao;
+    celulaDescricao.appendChild(areaDescricao);
+
+    const celulaAcoes = document.createElement("td");
+    const botaoApagar = document.createElement("button");
+    botaoApagar.className = "botao-perigo botao-com-icone";
+    botaoApagar.innerHTML = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+      + 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+      + '<polyline points="4 7 20 7" /><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />'
+      + '<path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" /></svg><span>Apagar</span>';
+    botaoApagar.addEventListener("click", () => apagarRelatorio(relatorio.id));
+    celulaAcoes.appendChild(botaoApagar);
+
+    linha.appendChild(celulaEmail);
+    linha.appendChild(celulaDescricao);
+    linha.appendChild(celulaAcoes);
+    corpoTabelaRelatorios.appendChild(linha);
+  });
+
+  relatoriosTotal.textContent = todosOsRelatorios.length;
+  textoPaginaRelatorios.textContent = `Página ${paginaRelatorios} de ${totalPaginas}`;
+  botaoRelatoriosPaginaAnterior.disabled = paginaRelatorios <= 1;
+  botaoRelatoriosPaginaSeguinte.disabled = paginaRelatorios >= totalPaginas;
+}
+
+async function apagarRelatorio(idRelatorio) {
+  if (!confirm("Apagar este relatório? Não é possível desfazer.")) return;
+  mensagemErroRelatorios.textContent = "";
+  try {
+    const resposta = await fetch(`/api/admin/relatorios/apagar/${idRelatorio}`, { method: "POST" });
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErroRelatorios.textContent = corpo.detail || "Não foi possível apagar o relatório.";
+      return;
+    }
+    todosOsRelatorios = todosOsRelatorios.filter((r) => r.id !== idRelatorio);
+    atualizarTabelaRelatorios();
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroRelatorios.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+botaoRelatoriosPaginaAnterior.addEventListener("click", () => {
+  paginaRelatorios -= 1;
+  atualizarTabelaRelatorios();
+});
+
+botaoRelatoriosPaginaSeguinte.addEventListener("click", () => {
+  paginaRelatorios += 1;
+  atualizarTabelaRelatorios();
 });
 
 carregarConteudoDaAba("utilizadores");

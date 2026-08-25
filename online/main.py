@@ -30,6 +30,7 @@ import cifragem
 import credenciais
 import executor
 import projeto
+import relatorios
 import alguem_ponte
 from alguem.fornecedores.base import ErroFornecedorLLM
 from alguem.scripts import metricas
@@ -258,6 +259,16 @@ async def rota_eu(id_estudante: int = Depends(estudante_atual)):
     return {"admin": await run_in_threadpool(autenticacao.eh_admin, id_estudante)}
 
 
+@app.post("/api/relatorios")
+async def rota_criar_relatorio(request: Request, id_estudante: int = Depends(estudante_atual)):
+    dados = await corpo_json(request)
+    descricao = dados.get("descricao", "")
+    if not isinstance(descricao, str) or not descricao.strip():
+        raise HTTPException(status_code=400, detail="Descrição não pode estar vazia.")
+    await run_in_threadpool(relatorios.criar_relatorio, id_estudante, descricao)
+    return {"ok": True}
+
+
 # ---------- administração: aprovar/rejeitar contas pendentes ----------
 
 @app.get("/api/admin/pendentes")
@@ -301,6 +312,19 @@ async def rota_admin_atividade(id_estudante: int = Depends(admin_atual)):
     # alguem_ponte usa de facto para escrever os logs, e os testes já
     # isolam esse caminho com monkeypatch (ver tests/conftest.py).
     return metricas.gerar_relatorio(registador_alguem.PASTA_LOGS_POR_OMISSAO)
+
+
+# ---------- administração: relatórios de problemas enviados por estudantes ----------
+
+@app.get("/api/admin/relatorios")
+async def rota_admin_relatorios(id_estudante: int = Depends(admin_atual)):
+    return {"relatorios": await run_in_threadpool(relatorios.listar_relatorios)}
+
+
+@app.post("/api/admin/relatorios/apagar/{id_relatorio}")
+async def rota_admin_apagar_relatorio(id_relatorio: int, id_estudante: int = Depends(admin_atual)):
+    await run_in_threadpool(relatorios.apagar_relatorio, id_relatorio)
+    return {"ok": True}
 
 
 # ---------- administração: descarregar a base de dados para backup ----------

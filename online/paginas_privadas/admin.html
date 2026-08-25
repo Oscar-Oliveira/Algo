@@ -9,21 +9,15 @@
 <script src="/estatico/tema.js"></script>
 </head>
 <body class="pagina-admin">
-  <header class="barra-topo">
+  <header class="barra-topo" id="cabecalho-pagina">
     <span class="marca marca-pequena"><img src="/estatico/algo-logo.svg" alt="" class="marca-simbolo"> Algo — admin</span>
-    <div class="acoes-topo">
-      <a href="/editor" class="botao-icone" title="Voltar ao editor"><svg class="icone-botao" viewBox="0 0 24 24"
-          fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12" />
-          <polyline points="12 19 5 12 12 5" />
-        </svg></a>
-    </div>
   </header>
 
   <main class="conteudo-admin">
     <nav class="abas-admin">
       <button type="button" class="aba-admin ativa" data-aba="utilizadores">Utilizadores</button>
       <button type="button" class="aba-admin" data-aba="atividade">Atividade</button>
+      <button type="button" class="aba-admin" data-aba="relatorios">Relatórios</button>
       <button type="button" class="aba-admin" data-aba="backup">Backup</button>
     </nav>
 
@@ -84,6 +78,36 @@
           </svg></button>
       </div>
       <p class="mensagem-erro" id="mensagem-erro-atividade"></p>
+    </section>
+
+    <section id="aba-conteudo-relatorios" class="conteudo-aba-admin escondido">
+      <p class="subtitulo">Problemas reportados pelos estudantes a partir do editor.</p>
+      <div class="cartoes-metricas">
+        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="relatorios-total">-</span><span class="cartao-metrica-titulo">Relatórios</span></div>
+      </div>
+      <table class="tabela-admin tabela-relatorios">
+        <thead>
+          <tr><th>Email</th><th>Descrição</th><th></th></tr>
+        </thead>
+        <tbody id="corpo-tabela-relatorios"></tbody>
+      </table>
+      <p id="mensagem-sem-relatorios" class="ajuda-campo escondido">Ainda não há nenhum relatório reportado.</p>
+      <div class="paginacao-admin">
+        <button type="button" id="relatorios-pagina-anterior" class="botao-secundario botao-com-icone"><svg
+            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg><span>Anterior</span></button>
+        <span id="relatorios-texto-pagina" class="ajuda-campo"></span>
+        <button type="button" id="relatorios-pagina-seguinte" class="botao-secundario botao-com-icone"><span>Seguinte</span><svg
+            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12" />
+            <polyline points="12 5 19 12 12 19" />
+          </svg></button>
+      </div>
+      <p class="mensagem-erro" id="mensagem-erro-relatorios"></p>
     </section>
 
     <section id="aba-conteudo-backup" class="conteudo-aba-admin escondido">

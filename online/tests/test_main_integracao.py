@@ -492,6 +492,78 @@ def test_admin_atividade_sem_logs_devolve_relatorio_vazio(cliente, monkeypatch):
     assert corpo["globais"]["num_sessoes"] == 0
 
 
+def test_criar_relatorio_exige_sessao(cliente):
+    r = cliente.post("/api/relatorios", json={"descricao": "algo partido"})
+    assert r.status_code == 401
+
+
+def test_criar_relatorio_com_descricao_vazia_da_400(cliente):
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    r = cliente.post("/api/relatorios", json={"descricao": "   "})
+    assert r.status_code == 400
+
+
+def test_criar_relatorio_valido(cliente):
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    r = cliente.post("/api/relatorios", json={"descricao": "O botão de guardar não funciona."})
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+
+
+def test_admin_relatorios_exige_admin(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = cliente.get("/api/admin/relatorios")
+    assert r.status_code == 403
+
+
+def test_admin_relatorios_lista_com_email_de_quem_reportou(cliente, monkeypatch):
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    cliente.post("/api/relatorios", json={"descricao": "O botão de guardar não funciona."})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+
+    r = cliente.get("/api/admin/relatorios")
+    assert r.status_code == 200
+    relatorios = r.json()["relatorios"]
+    assert len(relatorios) == 1
+    assert relatorios[0]["email"] == "aluno@escola.pt"
+    assert relatorios[0]["descricao"] == "O botão de guardar não funciona."
+
+
+def test_admin_apagar_relatorio_exige_admin(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = cliente.post("/api/admin/relatorios/apagar/1")
+    assert r.status_code == 403
+
+
+def test_admin_apagar_relatorio(cliente, monkeypatch):
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    cliente.post("/api/relatorios", json={"descricao": "O botão de guardar não funciona."})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+
+    id_relatorio = cliente.get("/api/admin/relatorios").json()["relatorios"][0]["id"]
+    r = cliente.post(f"/api/admin/relatorios/apagar/{id_relatorio}")
+    assert r.status_code == 200
+    assert cliente.get("/api/admin/relatorios").json()["relatorios"] == []
+
+
 def test_admin_bd_exige_admin(cliente, monkeypatch):
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
     cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})

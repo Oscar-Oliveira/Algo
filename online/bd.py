@@ -40,6 +40,13 @@ CREATE TABLE IF NOT EXISTS credencial_llm (
     host TEXT,
     atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS relatorio_problema (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    estudante_id INTEGER NOT NULL REFERENCES estudante(id) ON DELETE CASCADE,
+    descricao TEXT NOT NULL,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 # 'aprovado'/'admin' foram acrescentados depois da primeira versão do
