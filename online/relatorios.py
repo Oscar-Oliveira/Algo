@@ -7,21 +7,21 @@ from __future__ import annotations
 from bd import sessao_bd
 
 
-def criar_relatorio(estudante_id: int, descricao: str, caminho_bd: str | None = None) -> None:
+def criar_relatorio(estudante_id: int, descricao: str, dsn: str | None = None) -> None:
     descricao = descricao.strip()
     if not descricao:
         raise ValueError("Descrição não pode estar vazia.")
-    with sessao_bd(caminho_bd) as bd:
+    with sessao_bd(dsn) as bd:
         bd.execute(
-            "INSERT INTO relatorio_problema (estudante_id, descricao) VALUES (?, ?)",
+            "INSERT INTO relatorio_problema (estudante_id, descricao) VALUES (%s, %s)",
             (estudante_id, descricao),
         )
 
 
-def listar_relatorios(caminho_bd: str | None = None) -> list[dict]:
+def listar_relatorios(dsn: str | None = None) -> list[dict]:
     """Todos os reportes, mais recentes primeiro -- para a tabela de
     relatórios do painel de admin."""
-    with sessao_bd(caminho_bd) as bd:
+    with sessao_bd(dsn) as bd:
         linhas = bd.execute(
             """SELECT relatorio_problema.id, relatorio_problema.descricao,
                       relatorio_problema.criado_em, estudante.email
@@ -32,6 +32,6 @@ def listar_relatorios(caminho_bd: str | None = None) -> list[dict]:
     return [dict(linha) for linha in linhas]
 
 
-def apagar_relatorio(relatorio_id: int, caminho_bd: str | None = None) -> None:
-    with sessao_bd(caminho_bd) as bd:
-        bd.execute("DELETE FROM relatorio_problema WHERE id = ?", (relatorio_id,))
+def apagar_relatorio(relatorio_id: int, dsn: str | None = None) -> None:
+    with sessao_bd(dsn) as bd:
+        bd.execute("DELETE FROM relatorio_problema WHERE id = %s", (relatorio_id,))

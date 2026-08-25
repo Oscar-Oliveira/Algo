@@ -56,7 +56,7 @@ def limitar_ficheiros_visiveis(ficheiros: list[tuple[str, str]]) -> list[tuple[s
 def construir_alguem(
     estudante_id: int,
     ficheiros_visiveis: list[tuple[str, str]] | None = None,
-    caminho_bd: str | None = None,
+    dsn: str | None = None,
     pasta_logs: str | None = None,
 ) -> Alguem:
     """Lê a credencial do estudante e constrói um Alguem pronto a
@@ -65,12 +65,7 @@ def construir_alguem(
     usam o id_pseudonimo da conta, nunca o id nem o email diretamente.
     'pasta_logs' existe só para os testes conseguirem isolar os logs
     sem variáveis de ambiente (mesma técnica já usada em alguem/)."""
-    from bd import CAMINHO_BD_POR_OMISSAO
-
-    if caminho_bd is None:
-        caminho_bd = CAMINHO_BD_POR_OMISSAO
-
-    credencial: CredencialLLM | None = obter_credencial(estudante_id, caminho_bd)
+    credencial: CredencialLLM | None = obter_credencial(estudante_id, dsn)
     if credencial is None:
         raise ErroAlguemIndisponivel(
             "Ainda não configuraste nenhum fornecedor de LLM -- "
@@ -88,7 +83,7 @@ def construir_alguem(
     except ErroFornecedorLLM as e:
         raise ErroAlguemIndisponivel(str(e)) from e
 
-    kwargs_registador = {"id_estudante": obter_id_pseudonimo(estudante_id, caminho_bd)}
+    kwargs_registador = {"id_estudante": obter_id_pseudonimo(estudante_id, dsn)}
     if pasta_logs is not None:
         kwargs_registador["pasta_logs"] = pasta_logs
     registador = Registador(**kwargs_registador)

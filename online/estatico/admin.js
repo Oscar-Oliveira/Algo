@@ -6,6 +6,16 @@ function formatarPercentagem(valor) {
   return valor === null || valor === undefined ? "-" : `${Math.round(valor * 100)}%`;
 }
 
+// Etiqueta de estado colorida (ver .badge* em estilo.css) -- usada em
+// vez de texto simples sempre que uma célula representa um estado
+// (ativo/inativo, aprovado/pendente/admin, tipo de evento no log).
+function criarBadge(texto, variante) {
+  const badge = document.createElement("span");
+  badge.className = `badge badge-${variante}`;
+  badge.textContent = texto;
+  return badge;
+}
+
 // ---------- abas ----------
 
 const abas = document.querySelectorAll(".aba-admin");
@@ -24,6 +34,8 @@ function carregarConteudoDaAba(nomeAba) {
   conteudosCarregados[nomeAba] = true;
   if (nomeAba === "utilizadores") carregarUtilizadores();
   if (nomeAba === "atividade") carregarAtividade();
+  if (nomeAba === "grupos") carregarGrupos();
+  if (nomeAba === "registoatividade") carregarLog();
 }
 
 abas.forEach((aba) => {
@@ -42,21 +54,32 @@ const corpoTabelaUtilizadores = document.getElementById("corpo-tabela-utilizador
 const mensagemSemUtilizadores = document.getElementById("mensagem-sem-utilizadores");
 const mensagemErroUtilizadores = document.getElementById("mensagem-erro-utilizadores");
 
-function estadoDaConta(conta) {
-  if (conta.admin) return "Admin";
-  return conta.aprovado ? "Aprovado" : "Pendente";
+let todosOsGruposParaSelect = [];
+let idUtilizadorAtual = null;
+
+function badgeEstadoDaConta(conta) {
+  if (conta.admin) return criarBadge("Admin", "destaque");
+  return conta.aprovado ? criarBadge("Aprovado", "sucesso") : criarBadge("Pendente", "aviso");
 }
 
 async function carregarUtilizadores() {
   mensagemErroUtilizadores.textContent = "";
   try {
-    const resposta = await fetch("/api/admin/utilizadores");
-    if (!resposta.ok) {
-      const corpo = await resposta.json();
+    const [respostaUtilizadores, respostaGrupos, respostaEu] = await Promise.all([
+      fetch("/api/admin/utilizadores"), fetch("/api/admin/grupos"), fetch("/api/eu"),
+    ]);
+    if (!respostaUtilizadores.ok) {
+      const corpo = await respostaUtilizadores.json();
       mensagemErroUtilizadores.textContent = corpo.detail || "Não foi possível carregar os utilizadores.";
       return;
     }
-    const { utilizadores } = await resposta.json();
+    if (respostaGrupos.ok) {
+      todosOsGruposParaSelect = (await respostaGrupos.json()).grupos;
+    }
+    if (respostaEu.ok) {
+      idUtilizadorAtual = (await respostaEu.json()).id;
+    }
+    const { utilizadores } = await respostaUtilizadores.json();
     corpoTabelaUtilizadores.innerHTML = "";
     mensagemSemUtilizadores.classList.toggle("escondido", utilizadores.length > 0);
     utilizadores.forEach((conta) => {
@@ -66,7 +89,24 @@ async function carregarUtilizadores() {
       celulaEmail.textContent = conta.email;
 
       const celulaEstado = document.createElement("td");
-      celulaEstado.textContent = estadoDaConta(conta);
+      celulaEstado.appendChild(badgeEstadoDaConta(conta));
+
+      const celulaGrupo = document.createElement("td");
+      const selectGrupo = document.createElement("select");
+      selectGrupo.setAttribute("aria-label", `Grupo de ${conta.email}`);
+      const opcaoSemGrupo = document.createElement("option");
+      opcaoSemGrupo.value = "";
+      opcaoSemGrupo.textContent = "Sem grupo";
+      selectGrupo.appendChild(opcaoSemGrupo);
+      todosOsGruposParaSelect.forEach((g) => {
+        const opcao = document.createElement("option");
+        opcao.value = g.id;
+        opcao.textContent = g.nome;
+        selectGrupo.appendChild(opcao);
+      });
+      selectGrupo.value = conta.grupo_id ? String(conta.grupo_id) : "";
+      selectGrupo.addEventListener("change", () => mudarGrupoUtilizador(conta.id, selectGrupo.value));
+      celulaGrupo.appendChild(selectGrupo);
 
       const celulaData = document.createElement("td");
       celulaData.textContent = formatarData(conta.criado_em);
@@ -85,17 +125,37 @@ async function carregarUtilizadores() {
 
         celulaAcoes.appendChild(botaoAprovar);
         celulaAcoes.appendChild(botaoRejeitar);
-      } else if (!conta.admin) {
+      } else if (conta.admin) {
+        if (conta.id === idUtilizadorAtual) {
+          const notaPropriaConta = document.createElement("span");
+          notaPropriaConta.className = "ajuda-campo";
+          notaPropriaConta.textContent = "(a tua conta)";
+          celulaAcoes.appendChild(notaPropriaConta);
+        } else {
+          const botaoRemoverAdmin = document.createElement("button");
+          botaoRemoverAdmin.className = "botao-perigo";
+          botaoRemoverAdmin.textContent = "Remover admin";
+          botaoRemoverAdmin.addEventListener("click", () => agirSobreUtilizador(conta.id, "remover_admin"));
+          celulaAcoes.appendChild(botaoRemoverAdmin);
+        }
+      } else {
+        const botaoTornarAdmin = document.createElement("button");
+        botaoTornarAdmin.className = "botao-secundario";
+        botaoTornarAdmin.textContent = "Tornar admin";
+        botaoTornarAdmin.addEventListener("click", () => agirSobreUtilizador(conta.id, "tornar_admin"));
+
         const botaoRevogar = document.createElement("button");
         botaoRevogar.className = "botao-perigo";
         botaoRevogar.textContent = "Revogar";
         botaoRevogar.addEventListener("click", () => agirSobreUtilizador(conta.id, "revogar"));
 
+        celulaAcoes.appendChild(botaoTornarAdmin);
         celulaAcoes.appendChild(botaoRevogar);
       }
 
       linha.appendChild(celulaEmail);
       linha.appendChild(celulaEstado);
+      linha.appendChild(celulaGrupo);
       linha.appendChild(celulaData);
       linha.appendChild(celulaAcoes);
       corpoTabelaUtilizadores.appendChild(linha);
@@ -119,6 +179,26 @@ async function agirSobreUtilizador(idConta, acao) {
   } catch (erro) {
     console.error(erro);
     mensagemErroUtilizadores.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+async function mudarGrupoUtilizador(idConta, grupoIdTexto) {
+  mensagemErroUtilizadores.textContent = "";
+  try {
+    const resposta = await fetch(`/api/admin/utilizadores/${idConta}/grupo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grupo_id: grupoIdTexto ? Number(grupoIdTexto) : null }),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErroUtilizadores.textContent = corpo.detail || "Não foi possível mudar o grupo.";
+    }
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroUtilizadores.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  } finally {
+    carregarUtilizadores();
   }
 }
 
@@ -274,6 +354,370 @@ document.querySelectorAll("th.ordenavel").forEach((cabecalho) => {
   });
 });
 
+// ---------- grupos ----------
+
+const formCriarGrupo = document.getElementById("form-criar-grupo");
+const campoNomeGrupoNovo = document.getElementById("grupo-novo-nome");
+const corpoTabelaGrupos = document.getElementById("corpo-tabela-grupos");
+const mensagemSemGrupos = document.getElementById("mensagem-sem-grupos");
+const mensagemErroGrupos = document.getElementById("mensagem-erro-grupos");
+
+async function carregarGrupos() {
+  mensagemErroGrupos.textContent = "";
+  try {
+    const resposta = await fetch("/api/admin/grupos");
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErroGrupos.textContent = corpo.detail || "Não foi possível carregar os grupos.";
+      return;
+    }
+    const { grupos } = await resposta.json();
+    todosOsGruposParaSelect = grupos;
+    corpoTabelaGrupos.innerHTML = "";
+    mensagemSemGrupos.classList.toggle("escondido", grupos.length > 0);
+    grupos.forEach((grupo) => {
+      const linha = document.createElement("tr");
+
+      const celulaNome = document.createElement("td");
+      celulaNome.textContent = grupo.nome;
+
+      const celulaEstado = document.createElement("td");
+      celulaEstado.appendChild(grupo.ativo ? criarBadge("Ativo", "sucesso") : criarBadge("Inativo", "erro"));
+
+      const celulaMembros = document.createElement("td");
+      celulaMembros.className = "numero";
+      celulaMembros.textContent = grupo.num_membros;
+
+      const celulaCodigo = document.createElement("td");
+      const botaoVerCodigo = document.createElement("button");
+      botaoVerCodigo.className = "botao-secundario";
+      botaoVerCodigo.textContent = "Ver código";
+      botaoVerCodigo.addEventListener("click", () => verCodigoGrupo(grupo.id, celulaCodigo, botaoVerCodigo));
+      celulaCodigo.appendChild(botaoVerCodigo);
+
+      const celulaAcoes = document.createElement("td");
+      const botaoAtivarDesativar = document.createElement("button");
+      botaoAtivarDesativar.className = "botao-secundario";
+      botaoAtivarDesativar.textContent = grupo.ativo ? "Desativar" : "Ativar";
+      botaoAtivarDesativar.addEventListener("click", () => agirSobreGrupo(grupo.id, grupo.ativo ? "desativar" : "ativar"));
+
+      const botaoRegenerar = document.createElement("button");
+      botaoRegenerar.className = "botao-secundario";
+      botaoRegenerar.textContent = "Regenerar código";
+      botaoRegenerar.addEventListener("click", () => regenerarCodigoGrupo(grupo.id));
+
+      const botaoExportar = document.createElement("a");
+      botaoExportar.className = "botao-secundario";
+      botaoExportar.textContent = "Exportar membros";
+      botaoExportar.href = `/api/admin/grupos/${grupo.id}/membros.csv`;
+      botaoExportar.target = "_blank";
+
+      const botaoApagar = document.createElement("button");
+      botaoApagar.className = "botao-perigo";
+      botaoApagar.textContent = "Eliminar";
+      botaoApagar.addEventListener("click", () => apagarGrupo(grupo.id));
+
+      celulaAcoes.appendChild(botaoAtivarDesativar);
+      celulaAcoes.appendChild(botaoRegenerar);
+      celulaAcoes.appendChild(botaoExportar);
+      celulaAcoes.appendChild(botaoApagar);
+
+      linha.appendChild(celulaNome);
+      linha.appendChild(celulaEstado);
+      linha.appendChild(celulaMembros);
+      linha.appendChild(celulaCodigo);
+      linha.appendChild(celulaAcoes);
+      corpoTabelaGrupos.appendChild(linha);
+    });
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroGrupos.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+formCriarGrupo.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  mensagemErroGrupos.textContent = "";
+  try {
+    const resposta = await fetch("/api/admin/grupos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: campoNomeGrupoNovo.value }),
+    });
+    const corpo = await resposta.json();
+    if (!resposta.ok) {
+      mensagemErroGrupos.textContent = corpo.detail || "Não foi possível criar o grupo.";
+      return;
+    }
+    campoNomeGrupoNovo.value = "";
+    alert(`Grupo "${corpo.nome}" criado. Código: ${corpo.codigo}\n\nAnota-o -- podes voltar a consultá-lo a qualquer momento com "Ver código".`);
+    carregarGrupos();
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroGrupos.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+});
+
+async function verCodigoGrupo(grupoId, celula, botao) {
+  try {
+    const resposta = await fetch(`/api/admin/grupos/${grupoId}/codigo`);
+    const corpo = await resposta.json();
+    if (!resposta.ok) {
+      mensagemErroGrupos.textContent = corpo.detail || "Não foi possível obter o código.";
+      return;
+    }
+    celula.textContent = corpo.codigo;
+    celula.className = "texto-mono";
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroGrupos.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+async function regenerarCodigoGrupo(grupoId) {
+  if (!confirm("Gerar um código novo? O código antigo deixa de servir para novos registos (quem já está no grupo não é afetado).")) return;
+  mensagemErroGrupos.textContent = "";
+  try {
+    const resposta = await fetch(`/api/admin/grupos/${grupoId}/regenerar_codigo`, { method: "POST" });
+    const corpo = await resposta.json();
+    if (!resposta.ok) {
+      mensagemErroGrupos.textContent = corpo.detail || "Não foi possível regenerar o código.";
+      return;
+    }
+    alert(`Código novo: ${corpo.codigo}`);
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroGrupos.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+async function agirSobreGrupo(grupoId, acao) {
+  mensagemErroGrupos.textContent = "";
+  try {
+    const resposta = await fetch(`/api/admin/grupos/${grupoId}/${acao}`, { method: "POST" });
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErroGrupos.textContent = corpo.detail || "Não foi possível concluir a ação.";
+      return;
+    }
+    carregarGrupos();
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroGrupos.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+async function apagarGrupo(grupoId) {
+  if (!confirm("Eliminar este grupo definitivamente? Só é possível se não tiver membros.")) return;
+  await agirSobreGrupo(grupoId, "apagar");
+}
+
+// ---------- registo geral de atividade ----------
+
+const corpoTabelaLog = document.getElementById("corpo-tabela-log");
+const mensagemSemLog = document.getElementById("mensagem-sem-log");
+const mensagemErroLog = document.getElementById("mensagem-erro-log");
+const selectLogUtilizador = document.getElementById("log-filtro-utilizador");
+const selectLogGrupo = document.getElementById("log-filtro-grupo");
+const selectLogTipo = document.getElementById("log-filtro-tipo");
+const campoLogDataInicio = document.getElementById("log-filtro-data-inicio");
+const campoLogDataFim = document.getElementById("log-filtro-data-fim");
+const botaoLogAplicarFiltros = document.getElementById("log-aplicar-filtros");
+const linkLogExportarCsv = document.getElementById("log-exportar-csv");
+const checkboxLogSelecionarTudo = document.getElementById("log-selecionar-tudo");
+const botaoLogApagarSelecionados = document.getElementById("log-apagar-selecionados");
+const textoLogSelecionados = document.getElementById("log-texto-selecionados");
+const botaoLogPaginaAnterior = document.getElementById("log-pagina-anterior");
+const botaoLogPaginaSeguinte = document.getElementById("log-pagina-seguinte");
+const textoLogPagina = document.getElementById("log-texto-pagina");
+
+const TIPOS_LOG_CONHECIDOS = [
+  "login", "login_falhado", "registo", "conta_aprovada", "conta_rejeitada", "conta_revogada",
+  "admin_concedido", "admin_revogado", "grupo_criado", "grupo_editado", "grupo_ativado",
+  "grupo_desativado", "grupo_eliminado", "grupo_reatribuido",
+];
+
+// Agrupa os tipos de evento por variante de badge, para se conseguir
+// varrer a tabela visualmente à procura de falhas/remoções sem ler
+// cada linha -- mesma convenção já usada noutros painéis de auditoria.
+const TIPOS_LOG_ERRO = new Set([
+  "login_falhado", "conta_rejeitada", "conta_revogada",
+  "admin_revogado", "grupo_desativado", "grupo_eliminado",
+]);
+const TIPOS_LOG_SUCESSO = new Set([
+  "login", "registo", "conta_aprovada", "admin_concedido", "grupo_criado", "grupo_ativado",
+]);
+
+function variantePorTipoLog(tipo) {
+  if (TIPOS_LOG_ERRO.has(tipo)) return "erro";
+  if (TIPOS_LOG_SUCESSO.has(tipo)) return "sucesso";
+  return "neutro";
+}
+
+let paginaLog = 1;
+let idsSelecionadosLog = new Set();
+
+function construirQueryLog(incluirPagina) {
+  const parametros = new URLSearchParams();
+  if (selectLogUtilizador.value) parametros.set("estudante_id", selectLogUtilizador.value);
+  if (selectLogGrupo.value) parametros.set("grupo_id", selectLogGrupo.value);
+  if (selectLogTipo.value) parametros.set("tipo", selectLogTipo.value);
+  if (campoLogDataInicio.value) parametros.set("data_inicio", campoLogDataInicio.value);
+  if (campoLogDataFim.value) parametros.set("data_fim", campoLogDataFim.value);
+  if (incluirPagina) parametros.set("pagina", String(paginaLog));
+  return parametros;
+}
+
+async function popularFiltrosLog() {
+  selectLogTipo.innerHTML = '<option value="">Todos os tipos</option>';
+  TIPOS_LOG_CONHECIDOS.forEach((tipo) => {
+    const opcao = document.createElement("option");
+    opcao.value = tipo;
+    opcao.textContent = tipo;
+    selectLogTipo.appendChild(opcao);
+  });
+
+  try {
+    const [respostaUtilizadores, respostaGrupos] = await Promise.all([
+      fetch("/api/admin/utilizadores"), fetch("/api/admin/grupos"),
+    ]);
+    if (respostaUtilizadores.ok) {
+      const { utilizadores } = await respostaUtilizadores.json();
+      selectLogUtilizador.innerHTML = '<option value="">Todos os utilizadores</option>';
+      utilizadores.forEach((conta) => {
+        const opcao = document.createElement("option");
+        opcao.value = conta.id;
+        opcao.textContent = conta.email;
+        selectLogUtilizador.appendChild(opcao);
+      });
+    }
+    if (respostaGrupos.ok) {
+      const { grupos } = await respostaGrupos.json();
+      selectLogGrupo.innerHTML = '<option value="">Todos os grupos</option>';
+      grupos.forEach((grupo) => {
+        const opcao = document.createElement("option");
+        opcao.value = grupo.id;
+        opcao.textContent = grupo.nome;
+        selectLogGrupo.appendChild(opcao);
+      });
+    }
+  } catch (erro) {
+    console.error(erro);
+  }
+}
+
+function atualizarEstadoSelecaoLog() {
+  botaoLogApagarSelecionados.disabled = idsSelecionadosLog.size === 0;
+  textoLogSelecionados.textContent = idsSelecionadosLog.size > 0 ? `${idsSelecionadosLog.size} selecionado(s)` : "";
+}
+
+async function carregarLog() {
+  mensagemErroLog.textContent = "";
+  await popularFiltrosLog();
+  await atualizarTabelaLog();
+}
+
+async function atualizarTabelaLog() {
+  mensagemErroLog.textContent = "";
+  idsSelecionadosLog = new Set();
+  atualizarEstadoSelecaoLog();
+  checkboxLogSelecionarTudo.checked = false;
+  linkLogExportarCsv.href = `/api/admin/log.csv?${construirQueryLog(false).toString()}`;
+  try {
+    const resposta = await fetch(`/api/admin/log?${construirQueryLog(true).toString()}`);
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErroLog.textContent = corpo.detail || "Não foi possível carregar o registo de atividade.";
+      return;
+    }
+    const { eventos, total, pagina, por_pagina } = await resposta.json();
+    corpoTabelaLog.innerHTML = "";
+    mensagemSemLog.classList.toggle("escondido", eventos.length > 0);
+    eventos.forEach((evento) => {
+      const linha = document.createElement("tr");
+
+      const celulaCheckbox = document.createElement("td");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) idsSelecionadosLog.add(evento.id);
+        else idsSelecionadosLog.delete(evento.id);
+        atualizarEstadoSelecaoLog();
+      });
+      celulaCheckbox.appendChild(checkbox);
+
+      const celulaData = document.createElement("td");
+      celulaData.textContent = formatarData(evento.criado_em);
+
+      const celulaTipo = document.createElement("td");
+      celulaTipo.appendChild(criarBadge(evento.tipo, variantePorTipoLog(evento.tipo)));
+
+      const celulaAtor = document.createElement("td");
+      celulaAtor.textContent = evento.ator_email || "-";
+
+      const celulaAlvo = document.createElement("td");
+      celulaAlvo.textContent = evento.alvo_email || "-";
+
+      const celulaGrupoLog = document.createElement("td");
+      celulaGrupoLog.textContent = evento.grupo_nome || "-";
+
+      const celulaDetalhes = document.createElement("td");
+      celulaDetalhes.className = "texto-mono";
+      celulaDetalhes.textContent = evento.detalhes ? JSON.stringify(evento.detalhes) : "";
+
+      linha.appendChild(celulaCheckbox);
+      linha.appendChild(celulaData);
+      linha.appendChild(celulaTipo);
+      linha.appendChild(celulaAtor);
+      linha.appendChild(celulaAlvo);
+      linha.appendChild(celulaGrupoLog);
+      linha.appendChild(celulaDetalhes);
+      corpoTabelaLog.appendChild(linha);
+    });
+
+    const totalPaginas = Math.max(1, Math.ceil(total / por_pagina));
+    textoLogPagina.textContent = `Página ${pagina} de ${totalPaginas} (${total} registos)`;
+    botaoLogPaginaAnterior.disabled = pagina <= 1;
+    botaoLogPaginaSeguinte.disabled = pagina >= totalPaginas;
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroLog.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+botaoLogAplicarFiltros.addEventListener("click", () => { paginaLog = 1; atualizarTabelaLog(); });
+botaoLogPaginaAnterior.addEventListener("click", () => { paginaLog -= 1; atualizarTabelaLog(); });
+botaoLogPaginaSeguinte.addEventListener("click", () => { paginaLog += 1; atualizarTabelaLog(); });
+
+checkboxLogSelecionarTudo.addEventListener("change", () => {
+  document.querySelectorAll("#corpo-tabela-log input[type=checkbox]").forEach((cb) => {
+    cb.checked = checkboxLogSelecionarTudo.checked;
+    cb.dispatchEvent(new Event("change"));
+  });
+});
+
+botaoLogApagarSelecionados.addEventListener("click", async () => {
+  if (idsSelecionadosLog.size === 0) return;
+  if (!confirm(`Eliminar definitivamente ${idsSelecionadosLog.size} registo(s)? Esta ação não pode ser desfeita.`)) return;
+  mensagemErroLog.textContent = "";
+  try {
+    const resposta = await fetch("/api/admin/log/apagar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [...idsSelecionadosLog] }),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErroLog.textContent = corpo.detail || "Não foi possível eliminar os registos selecionados.";
+      return;
+    }
+    atualizarTabelaLog();
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroLog.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+});
+
 // ---------- relatórios de problemas ----------
 
 const corpoTabelaRelatorios = document.getElementById("corpo-tabela-relatorios");
@@ -384,4 +828,4 @@ botaoRelatoriosPaginaSeguinte.addEventListener("click", () => {
   atualizarTabelaRelatorios();
 });
 
-carregarConteudoDaAba("utilizadores");
+carregarConteudoDaAba("grupos");

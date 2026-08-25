@@ -7,5 +7,5 @@ venv/
 .pytest_cache/
 *.db
 .estudante_id
-.env
+# .env
 /dist/

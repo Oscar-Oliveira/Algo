@@ -61,7 +61,7 @@ class CredencialLLM:
 
 def guardar_credencial(estudante_id: int, fornecedor: str, modelo: str,
                         api_key: str, host: str | None = None,
-                        caminho_bd: str | None = None) -> None:
+                        dsn: str | None = None) -> None:
     if fornecedor not in FORNECEDORES_VALIDOS:
         disponiveis = ", ".join(sorted(FORNECEDORES_VALIDOS))
         raise ErroCredencial(f"Fornecedor '{fornecedor}' desconhecido. Disponíveis: {disponiveis}.")
@@ -80,10 +80,10 @@ def guardar_credencial(estudante_id: int, fornecedor: str, modelo: str,
         _validar_host_ollama(host)
 
     api_key_cifrada = cifrar(api_key) if api_key else b""
-    with sessao_bd(caminho_bd) as bd:
+    with sessao_bd(dsn) as bd:
         bd.execute(
             """INSERT INTO credencial_llm (estudante_id, fornecedor, modelo, api_key_cifrada, host, atualizado_em)
-               VALUES (?, ?, ?, ?, ?, datetime('now'))
+               VALUES (%s, %s, %s, %s, %s, now())
                ON CONFLICT(estudante_id) DO UPDATE SET
                    fornecedor = excluded.fornecedor,
                    modelo = excluded.modelo,
@@ -94,12 +94,12 @@ def guardar_credencial(estudante_id: int, fornecedor: str, modelo: str,
         )
 
 
-def obter_credencial(estudante_id: int, caminho_bd: str | None = None) -> CredencialLLM | None:
+def obter_credencial(estudante_id: int, dsn: str | None = None) -> CredencialLLM | None:
     """Devolve a credencial do estudante (com a chave já decifrada),
     ou None se ainda não configurou nenhuma."""
-    with sessao_bd(caminho_bd) as bd:
+    with sessao_bd(dsn) as bd:
         linha = bd.execute(
-            "SELECT fornecedor, modelo, api_key_cifrada, host FROM credencial_llm WHERE estudante_id = ?",
+            "SELECT fornecedor, modelo, api_key_cifrada, host FROM credencial_llm WHERE estudante_id = %s",
             (estudante_id,),
         ).fetchone()
     if linha is None:
@@ -107,6 +107,6 @@ def obter_credencial(estudante_id: int, caminho_bd: str | None = None) -> Creden
     return CredencialLLM(
         fornecedor=linha["fornecedor"],
         modelo=linha["modelo"],
-        api_key=decifrar(linha["api_key_cifrada"]),
+        api_key=decifrar(bytes(linha["api_key_cifrada"]) if linha["api_key_cifrada"] else b""),
         host=linha["host"],
     )

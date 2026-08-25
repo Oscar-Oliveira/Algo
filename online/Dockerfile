@@ -8,8 +8,10 @@ FROM python:3.12-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142
 # graphviz -- é isto que resolve o fluxograma, e é exatamente o tipo
 # de dependência de sistema que uma imagem Docker existe para tratar
 # de forma reproduzível, em vez de assumir que já está na máquina.
+# postgresql-client -- fornece o 'pg_dump' usado por bd.gerar_backup_sql
+# (rota /api/admin/bd), mesma lógica: reproduzível, não assumido presente.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends graphviz \
+    && apt-get install -y --no-install-recommends graphviz postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # ON-27: nunca correr o servidor como root -- utilizador dedicado, sem
@@ -34,11 +36,9 @@ RUN pip install --no-cache-dir -r /app/online/requerimentos.txt
 
 WORKDIR /app/online
 
-# a base de dados SQLite fica em online/dados/ -- é essa subpasta que
-# deve ser montada como volume, para os dados sobreviverem a um
-# reinício do contentor (ex: docker run -v algo_dados:/app/online/dados ...)
-RUN mkdir -p /app/online/dados && chown algo:algo /app/online/dados
-VOLUME ["/app/online/dados"]
+# a base de dados passou a ser PostgreSQL (ver bd.py e ONLINE_DATABASE_URL)
+# -- os dados já não vivem num ficheiro dentro deste contentor, por isso
+# já não há nenhuma pasta local a montar como volume aqui.
 
 USER algo
 

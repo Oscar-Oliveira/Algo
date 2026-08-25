@@ -25,6 +25,9 @@ from contextlib import asynccontextmanager
 
 import bd
 import autenticacao
+import atividade
+import grupos
+import limitador_registo
 import modo_codemirror
 import cifragem
 import credenciais
@@ -220,29 +223,58 @@ async def pasta_execucao_atual(id_estudante: int = Depends(estudante_atual)) -> 
     return executor.preparar_pasta_execucao(pseudonimo)
 
 
+def _ip_do_pedido(request: Request) -> str:
+    return request.client.host if request.client else "desconhecido"
+
+
 @app.post("/api/registar")
 async def rota_registar(request: Request):
     dados = await corpo_json(request)
+    codigo_grupo = (dados.get("codigo_grupo") or "").strip() or None
+    ip_hash = limitador_registo.hash_ip(_ip_do_pedido(request))
+
+    if codigo_grupo:
+        try:
+            await run_in_threadpool(limitador_registo.verificar_bloqueado, ip_hash)
+        except limitador_registo.ErroLimiteRegisto as e:
+            raise HTTPException(status_code=429, detail=str(e))
+
     try:
         id_estudante = await run_in_threadpool(
-            autenticacao.registar, dados.get("email", ""), dados.get("password", ""))
+            autenticacao.registar, dados.get("email", ""), dados.get("password", ""), codigo_grupo)
+    except autenticacao.ErroCodigoGrupoInvalido as e:
+        if codigo_grupo:
+            await run_in_threadpool(limitador_registo.registar_falha, ip_hash)
+        raise HTTPException(status_code=400, detail=str(e))
     except autenticacao.ErroAutenticacao as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if codigo_grupo:
+        await run_in_threadpool(limitador_registo.limpar, ip_hash)
+        grupo_id = await run_in_threadpool(grupos.verificar_codigo, codigo_grupo)
+    else:
+        grupo_id = None
+
     aprovado = await run_in_threadpool(autenticacao.esta_aprovado, id_estudante)
     if aprovado:
         request.session["id_estudante"] = id_estudante
+    await run_in_threadpool(
+        atividade.registar_evento, "registo", id_estudante, id_estudante, grupo_id)
     return {"ok": True, "pendente": not aprovado}
 
 
 @app.post("/api/entrar")
 async def rota_entrar(request: Request):
     dados = await corpo_json(request)
+    email = dados.get("email", "")
     try:
-        id_estudante = await run_in_threadpool(
-            autenticacao.autenticar, dados.get("email", ""), dados.get("password", ""))
+        id_estudante = await run_in_threadpool(autenticacao.autenticar, email, dados.get("password", ""))
     except autenticacao.ErroAutenticacao as e:
+        await run_in_threadpool(
+            atividade.registar_evento, "login_falhado", None, None, None, {"email": email})
         raise HTTPException(status_code=401, detail=str(e))
     request.session["id_estudante"] = id_estudante
+    await run_in_threadpool(atividade.registar_evento, "login", id_estudante, id_estudante)
     return {"ok": True}
 
 
@@ -254,9 +286,14 @@ async def rota_sair(request: Request):
 
 @app.get("/api/eu")
 async def rota_eu(id_estudante: int = Depends(estudante_atual)):
-    """Usado pelo frontend só para decidir se mostra a ligação para o
-    painel de admin -- não devolve mais nada sobre a conta."""
-    return {"admin": await run_in_threadpool(autenticacao.eh_admin, id_estudante)}
+    """Usado pelo frontend para decidir se mostra a ligação para o
+    painel de admin, e (o 'id') para o painel de admin conseguir
+    identificar a própria conta na tabela de utilizadores -- ex: para
+    nunca mostrar um botão de "remover admin" na própria linha."""
+    return {
+        "id": id_estudante,
+        "admin": await run_in_threadpool(autenticacao.eh_admin, id_estudante),
+    }
 
 
 @app.post("/api/relatorios")
@@ -279,16 +316,24 @@ async def rota_admin_pendentes(id_estudante: int = Depends(admin_atual)):
 @app.post("/api/admin/aprovar/{id_estudante_alvo}")
 async def rota_admin_aprovar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
     await run_in_threadpool(autenticacao.aprovar_conta, id_estudante_alvo)
+    await run_in_threadpool(atividade.registar_evento, "conta_aprovada", id_estudante, id_estudante_alvo)
     return {"ok": True}
 
 
 @app.post("/api/admin/rejeitar/{id_estudante_alvo}")
 async def rota_admin_rejeitar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
-    await run_in_threadpool(autenticacao.rejeitar_conta, id_estudante_alvo)
+    # rejeitar_conta APAGA a conta -- por isso o evento não pode
+    # referenciar id_estudante_alvo em alvo_id (deixaria de existir na
+    # tabela estudante); regista-se antes o email como snapshot.
+    email_apagado = await run_in_threadpool(autenticacao.rejeitar_conta, id_estudante_alvo)
+    if email_apagado is not None:
+        await run_in_threadpool(
+            atividade.registar_evento, "conta_rejeitada", id_estudante, None, None,
+            {"email": email_apagado, "id_original": id_estudante_alvo})
     return {"ok": True}
 
 
-# ---------- administração: todos os utilizadores e revogação ----------
+# ---------- administração: todos os utilizadores, revogação e privilégios ----------
 
 @app.get("/api/admin/utilizadores")
 async def rota_admin_utilizadores(id_estudante: int = Depends(admin_atual)):
@@ -300,7 +345,170 @@ async def rota_admin_revogar(id_estudante_alvo: int, id_estudante: int = Depends
     if id_estudante_alvo == id_estudante:
         raise HTTPException(status_code=400, detail="Não podes revogar a tua própria conta.")
     await run_in_threadpool(autenticacao.revogar_conta, id_estudante_alvo)
+    await run_in_threadpool(atividade.registar_evento, "conta_revogada", id_estudante, id_estudante_alvo)
     return {"ok": True}
+
+
+@app.post("/api/admin/tornar_admin/{id_estudante_alvo}")
+async def rota_admin_tornar_admin(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+    await run_in_threadpool(autenticacao.tornar_admin, id_estudante_alvo)
+    await run_in_threadpool(atividade.registar_evento, "admin_concedido", id_estudante, id_estudante_alvo)
+    return {"ok": True}
+
+
+@app.post("/api/admin/remover_admin/{id_estudante_alvo}")
+async def rota_admin_remover_admin(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+    if id_estudante_alvo == id_estudante:
+        raise HTTPException(status_code=400, detail="Não podes remover os teus próprios privilégios de admin.")
+    alterou = await run_in_threadpool(autenticacao.remover_admin, id_estudante_alvo, id_estudante)
+    if not alterou:
+        raise HTTPException(
+            status_code=400,
+            detail="Não é possível remover: teria de sobrar pelo menos um administrador ativo.",
+        )
+    await run_in_threadpool(atividade.registar_evento, "admin_revogado", id_estudante, id_estudante_alvo)
+    return {"ok": True}
+
+
+@app.post("/api/admin/utilizadores/{id_estudante_alvo}/grupo")
+async def rota_admin_reatribuir_grupo(id_estudante_alvo: int, request: Request,
+                                       id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    novo_grupo_id = dados.get("grupo_id")
+    if novo_grupo_id is not None and not isinstance(novo_grupo_id, int):
+        raise HTTPException(status_code=400, detail="'grupo_id' tem de ser um inteiro ou null.")
+    try:
+        grupo_anterior_id = await run_in_threadpool(
+            grupos.reatribuir_grupo, id_estudante_alvo, novo_grupo_id)
+    except grupos.ErroGrupo as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "grupo_reatribuido", id_estudante, id_estudante_alvo, novo_grupo_id,
+        {"grupo_anterior_id": grupo_anterior_id, "grupo_novo_id": novo_grupo_id})
+    return {"ok": True}
+
+
+# ---------- administração: grupos ----------
+
+@app.get("/api/admin/grupos")
+async def rota_admin_listar_grupos(id_estudante: int = Depends(admin_atual)):
+    return {"grupos": await run_in_threadpool(grupos.listar_grupos)}
+
+
+@app.post("/api/admin/grupos")
+async def rota_admin_criar_grupo(request: Request, id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    try:
+        resultado = await run_in_threadpool(grupos.criar_grupo, dados.get("nome", ""), id_estudante)
+    except grupos.ErroGrupo as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "grupo_criado", id_estudante, None, resultado["id"],
+        {"nome": resultado["nome"]})
+    return resultado
+
+
+@app.post("/api/admin/grupos/{grupo_id}/editar")
+async def rota_admin_editar_grupo(grupo_id: int, request: Request, id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    try:
+        await run_in_threadpool(grupos.editar_grupo, grupo_id, dados.get("nome", ""))
+    except grupos.ErroGrupo as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "grupo_editado", id_estudante, None, grupo_id,
+        {"nome_novo": dados.get("nome", "")})
+    return {"ok": True}
+
+
+@app.post("/api/admin/grupos/{grupo_id}/ativar")
+async def rota_admin_ativar_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+    await run_in_threadpool(grupos.ativar_grupo, grupo_id)
+    await run_in_threadpool(atividade.registar_evento, "grupo_ativado", id_estudante, None, grupo_id)
+    return {"ok": True}
+
+
+@app.post("/api/admin/grupos/{grupo_id}/desativar")
+async def rota_admin_desativar_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+    await run_in_threadpool(grupos.desativar_grupo, grupo_id)
+    await run_in_threadpool(atividade.registar_evento, "grupo_desativado", id_estudante, None, grupo_id)
+    return {"ok": True}
+
+
+@app.post("/api/admin/grupos/{grupo_id}/apagar")
+async def rota_admin_apagar_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+    try:
+        await run_in_threadpool(grupos.apagar_grupo, grupo_id)
+    except grupos.ErroGrupo as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(atividade.registar_evento, "grupo_eliminado", id_estudante, None, grupo_id)
+    return {"ok": True}
+
+
+@app.get("/api/admin/grupos/{grupo_id}/codigo")
+async def rota_admin_ver_codigo_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+    try:
+        codigo = await run_in_threadpool(grupos.ver_codigo, grupo_id)
+    except grupos.ErroGrupo as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"codigo": codigo}
+
+
+@app.post("/api/admin/grupos/{grupo_id}/regenerar_codigo")
+async def rota_admin_regenerar_codigo_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+    try:
+        codigo = await run_in_threadpool(grupos.regenerar_codigo, grupo_id)
+    except grupos.ErroGrupo as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    await run_in_threadpool(atividade.registar_evento, "grupo_editado", id_estudante, None, grupo_id,
+                             {"acao": "codigo_regenerado"})
+    return {"codigo": codigo}
+
+
+@app.get("/api/admin/grupos/{grupo_id}/membros.csv")
+async def rota_admin_exportar_membros_csv(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+    try:
+        csv_texto = await run_in_threadpool(grupos.exportar_membros_csv, grupo_id)
+    except grupos.ErroGrupo as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return Response(
+        content=csv_texto, media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="grupo-{grupo_id}-membros.csv"'},
+    )
+
+
+# ---------- administração: registo geral de atividade ----------
+
+@app.get("/api/admin/log")
+async def rota_admin_listar_log(id_estudante: int = Depends(admin_atual),
+                                 estudante_id: int | None = None, grupo_id: int | None = None,
+                                 tipo: str | None = None, data_inicio: str | None = None,
+                                 data_fim: str | None = None, pagina: int = 1):
+    return await run_in_threadpool(
+        atividade.listar_eventos, estudante_id, grupo_id, tipo, data_inicio, data_fim, pagina)
+
+
+@app.post("/api/admin/log/apagar")
+async def rota_admin_apagar_log(request: Request, id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    ids = dados.get("ids", [])
+    if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+        raise HTTPException(status_code=400, detail="'ids' tem de ser uma lista de inteiros.")
+    apagados = await run_in_threadpool(atividade.apagar_eventos, ids)
+    return {"ok": True, "apagados": apagados}
+
+
+@app.get("/api/admin/log.csv")
+async def rota_admin_exportar_log_csv(id_estudante: int = Depends(admin_atual),
+                                       estudante_id: int | None = None, grupo_id: int | None = None,
+                                       tipo: str | None = None, data_inicio: str | None = None,
+                                       data_fim: str | None = None):
+    csv_texto = await run_in_threadpool(
+        atividade.exportar_csv, estudante_id, grupo_id, tipo, data_inicio, data_fim)
+    return Response(
+        content=csv_texto, media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="atividade.csv"'},
+    )
 
 
 # ---------- administração: atividade/métricas dos logs do Alguem ----------
@@ -331,18 +539,22 @@ async def rota_admin_apagar_relatorio(id_relatorio: int, id_estudante: int = Dep
 
 @app.get("/api/admin/bd")
 async def rota_admin_descarregar_bd(tarefas: BackgroundTasks, id_estudante: int = Depends(admin_atual)):
-    """Devolve uma cópia .db da base de dados inteira, para o admin
-    guardar como backup ou analisar offline. A cópia é feita pela API
-    de backup do sqlite3 (bd.copiar_para_backup), não por uma leitura
-    direta do ficheiro, para nunca apanhar uma escrita a meio."""
-    descritor, caminho_copia = tempfile.mkstemp(suffix=".db")
+    """Devolve um dump .sql da base de dados inteira (via pg_dump), para
+    o admin guardar como backup ou analisar offline -- ver
+    bd.gerar_backup_sql."""
+    descritor, caminho_copia = tempfile.mkstemp(suffix=".sql")
     os.close(descritor)
-    await run_in_threadpool(bd.copiar_para_backup, caminho_copia)
+    try:
+        await bd.gerar_backup_sql(caminho_copia)
+    except bd.ErroBackup as e:
+        os.remove(caminho_copia)
+        _logger.error("pg_dump falhou ao gerar backup: %s", e)
+        raise HTTPException(status_code=500, detail="Não foi possível gerar o backup.")
     tarefas.add_task(os.remove, caminho_copia)
-    nome_ficheiro = f"algo-online-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.db"
+    nome_ficheiro = f"algo-online-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.sql"
     return FileResponse(
         caminho_copia,
-        media_type="application/vnd.sqlite3",
+        media_type="application/sql",
         filename=nome_ficheiro,
         background=tarefas,
     )

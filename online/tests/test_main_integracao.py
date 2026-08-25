@@ -2,6 +2,7 @@
 import asyncio
 import io
 import json
+import shutil
 import zipfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -401,12 +402,16 @@ def test_admin_rejeita_conta_pendente(cliente, monkeypatch):
 def test_api_eu_reflete_se_a_conta_e_admin(cliente, monkeypatch):
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
     cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
-    assert cliente.get("/api/eu").json() == {"admin": True}
+    corpo = cliente.get("/api/eu").json()
+    assert corpo["admin"] is True
+    assert isinstance(corpo["id"], int)
 
     cliente.post("/api/sair")
     monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
     cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
-    assert cliente.get("/api/eu").json() == {"admin": False}
+    corpo = cliente.get("/api/eu").json()
+    assert corpo["admin"] is False
+    assert isinstance(corpo["id"], int)
 
 
 def test_pagina_admin_redireciona_quem_nao_e_admin(cliente):
@@ -575,22 +580,241 @@ def test_admin_bd_exige_admin(cliente, monkeypatch):
     assert r.status_code == 403
 
 
-def test_admin_bd_devolve_copia_sqlite_valida(cliente, monkeypatch, tmp_path):
+@pytest.mark.skipif(shutil.which("pg_dump") is None, reason="pg_dump não está disponível no PATH deste ambiente")
+def test_admin_bd_devolve_dump_sql_valido(cliente, monkeypatch):
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "a@b.com")
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
 
     r = cliente.get("/api/admin/bd")
     assert r.status_code == 200
-    assert r.headers["content-type"] == "application/vnd.sqlite3"
+    assert r.headers["content-type"] == "application/sql"
+    conteudo = r.content.decode("utf-8", errors="replace")
+    assert "estudante" in conteudo
+    assert "a@b.com" in conteudo
 
-    caminho_copia = tmp_path / "copia.db"
-    caminho_copia.write_bytes(r.content)
-    ligacao = bd.obter_ligacao(str(caminho_copia))
-    try:
-        emails = [linha["email"] for linha in ligacao.execute("SELECT email FROM estudante")]
-    finally:
-        ligacao.close()
-    assert emails == ["a@b.com"]
+
+# ---------- grupos, registo de atividade e privilégios de admin ----------
+
+def _entrar_como_admin(cliente, monkeypatch, email="professor@escola.pt"):
+    """Regista (primeira vez) ou entra (se a conta já existir) como
+    admin -- idempotente, para poder ser chamado de novo depois de um
+    /api/sair a meio de um teste sem tentar registar o mesmo email
+    duas vezes (o que daria 400, não voltaria a criar sessão)."""
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", email)
+    r = cliente.post("/api/registar", json={"email": email, "password": "password123"})
+    if r.status_code != 200:
+        cliente.post("/api/entrar", json={"email": email, "password": "password123"})
+
+
+@pytest.mark.parametrize("rota,metodo", [
+    ("/api/admin/grupos", "get"),
+    ("/api/admin/log", "get"),
+    ("/api/admin/log.csv", "get"),
+])
+def test_rotas_de_grupos_e_log_exigem_admin(cliente, rota, metodo):
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    r = getattr(cliente, metodo)(rota)
+    assert r.status_code == 403
+
+
+def test_criar_listar_e_ver_codigo_de_grupo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"})
+    assert r.status_code == 200
+    corpo = r.json()
+    assert corpo["nome"] == "Grupo A"
+    codigo = corpo["codigo"]
+
+    grupos_listados = cliente.get("/api/admin/grupos").json()["grupos"]
+    assert grupos_listados[0]["nome"] == "Grupo A"
+    assert grupos_listados[0]["num_membros"] == 0
+
+    r_codigo = cliente.get(f"/api/admin/grupos/{corpo['id']}/codigo")
+    assert r_codigo.json()["codigo"] == codigo
+
+
+def test_registo_com_codigo_de_grupo_via_http(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    codigo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()["codigo"]
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    r = cliente.post("/api/registar", json={
+        "email": "aluno@escola.pt", "password": "password123", "codigo_grupo": codigo,
+    })
+    assert r.status_code == 200
+
+    _entrar_como_admin(cliente, monkeypatch)
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    aluno = next(u for u in utilizadores if u["email"] == "aluno@escola.pt")
+    assert aluno["grupo_id"] is not None
+
+
+def test_registo_com_codigo_de_grupo_invalido_via_http(cliente):
+    r = cliente.post("/api/registar", json={
+        "email": "aluno@escola.pt", "password": "password123", "codigo_grupo": "nao-existe",
+    })
+    assert r.status_code == 400
+
+
+def test_desativar_grupo_bloqueia_login_do_membro(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={
+        "email": "aluno@escola.pt", "password": "password123", "codigo_grupo": grupo["codigo"],
+    })
+    cliente.post("/api/sair")
+
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post(f"/api/admin/grupos/{grupo['id']}/desativar")
+    assert r.status_code == 200
+    cliente.post("/api/sair")
+
+    r_login = cliente.post("/api/entrar", json={"email": "aluno@escola.pt", "password": "password123"})
+    assert r_login.status_code == 401
+    assert "desativado" in r_login.json()["detail"]
+
+
+def test_apagar_grupo_com_membros_da_400(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={
+        "email": "aluno@escola.pt", "password": "password123", "codigo_grupo": grupo["codigo"],
+    })
+    cliente.post("/api/sair")
+
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post(f"/api/admin/grupos/{grupo['id']}/apagar")
+    assert r.status_code == 400
+
+
+def test_reatribuir_grupo_de_utilizador(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    _entrar_como_admin(cliente, monkeypatch)
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    id_aluno = next(u["id"] for u in utilizadores if u["email"] == "aluno@escola.pt")
+
+    r = cliente.post(f"/api/admin/utilizadores/{id_aluno}/grupo", json={"grupo_id": grupo["id"]})
+    assert r.status_code == 200
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    assert next(u for u in utilizadores if u["id"] == id_aluno)["grupo_id"] == grupo["id"]
+
+
+def test_tornar_e_remover_admin_via_http(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    id_outro = next(u["id"] for u in utilizadores if u["email"] == "outro@escola.pt")
+
+    r = cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    assert r.status_code == 200
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    assert next(u for u in utilizadores if u["id"] == id_outro)["admin"] is True
+
+    r = cliente.post(f"/api/admin/remover_admin/{id_outro}")
+    assert r.status_code == 200
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    assert next(u for u in utilizadores if u["id"] == id_outro)["admin"] is False
+
+
+def test_admin_nao_pode_remover_os_proprios_privilegios(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    id_proprio = utilizadores[0]["id"]
+    r = cliente.post(f"/api/admin/remover_admin/{id_proprio}")
+    assert r.status_code == 400
+
+
+def test_nao_pode_remover_o_ultimo_admin_ativo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    id_professor = next(u["id"] for u in utilizadores if u["email"] == "professor@escola.pt")
+    id_outro = next(u["id"] for u in utilizadores if u["email"] == "outro@escola.pt")
+
+    # promove 'outro' e depois volta a remover -- fica só o professor como admin
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    cliente.post(f"/api/admin/remover_admin/{id_outro}")
+
+    r = cliente.post(f"/api/admin/remover_admin/{id_professor}")
+    assert r.status_code == 400
+
+
+def test_registo_de_atividade_regista_login_e_pode_ser_filtrado_e_apagado(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    cliente.post("/api/sair")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+
+    log = cliente.get("/api/admin/log").json()
+    assert log["total"] >= 2  # registo + login do próprio admin
+    tipos = {e["tipo"] for e in log["eventos"]}
+    assert "registo" in tipos
+    assert "login" in tipos
+
+    ids = [e["id"] for e in log["eventos"]]
+    r = cliente.post("/api/admin/log/apagar", json={"ids": ids})
+    assert r.status_code == 200
+    assert r.json()["apagados"] == len(ids)
+    assert cliente.get("/api/admin/log").json()["total"] == 0
+
+
+def test_login_falhado_fica_registado_no_log(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    cliente.post("/api/sair")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "errada"})
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    log = cliente.get("/api/admin/log", params={"tipo": "login_falhado"}).json()
+    assert log["total"] == 1
+
+
+def test_exportar_csv_de_log(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.get("/api/admin/log.csv")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    assert "professor@escola.pt" in r.text
+
+
+def test_exportar_csv_de_membros_do_grupo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={
+        "email": "aluno@escola.pt", "password": "password123", "codigo_grupo": grupo["codigo"],
+    })
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    r = cliente.get(f"/api/admin/grupos/{grupo['id']}/membros.csv")
+    assert r.status_code == 200
+    assert "aluno@escola.pt" in r.text
 
 
 # ---------- credenciais ----------

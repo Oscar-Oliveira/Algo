@@ -1,32 +1,37 @@
 # Algo Online
 
 Versão web do Algo + Alguem: vários estudantes, cada um com a sua
-conta, código isolado por processo, e o seu próprio fornecedor de LLM.
-Construído deliberadamente sem grandes *frameworks* — FastAPI, SQLite
-puro (sem ORM), sem sistema de *templates* (HTML servido tal e qual).
+conta, agrupados opcionalmente em grupos, código isolado por processo,
+e o seu próprio fornecedor de LLM. Construído deliberadamente sem
+grandes *frameworks* — FastAPI, PostgreSQL puro (sem ORM), sem sistema
+de *templates* (HTML servido tal e qual).
 
-**Estado**: primeira versão, testada (83 testes), nunca testada num
-browser real nem em produção. Ver "O que falta" no fim.
+**Estado**: base de dados migrada de SQLite para PostgreSQL; sistema
+de grupos, registo geral de atividade e gestão de privilégios de admin
+acrescentados. Ver "O que falta" no fim.
 
 ## Arquitetura
 
 ```
 online/
 ├── Dockerfile
-├── docker-compose.yml
-├── .env.exemplo          # copiar para .env e preencher
-├── main.py            # aplicação FastAPI -- rotas HTTP + os 2 WebSockets
-├── bd.py               # esquema SQLite (sem ORM)
-├── autenticacao.py      # registo/login, hash de password (bcrypt)
-├── credenciais.py        # credencial de LLM por conta, cifrada em repouso
-├── cifragem.py            # cifragem simétrica (Fernet) das chaves de API
-├── executor.py             # execução assíncrona e interativa de programas Algo
-├── alguem_ponte.py          # constrói um Alguem a partir da credencial da BD
-├── modo_codemirror.py    # gera o realce de sintaxe a partir do compilador
-├── estatico/                 # HTML/CSS/JS -- sem framework de frontend
-│   ├── vendor/codemirror6/      # CodeMirror 6 auto-hospedado (não depende de CDN)
-│   └── visualizador/            # visualizador de rasto (algo-trace-viewer.html/.jsx), só existe aqui
-└── tests/                     # 83 testes (pytest)
+├── docker-compose.yml       # inclui o serviço 'bd' (PostgreSQL)
+├── .env.exemplo             # copiar para .env e preencher
+├── main.py                  # aplicação FastAPI -- rotas HTTP + os 2 WebSockets
+├── bd.py                    # esquema PostgreSQL (sem ORM, psycopg)
+├── autenticacao.py          # registo/login, hash de password (bcrypt)
+├── grupos.py                 # grupos: CRUD, código de junção, reatribuição
+├── atividade.py               # registo geral de atividade (separado dos logs do Alguem)
+├── limitador_registo.py        # rate limiting por IP no registo com código de grupo errado
+├── credenciais.py            # credencial de LLM por conta, cifrada em repouso
+├── cifragem.py                 # cifragem simétrica (Fernet) das chaves de API
+├── executor.py                  # execução assíncrona e interativa de programas Algo
+├── alguem_ponte.py               # constrói um Alguem a partir da credencial da BD
+├── modo_codemirror.py         # gera o realce de sintaxe a partir do compilador
+├── estatico/                      # HTML/CSS/JS -- sem framework de frontend
+│   ├── vendor/codemirror6/           # CodeMirror 6 auto-hospedado (não depende de CDN)
+│   └── visualizador/                 # visualizador de rasto (algo-trace-viewer.html/.jsx), só existe aqui
+└── tests/                          # pytest
 ```
 
 `algo_lang/` (o compilador) e `alguem/` (o tutor) não são alterados —
@@ -75,6 +80,30 @@ em vez de um `config.json` local.
 - **Cada estudante traz a sua própria chave de LLM**, cifrada em
   repouso (Fernet) com uma chave de cifragem que nunca fica na base de
   dados nem no código.
+- **Grupos**: geridos por um admin, com um código de junção
+  gerado pelo servidor (alta entropia, nunca escolhido por uma
+  pessoa). Guardado de duas formas -- um hash SHA-256 determinístico
+  (`grupo.codigo_hash`, para verificar o código submetido no registo
+  por *lookup* indexado) e uma cópia cifrada com Fernet
+  (`grupo.codigo_cifrado`, para o admin poder voltar a consultar o
+  código em claro no painel a qualquer momento). O código no registo é
+  **sempre opcional** -- um admin pode atribuir/mudar o grupo de
+  qualquer conta depois. Desativar um grupo bloqueia o login dos seus
+  membros **sem exceção**, incluindo contas admin (decisão explícita:
+  simplicidade e previsibilidade acima de evitar um caso raro de
+  auto-exclusão).
+- **Registo geral de atividade** (`atividade.py`, tabela
+  `log_atividade`): separado dos logs de conversa com o Alguem
+  (`alguem/nucleo/registador.py`, ficheiros `.jsonl`, inalterados). A
+  eliminação de registos é **física e definitiva** (sem soft-delete) --
+  decisão explícita, ver `notes.md`. O separador "Atividade" (métricas
+  do Alguem) no painel de admin está temporariamente oculto por CSS
+  (funcionalidade ainda não usada), sem apagar dados nem a rota.
+- **Privilégios de admin**: um único booleano (`estudante.admin`), sem
+  tabela de papéis. Conceder/remover fica registado em
+  `log_atividade`; remover está protegido contra auto-remoção e contra
+  deixar a aplicação sem nenhum admin ativo (ambas as guardas embutidas
+  na própria query SQL, não só na rota).
 
 ## Docker
 
@@ -83,9 +112,14 @@ em vez de um `config.json` local.
 ```bash
 cd online
 cp .env.exemplo .env
-# edita o .env e preenche as duas chaves (instruções lá dentro)
+# edita o .env e preenche as chaves e as credenciais do Postgres (instruções lá dentro)
 docker compose up -d --build
 ```
+
+`docker-compose.yml` já inclui o serviço `bd` (PostgreSQL, imagem
+`postgres:16-alpine`), com os dados guardados no volume
+`algo_dados_postgres`. `algo-online` só arranca depois de `bd` reportar
+saudável (`depends_on: condition: service_healthy`).
 
 ### Sem docker compose
 
@@ -98,10 +132,14 @@ docker build -f online/Dockerfile -t algo-online .
 docker run -d -p 8000:8000 \
   -e ONLINE_CHAVE_CIFRAGEM="<a tua chave gerada>" \
   -e ONLINE_CHAVE_SESSAO="<a tua outra chave gerada>" \
-  -v algo_dados:/app/online/dados \
+  -e ONLINE_DATABASE_URL="postgresql://utilizador:password@host:5432/base_de_dados" \
   --pids-limit=512 \
   algo-online
 ```
+
+Sem `docker-compose.yml`, precisas de um PostgreSQL próprio acessível
+(container, serviço gerido, ou instalação local) -- este comando não
+sobe nenhum.
 
 `--pids-limit` (ou `pids_limit:` no `docker-compose.yml`) limita o
 número de processos dentro do contentor via cgroups -- isolado por
@@ -114,16 +152,11 @@ kernel, partilhado com processos fora do contentor, e confirmado pouco
 fiável em testes (tanto afetado por processos não relacionados como,
 nalguns motores de contentores, nem sequer aplicado).
 
-A imagem já traz o `graphviz` incluído — é o que resolve o fluxograma
-sem precisar de nada instalado à parte na máquina que corre o
-contentor. O volume `algo_dados` mantém a base de dados (contas,
-credenciais) entre reinícios do contentor.
-
-> **Nota de honestidade**: `docker build`, `docker run` e um smoke
-> test real (arranque do servidor, resposta HTTP 200, confirmação de
-> que corre como utilizador não-root, ON-27) foram validados nesta
-> sessão de trabalho. `docker compose up` em si
-> ainda não foi corrido a sério -- a sintaxe YAML foi revista à mão.
+A imagem já traz o `graphviz` e o `postgresql-client` (para o
+`pg_dump` usado no backup, ver `/api/admin/bd`) incluídos — nada a
+instalar à parte na máquina que corre o contentor. Os dados (contas,
+grupos, credenciais, registo de atividade) vivem no PostgreSQL do
+serviço `bd`, não num ficheiro dentro do contentor `algo-online`.
 
 ## Como arrancar (sem Docker)
 
@@ -136,13 +169,21 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 
 export ONLINE_CHAVE_CIFRAGEM="<a chave gerada acima>"
 export ONLINE_CHAVE_SESSAO="<a segunda chave gerada acima>"
+export ONLINE_DATABASE_URL="postgresql://utilizador:password@localhost:5432/algo_online"
 
 uvicorn main:app --reload --ws-max-size 2000000
 ```
 
-O servidor recusa-se a arrancar sem as duas variáveis de ambiente --
-de propósito, para nunca gerar uma chave nova sozinho (isso tornaria
-todas as credenciais já guardadas ilegíveis no reinício seguinte).
+Precisas de um PostgreSQL a correr e acessível nessa DSN antes de
+arrancar (ex: `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=... postgres:16-alpine`
+para desenvolvimento local). O esquema é criado automaticamente no
+arranque (`bd.preparar_bd()`, idempotente).
+
+O servidor recusa-se a arrancar sem `ONLINE_CHAVE_CIFRAGEM`/
+`ONLINE_CHAVE_SESSAO` -- de propósito, para nunca gerar uma chave nova
+sozinho (isso tornaria todas as credenciais já guardadas ilegíveis no
+reinício seguinte). Sem `ONLINE_DATABASE_URL`, falha já no arranque do
+ciclo de vida da aplicação (`bd.preparar_bd()`), com um erro claro.
 
 `ONLINE_CHAVE_CIFRAGEM` tem sempre de vir do comando acima
 (`gerar_chave_nova()`) -- nunca escrita à mão. Uma chave pouco
@@ -159,13 +200,20 @@ de HTTPS em produção.
 
 ```bash
 cd online
+# precisa de um PostgreSQL de teste acessível -- por omissão
+# postgresql://postgres:teste@localhost:5433/algo_teste (ver
+# tests/conftest.py), configurável via ONLINE_TEST_DATABASE_URL
 python3 -m pytest -v
 ```
 
-Isolamento sem variáveis de ambiente (mesma técnica já usada em
-`alguem/tests/`): base de dados e pasta de logs do Alguem redirigidas
-por `monkeypatch`, numa pasta temporária por teste — nenhum teste
-escreve na base de dados real nem na pasta `alguem/logs/` real.
+Isolamento: uma base de dados de teste dedicada (nunca a de produção),
+com todas as tabelas esvaziadas (`TRUNCATE ... RESTART IDENTITY
+CASCADE`) antes de cada teste. A pasta de logs do Alguem continua
+redirigida por `monkeypatch` (mesma técnica de sempre) para uma pasta
+temporária por teste — nenhum teste escreve na pasta `alguem/logs/`
+real. O teste do backup (`/api/admin/bd`, via `pg_dump`) é ignorado
+automaticamente se `pg_dump` não estiver no `PATH` do ambiente onde os
+testes correm.
 
 ## Correções recentes (feedback de uso real)
 
@@ -206,8 +254,11 @@ escreve na base de dados real nem na pasta `alguem/logs/` real.
   linha, não testado de facto (ver a nota na secção Docker acima).
 - **Sem HTTPS configurado** — `https_only=False` no cookie de sessão é
   aceitável em desenvolvimento local, não em produção.
-- **Sem limite de pedidos** (*rate limiting*) — um estudante podia, em
-  teoria, abrir execuções repetidamente sem controlo.
+- **Sem limite de pedidos geral** (*rate limiting*) — um estudante
+  podia, em teoria, abrir execuções repetidamente sem controlo. Existe
+  rate limiting específico só em dois pontos: login por conta (ON-11)
+  e tentativas de registo com código de grupo errado, por IP
+  (`limitador_registo.py`).
 - **Rasto (tracer) só com entradas antecipadas** — decisão explícita
   de âmbito: `ler()` interativo a meio de um rasto (ao contrário da
   execução normal, que já é interativa) fica para uma versão seguinte.

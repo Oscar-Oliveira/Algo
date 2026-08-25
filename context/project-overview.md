@@ -65,7 +65,8 @@ lexer.py (tokenizar) → parser.py (parse/parse_biblioteca, recursive-descent)
 
 ## Online service architecture (`online/`)
 
-* Deliberately framework-light: FastAPI + raw `sqlite3` (`bd.py`, no ORM), no template engine (HTML served as-is from `estatico/`).
+* Deliberately framework-light: FastAPI + raw `psycopg`/PostgreSQL (`bd.py`, no ORM; migrated from SQLite), no template engine (HTML served as-is from `estatico/`).
+* Students can belong to a `grupo` (class), managed by an admin, joined at registration via an optional server-generated code (`grupos.py`); a deactivated group blocks login for its members, no exception for admins. A general `log_atividade` table (`atividade.py`) records account/group/admin-privilege events, separate from the Alguem tutor's own `.jsonl` logs — its admin UI tab is temporarily hidden by CSS, not removed. Admin privilege grants/revokes (`autenticacao.tornar_admin`/`remover_admin`) are guarded against self-removal and against leaving zero active admins.
 * `executor.py` runs student code via `asyncio.create_subprocess_exec` (never `subprocess.run`, which would block the whole server), one subprocess per execution, in a per-student folder keyed by pseudonymous ID (never email), with CPU/memory limits via `resource.setrlimit`. This provides reasonable isolation for a trusted classroom on one VM, not a sandbox against a hostile user.
 * `alguem_ponte.py` is the only real adaptation needed to reuse `alguem/`. It builds an `Alguem` from a DB-stored, per-account encrypted credential instead of a local `config.json`.
 * `credenciais.py` and `cifragem.py`: each student brings their own LLM API key, encrypted at rest (Fernet) under `ONLINE_CHAVE_CIFRAGEM`, which is never stored in the DB or code.

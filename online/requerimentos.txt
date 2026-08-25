@@ -10,3 +10,5 @@ cryptography==50.0.0
 python-multipart==0.0.32
 itsdangerous==2.2.0
 websockets==17.0.1
+psycopg[binary]==3.3.4
+psycopg-pool==3.3.1

@@ -168,12 +168,12 @@ def test_email_normalizado_para_minusculas():
     assert id_login is not None
 
 
-def test_password_nunca_fica_em_texto_simples(caminho_bd):
-    id_est = autenticacao.registar("a@b.com", "password123", caminho_bd)
+def test_password_nunca_fica_em_texto_simples(dsn):
+    id_est = autenticacao.registar("a@b.com", "password123", dsn=dsn)
     import bd
-    with bd.sessao_bd(caminho_bd) as ligacao:
-        linha = ligacao.execute("SELECT password_hash FROM estudante WHERE id=?", (id_est,)).fetchone()
-    assert b"password123" not in linha["password_hash"]
+    with bd.sessao_bd(dsn) as ligacao:
+        linha = ligacao.execute("SELECT password_hash FROM estudante WHERE id=%s", (id_est,)).fetchone()
+    assert b"password123" not in bytes(linha["password_hash"])
 
 
 def test_id_pseudonimo_diferente_do_id_da_conta():
@@ -290,6 +290,122 @@ def test_admin_configurado_depois_da_conta_ja_existir(monkeypatch):
     assert autenticacao.eh_admin(id_est) is True
 
 
+# ---------- registo com código de grupo ----------
+
+def test_registar_sem_codigo_de_grupo_fica_sem_grupo():
+    import grupos
+    id_est = autenticacao.registar("a@b.com", "password123")
+    todos = {c["id"]: c for c in autenticacao.listar_todos()}
+    assert todos[id_est]["grupo_id"] is None
+
+
+def test_registar_com_codigo_de_grupo_valido():
+    import grupos
+    grupo = grupos.criar_grupo("Grupo A")
+    id_est = autenticacao.registar("a@b.com", "password123", codigo_grupo=grupo["codigo"])
+    todos = {c["id"]: c for c in autenticacao.listar_todos()}
+    assert todos[id_est]["grupo_id"] == grupo["id"]
+
+
+def test_registar_com_codigo_de_grupo_invalido_da_erro():
+    with pytest.raises(autenticacao.ErroCodigoGrupoInvalido, match="inválido"):
+        autenticacao.registar("a@b.com", "password123", codigo_grupo="nao-existe")
+
+
+def test_registar_com_codigo_de_grupo_desativado_da_erro():
+    import grupos
+    grupo = grupos.criar_grupo("Grupo A")
+    grupos.desativar_grupo(grupo["id"])
+    with pytest.raises(autenticacao.ErroCodigoGrupoInvalido, match="inválido"):
+        autenticacao.registar("a@b.com", "password123", codigo_grupo=grupo["codigo"])
+
+
+# ---------- grupo desativado bloqueia login (sem exceção para admin) ----------
+
+def test_login_bloqueado_quando_grupo_esta_desativado(monkeypatch):
+    import grupos
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    grupo = grupos.criar_grupo("Grupo A")
+    autenticacao.registar("aluno@escola.pt", "password123", codigo_grupo=grupo["codigo"])
+    grupos.desativar_grupo(grupo["id"])
+    with pytest.raises(autenticacao.ErroAutenticacao, match="grupo foi desativado"):
+        autenticacao.autenticar("aluno@escola.pt", "password123")
+
+
+def test_login_de_admin_tambem_e_bloqueado_por_grupo_desativado(monkeypatch):
+    """Decisão explícita: sem exceção para admins -- desativar o
+    próprio grupo pode auto-excluir um admin (risco aceite, ver
+    notes.md)."""
+    import grupos
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    grupo = grupos.criar_grupo("Grupo A")
+    id_admin = autenticacao.registar("professor@escola.pt", "password123", codigo_grupo=grupo["codigo"])
+    assert autenticacao.eh_admin(id_admin) is True
+    grupos.desativar_grupo(grupo["id"])
+    with pytest.raises(autenticacao.ErroAutenticacao, match="grupo foi desativado"):
+        autenticacao.autenticar("professor@escola.pt", "password123")
+
+
+def test_login_permitido_quando_grupo_e_reativado(monkeypatch):
+    import grupos
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    grupo = grupos.criar_grupo("Grupo A")
+    id_est = autenticacao.registar("aluno@escola.pt", "password123", codigo_grupo=grupo["codigo"])
+    grupos.desativar_grupo(grupo["id"])
+    grupos.ativar_grupo(grupo["id"])
+    assert autenticacao.autenticar("aluno@escola.pt", "password123") == id_est
+
+
+def test_login_sem_grupo_nao_e_afetado_por_nenhum_grupo(monkeypatch):
+    import grupos
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    grupo = grupos.criar_grupo("Grupo A")
+    grupos.desativar_grupo(grupo["id"])
+    id_est = autenticacao.registar("aluno@escola.pt", "password123")  # sem código
+    assert autenticacao.autenticar("aluno@escola.pt", "password123") == id_est
+
+
+# ---------- privilégios de admin (conceder/remover) ----------
+
+def test_tornar_admin_concede_privilegios():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    assert autenticacao.eh_admin(id_est) is False
+    autenticacao.tornar_admin(id_est)
+    assert autenticacao.eh_admin(id_est) is True
+
+
+def test_remover_admin_com_mais_do_que_um_admin():
+    id_admin1 = autenticacao.registar("a@b.com", "password123")
+    id_admin2 = autenticacao.registar("c@d.com", "password123")
+    autenticacao.tornar_admin(id_admin1)
+    autenticacao.tornar_admin(id_admin2)
+
+    alterou = autenticacao.remover_admin(id_admin2, ator_id=id_admin1)
+    assert alterou is True
+    assert autenticacao.eh_admin(id_admin2) is False
+
+
+def test_remover_admin_nao_se_deixasse_zero_admins():
+    id_admin1 = autenticacao.registar("a@b.com", "password123")
+    id_outro = autenticacao.registar("c@d.com", "password123")
+    autenticacao.tornar_admin(id_admin1)
+
+    alterou = autenticacao.remover_admin(id_admin1, ator_id=id_outro)
+    assert alterou is False
+    assert autenticacao.eh_admin(id_admin1) is True
+
+
+def test_remover_admin_do_proprio_ator_nao_muda_nada():
+    id_admin1 = autenticacao.registar("a@b.com", "password123")
+    id_admin2 = autenticacao.registar("c@d.com", "password123")
+    autenticacao.tornar_admin(id_admin1)
+    autenticacao.tornar_admin(id_admin2)
+
+    alterou = autenticacao.remover_admin(id_admin1, ator_id=id_admin1)
+    assert alterou is False
+    assert autenticacao.eh_admin(id_admin1) is True
+
+
 # ---------- credenciais ----------
 
 def test_sem_credencial_configurada():
@@ -389,15 +505,15 @@ def test_credencial_ollama_com_host_publico_e_aceite():
     assert c.host == "http://8.8.8.8:11434"
 
 
-def test_credencial_fica_cifrada_em_disco(caminho_bd):
-    id_est = autenticacao.registar("a@b.com", "password123", caminho_bd)
-    credenciais.guardar_credencial(id_est, "openai", "gpt-4o-mini", "sk-super-secreta", caminho_bd=caminho_bd)
+def test_credencial_fica_cifrada_em_disco(dsn):
+    id_est = autenticacao.registar("a@b.com", "password123", dsn=dsn)
+    credenciais.guardar_credencial(id_est, "openai", "gpt-4o-mini", "sk-super-secreta", dsn=dsn)
     import bd
-    with bd.sessao_bd(caminho_bd) as ligacao:
+    with bd.sessao_bd(dsn) as ligacao:
         linha = ligacao.execute(
-            "SELECT api_key_cifrada FROM credencial_llm WHERE estudante_id=?", (id_est,)
+            "SELECT api_key_cifrada FROM credencial_llm WHERE estudante_id=%s", (id_est,)
         ).fetchone()
-    assert b"sk-super-secreta" not in linha["api_key_cifrada"]
+    assert b"sk-super-secreta" not in bytes(linha["api_key_cifrada"])
 
 
 # ---------- arranque do servidor: validação cedo das chaves ----------

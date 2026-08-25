@@ -15,22 +15,85 @@
 
   <main class="conteudo-admin">
     <nav class="abas-admin">
-      <button type="button" class="aba-admin ativa" data-aba="utilizadores">Utilizadores</button>
-      <button type="button" class="aba-admin" data-aba="atividade">Atividade</button>
-      <button type="button" class="aba-admin" data-aba="relatorios">Relatórios</button>
+      <button type="button" class="aba-admin ativa" data-aba="grupos">Grupos</button>
+      <button type="button" class="aba-admin" data-aba="utilizadores">Utilizadores</button>
+      <button type="button" class="aba-admin" data-aba="registoatividade">Registo de Atividade</button>
+      <!-- Separador "Atividade" (métricas do Alguem) fica temporariamente
+           oculto -- funcionalidade ainda não usada, mas os dados/rota/lógica
+           continuam intactos (ver online/main.py rota_admin_atividade). Reverter
+           removendo a classe "escondido" do botão e da secção abaixo. -->
+      <button type="button" class="aba-admin escondido" data-aba="atividade">Atividade</button>
+      <button type="button" class="aba-admin" data-aba="relatorios">Problemas Reportados</button>
       <button type="button" class="aba-admin" data-aba="backup">Backup</button>
     </nav>
 
-    <section id="aba-conteudo-utilizadores" class="conteudo-aba-admin">
-      <p class="subtitulo">Contas registadas: aprova ou rejeita quem está pendente, ou revoga o acesso de quem já tinha sido aprovado.</p>
+    <section id="aba-conteudo-grupos" class="conteudo-aba-admin">
+      <p class="subtitulo">Cria um grupo para gerares um código de junção para os teus estudantes. Só podes eliminar definitivamente um grupo sem membros -- se já tiver estudantes, desativa-o em vez disso (os membros existentes continuam a poder entrar, mas o grupo deixa de aceitar novos registos com o código antigo).</p>
+      <form id="form-criar-grupo" class="formulario formulario-inline">
+        <label>Nome do grupo
+          <input type="text" id="grupo-novo-nome" required placeholder="ex: 12ºA 2026">
+        </label>
+        <button type="submit" class="botao-primario">Criar grupo</button>
+      </form>
+      <p class="mensagem-erro" id="mensagem-erro-grupos"></p>
       <table class="tabela-admin">
         <thead>
-          <tr><th>Email</th><th>Estado</th><th>Registada em</th><th></th></tr>
+          <tr><th>Nome</th><th>Estado</th><th class="numero">Membros</th><th>Código</th><th></th></tr>
+        </thead>
+        <tbody id="corpo-tabela-grupos"></tbody>
+      </table>
+      <p id="mensagem-sem-grupos" class="ajuda-campo escondido">Ainda não criaste nenhum grupo.</p>
+    </section>
+
+    <section id="aba-conteudo-utilizadores" class="conteudo-aba-admin escondido">
+      <p class="subtitulo">Contas registadas: aprova ou rejeita quem está pendente, revoga o acesso de quem já tinha sido aprovado, muda o grupo de alguém, ou atribui/remove privilégios de administrador.</p>
+      <table class="tabela-admin">
+        <thead>
+          <tr><th>Email</th><th>Estado</th><th>Grupo</th><th>Registada em</th><th></th></tr>
         </thead>
         <tbody id="corpo-tabela-utilizadores"></tbody>
       </table>
       <p id="mensagem-sem-utilizadores" class="ajuda-campo escondido">Ainda não há nenhuma conta registada.</p>
       <p class="mensagem-erro" id="mensagem-erro-utilizadores"></p>
+    </section>
+
+    <section id="aba-conteudo-registoatividade" class="conteudo-aba-admin escondido">
+      <p class="subtitulo">Registo geral de atividade da aplicação (contas, grupos, privilégios) -- separado das conversas com o Alguem.</p>
+      <div class="filtros-admin">
+        <select id="log-filtro-utilizador" aria-label="Filtrar por utilizador">
+          <option value="">Todos os utilizadores</option>
+        </select>
+        <select id="log-filtro-grupo" aria-label="Filtrar por grupo">
+          <option value="">Todos os grupos</option>
+        </select>
+        <select id="log-filtro-tipo" aria-label="Filtrar por tipo de evento">
+          <option value="">Todos os tipos</option>
+        </select>
+        <label class="ajuda-campo">De <input type="date" id="log-filtro-data-inicio"></label>
+        <label class="ajuda-campo">Até <input type="date" id="log-filtro-data-fim"></label>
+        <button type="button" id="log-aplicar-filtros" class="botao-secundario">Filtrar</button>
+        <a id="log-exportar-csv" class="botao-secundario" href="#" target="_blank">Exportar CSV</a>
+      </div>
+      <div class="filtros-admin">
+        <button type="button" id="log-apagar-selecionados" class="botao-perigo" disabled>Eliminar selecionados</button>
+        <span id="log-texto-selecionados" class="ajuda-campo"></span>
+      </div>
+      <table class="tabela-admin">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="log-selecionar-tudo" aria-label="Selecionar todos os registos"></th>
+            <th>Data/hora</th><th>Tipo</th><th>Ator</th><th>Alvo</th><th>Grupo</th><th>Detalhes</th>
+          </tr>
+        </thead>
+        <tbody id="corpo-tabela-log"></tbody>
+      </table>
+      <p id="mensagem-sem-log" class="ajuda-campo escondido">Nenhum registo corresponde aos filtros atuais.</p>
+      <div class="paginacao-admin">
+        <button type="button" id="log-pagina-anterior" class="botao-secundario">Anterior</button>
+        <span id="log-texto-pagina" class="ajuda-campo"></span>
+        <button type="button" id="log-pagina-seguinte" class="botao-secundario">Seguinte</button>
+      </div>
+      <p class="mensagem-erro" id="mensagem-erro-log"></p>
     </section>
 
     <section id="aba-conteudo-atividade" class="conteudo-aba-admin escondido">

@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import os
 import re
-import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
+import psycopg
 
+import grupos
 from bd import sessao_bd
 
 PADRAO_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -41,6 +42,15 @@ def _duracao_bloqueio_segundos(tentativas: int) -> int:
 
 
 class ErroAutenticacao(Exception):
+    pass
+
+
+class ErroCodigoGrupoInvalido(ErroAutenticacao):
+    """Subclasse à parte (não só ErroAutenticacao genérico) para quem
+    chamar registar() poder distinguir esta falha das outras (email
+    inválido, password fraca, email já em uso) e aplicar rate-limiting
+    por IP só a tentativas de código de grupo errado -- ver
+    limitador_registo.py."""
     pass
 
 
@@ -77,18 +87,19 @@ def _emails_admin() -> set[str]:
     return {e.strip().lower() for e in bruto.split(",") if e.strip()}
 
 
-def registar(email: str, password: str, caminho_bd: str | None = None) -> int:
-    """Cria uma conta nova. Devolve o id do estudante -- mesma
-    assinatura de sempre, mesmo agora que a conta pode ficar
-    'pendente' (ver esta_aprovado()), para não obrigar todos os
-    chamadores existentes a mudar. 'aprovado' fica True se
-    ONLINE_EMAIL_ADMIN não estiver configurada, ou se este email for
-    um dos admins -- caso contrário a conta fica pendente até um admin
-    a aprovar. Levanta ErroAutenticacao se os dados forem inválidos ou
-    se o email já estiver em uso -- ON-12: a mensagem para email já em
-    uso é deliberadamente genérica (não diz "já existe conta"), para
-    não revelar a quem regista quais emails já têm conta -- a mesma
-    filosofia já aplicada em autenticar()."""
+def registar(email: str, password: str, codigo_grupo: str | None = None,
+             dsn: str | None = None) -> int:
+    """Cria uma conta nova. Devolve o id do estudante. 'aprovado' fica
+    True se ONLINE_EMAIL_ADMIN não estiver configurada, ou se este
+    email for um dos admins -- caso contrário a conta fica pendente até
+    um admin a aprovar. 'codigo_grupo' é sempre opcional: se indicado,
+    tem de corresponder a um grupo ativo (ErroAutenticacao caso
+    contrário); se omitido, a conta fica sem grupo (grupo_id NULL) até
+    um admin lha atribuir. Levanta ErroAutenticacao se os dados forem
+    inválidos ou se o email já estiver em uso -- ON-12: a mensagem para
+    email já em uso é deliberadamente genérica (não diz "já existe
+    conta"), para não revelar a quem regista quais emails já têm
+    conta -- a mesma filosofia já aplicada em autenticar()."""
     email = _validar_email(email)
     _validar_password(password)
     password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
@@ -96,60 +107,73 @@ def registar(email: str, password: str, caminho_bd: str | None = None) -> int:
     emails_admin = _emails_admin()
     eh_admin = email in emails_admin
     aprovado = eh_admin or not emails_admin
+
+    grupo_id = None
+    if codigo_grupo:
+        grupo_id = grupos.verificar_codigo(codigo_grupo, dsn=dsn)
+        if grupo_id is None:
+            raise ErroCodigoGrupoInvalido("Código de grupo inválido.")
+
     try:
-        with sessao_bd(caminho_bd) as bd:
+        with sessao_bd(dsn) as bd:
             cursor = bd.execute(
-                "INSERT INTO estudante (email, password_hash, id_pseudonimo, aprovado, admin) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (email, password_hash, id_pseudonimo, int(aprovado), int(eh_admin)),
+                "INSERT INTO estudante (email, password_hash, id_pseudonimo, aprovado, admin, grupo_id) "
+                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                (email, password_hash, id_pseudonimo, aprovado, eh_admin, grupo_id),
             )
-            return cursor.lastrowid
-    except sqlite3.IntegrityError as e:
+            return cursor.fetchone()["id"]
+    except psycopg.errors.UniqueViolation as e:
         raise ErroAutenticacao(
             "Não foi possível concluir o registo com estes dados. Se já "
             "tens conta, tenta entrar em vez de registar."
         ) from e
 
 
-def esta_aprovado(estudante_id: int, caminho_bd: str | None = None) -> bool:
-    with sessao_bd(caminho_bd) as bd:
+def esta_aprovado(estudante_id: int, dsn: str | None = None) -> bool:
+    with sessao_bd(dsn) as bd:
         linha = bd.execute(
-            "SELECT aprovado FROM estudante WHERE id = ?", (estudante_id,)
+            "SELECT aprovado FROM estudante WHERE id = %s", (estudante_id,)
         ).fetchone()
     return bool(linha and linha["aprovado"])
 
 
-def obter_id_pseudonimo(estudante_id: int, caminho_bd: str | None = None) -> str:
+def obter_id_pseudonimo(estudante_id: int, dsn: str | None = None) -> str:
     """O identificador usado nos logs do Alguem -- nunca o id da conta
     nem o email diretamente, para as conversas registadas não ficarem
     trivialmente ligadas à identidade real do estudante."""
-    with sessao_bd(caminho_bd) as bd:
+    with sessao_bd(dsn) as bd:
         linha = bd.execute(
-            "SELECT id_pseudonimo FROM estudante WHERE id = ?", (estudante_id,)
+            "SELECT id_pseudonimo FROM estudante WHERE id = %s", (estudante_id,)
         ).fetchone()
     if linha is None:
         raise ErroAutenticacao("Conta não encontrada.")
     return linha["id_pseudonimo"]
 
 
-def autenticar(email: str, password: str, caminho_bd: str | None = None) -> int:
+def autenticar(email: str, password: str, dsn: str | None = None) -> int:
     """Confirma email+password. Devolve o id do estudante se
     corretos. Levanta ErroAutenticacao caso contrário -- a mensagem é
     deliberadamente igual para 'email não existe' e 'password errada',
     para não revelar quais emails têm conta (a mensagem de 'conta
-    pendente' já é diferente de propósito -- só é mostrada depois de a
-    password já ter sido confirmada como correta, por isso não revela
-    nada que o próprio estudante não soubesse já).
+    pendente'/'grupo desativado' já é diferente de propósito -- só é
+    mostrada depois de a password já ter sido confirmada como correta,
+    por isso não revela nada que o próprio estudante não soubesse já).
 
     ON-11: depois de LIMIAR_TENTATIVAS_LOGIN falhas seguidas, a conta
     fica bloqueada por um período que cresce a cada falha a mais (ver
     _duracao_bloqueio_segundos) -- verificado ANTES de comparar a
-    password, para não gastar ciclos de bcrypt numa conta já bloqueada."""
+    password, para não gastar ciclos de bcrypt numa conta já bloqueada.
+
+    Um grupo desativado bloqueia o login dos seus membros, sem exceção
+    (incluindo contas admin) -- decisão explícita, ver notes.md."""
     email = email.strip().lower()
-    with sessao_bd(caminho_bd) as bd:
+    with sessao_bd(dsn) as bd:
         linha = bd.execute(
-            "SELECT id, password_hash, aprovado, admin, tentativas_login_falhadas, bloqueado_ate "
-            "FROM estudante WHERE email = ?", (email,)
+            "SELECT estudante.id, estudante.password_hash, estudante.aprovado, estudante.admin, "
+            "       estudante.tentativas_login_falhadas, estudante.bloqueado_ate, "
+            "       estudante.grupo_id, grupo.ativo AS grupo_ativo "
+            "FROM estudante LEFT JOIN grupo ON grupo.id = estudante.grupo_id "
+            "WHERE estudante.email = %s", (email,)
         ).fetchone()
     erro = ErroAutenticacao("Email ou password incorretos.")
     if linha is None:
@@ -157,7 +181,7 @@ def autenticar(email: str, password: str, caminho_bd: str | None = None) -> int:
 
     agora = datetime.now(timezone.utc)
     if linha["bloqueado_ate"]:
-        bloqueado_ate = datetime.fromisoformat(linha["bloqueado_ate"])
+        bloqueado_ate = linha["bloqueado_ate"]
         if agora < bloqueado_ate:
             minutos_restantes = max(1, int((bloqueado_ate - agora).total_seconds() // 60))
             raise ErroAutenticacao(
@@ -165,24 +189,24 @@ def autenticar(email: str, password: str, caminho_bd: str | None = None) -> int:
                 f"{minutos_restantes} minuto(s)."
             )
 
-    if not bcrypt.checkpw(password.encode("utf-8"), linha["password_hash"]):
+    if not bcrypt.checkpw(password.encode("utf-8"), bytes(linha["password_hash"])):
         tentativas = linha["tentativas_login_falhadas"] + 1
         bloqueado_ate_novo = None
         if tentativas >= LIMIAR_TENTATIVAS_LOGIN:
             duracao = _duracao_bloqueio_segundos(tentativas)
-            bloqueado_ate_novo = (agora + timedelta(seconds=duracao)).isoformat()
-        with sessao_bd(caminho_bd) as bd:
+            bloqueado_ate_novo = agora + timedelta(seconds=duracao)
+        with sessao_bd(dsn) as bd:
             bd.execute(
-                "UPDATE estudante SET tentativas_login_falhadas = ?, bloqueado_ate = ? WHERE id = ?",
+                "UPDATE estudante SET tentativas_login_falhadas = %s, bloqueado_ate = %s WHERE id = %s",
                 (tentativas, bloqueado_ate_novo, linha["id"]),
             )
         raise erro
 
     # password correta -- repõe o contador de falhas
     if linha["tentativas_login_falhadas"] or linha["bloqueado_ate"]:
-        with sessao_bd(caminho_bd) as bd:
+        with sessao_bd(dsn) as bd:
             bd.execute(
-                "UPDATE estudante SET tentativas_login_falhadas = 0, bloqueado_ate = NULL WHERE id = ?",
+                "UPDATE estudante SET tentativas_login_falhadas = 0, bloqueado_ate = NULL WHERE id = %s",
                 (linha["id"],),
             )
 
@@ -190,9 +214,9 @@ def autenticar(email: str, password: str, caminho_bd: str | None = None) -> int:
     # já existir (ONLINE_EMAIL_ADMIN configurada mais tarde), atualiza-a
     # aqui em vez de deixar o estudante bloqueado para sempre.
     if email in _emails_admin() and not (linha["admin"] and linha["aprovado"]):
-        with sessao_bd(caminho_bd) as bd:
+        with sessao_bd(dsn) as bd:
             bd.execute(
-                "UPDATE estudante SET admin = 1, aprovado = 1 WHERE id = ?", (linha["id"],)
+                "UPDATE estudante SET admin = TRUE, aprovado = TRUE WHERE id = %s", (linha["id"],)
             )
         return linha["id"]
 
@@ -200,58 +224,102 @@ def autenticar(email: str, password: str, caminho_bd: str | None = None) -> int:
         raise ErroAutenticacao(
             "A tua conta está pendente de aprovação por um administrador -- "
             "não precisas de te registar outra vez. Se demorar mais do que "
-            "esperavas, contacta o professor ou administrador responsável por esta turma."
+            "esperavas, contacta o professor ou administrador responsável por este grupo."
         )
+
+    if linha["grupo_id"] is not None and not linha["grupo_ativo"]:
+        raise ErroAutenticacao(
+            "O teu grupo foi desativado. Contacta o administrador responsável por este grupo."
+        )
+
     return linha["id"]
 
 
-def eh_admin(estudante_id: int, caminho_bd: str | None = None) -> bool:
-    with sessao_bd(caminho_bd) as bd:
+def eh_admin(estudante_id: int, dsn: str | None = None) -> bool:
+    with sessao_bd(dsn) as bd:
         linha = bd.execute(
-            "SELECT admin FROM estudante WHERE id = ?", (estudante_id,)
+            "SELECT admin FROM estudante WHERE id = %s", (estudante_id,)
         ).fetchone()
     return bool(linha and linha["admin"])
 
 
-def listar_pendentes(caminho_bd: str | None = None) -> list[dict]:
+def listar_pendentes(dsn: str | None = None) -> list[dict]:
     """Contas ainda não aprovadas, mais antigas primeiro."""
-    with sessao_bd(caminho_bd) as bd:
+    with sessao_bd(dsn) as bd:
         linhas = bd.execute(
-            "SELECT id, email, criado_em FROM estudante WHERE aprovado = 0 ORDER BY criado_em"
+            "SELECT id, email, criado_em FROM estudante WHERE aprovado = FALSE ORDER BY criado_em"
         ).fetchall()
     return [dict(linha) for linha in linhas]
 
 
-def aprovar_conta(estudante_id: int, caminho_bd: str | None = None) -> None:
-    with sessao_bd(caminho_bd) as bd:
-        bd.execute("UPDATE estudante SET aprovado = 1 WHERE id = ?", (estudante_id,))
+def aprovar_conta(estudante_id: int, dsn: str | None = None) -> None:
+    with sessao_bd(dsn) as bd:
+        bd.execute("UPDATE estudante SET aprovado = TRUE WHERE id = %s", (estudante_id,))
 
 
-def rejeitar_conta(estudante_id: int, caminho_bd: str | None = None) -> None:
+def rejeitar_conta(estudante_id: int, dsn: str | None = None) -> str | None:
     """Remove uma conta ainda pendente -- nunca uma já aprovada (o
-    WHERE aprovado = 0 é a salvaguarda), para 'rejeitar' não poder ser
-    usado por engano para apagar uma conta ativa."""
-    with sessao_bd(caminho_bd) as bd:
-        bd.execute("DELETE FROM estudante WHERE id = ? AND aprovado = 0", (estudante_id,))
+    WHERE aprovado = FALSE é a salvaguarda), para 'rejeitar' não poder
+    ser usado por engano para apagar uma conta ativa. Devolve o email
+    da conta apagada (ou None se não havia nenhuma pendente com este
+    id) -- como a linha deixa de existir, é este o único registo que
+    sobra para quem quiser deixar um rasto de auditoria da rejeição
+    (ver main.py: log_atividade.alvo_id não pode apontar para um id
+    já removido)."""
+    with sessao_bd(dsn) as bd:
+        linha = bd.execute(
+            "DELETE FROM estudante WHERE id = %s AND aprovado = FALSE RETURNING email",
+            (estudante_id,),
+        ).fetchone()
+    return linha["email"] if linha else None
 
 
-def listar_todos(caminho_bd: str | None = None) -> list[dict]:
+def listar_todos(dsn: str | None = None) -> list[dict]:
     """Todas as contas (pendentes, aprovadas e admin), mais antigas
     primeiro -- para a tabela de utilizadores do painel de admin."""
-    with sessao_bd(caminho_bd) as bd:
+    with sessao_bd(dsn) as bd:
         linhas = bd.execute(
-            "SELECT id, email, criado_em, aprovado, admin FROM estudante ORDER BY criado_em"
+            "SELECT estudante.id, estudante.email, estudante.criado_em, estudante.aprovado, "
+            "       estudante.admin, estudante.grupo_id, grupo.nome AS grupo_nome "
+            "FROM estudante LEFT JOIN grupo ON grupo.id = estudante.grupo_id "
+            "ORDER BY estudante.criado_em"
         ).fetchall()
     return [dict(linha) for linha in linhas]
 
 
-def revogar_conta(estudante_id: int, caminho_bd: str | None = None) -> None:
-    """Bloqueia o login de uma conta já aprovada (põe aprovado=0),
-    revertendo aprovar_conta -- nunca uma conta admin (o WHERE admin = 0
-    é a salvaguarda, simétrica à de rejeitar_conta), para não ser
+def revogar_conta(estudante_id: int, dsn: str | None = None) -> None:
+    """Bloqueia o login de uma conta já aprovada (põe aprovado=FALSE),
+    revertendo aprovar_conta -- nunca uma conta admin (o WHERE admin =
+    FALSE é a salvaguarda, simétrica à de rejeitar_conta), para não ser
     possível bloquear um admin por engano a partir desta ação."""
-    with sessao_bd(caminho_bd) as bd:
+    with sessao_bd(dsn) as bd:
         bd.execute(
-            "UPDATE estudante SET aprovado = 0 WHERE id = ? AND aprovado = 1 AND admin = 0",
+            "UPDATE estudante SET aprovado = FALSE WHERE id = %s AND aprovado = TRUE AND admin = FALSE",
             (estudante_id,),
         )
+
+
+def tornar_admin(estudante_id: int, dsn: str | None = None) -> None:
+    with sessao_bd(dsn) as bd:
+        bd.execute("UPDATE estudante SET admin = TRUE WHERE id = %s", (estudante_id,))
+
+
+def remover_admin(estudante_id: int, ator_id: int, dsn: str | None = None) -> bool:
+    """Remove o estatuto de admin de 'estudante_id' -- nunca do próprio
+    ator (guarda também embutida na query, além da verificação feita
+    pela rota), e nunca se isso deixasse a aplicação sem nenhum admin
+    ativo (subquery COUNT no próprio WHERE, para a condição ser
+    avaliada atomicamente com o UPDATE e não deixar uma janela de
+    corrida entre "contar admins" e "remover admin" em dois pedidos
+    concorrentes). Devolve True se a conta foi mesmo alterada -- False
+    significa que uma das guardas impediu a ação (quem chamar pode
+    então mostrar uma mensagem clara em vez de um sucesso silencioso
+    que não fez nada)."""
+    with sessao_bd(dsn) as bd:
+        cursor = bd.execute(
+            "UPDATE estudante SET admin = FALSE "
+            "WHERE id = %s AND id != %s AND admin = TRUE "
+            "AND (SELECT COUNT(*) FROM estudante WHERE admin = TRUE AND aprovado = TRUE) > 1",
+            (estudante_id, ator_id),
+        )
+        return cursor.rowcount > 0

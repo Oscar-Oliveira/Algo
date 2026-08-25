@@ -9,17 +9,12 @@ docker compose up -d --build
 
 
 online
-- bd?
 
-- deixar estudande visivel
-- grupos
 - admin atica deeactiva alguem
 
+- combo fluxograma podia ir para o header FLIXOGRAMA
 
-
-visualizador
-- retirar botao voltar
-- nao precisa de barra o trocar ficheiro por ir para a barra de topo
+o modal
 
 update -> db
 
