@@ -1,0 +1,19 @@
+algoritmo "TabuleiroJogoGalo"
+
+inicio
+    tabuleiro:caracter[3][3]
+    i:inteiro
+    j:inteiro
+    para i de 0 ate 2 fazer
+        para j de 0 ate 2 fazer
+            tabuleiro[i][j] = '-'
+
+    tabuleiro[0][0] = 'X'
+    tabuleiro[1][1] = 'X'
+    tabuleiro[2][2] = 'O'
+
+    para i de 0 ate 2 fazer
+        linha:cadeia = ""
+        para j de 0 ate 2 fazer
+            linha = linha + tabuleiro[i][j]
+        escrever(linha)

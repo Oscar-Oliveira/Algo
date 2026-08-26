@@ -1,0 +1,20 @@
+digraph EnquantoMemoria {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="8">
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>volta</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>n (início da volta)</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>n &gt; 0 ?</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>ação</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>n (fim da volta)</b></font></td>
+            </tr>
+            <tr><td>1</td><td>3</td><td>verdadeiro</td><td>escreve 3, depois n = n - 1</td><td>2</td></tr>
+            <tr><td>2</td><td>2</td><td>verdadeiro</td><td>escreve 2, depois n = n - 1</td><td>1</td></tr>
+            <tr><td>3</td><td>1</td><td>verdadeiro</td><td>escreve 1, depois n = n - 1</td><td>0</td></tr>
+            <tr><td>4</td><td>0</td><td>falso</td><td>sai do ciclo</td><td>0</td></tr>
+        </table>
+    >];
+}

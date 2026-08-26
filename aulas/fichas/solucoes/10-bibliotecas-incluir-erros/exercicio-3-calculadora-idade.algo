@@ -1,0 +1,13 @@
+algoritmo "CalculadoraIdade"
+
+constante ANO_ATUAL:inteiro = 2026
+
+inicio
+    anoNascimento:inteiro
+    escrever("Ano de nascimento: ")
+    ler(anoNascimento)
+
+    afirmar anoNascimento <= ANO_ATUAL, "o ano de nascimento não pode ser no futuro"
+
+    idade:inteiro = ANO_ATUAL - anoNascimento
+    escrever("Idade: ", idade)

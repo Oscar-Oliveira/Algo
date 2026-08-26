@@ -1,0 +1,25 @@
+digraph VetorIndices {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="12">
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>índice</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>0</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>1</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>2</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>3</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>4</b></font></td>
+            </tr>
+            <tr>
+                <td bgcolor="#e3f2fd"><b>notas</b></td>
+                <td>14.0</td>
+                <td>9.5</td>
+                <td>18.0</td>
+                <td>12.5</td>
+                <td>16.0</td>
+            </tr>
+        </table>
+    >];
+}

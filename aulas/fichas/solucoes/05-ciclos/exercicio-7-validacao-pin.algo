@@ -1,0 +1,12 @@
+algoritmo "ValidacaoPIN"
+
+constante PIN_CORRETO:inteiro = 1234
+
+inicio
+    pin:inteiro
+    fazer
+        escrever("PIN: ")
+        ler(pin)
+    enquanto pin <> PIN_CORRETO
+
+    escrever("Acesso permitido")

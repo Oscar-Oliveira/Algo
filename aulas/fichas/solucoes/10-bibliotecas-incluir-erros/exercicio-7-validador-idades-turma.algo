@@ -1,0 +1,25 @@
+algoritmo "ValidadorIdadeTurma"
+
+estrutura Aluno
+    nome:cadeia
+    idade:inteiro
+
+inicio
+    n:inteiro
+    escrever("Quantos alunos? ")
+    ler(n)
+
+    alunos:Aluno[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nome: ")
+        ler(alunos[i].nome)
+        escrever("Idade: ")
+        ler(alunos[i].idade)
+        afirmar alunos[i].idade >= 0 e alunos[i].idade <= 120, "idade inválida"
+
+    somaIdades:inteiro = 0
+    para i de 0 ate n - 1 fazer
+        somaIdades = somaIdades + alunos[i].idade
+
+    escrever("Idade média: ", somaIdades / n)

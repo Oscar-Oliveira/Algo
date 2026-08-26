@@ -1,0 +1,38 @@
+algoritmo "RegistoDespesas"
+
+importar Cadeia
+
+estrutura Despesa
+    descricao:cadeia
+    valor:decimal
+    categoria:cadeia
+
+funcao totalPorCategoria(despesas:Despesa[], tamanho:inteiro, categoriaAlvo:cadeia):decimal
+    total:decimal = 0.0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se cadeia.minusculas(despesas[i].categoria) == cadeia.minusculas(categoriaAlvo) entao
+            total = total + despesas[i].valor
+    retornar total
+
+inicio
+    n:inteiro
+    escrever("Quantas despesas? ")
+    ler(n)
+
+    despesas:Despesa[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Descrição: ")
+        ler(despesas[i].descricao)
+        escrever("Valor: ")
+        ler(despesas[i].valor)
+        afirmar despesas[i].valor > 0.0, "o valor tem de ser positivo"
+        escrever("Categoria: ")
+        ler(despesas[i].categoria)
+
+    categoria:cadeia
+    escrever("Ver total de que categoria? ")
+    ler(categoria)
+
+    escrever("Total em ", categoria, ": ", totalPorCategoria(despesas, n, categoria))

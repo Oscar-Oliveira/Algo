@@ -1,0 +1,10 @@
+algoritmo "PedeNumeroPositivo"
+
+inicio
+    numero:inteiro
+    fazer
+        escrever("Número positivo: ")
+        ler(numero)
+    enquanto numero <= 0
+
+    escrever("Recebi: ", numero)

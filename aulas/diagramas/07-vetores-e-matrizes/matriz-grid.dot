@@ -1,0 +1,27 @@
+digraph MatrizGrid {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="12">
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>m[i][j]</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>j=0</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>j=1</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>j=2</b></font></td>
+            </tr>
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>i=0</b></font></td>
+                <td>1</td>
+                <td>2</td>
+                <td>3</td>
+            </tr>
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>i=1</b></font></td>
+                <td>4</td>
+                <td>5</td>
+                <td>6</td>
+            </tr>
+        </table>
+    >];
+}

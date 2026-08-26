@@ -1,0 +1,12 @@
+algoritmo "AnosExperiencia"
+
+inicio
+    atividade:cadeia
+    escrever("Que atividade praticas? ")
+    ler(atividade)
+
+    anos:inteiro
+    escrever("Há quantos anos a praticas? ")
+    ler(anos)
+
+    escrever("Já praticas ", atividade, " há ", anos, " anos. Continua assim!")

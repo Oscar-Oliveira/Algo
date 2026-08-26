@@ -1,0 +1,20 @@
+algoritmo "SimuladorJuroSimples"
+
+inicio
+    capital:decimal
+    escrever("Capital inicial: ")
+    ler(capital)
+
+    taxaAnual:decimal
+    escrever("Taxa de juro anual: ")
+    ler(taxaAnual)
+
+    anos:inteiro
+    escrever("Número de anos: ")
+    ler(anos)
+
+    juros:decimal = capital * taxaAnual / 100.0 * anos
+    montanteFinal:decimal = capital + juros
+
+    escrever("Juros acumulados: ", juros)
+    escrever("Montante final: ", montanteFinal)

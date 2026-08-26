@@ -1,0 +1,8 @@
+algoritmo "SaudarPessoa"
+
+procedimento saudarPessoa(nome:cadeia, idade:inteiro)
+    escrever("Olá, ", nome, "! Tens ", idade, " anos.")
+
+inicio
+    saudarPessoa("Rita", 20)
+    saudarPessoa("Bruno", 15)

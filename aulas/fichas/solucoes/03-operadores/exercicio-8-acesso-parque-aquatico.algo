@@ -1,0 +1,20 @@
+algoritmo "AcessoParqueAquatico"
+
+constante IDADE_MINIMA_SEM_ADULTO:inteiro = 12
+
+inicio
+    nome:cadeia
+    escrever("Nome: ")
+    ler(nome)
+
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    acompanhado:booleano
+    escrever("Vem acompanhado de um adulto? (verdadeiro/falso): ")
+    ler(acompanhado)
+
+    podeEntrarSozinho:booleano = idade >= IDADE_MINIMA_SEM_ADULTO ou acompanhado
+
+    escrever(nome, " pode entrar: ", podeEntrarSozinho)

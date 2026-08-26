@@ -1,0 +1,17 @@
+algoritmo "AgendaContactos"
+
+estrutura Contacto
+    nome:cadeia
+    telefone:cadeia
+
+inicio
+    contactos:Contacto[3]
+    i:inteiro
+    para i de 0 ate 2 fazer
+        escrever("Nome: ")
+        ler(contactos[i].nome)
+        escrever("Telefone: ")
+        ler(contactos[i].telefone)
+
+    para i de 0 ate 2 fazer
+        escrever(contactos[i].nome, " -- ", contactos[i].telefone)

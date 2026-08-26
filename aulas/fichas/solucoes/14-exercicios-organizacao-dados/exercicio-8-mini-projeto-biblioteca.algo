@@ -1,0 +1,83 @@
+algoritmo "SistemaGestaoBiblioteca"
+
+importar Cadeia
+
+constante MAX_LIVROS:inteiro = 20
+
+estrutura Livro
+    titulo:cadeia
+    autor:cadeia
+    emprestado:booleano
+
+funcao contarDisponiveis(livros:Livro[], tamanho:inteiro):inteiro
+    total:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se nao livros[i].emprestado entao
+            total = total + 1
+    retornar total
+
+funcao procurarPorTitulo(livros:Livro[], tamanho:inteiro, alvo:cadeia):inteiro
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se cadeia.minusculas(livros[i].titulo) == cadeia.minusculas(alvo) entao
+            retornar i
+    retornar -1
+
+inicio
+    livros:Livro[MAX_LIVROS]
+    numLivros:inteiro = 0
+
+    opcao:inteiro
+    fazer
+        escrever("")
+        escrever("1) Adicionar livro")
+        escrever("2) Listar livros")
+        escrever("3) Emprestar livro")
+        escrever("4) Devolver livro")
+        escrever("5) Sair")
+        escrever("Escolhe: ")
+        ler(opcao)
+
+        escolher opcao
+            caso 1
+                afirmar numLivros < MAX_LIVROS, "biblioteca cheia"
+                escrever("Título: ")
+                ler(livros[numLivros].titulo)
+                escrever("Autor: ")
+                ler(livros[numLivros].autor)
+                livros[numLivros].emprestado = falso
+                numLivros = numLivros + 1
+            caso 2
+                i:inteiro
+                para i de 0 ate numLivros - 1 fazer
+                    estado:cadeia = "disponível"
+                    se livros[i].emprestado entao
+                        estado = "emprestado"
+                    escrever(livros[i].titulo, " -- ", livros[i].autor, " (", estado, ")")
+                escrever("Disponíveis: ", contarDisponiveis(livros, numLivros))
+            caso 3
+                titulo:cadeia
+                escrever("Título a emprestar: ")
+                ler(titulo)
+                indice:inteiro = procurarPorTitulo(livros, numLivros, titulo)
+                se indice == -1 entao
+                    escrever("Livro não encontrado.")
+                senao
+                    livros[indice].emprestado = verdadeiro
+                    escrever("Emprestado.")
+            caso 4
+                titulo:cadeia
+                escrever("Título a devolver: ")
+                ler(titulo)
+                indice:inteiro = procurarPorTitulo(livros, numLivros, titulo)
+                se indice == -1 entao
+                    escrever("Livro não encontrado.")
+                senao
+                    livros[indice].emprestado = falso
+                    escrever("Devolvido.")
+            caso 5
+                escrever("Até à próxima!")
+            contrario
+                escrever("Opção inválida")
+    enquanto opcao <> 5

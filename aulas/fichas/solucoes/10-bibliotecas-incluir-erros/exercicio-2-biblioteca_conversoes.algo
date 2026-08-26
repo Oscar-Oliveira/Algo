@@ -1,0 +1,5 @@
+funcao celsiusParaFahrenheit(celsius:decimal):decimal
+    retornar celsius * 9.0 / 5.0 + 32.0
+
+funcao fahrenheitParaCelsius(fahrenheit:decimal):decimal
+    retornar (fahrenheit - 32.0) * 5.0 / 9.0

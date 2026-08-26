@@ -1,0 +1,19 @@
+algoritmo "PoupancaAteObjetivo"
+
+inicio
+    objetivo:decimal
+    escrever("Objetivo: ")
+    ler(objetivo)
+
+    poupancaMensal:decimal
+    escrever("Poupança mensal: ")
+    ler(poupancaMensal)
+
+    total:decimal = 0.0
+    meses:inteiro = 0
+    enquanto total < objetivo fazer
+        total = total + poupancaMensal
+        meses = meses + 1
+
+    escrever("Meses necessários: ", meses)
+    escrever("Total poupado: ", total)

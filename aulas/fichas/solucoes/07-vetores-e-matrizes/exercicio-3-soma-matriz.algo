@@ -1,0 +1,12 @@
+algoritmo "SomaMatriz"
+
+inicio
+    m:inteiro[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}
+    soma:inteiro = 0
+    i:inteiro
+    j:inteiro
+    para i de 0 ate 2 fazer
+        para j de 0 ate 2 fazer
+            soma = soma + m[i][j]
+
+    escrever("Soma da matriz: ", soma)

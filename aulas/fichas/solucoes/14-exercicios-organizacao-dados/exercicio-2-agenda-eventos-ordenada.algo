@@ -1,0 +1,30 @@
+algoritmo "AgendaEventosOrdenada"
+
+estrutura Evento
+    descricao:cadeia
+    dia:inteiro
+
+inicio
+    n:inteiro
+    escrever("Quantos eventos? ")
+    ler(n)
+
+    eventos:Evento[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Descrição: ")
+        ler(eventos[i].descricao)
+        escrever("Dia do mês: ")
+        ler(eventos[i].dia)
+
+    j:inteiro
+    para i de 0 ate n - 2 fazer
+        para j de 0 ate n - 2 - i fazer
+            se eventos[j].dia > eventos[j + 1].dia entao
+                temp:Evento = eventos[j]
+                eventos[j] = eventos[j + 1]
+                eventos[j + 1] = temp
+
+    escrever("-- Agenda ordenada --")
+    para i de 0 ate n - 1 fazer
+        escrever("Dia ", eventos[i].dia, ": ", eventos[i].descricao)

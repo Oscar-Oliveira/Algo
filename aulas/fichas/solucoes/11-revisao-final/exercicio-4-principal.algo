@@ -1,0 +1,28 @@
+algoritmo "GestorContactos"
+
+importar Cadeia
+incluir "exercicio-4-biblioteca_validacoes.algo"
+
+estrutura Contacto
+    nome:cadeia
+    telefone:cadeia
+
+inicio
+    n:inteiro
+    escrever("Quantos contactos? ")
+    ler(n)
+
+    contactos:Contacto[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nome: ")
+        ler(contactos[i].nome)
+
+        telefone:cadeia
+        escrever("Telefone (9 dígitos): ")
+        ler(telefone)
+        afirmar ehTelefoneValido(telefone), "telefone tem de ter 9 dígitos"
+        contactos[i].telefone = telefone
+
+    para i de 0 ate n - 1 fazer
+        escrever(contactos[i].nome, " -- ", contactos[i].telefone)

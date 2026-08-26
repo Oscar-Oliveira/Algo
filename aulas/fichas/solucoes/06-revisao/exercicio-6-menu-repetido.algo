@@ -1,0 +1,33 @@
+algoritmo "MenuRepetido"
+
+inicio
+    opcao:inteiro
+    fazer
+        escrever("1) Somar dois números")
+        escrever("2) Multiplicar dois números")
+        escrever("3) Sair")
+        escrever("Escolhe: ")
+        ler(opcao)
+
+        escolher opcao
+            caso 1
+                a:decimal
+                b:decimal
+                escrever("Primeiro número: ")
+                ler(a)
+                escrever("Segundo número: ")
+                ler(b)
+                escrever("Resultado: ", a + b)
+            caso 2
+                a:decimal
+                b:decimal
+                escrever("Primeiro número: ")
+                ler(a)
+                escrever("Segundo número: ")
+                ler(b)
+                escrever("Resultado: ", a * b)
+            caso 3
+                escrever("Até logo!")
+            contrario
+                escrever("Opção inválida")
+    enquanto opcao <> 3

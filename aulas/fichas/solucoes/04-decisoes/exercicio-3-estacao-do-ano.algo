@@ -1,0 +1,18 @@
+algoritmo "EstacaoDoAno"
+
+inicio
+    mes:inteiro
+    escrever("Mês (1-12): ")
+    ler(mes)
+
+    escolher mes
+        caso 12, 1, 2
+            escrever("Inverno")
+        caso 3, 4, 5
+            escrever("Primavera")
+        caso 6, 7, 8
+            escrever("Verão")
+        caso 9, 10, 11
+            escrever("Outono")
+        contrario
+            escrever("Mês inválido")

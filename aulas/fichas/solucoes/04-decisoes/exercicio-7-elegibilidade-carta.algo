@@ -1,0 +1,19 @@
+algoritmo "ElegibilidadeCarta"
+
+constante IDADE_MINIMA:inteiro = 18
+
+inicio
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    temExamePratico:booleano
+    escrever("Já fez o exame prático? (verdadeiro/falso): ")
+    ler(temExamePratico)
+
+    se idade < IDADE_MINIMA entao
+        escrever("Ainda não tens idade suficiente")
+    senao se nao temExamePratico entao
+        escrever("Falta fazer o exame prático")
+    senao
+        escrever("Podes tirar a carta")

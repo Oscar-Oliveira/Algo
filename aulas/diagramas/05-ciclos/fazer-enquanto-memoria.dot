@@ -1,0 +1,23 @@
+digraph FazerEnquantoMemoria {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="8">
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>tentativa</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>ler(numero)</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>numero &lt;= 0 ?</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>ação</b></font></td>
+            </tr>
+            <tr><td>1</td><td>-3</td><td>verdadeiro</td><td>repete</td></tr>
+            <tr><td>2</td><td>-1</td><td>verdadeiro</td><td>repete</td></tr>
+            <tr><td>3</td><td>0</td><td>verdadeiro</td><td>repete</td></tr>
+            <tr><td>4</td><td>5</td><td>falso</td><td>sai do ciclo</td></tr>
+            <tr>
+                <td bgcolor="#ffebee" colspan="3"><b>depois do ciclo</b></td>
+                <td bgcolor="#ffebee">numero fica com <b>5</b></td>
+            </tr>
+        </table>
+    >];
+}

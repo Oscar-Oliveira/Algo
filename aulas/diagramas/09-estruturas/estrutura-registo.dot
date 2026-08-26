@@ -1,0 +1,20 @@
+digraph EstruturaRegisto {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="12">
+            <tr>
+                <td bgcolor="#1a5fb4" colspan="2"><font color="white"><b>p : Ponto</b></font></td>
+            </tr>
+            <tr>
+                <td bgcolor="#e3f2fd"><b>x</b></td>
+                <td>3</td>
+            </tr>
+            <tr>
+                <td bgcolor="#e3f2fd"><b>y</b></td>
+                <td>4</td>
+            </tr>
+        </table>
+    >];
+}

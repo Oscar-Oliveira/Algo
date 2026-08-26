@@ -1,0 +1,16 @@
+algoritmo "CorSemaforo"
+
+inicio
+    cor:inteiro
+    escrever("Cor (1-3): ")
+    ler(cor)
+
+    escolher cor
+        caso 1
+            escrever("Pare")
+        caso 2
+            escrever("Atenção")
+        caso 3
+            escrever("Siga")
+        contrario
+            escrever("Inválido")

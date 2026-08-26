@@ -121,7 +121,9 @@ async function carregarUtilizadores() {
         const botaoRejeitar = document.createElement("button");
         botaoRejeitar.className = "botao-perigo";
         botaoRejeitar.textContent = "Rejeitar";
-        botaoRejeitar.addEventListener("click", () => agirSobreUtilizador(conta.id, "rejeitar"));
+        botaoRejeitar.addEventListener("click", () => {
+          if (confirm(`Rejeitar e eliminar definitivamente a conta de ${conta.email}?`)) agirSobreUtilizador(conta.id, "rejeitar");
+        });
 
         celulaAcoes.appendChild(botaoAprovar);
         celulaAcoes.appendChild(botaoRejeitar);

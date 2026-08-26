@@ -1,0 +1,13 @@
+algoritmo "CatalogoComBiblioteca"
+
+importar Cadeia
+
+estrutura Produto
+    nome:cadeia
+    preco:decimal
+
+inicio
+    produtos:Produto[2] = {{nome: "teclado", preco: 25.5}, {nome: "rato", preco: 12.0}}
+    i:inteiro
+    para i de 0 ate 1 fazer
+        escrever(cadeia.maiusculas(produtos[i].nome), ": ", produtos[i].preco)

@@ -1,0 +1,13 @@
+digraph PorValor {
+    rankdir=TB;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=16, style=filled, shape=box];
+    edge [fontname="Segoe UI,Arial", fontsize=13, color="#555555"];
+
+    a [label="chamador: x = 5", fillcolor="#e8f5e9", color="#66bb6a"];
+    b [label="parâmetro x recebe uma CÓPIA\n(caixa diferente, também com 5)", fillcolor="#e3f2fd", color="#42a5f5"];
+    c [label="dentro da função: x = x * 2\n(a cópia passa a 10)", fillcolor="#fff8e1", color="#f9a825"];
+    d [label="depois da chamada:\no x do chamador continua 5", fillcolor="#ffebee", color="#ef5350"];
+
+    a -> b -> c -> d;
+}

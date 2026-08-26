@@ -1,0 +1,22 @@
+algoritmo "BilheteCinema"
+
+// Ainda não vimos "se", por isso o desconto de sócio é sempre aplicado
+// ao preço final (independentemente da resposta a "És sócio?").
+constante PRECO_BASE:decimal = 8.0
+constante DESCONTO_SOCIO:decimal = 2.0
+
+inicio
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    socio:booleano
+    escrever("És sócio? (verdadeiro/falso): ")
+    ler(socio)
+
+    precoFinal:decimal = PRECO_BASE - DESCONTO_SOCIO
+
+    escrever("Preço base: ", PRECO_BASE)
+    escrever("Idade: ", idade)
+    escrever("Sócio: ", socio)
+    escrever("Preço final (desconto de sócio já incluído): ", precoFinal)

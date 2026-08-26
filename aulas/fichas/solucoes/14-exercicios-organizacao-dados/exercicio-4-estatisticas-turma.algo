@@ -1,0 +1,29 @@
+algoritmo "EstatisticasTurma"
+
+estrutura Aluno
+    nome:cadeia
+    media:decimal
+
+inicio
+    n:inteiro
+    escrever("Quantos alunos? ")
+    ler(n)
+
+    alunos:Aluno[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nome: ")
+        ler(alunos[i].nome)
+        escrever("Média: ")
+        ler(alunos[i].media)
+
+    melhorIndice:inteiro = 0
+    piorIndice:inteiro = 0
+    para i de 0 ate n - 1 fazer
+        se alunos[i].media > alunos[melhorIndice].media entao
+            melhorIndice = i
+        se alunos[i].media < alunos[piorIndice].media entao
+            piorIndice = i
+
+    escrever("Melhor aluno: ", alunos[melhorIndice].nome, " (", alunos[melhorIndice].media, ")")
+    escrever("Pior aluno: ", alunos[piorIndice].nome, " (", alunos[piorIndice].media, ")")

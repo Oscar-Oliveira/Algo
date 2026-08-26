@@ -1,0 +1,2 @@
+funcao ehTelefoneValido(tel:cadeia):booleano
+    retornar cadeia.comprimento(tel) == 9

@@ -1,0 +1,12 @@
+algoritmo "ApresentacaoCidade"
+
+inicio
+    nome:cadeia
+    escrever("Como te chamas? ")
+    ler(nome)
+
+    cidade:cadeia
+    escrever("De que cidade és? ")
+    ler(cidade)
+
+    escrever(nome, " é de ", cidade, ".")

@@ -1383,6 +1383,20 @@ button {
   margin-bottom: 0.8rem;
 }
 
+.titulo-painel-terminal {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.painel-cabecalho .seletor-rotina {
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: normal;
+  margin-bottom: 0;
+}
+
 .seletor-rotina select {
   font: inherit;
   padding: 0.3rem 0.5rem;
@@ -1407,10 +1421,6 @@ button {
 .vista-fluxograma {
   padding: 0.8rem 1rem;
   gap: 0.5rem;
-}
-
-.vista-fluxograma .seletor-rotina {
-  margin-bottom: 0;
 }
 
 .vista-linter {

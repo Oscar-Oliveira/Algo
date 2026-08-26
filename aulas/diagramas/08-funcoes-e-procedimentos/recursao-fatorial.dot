@@ -1,0 +1,26 @@
+digraph RecursaoFatorial {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="8">
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>chamada</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>n</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>n &lt;= 1 ?</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>ação</b></font></td>
+            </tr>
+            <tr><td>fatorial(4)</td><td>4</td><td>falso</td><td>chama fatorial(3), depois calcula 4 * resultado</td></tr>
+            <tr><td>fatorial(3)</td><td>3</td><td>falso</td><td>chama fatorial(2), depois calcula 3 * resultado</td></tr>
+            <tr><td>fatorial(2)</td><td>2</td><td>falso</td><td>chama fatorial(1), depois calcula 2 * resultado</td></tr>
+            <tr><td>fatorial(1)</td><td>1</td><td>verdadeiro</td><td>retorna 1 (caso base -- não chama mais nada)</td></tr>
+            <tr>
+                <td bgcolor="#e8f5e9" colspan="4"><b>a subir (cada chamada usa o resultado da seguinte)</b></td>
+            </tr>
+            <tr><td colspan="3">fatorial(1) retorna</td><td><b>1</b></td></tr>
+            <tr><td colspan="3">fatorial(2) retorna 2 * 1</td><td><b>2</b></td></tr>
+            <tr><td colspan="3">fatorial(3) retorna 3 * 2</td><td><b>6</b></td></tr>
+            <tr><td colspan="3">fatorial(4) retorna 4 * 6</td><td><b>24</b></td></tr>
+        </table>
+    >];
+}

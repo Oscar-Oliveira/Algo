@@ -1,0 +1,22 @@
+algoritmo "ContarParesComFuncao"
+
+funcao ehPar(numero:inteiro):booleano
+    retornar numero mod 2 == 0
+
+inicio
+    n:inteiro
+    escrever("Quantos números? ")
+    ler(n)
+
+    v:inteiro[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Número: ")
+        ler(v[i])
+
+    contagem:inteiro = 0
+    para i de 0 ate n - 1 fazer
+        se ehPar(v[i]) entao
+            contagem = contagem + 1
+
+    escrever("Pares: ", contagem)

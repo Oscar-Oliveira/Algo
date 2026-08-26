@@ -1,0 +1,14 @@
+algoritmo "PodeEntrarEvento"
+
+inicio
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    temConvite:booleano
+    escrever("Tem convite especial? (verdadeiro/falso): ")
+    ler(temConvite)
+
+    podeEntrar:booleano = idade >= 18 ou temConvite
+
+    escrever("Pode entrar: ", podeEntrar)

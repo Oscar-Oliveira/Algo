@@ -1,0 +1,26 @@
+digraph AcumuladorMemoria {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="8">
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>volta</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>i</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>soma (antes)</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>soma = soma + i</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>soma (depois)</b></font></td>
+            </tr>
+            <tr><td>-</td><td>-</td><td>-</td><td><i>(antes do ciclo)</i></td><td>0</td></tr>
+            <tr><td>1</td><td>1</td><td>0</td><td>0 + 1</td><td>1</td></tr>
+            <tr><td>2</td><td>2</td><td>1</td><td>1 + 2</td><td>3</td></tr>
+            <tr><td>3</td><td>3</td><td>3</td><td>3 + 3</td><td>6</td></tr>
+            <tr><td>4</td><td>4</td><td>6</td><td>6 + 4</td><td>10</td></tr>
+            <tr><td>5</td><td>5</td><td>10</td><td>10 + 5</td><td>15</td></tr>
+            <tr>
+                <td bgcolor="#ffebee" colspan="4"><b>depois do ciclo</b></td>
+                <td bgcolor="#ffebee"><b>15</b></td>
+            </tr>
+        </table>
+    >];
+}

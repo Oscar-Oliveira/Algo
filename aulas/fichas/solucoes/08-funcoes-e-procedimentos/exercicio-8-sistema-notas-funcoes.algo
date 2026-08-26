@@ -1,0 +1,27 @@
+algoritmo "SistemaNotasComFuncoes"
+
+funcao classificarNota(nota:decimal):cadeia
+    se nota >= 9.5 entao
+        retornar "Aprovado"
+    senao
+        retornar "Reprovado"
+
+inicio
+    n:inteiro
+    escrever("Quantos alunos? ")
+    ler(n)
+
+    notas:decimal[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nota: ")
+        ler(notas[i])
+
+    aprovados:inteiro = 0
+    para i de 0 ate n - 1 fazer
+        resultado:cadeia = classificarNota(notas[i])
+        escrever("Nota ", notas[i], ": ", resultado)
+        se resultado == "Aprovado" entao
+            aprovados = aprovados + 1
+
+    escrever("Total aprovados: ", aprovados)

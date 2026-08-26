@@ -1,0 +1,10 @@
+algoritmo "ConversorTemperatura"
+
+incluir "exercicio-2-biblioteca_conversoes.algo"
+
+inicio
+    celsius:decimal
+    escrever("Temperatura em Celsius: ")
+    ler(celsius)
+
+    escrever("Em Fahrenheit: ", celsiusParaFahrenheit(celsius))

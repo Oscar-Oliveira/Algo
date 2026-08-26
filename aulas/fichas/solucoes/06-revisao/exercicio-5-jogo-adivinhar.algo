@@ -1,0 +1,20 @@
+algoritmo "JogoAdivinhar"
+
+constante NUMERO_SECRETO:inteiro = 42
+
+inicio
+    palpite:inteiro
+    tentativas:inteiro = 0
+
+    fazer
+        escrever("Palpite: ")
+        ler(palpite)
+        tentativas = tentativas + 1
+
+        se palpite < NUMERO_SECRETO entao
+            escrever("Mais alto!")
+        senao se palpite > NUMERO_SECRETO entao
+            escrever("Mais baixo!")
+    enquanto palpite <> NUMERO_SECRETO
+
+    escrever("Acertaste em ", tentativas, " tentativas!")

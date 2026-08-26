@@ -1,0 +1,21 @@
+algoritmo "SomaEContagemMatriz"
+
+inicio
+    m:inteiro[2][3]
+    i:inteiro
+    j:inteiro
+    para i de 0 ate 1 fazer
+        para j de 0 ate 2 fazer
+            escrever("Valor [", i, "][", j, "]: ")
+            ler(m[i][j])
+
+    soma:inteiro = 0
+    positivos:inteiro = 0
+    para i de 0 ate 1 fazer
+        para j de 0 ate 2 fazer
+            soma = soma + m[i][j]
+            se m[i][j] > 0 entao
+                positivos = positivos + 1
+
+    escrever("Soma: ", soma)
+    escrever("Positivos: ", positivos)

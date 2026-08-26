@@ -1,0 +1,29 @@
+algoritmo "VerificadorVencedorGalo"
+
+funcao verificarVencedor(tabuleiro:caracter[][], marca:caracter):booleano
+    i:inteiro
+
+    para i de 0 ate 2 fazer
+        se tabuleiro[i][0] == marca e tabuleiro[i][1] == marca e tabuleiro[i][2] == marca entao
+            retornar verdadeiro
+
+    para i de 0 ate 2 fazer
+        se tabuleiro[0][i] == marca e tabuleiro[1][i] == marca e tabuleiro[2][i] == marca entao
+            retornar verdadeiro
+
+    se tabuleiro[0][0] == marca e tabuleiro[1][1] == marca e tabuleiro[2][2] == marca entao
+        retornar verdadeiro
+    se tabuleiro[0][2] == marca e tabuleiro[1][1] == marca e tabuleiro[2][0] == marca entao
+        retornar verdadeiro
+
+    retornar falso
+
+inicio
+    tabuleiro:caracter[3][3] = {{'X', 'X', 'X'}, {'O', 'O', '-'}, {'-', '-', '-'}}
+
+    se verificarVencedor(tabuleiro, 'X') entao
+        escrever("X venceu!")
+    senao se verificarVencedor(tabuleiro, 'O') entao
+        escrever("O venceu!")
+    senao
+        escrever("Ainda sem vencedor.")

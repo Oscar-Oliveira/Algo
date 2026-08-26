@@ -1,0 +1,13 @@
+algoritmo "SomaDiagonais"
+
+inicio
+    m:inteiro[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}
+    somaPrincipal:inteiro = 0
+    somaSecundaria:inteiro = 0
+    i:inteiro
+    para i de 0 ate 2 fazer
+        somaPrincipal = somaPrincipal + m[i][i]
+        somaSecundaria = somaSecundaria + m[i][2 - i]
+
+    escrever("Diagonal principal: ", somaPrincipal)
+    escrever("Diagonal secundária: ", somaSecundaria)

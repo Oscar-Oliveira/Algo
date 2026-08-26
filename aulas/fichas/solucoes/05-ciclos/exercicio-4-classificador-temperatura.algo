@@ -1,0 +1,15 @@
+algoritmo "ClassificadorTemperatura"
+
+inicio
+    temp:decimal
+    escrever("Temperatura: ")
+    ler(temp)
+
+    se temp < 0 entao
+        escrever("Gelado")
+    senao se temp < 15 entao
+        escrever("Frio")
+    senao se temp < 25 entao
+        escrever("Ameno")
+    senao
+        escrever("Quente")

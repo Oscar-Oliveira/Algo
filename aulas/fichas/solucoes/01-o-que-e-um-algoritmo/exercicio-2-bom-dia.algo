@@ -1,0 +1,8 @@
+algoritmo "BomDia"
+
+inicio
+    nome:cadeia
+    escrever("Como te chamas? ")
+    ler(nome)
+
+    escrever("Bom dia, ", nome, "! Espero que estejas bem.")

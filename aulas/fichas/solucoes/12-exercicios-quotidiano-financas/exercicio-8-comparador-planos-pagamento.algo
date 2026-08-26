@@ -1,0 +1,25 @@
+algoritmo "ComparadorPlanosPagamento"
+
+inicio
+    valorTotal:decimal
+    escrever("Valor total da compra: ")
+    ler(valorTotal)
+
+    descontoAVista:decimal
+    escrever("Desconto à vista: ")
+    ler(descontoAVista)
+
+    numParcelas:inteiro
+    escrever("Número de parcelas: ")
+    ler(numParcelas)
+
+    valorAVista:decimal = valorTotal - valorTotal * descontoAVista / 100.0
+    valorPorParcela:decimal = valorTotal / numParcelas
+
+    escrever("Pagamento à vista: ", valorAVista)
+    escrever("Pagamento parcelado: ", numParcelas, " x ", valorPorParcela)
+
+    se valorAVista < valorTotal entao
+        escrever("O pagamento à vista é mais vantajoso.")
+    senao
+        escrever("Tanto faz -- sem desconto real à vista.")

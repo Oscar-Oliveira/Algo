@@ -1,0 +1,18 @@
+digraph SeSenao {
+    rankdir=TB;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=20, style=filled];
+    edge [fontname="Segoe UI,Arial", fontsize=16, color="#555555"];
+
+    inicio [shape=ellipse, label="Início", fillcolor="#e8f5e9", color="#66bb6a"];
+    cond   [shape=diamond, label="idade >= 18 ?", fillcolor="#fff8e1", color="#f9a825", fontsize=20];
+    sim    [shape=box, label="escrever(\"Maior de idade\")", fillcolor="#e3f2fd", color="#42a5f5"];
+    nao    [shape=box, label="escrever(\"Menor de idade\")", fillcolor="#e3f2fd", color="#42a5f5"];
+    fim    [shape=ellipse, label="Fim", fillcolor="#ffebee", color="#ef5350"];
+
+    inicio -> cond;
+    cond -> sim [label="verdadeiro"];
+    cond -> nao [label="falso"];
+    sim -> fim;
+    nao -> fim;
+}

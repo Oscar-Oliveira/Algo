@@ -1,0 +1,15 @@
+algoritmo "Fibonacci"
+
+inicio
+    n:inteiro
+    escrever("Quantos termos? ")
+    ler(n)
+
+    anterior:inteiro = 0
+    atual:inteiro = 1
+    i:inteiro
+    para i de 1 ate n fazer
+        escrever(anterior)
+        proximo:inteiro = anterior + atual
+        anterior = atual
+        atual = proximo

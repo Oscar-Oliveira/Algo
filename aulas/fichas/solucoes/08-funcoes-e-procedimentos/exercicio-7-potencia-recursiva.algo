@@ -1,0 +1,9 @@
+algoritmo "PotenciaRecursiva"
+
+funcao potencia(base:inteiro, expoente:inteiro):inteiro
+    se expoente == 0 entao
+        retornar 1
+    retornar base * potencia(base, expoente - 1)
+
+inicio
+    escrever(potencia(2, 10))

@@ -1,0 +1,12 @@
+digraph FuncaoCaixaPreta {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=17, style=filled];
+    edge [fontname="Segoe UI,Arial", fontsize=14, color="#555555"];
+
+    entrada [shape=box, label="entrada\nx = 21", fillcolor="#e8f5e9", color="#66bb6a"];
+    funcao  [shape=box, label="função dobro(x)\nretornar x * 2", fillcolor="#e3f2fd", color="#42a5f5", style="filled,rounded"];
+    saida   [shape=box, label="saída\n42", fillcolor="#ffebee", color="#ef5350"];
+
+    entrada -> funcao -> saida;
+}

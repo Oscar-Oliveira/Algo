@@ -1,0 +1,29 @@
+algoritmo "MediasDaTurma"
+
+inicio
+    numAlunos:inteiro
+    escrever("Quantos alunos? ")
+    ler(numAlunos)
+
+    somaNotas:decimal = 0.0
+    numAprovados:inteiro = 0
+
+    i:inteiro
+    para i de 1 ate numAlunos fazer
+        nota:decimal
+        escrever("Nota do aluno ", i, ": ")
+        ler(nota)
+
+        somaNotas = somaNotas + nota
+        se nota >= 9.5 entao
+            numAprovados = numAprovados + 1
+
+    mediaTurma:decimal = somaNotas / numAlunos
+
+    escrever("Média da turma: ", mediaTurma)
+    escrever("Aprovados: ", numAprovados)
+
+    se mediaTurma >= 9.5 entao
+        escrever("Turma com média positiva")
+    senao
+        escrever("Turma com média negativa")

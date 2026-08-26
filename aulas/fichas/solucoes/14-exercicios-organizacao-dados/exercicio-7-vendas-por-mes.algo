@@ -1,0 +1,35 @@
+algoritmo "VendasPorMes"
+
+estrutura Venda
+    produto:cadeia
+    valor:decimal
+    mes:inteiro
+
+funcao totalPorMes(vendas:Venda[], tamanho:inteiro, mesAlvo:inteiro):decimal
+    total:decimal = 0.0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se vendas[i].mes == mesAlvo entao
+            total = total + vendas[i].valor
+    retornar total
+
+inicio
+    n:inteiro
+    escrever("Quantas vendas? ")
+    ler(n)
+
+    vendas:Venda[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Produto: ")
+        ler(vendas[i].produto)
+        escrever("Valor: ")
+        ler(vendas[i].valor)
+        escrever("Mês (1-12): ")
+        ler(vendas[i].mes)
+
+    mesConsulta:inteiro
+    escrever("Ver total de que mês? ")
+    ler(mesConsulta)
+
+    escrever("Total no mês ", mesConsulta, ": ", totalPorMes(vendas, n, mesConsulta))

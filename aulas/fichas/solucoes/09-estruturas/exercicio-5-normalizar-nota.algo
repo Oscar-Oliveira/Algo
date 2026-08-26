@@ -1,0 +1,15 @@
+algoritmo "NormalizarNota"
+
+procedimento normalizarNota(ref nota:decimal)
+    se nota > 20.0 entao
+        nota = 20.0
+    senao se nota < 0.0 entao
+        nota = 0.0
+
+inicio
+    n:decimal
+    escrever("Nota: ")
+    ler(n)
+
+    normalizarNota(n)
+    escrever("Nota normalizada: ", n)

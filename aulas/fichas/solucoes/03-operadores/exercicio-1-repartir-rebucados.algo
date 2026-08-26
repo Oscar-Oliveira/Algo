@@ -1,0 +1,16 @@
+algoritmo "RepartirRebucados"
+
+inicio
+    totalRebucados:inteiro
+    escrever("Total de rebuçados: ")
+    ler(totalRebucados)
+
+    numAmigos:inteiro
+    escrever("Número de amigos: ")
+    ler(numAmigos)
+
+    cadaAmigo:inteiro = totalRebucados div numAmigos
+    sobra:inteiro = totalRebucados mod numAmigos
+
+    escrever("Cada amigo recebe: ", cadaAmigo)
+    escrever("Sobram: ", sobra)

@@ -1,0 +1,10 @@
+algoritmo "DobrarValor"
+
+procedimento dobrarValor(ref valor:inteiro)
+    valor = valor * 2
+
+inicio
+    x:inteiro = 5
+    escrever("Antes: ", x)
+    dobrarValor(x)
+    escrever("Depois: ", x)

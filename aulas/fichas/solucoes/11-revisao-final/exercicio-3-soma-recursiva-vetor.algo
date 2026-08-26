@@ -1,0 +1,10 @@
+algoritmo "SomaRecursivaVetor"
+
+funcao somaVetor(v:inteiro[], i:inteiro, tamanho:inteiro):inteiro
+    se i == tamanho entao
+        retornar 0
+    retornar v[i] + somaVetor(v, i + 1, tamanho)
+
+inicio
+    numeros:inteiro[5] = {1, 2, 3, 4, 5}
+    escrever(somaVetor(numeros, 0, 5))

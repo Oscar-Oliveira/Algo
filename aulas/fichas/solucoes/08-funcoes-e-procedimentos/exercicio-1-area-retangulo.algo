@@ -1,0 +1,15 @@
+algoritmo "AreaRetangulo"
+
+funcao areaRetangulo(base:decimal, altura:decimal):decimal
+    retornar base * altura
+
+inicio
+    b:decimal
+    escrever("Base: ")
+    ler(b)
+
+    a:decimal
+    escrever("Altura: ")
+    ler(a)
+
+    escrever("Área: ", areaRetangulo(b, a))

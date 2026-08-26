@@ -1,0 +1,28 @@
+algoritmo "BatalhaMonstros"
+
+estrutura Monstro
+    nome:cadeia
+    vida:inteiro
+    ataque:inteiro
+
+procedimento atacar(ref atacante:Monstro, ref defensor:Monstro)
+    defensor.vida = defensor.vida - atacante.ataque
+    escrever(atacante.nome, " ataca ", defensor.nome, " e causa ", atacante.ataque, " de dano")
+
+inicio
+    heroi:Monstro = {nome: "Herói", vida: 30, ataque: 5}
+    dragao:Monstro = {nome: "Dragão", vida: 25, ataque: 4}
+
+    turno:inteiro = 1
+    enquanto heroi.vida > 0 e dragao.vida > 0 fazer
+        escrever("-- Turno ", turno, " --")
+        atacar(heroi, dragao)
+        se dragao.vida <= 0 entao
+            sair
+        atacar(dragao, heroi)
+        turno = turno + 1
+
+    se heroi.vida > 0 entao
+        escrever("O herói venceu!")
+    senao
+        escrever("O dragão venceu!")

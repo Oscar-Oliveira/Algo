@@ -1,0 +1,22 @@
+/* Tema partilhado por todas as apresentações reveal.js das aulas.
+   Referenciado a partir de cada slides.md via front matter:
+   ---
+   customTheme: "../estilo-aulas.css"
+   --- */
+
+.reveal { font-size: 28px; --r-background-color: #ffffff; --r-main-color: #1c1c1c; }
+.reveal, .reveal-viewport { background: #ffffff; }
+.reveal h1 { font-size: 1.8em; }
+.reveal h2 { font-size: 1.4em; }
+.reveal section img { max-height: 60vh; }
+.reveal ol, .reveal ul { display: block; }
+
+.reveal pre { width: 100%; box-shadow: none; }
+.reveal pre code {
+    font-size: 1.05em;
+    line-height: 1.5;
+    max-height: none;
+    padding: 0.6em 0.8em;
+    background: #1e1e1e;
+    color: #f2f2f2;
+}

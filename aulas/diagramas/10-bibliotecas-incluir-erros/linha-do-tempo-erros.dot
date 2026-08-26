@@ -1,0 +1,20 @@
+digraph LinhaDoTempoErros {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=14, style=filled, shape=box];
+    edge [fontname="Segoe UI,Arial", fontsize=12, color="#555555"];
+
+    escreves [label="escreves\no código", fillcolor="#e8f5e9", color="#66bb6a"];
+    compilacao [label="COMPILAÇÃO\nerro de tipo/sintaxe\nacontece sempre,\nantes de correr", fillcolor="#ffe0e0", color="#e53935"];
+    corre [label="o programa\nCOMEÇA a correr", fillcolor="#e8f5e9", color="#66bb6a"];
+    runtime [label="erro em RUNTIME\níndice inválido, divisão\npor zero, ... -- só com\ncertos dados concretos", fillcolor="#fff3e0", color="#fb8c00"];
+    afirmarNode [label="afirmar falha\numa verificação TUA,\nnão do compilador", fillcolor="#e3f2fd", color="#1e88e5"];
+    para [label="o programa PARA\ncom mensagem clara", fillcolor="#f3e5f5", color="#8e24aa"];
+
+    escreves -> compilacao;
+    compilacao -> corre [label="  se compilar bem  "];
+    corre -> runtime;
+    corre -> afirmarNode;
+    runtime -> para;
+    afirmarNode -> para;
+}

@@ -1,0 +1,40 @@
+algoritmo "SistemaNotasCompleto"
+
+importar Cadeia
+
+estrutura Aluno
+    nome:cadeia
+    notas:decimal[3]
+
+funcao media(v:decimal[], tamanho:inteiro):decimal
+    total:decimal = 0.0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        total = total + v[i]
+    retornar total / tamanho
+
+funcao classificar(m:decimal):cadeia
+    se m >= 9.5 entao
+        retornar "Aprovado"
+    senao
+        retornar "Reprovado"
+
+inicio
+    n:inteiro
+    escrever("Quantos alunos? ")
+    ler(n)
+
+    alunos:Aluno[n]
+    i:inteiro
+    j:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nome: ")
+        ler(alunos[i].nome)
+        para j de 0 ate 2 fazer
+            escrever("Nota ", j + 1, ": ")
+            ler(alunos[i].notas[j])
+            afirmar alunos[i].notas[j] >= 0.0 e alunos[i].notas[j] <= 20.0, "nota inválida"
+
+    para i de 0 ate n - 1 fazer
+        m:decimal = media(alunos[i].notas, 3)
+        escrever(cadeia.maiusculas(alunos[i].nome), ": média ", m, " -- ", classificar(m))

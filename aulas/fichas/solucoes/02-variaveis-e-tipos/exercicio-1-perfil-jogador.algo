@@ -1,0 +1,15 @@
+algoritmo "PerfilJogador"
+
+// Um valor de cada um dos 5 tipos primitivos, todos com valor inicial.
+inicio
+    nome:cadeia = "DragoVeloz"
+    vida:inteiro = 100
+    velocidade:decimal = 7.5
+    ativo:booleano = verdadeiro
+    classe:caracter = 'M'
+
+    escrever("Nome: ", nome)
+    escrever("Vida: ", vida)
+    escrever("Velocidade: ", velocidade)
+    escrever("Ativo: ", ativo)
+    escrever("Classe: ", classe)

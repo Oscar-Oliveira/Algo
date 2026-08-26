@@ -1,0 +1,41 @@
+algoritmo "EscolhaMenu"
+
+constante PRECO_PRATO_DIA:decimal = 8.5
+constante PRECO_HAMBURGER:decimal = 6.0
+constante PRECO_SALADA:decimal = 5.5
+constante PRECO_SOBREMESA:decimal = 3.0
+
+inicio
+    opcao:inteiro
+    escrever("Escolhe (1-4): ")
+    ler(opcao)
+
+    quantidade:inteiro
+    escrever("Quantidade: ")
+    ler(quantidade)
+
+    // 'nomePrato' e 'precoUnitario' têm de ser declaradas ANTES do
+    // 'escolher' -- se fossem declaradas dentro de cada 'caso', deixavam
+    // de existir depois do bloco (ver "Onde vivem as variáveis").
+    nomePrato:cadeia
+    precoUnitario:decimal
+
+    escolher opcao
+        caso 1
+            nomePrato = "Prato do dia"
+            precoUnitario = PRECO_PRATO_DIA
+        caso 2
+            nomePrato = "Hambúrguer"
+            precoUnitario = PRECO_HAMBURGER
+        caso 3
+            nomePrato = "Salada"
+            precoUnitario = PRECO_SALADA
+        caso 4
+            nomePrato = "Sobremesa"
+            precoUnitario = PRECO_SOBREMESA
+        contrario
+            nomePrato = "Opção inválida"
+            precoUnitario = 0.0
+
+    total:decimal = precoUnitario * quantidade
+    escrever(quantidade, " x ", nomePrato, " = ", total)

@@ -1,0 +1,20 @@
+algoritmo "DivisaoContaRestaurante"
+
+inicio
+    valorConta:decimal
+    escrever("Valor da conta: ")
+    ler(valorConta)
+
+    percentagemGorjeta:decimal
+    escrever("Percentagem de gorjeta: ")
+    ler(percentagemGorjeta)
+
+    numAmigos:inteiro
+    escrever("Número de amigos: ")
+    ler(numAmigos)
+
+    valorComGorjeta:decimal = valorConta + valorConta * percentagemGorjeta / 100.0
+    valorPorPessoa:decimal = valorComGorjeta / numAmigos
+
+    escrever("Valor total com gorjeta: ", valorComGorjeta)
+    escrever("Cada um paga: ", valorPorPessoa)

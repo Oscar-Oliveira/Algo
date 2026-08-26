@@ -1,0 +1,13 @@
+algoritmo "ElegivelDesconto"
+
+inicio
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    clienteVip:booleano
+    escrever("Cliente VIP? (verdadeiro/falso): ")
+    ler(clienteVip)
+
+    elegivelDesconto:booleano = idade >= 65 ou clienteVip
+    escrever("Elegível para desconto: ", elegivelDesconto)

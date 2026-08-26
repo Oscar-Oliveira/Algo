@@ -1,0 +1,13 @@
+algoritmo "ConversorMoeda"
+
+inicio
+    valorEuros:decimal
+    escrever("Valor em euros: ")
+    ler(valorEuros)
+
+    taxaCambio:decimal
+    escrever("Taxa de câmbio: ")
+    ler(taxaCambio)
+
+    valorConvertido:decimal = valorEuros * taxaCambio
+    escrever("Valor convertido: ", valorConvertido)

@@ -1,0 +1,15 @@
+algoritmo "ClassificadorEtario"
+
+inicio
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    se idade < 12 entao
+        escrever("Criança")
+    senao se idade < 18 entao
+        escrever("Adolescente")
+    senao se idade < 65 entao
+        escrever("Adulto")
+    senao
+        escrever("Idoso")

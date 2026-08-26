@@ -1,0 +1,23 @@
+digraph ListaComRef {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+    edge [fontname="Segoe UI,Arial", fontsize=12, color="#555555"];
+
+    antes [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="9">
+            <tr><td colspan="2" bgcolor="#1a5fb4"><font color="white"><b>a.seguinte = b  (ALIAS, campo 'ref')</b></font></td></tr>
+            <tr><td bgcolor="#e3f2fd"><b>b.valor</b></td><td>2</td></tr>
+            <tr><td bgcolor="#e3f2fd"><b>a.seguinte.valor</b></td><td>2 (mesma caixa que b)</td></tr>
+        </table>
+    >];
+
+    depois [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="9">
+            <tr><td colspan="2" bgcolor="#1a5fb4"><font color="white"><b>depois de b.valor = 99</b></font></td></tr>
+            <tr><td bgcolor="#fff3e0"><b>b.valor</b></td><td>99</td></tr>
+            <tr><td bgcolor="#fff3e0"><b>a.seguinte.valor</b></td><td>99 -- reflete a mudança!</td></tr>
+        </table>
+    >];
+
+    antes -> depois [label="  b.valor = 99  "];
+}

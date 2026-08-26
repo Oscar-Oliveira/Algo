@@ -1,0 +1,28 @@
+algoritmo "IMCRepetido"
+
+inicio
+    querOutro:booleano
+    fazer
+        peso:decimal
+        escrever("Peso (kg): ")
+        ler(peso)
+
+        altura:decimal
+        escrever("Altura (m): ")
+        ler(altura)
+
+        imc:decimal = peso / (altura ^ 2)
+        escrever("IMC: ", imc)
+
+        se imc < 18.5 entao
+            escrever("Abaixo do peso")
+        senao se imc < 25.0 entao
+            escrever("Peso normal")
+        senao se imc < 30.0 entao
+            escrever("Excesso de peso")
+        senao
+            escrever("Obesidade")
+
+        escrever("Queres calcular outro? (verdadeiro/falso): ")
+        ler(querOutro)
+    enquanto querOutro

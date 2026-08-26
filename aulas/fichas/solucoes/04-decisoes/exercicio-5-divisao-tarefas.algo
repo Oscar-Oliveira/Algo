@@ -1,0 +1,16 @@
+algoritmo "DivisaoTarefas"
+
+inicio
+    totalTarefas:inteiro
+    escrever("Total de tarefas: ")
+    ler(totalTarefas)
+
+    numPessoas:inteiro
+    escrever("Número de pessoas: ")
+    ler(numPessoas)
+
+    tarefasPorPessoa:inteiro = totalTarefas div numPessoas
+    sobra:inteiro = totalTarefas mod numPessoas
+
+    escrever("Tarefas por pessoa: ", tarefasPorPessoa)
+    escrever("Sobram: ", sobra)

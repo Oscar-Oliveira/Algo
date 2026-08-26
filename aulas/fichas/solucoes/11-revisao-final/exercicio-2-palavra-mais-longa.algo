@@ -1,0 +1,26 @@
+algoritmo "PalavraMaisLonga"
+
+importar Cadeia
+
+estrutura Palavra
+    texto:cadeia
+    tamanho:inteiro
+
+inicio
+    frase:cadeia
+    escrever("Frase (5 palavras): ")
+    ler(frase)
+
+    partes:cadeia[5] = cadeia.dividir(frase, " ")
+
+    palavras:Palavra[5]
+    i:inteiro
+    para i de 0 ate 4 fazer
+        palavras[i] = {texto: partes[i], tamanho: cadeia.comprimento(partes[i])}
+
+    indiceMaior:inteiro = 0
+    para i de 0 ate 4 fazer
+        se palavras[i].tamanho > palavras[indiceMaior].tamanho entao
+            indiceMaior = i
+
+    escrever("Palavra mais longa: ", palavras[indiceMaior].texto)

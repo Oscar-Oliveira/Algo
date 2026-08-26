@@ -1,0 +1,19 @@
+algoritmo "ReciboSimples"
+
+inicio
+    nomeArtigo:cadeia
+    escrever("Artigo: ")
+    ler(nomeArtigo)
+
+    preco:decimal
+    escrever("Preço unitário: ")
+    ler(preco)
+
+    quantidade:inteiro
+    escrever("Quantidade: ")
+    ler(quantidade)
+
+    total:decimal = preco * quantidade
+
+    escrever(quantidade, " x ", nomeArtigo)
+    escrever("Total: ", total)

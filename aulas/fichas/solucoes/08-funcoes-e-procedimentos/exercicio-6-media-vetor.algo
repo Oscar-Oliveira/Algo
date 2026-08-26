@@ -1,0 +1,12 @@
+algoritmo "MediaVetor"
+
+funcao media(v:decimal[], tamanho:inteiro):decimal
+    total:decimal = 0.0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        total = total + v[i]
+    retornar total / tamanho
+
+inicio
+    notas:decimal[4] = {12.0, 15.5, 9.0, 18.0}
+    escrever("Média: ", media(notas, 4))

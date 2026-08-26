@@ -1,0 +1,27 @@
+digraph Escolher {
+    rankdir=TB;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=18, style=filled];
+    edge [fontname="Segoe UI,Arial", fontsize=15, color="#555555"];
+
+    inicio [shape=ellipse, label="Início", fillcolor="#e8f5e9", color="#66bb6a"];
+    hub [shape=diamond, label="mes = ?", fillcolor="#fff8e1", color="#f9a825"];
+    inv [shape=box, label="\"Inverno\"", fillcolor="#e3f2fd", color="#42a5f5"];
+    pri [shape=box, label="\"Primavera\"", fillcolor="#e3f2fd", color="#42a5f5"];
+    ver [shape=box, label="\"Verão\"", fillcolor="#e3f2fd", color="#42a5f5"];
+    out [shape=box, label="\"Outono\"", fillcolor="#e3f2fd", color="#42a5f5"];
+    inval [shape=box, label="\"Mês inválido\"", fillcolor="#ffe0e0", color="#ef5350"];
+    fim [shape=ellipse, label="Fim", fillcolor="#ffebee", color="#ef5350"];
+
+    inicio -> hub;
+    hub -> inv [label="12, 1, 2"];
+    hub -> pri [label="3, 4, 5"];
+    hub -> ver [label="6, 7, 8"];
+    hub -> out [label="9, 10, 11"];
+    hub -> inval [label="contrário"];
+    inv -> fim;
+    pri -> fim;
+    ver -> fim;
+    out -> fim;
+    inval -> fim;
+}

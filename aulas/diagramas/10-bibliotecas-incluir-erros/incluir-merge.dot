@@ -1,0 +1,13 @@
+digraph IncluirMerge {
+    rankdir=LR;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=15, style=filled, shape=box];
+    edge [fontname="Segoe UI,Arial", fontsize=13, color="#555555"];
+
+    principal [label="principal.algo\n\nalgoritmo \"Principal\"\nincluir \"geometria.algo\"\n\ninicio\n    escrever(areaCirculo(2.0))", fillcolor="#e3f2fd", color="#42a5f5"];
+    geometria [label="geometria.algo\n\nconstante PI:decimal = 3.14159\n\nfuncao areaCirculo(raio)\n    retornar PI * raio * raio", fillcolor="#fff8e1", color="#f9a825"];
+    resultado [label="como se estivesse tudo\nno mesmo ficheiro:\nPI e areaCirculo já existem\nquando o programa começa", fillcolor="#e8f5e9", color="#66bb6a"];
+
+    principal -> resultado;
+    geometria -> resultado;
+}

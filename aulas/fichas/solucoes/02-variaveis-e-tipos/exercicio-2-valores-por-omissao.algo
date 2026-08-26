@@ -1,0 +1,16 @@
+algoritmo "ValoresPorOmissao"
+
+// Declara uma variável de cada tipo, sem valor inicial, para ver o
+// valor por omissão de cada uma.
+inicio
+    valInteiro:inteiro
+    valDecimal:decimal
+    valBooleano:booleano
+    valCadeia:cadeia
+    valCaracter:caracter
+
+    escrever("inteiro: ", valInteiro)
+    escrever("decimal: ", valDecimal)
+    escrever("booleano: ", valBooleano)
+    escrever("cadeia: '", valCadeia, "'")
+    escrever("caracter: '", valCaracter, "'")

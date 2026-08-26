@@ -1,0 +1,11 @@
+algoritmo "VerificaAprovacao"
+
+inicio
+    nota:decimal
+    escrever("Nota: ")
+    ler(nota)
+
+    se nota >= 9.5 entao
+        escrever("Aprovado")
+    senao
+        escrever("Reprovado")

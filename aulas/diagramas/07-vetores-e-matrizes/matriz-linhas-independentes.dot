@@ -1,0 +1,23 @@
+digraph LinhasIndependentes {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+    edge [fontname="Segoe UI,Arial", fontsize=13, color="#555555"];
+
+    antes [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="10">
+            <tr><td colspan="3" bgcolor="#1a5fb4"><font color="white"><b>antes</b></font></td></tr>
+            <tr><td bgcolor="#e3f2fd"><b>m[0]</b></td><td>1</td><td>2</td></tr>
+            <tr><td bgcolor="#e3f2fd"><b>m[1]</b></td><td>1</td><td>2</td></tr>
+        </table>
+    >];
+
+    depois [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="10">
+            <tr><td colspan="3" bgcolor="#1a5fb4"><font color="white"><b>depois</b></font></td></tr>
+            <tr><td bgcolor="#fff3e0"><b>m[0]</b></td><td>99</td><td>2</td></tr>
+            <tr><td bgcolor="#e3f2fd"><b>m[1]</b></td><td>1</td><td>2</td></tr>
+        </table>
+    >];
+
+    antes -> depois [label="  m[0][0] = 99  "];
+}

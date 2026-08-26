@@ -1,0 +1,28 @@
+digraph SenaoSe {
+    rankdir=TB;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=18, style=filled];
+    edge [fontname="Segoe UI,Arial", fontsize=15, color="#555555"];
+
+    inicio [shape=ellipse, label="Início", fillcolor="#e8f5e9", color="#66bb6a"];
+    c1 [shape=diamond, label="idade < 12 ?", fillcolor="#fff8e1", color="#f9a825"];
+    c2 [shape=diamond, label="idade < 18 ?", fillcolor="#fff8e1", color="#f9a825"];
+    c3 [shape=diamond, label="idade < 65 ?", fillcolor="#fff8e1", color="#f9a825"];
+    r1 [shape=box, label="\"Criança\"", fillcolor="#e3f2fd", color="#42a5f5"];
+    r2 [shape=box, label="\"Adolescente\"", fillcolor="#e3f2fd", color="#42a5f5"];
+    r3 [shape=box, label="\"Adulto\"", fillcolor="#e3f2fd", color="#42a5f5"];
+    r4 [shape=box, label="\"Idoso\"", fillcolor="#e3f2fd", color="#42a5f5"];
+    fim [shape=ellipse, label="Fim", fillcolor="#ffebee", color="#ef5350"];
+
+    inicio -> c1;
+    c1 -> r1 [label="verdadeiro"];
+    c1 -> c2 [label="falso"];
+    c2 -> r2 [label="verdadeiro"];
+    c2 -> c3 [label="falso"];
+    c3 -> r3 [label="verdadeiro"];
+    c3 -> r4 [label="falso"];
+    r1 -> fim;
+    r2 -> fim;
+    r3 -> fim;
+    r4 -> fim;
+}

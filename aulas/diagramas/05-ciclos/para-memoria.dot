@@ -1,0 +1,24 @@
+digraph ParaMemoria {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="8">
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>volta</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>i</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>i + passo &lt;= ate ?</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>escrever(i)</b></font></td>
+            </tr>
+            <tr><td>1</td><td>1</td><td>1+1 &lt;= 5 → verdadeiro</td><td>1</td></tr>
+            <tr><td>2</td><td>2</td><td>2+1 &lt;= 5 → verdadeiro</td><td>2</td></tr>
+            <tr><td>3</td><td>3</td><td>3+1 &lt;= 5 → verdadeiro</td><td>3</td></tr>
+            <tr><td>4</td><td>4</td><td>4+1 &lt;= 5 → verdadeiro</td><td>4</td></tr>
+            <tr><td>5</td><td>5</td><td>5+1 &lt;= 5 → falso</td><td>5</td></tr>
+            <tr>
+                <td bgcolor="#ffebee" colspan="2"><b>depois do ciclo</b></td>
+                <td bgcolor="#ffebee" colspan="2">i mantém o valor que já tinha: <b>5</b></td>
+            </tr>
+        </table>
+    >];
+}

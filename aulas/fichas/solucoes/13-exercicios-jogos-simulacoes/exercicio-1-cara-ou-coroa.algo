@@ -1,0 +1,21 @@
+algoritmo "CaraOuCoroa"
+
+importar Matematica
+
+inicio
+    n:inteiro
+    escrever("Quantas vezes lançar? ")
+    ler(n)
+
+    caras:inteiro = 0
+    coroas:inteiro = 0
+    i:inteiro
+    para i de 1 ate n fazer
+        resultado:inteiro = matematica.aleatorio(0, 1)
+        se resultado == 0 entao
+            caras = caras + 1
+        senao
+            coroas = coroas + 1
+
+    escrever("Caras: ", caras)
+    escrever("Coroas: ", coroas)

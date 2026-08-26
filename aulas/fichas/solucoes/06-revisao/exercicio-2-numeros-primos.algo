@@ -1,0 +1,17 @@
+algoritmo "NumerosPrimosAteN"
+
+inicio
+    n:inteiro
+    escrever("Até: ")
+    ler(n)
+
+    numero:inteiro
+    para numero de 2 ate n fazer
+        ehPrimo:booleano = verdadeiro
+        divisor:inteiro
+        para divisor de 2 ate numero - 1 fazer
+            se numero mod divisor == 0 entao
+                ehPrimo = falso
+                sair
+        se ehPrimo entao
+            escrever(numero)

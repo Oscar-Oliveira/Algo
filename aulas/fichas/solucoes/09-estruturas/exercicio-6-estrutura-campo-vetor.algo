@@ -1,0 +1,12 @@
+algoritmo "EstruturaComVetor"
+
+estrutura Equipa
+    nome:cadeia
+    jogadores:cadeia[3]
+
+inicio
+    equipa:Equipa = {nome: "Tigres", jogadores: {"Ana", "Bruno", "Carla"}}
+    escrever("Equipa: ", equipa.nome)
+    i:inteiro
+    para i de 0 ate 2 fazer
+        escrever("- ", equipa.jogadores[i])

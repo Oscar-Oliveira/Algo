@@ -1,0 +1,27 @@
+algoritmo "CartaoSocioBiblioteca"
+
+constante ANO_ATUAL:inteiro = 2026
+
+inicio
+    nome:cadeia
+    escrever("Nome: ")
+    ler(nome)
+
+    inicial:caracter
+    escrever("Inicial (1 letra): ")
+    ler(inicial)
+
+    anoNascimento:inteiro
+    escrever("Ano de nascimento: ")
+    ler(anoNascimento)
+
+    leitorAssiduo:booleano
+    escrever("És leitor assíduo? (verdadeiro/falso): ")
+    ler(leitorAssiduo)
+
+    idadeAproximada:inteiro = ANO_ATUAL - anoNascimento
+
+    escrever("Cartão de sócio")
+    escrever("Nome: ", nome, " (", inicial, ".)")
+    escrever("Idade aproximada: ", idadeAproximada)
+    escrever("Leitor assíduo: ", leitorAssiduo)

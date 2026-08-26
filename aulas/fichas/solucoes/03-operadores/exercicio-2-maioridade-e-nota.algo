@@ -1,0 +1,16 @@
+algoritmo "VerificaMaioridadeENota"
+
+inicio
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    nota:decimal
+    escrever("Nota: ")
+    ler(nota)
+
+    maioridade:booleano = idade >= 18
+    notaPositiva:booleano = nota >= 9.5
+
+    escrever("Maioridade: ", maioridade)
+    escrever("Nota positiva: ", notaPositiva)

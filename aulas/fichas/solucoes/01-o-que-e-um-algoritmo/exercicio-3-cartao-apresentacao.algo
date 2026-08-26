@@ -1,0 +1,12 @@
+algoritmo "CartaoApresentacao"
+
+inicio
+    nome:cadeia
+    escrever("Nome: ")
+    ler(nome)
+
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    escrever(nome, " tem ", idade, " anos.")

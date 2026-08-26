@@ -1,0 +1,16 @@
+algoritmo "CalculadoraDesconto"
+
+inicio
+    precoOriginal:decimal
+    escrever("Preço original: ")
+    ler(precoOriginal)
+
+    percentagemDesconto:decimal
+    escrever("Percentagem de desconto: ")
+    ler(percentagemDesconto)
+
+    valorDesconto:decimal = precoOriginal * percentagemDesconto / 100.0
+    precoFinal:decimal = precoOriginal - valorDesconto
+
+    escrever("Desconto: ", valorDesconto)
+    escrever("Preço final: ", precoFinal)

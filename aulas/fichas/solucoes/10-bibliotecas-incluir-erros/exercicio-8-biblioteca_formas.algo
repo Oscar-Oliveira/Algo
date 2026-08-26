@@ -1,0 +1,9 @@
+constante PI:decimal = 3.14159
+
+funcao areaCirculo(raio:decimal):decimal
+    afirmar raio > 0.0, "o raio tem de ser positivo"
+    retornar PI * raio * raio
+
+funcao areaRetangulo(base:decimal, altura:decimal):decimal
+    afirmar base > 0.0 e altura > 0.0, "base e altura têm de ser positivas"
+    retornar base * altura

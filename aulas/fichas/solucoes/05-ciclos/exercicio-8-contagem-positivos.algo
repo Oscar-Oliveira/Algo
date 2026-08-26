@@ -1,0 +1,17 @@
+algoritmo "ContagemPositivos"
+
+inicio
+    quantos:inteiro
+    escrever("Quantos números vais inserir? ")
+    ler(quantos)
+
+    contagemPositivos:inteiro = 0
+    i:inteiro
+    para i de 1 ate quantos fazer
+        numero:inteiro
+        escrever("Número: ")
+        ler(numero)
+        se numero > 0 entao
+            contagemPositivos = contagemPositivos + 1
+
+    escrever("Positivos: ", contagemPositivos)

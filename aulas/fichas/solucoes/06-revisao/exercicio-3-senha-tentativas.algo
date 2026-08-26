@@ -1,0 +1,22 @@
+algoritmo "SenhaComTentativas"
+
+constante SENHA_CORRETA:inteiro = 4321
+constante MAX_TENTATIVAS:inteiro = 3
+
+inicio
+    tentativa:inteiro
+    acertou:booleano = falso
+
+    para tentativa de 1 ate MAX_TENTATIVAS fazer
+        senhaDigitada:inteiro
+        escrever("Tentativa ", tentativa, " -- Senha: ")
+        ler(senhaDigitada)
+
+        se senhaDigitada == SENHA_CORRETA entao
+            acertou = verdadeiro
+            sair
+
+    se acertou entao
+        escrever("Acesso permitido")
+    senao
+        escrever("Acesso bloqueado")

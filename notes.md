@@ -7,16 +7,13 @@ docker compose up -d --build
 
 ---
 
+aulas
+
+compilador v2
 
 online
-
 - admin atica deeactiva alguem
-
-- combo fluxograma podia ir para o header FLIXOGRAMA
-
-o modal
-
-update -> db
+- definiç~eos de llm
 
 - alguem escolher o activo ativo
 - admin llm for
@@ -25,4 +22,4 @@ update -> db
 
 - activities apenas qd se chama alguem
 
-- logs de td para analise do progresso do estudante e aconselhamento sobre conteudo a reforcar
+- logs das duvidas  para analise do progresso do estudante e aconselhamento sobre conteudo a reforcar

@@ -1,0 +1,35 @@
+algoritmo "ListaTelefonicaComBusca"
+
+estrutura Contacto
+    nome:cadeia
+    telefone:cadeia
+
+funcao procurarContacto(contactos:Contacto[], tamanho:inteiro, alvo:cadeia):inteiro
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se contactos[i].nome == alvo entao
+            retornar i
+    retornar -1
+
+inicio
+    n:inteiro
+    escrever("Quantos contactos? ")
+    ler(n)
+
+    contactos:Contacto[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nome: ")
+        ler(contactos[i].nome)
+        escrever("Telefone: ")
+        ler(contactos[i].telefone)
+
+    alvo:cadeia
+    escrever("Procurar quem? ")
+    ler(alvo)
+
+    indice:inteiro = procurarContacto(contactos, n, alvo)
+    se indice == -1 entao
+        escrever("Contacto não encontrado.")
+    senao
+        escrever(contactos[indice].nome, ": ", contactos[indice].telefone)

@@ -1,0 +1,17 @@
+algoritmo "LancamentoDadoHistograma"
+
+importar Matematica
+
+inicio
+    n:inteiro
+    escrever("Quantos lançamentos? ")
+    ler(n)
+
+    contagens:inteiro[6]
+    i:inteiro
+    para i de 1 ate n fazer
+        valor:inteiro = matematica.aleatorio(1, 6)
+        contagens[valor - 1] = contagens[valor - 1] + 1
+
+    para i de 0 ate 5 fazer
+        escrever("Face ", i + 1, ": ", contagens[i], " vezes")

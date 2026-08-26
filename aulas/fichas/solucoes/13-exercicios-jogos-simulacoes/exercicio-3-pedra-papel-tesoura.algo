@@ -1,0 +1,19 @@
+algoritmo "PedraPapelTesoura"
+
+importar Matematica
+
+inicio
+    escrever("1) Pedra  2) Papel  3) Tesoura")
+    escolhaJogador:inteiro
+    escrever("Escolhe: ")
+    ler(escolhaJogador)
+
+    escolhaComputador:inteiro = matematica.aleatorio(1, 3)
+    escrever("Computador escolheu: ", escolhaComputador)
+
+    se escolhaJogador == escolhaComputador entao
+        escrever("Empate!")
+    senao se (escolhaJogador == 1 e escolhaComputador == 3) ou (escolhaJogador == 2 e escolhaComputador == 1) ou (escolhaJogador == 3 e escolhaComputador == 2) entao
+        escrever("Ganhaste!")
+    senao
+        escrever("O computador ganhou!")

@@ -1,0 +1,26 @@
+algoritmo "OrcamentoMensal"
+
+inicio
+    rendimento:decimal
+    escrever("Rendimento mensal: ")
+    ler(rendimento)
+
+    n:inteiro
+    escrever("Quantas despesas? ")
+    ler(n)
+
+    despesas:decimal[n]
+    i:inteiro
+    totalDespesas:decimal = 0.0
+    para i de 0 ate n - 1 fazer
+        escrever("Despesa ", i + 1, ": ")
+        ler(despesas[i])
+        totalDespesas = totalDespesas + despesas[i]
+
+    saldo:decimal = rendimento - totalDespesas
+
+    escrever("Total de despesas: ", totalDespesas)
+    se saldo < 0.0 entao
+        escrever("Atenção! Saldo negativo: ", saldo)
+    senao
+        escrever("Saldo restante: ", saldo)

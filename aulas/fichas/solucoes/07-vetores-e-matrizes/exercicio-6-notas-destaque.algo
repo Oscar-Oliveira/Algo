@@ -1,0 +1,25 @@
+algoritmo "NotasComDestaque"
+
+inicio
+    n:inteiro
+    escrever("Quantos alunos? ")
+    ler(n)
+
+    nomes:cadeia[n]
+    notas:decimal[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nome: ")
+        ler(nomes[i])
+        escrever("Nota: ")
+        ler(notas[i])
+
+    soma:decimal = 0.0
+    indiceMelhor:inteiro = 0
+    para i de 0 ate n - 1 fazer
+        soma = soma + notas[i]
+        se notas[i] > notas[indiceMelhor] entao
+            indiceMelhor = i
+
+    escrever("Média: ", soma / n)
+    escrever("Melhor aluno: ", nomes[indiceMelhor], " com ", notas[indiceMelhor])

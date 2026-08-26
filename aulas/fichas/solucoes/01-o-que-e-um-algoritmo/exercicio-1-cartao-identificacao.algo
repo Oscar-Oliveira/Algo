@@ -1,0 +1,7 @@
+algoritmo "CartaoIdentificacao"
+
+// Mostra três informações fixas sobre mim, sem pedir nada ao utilizador.
+inicio
+    escrever("Nome: Ana Silva")
+    escrever("Idade: 15")
+    escrever("Cidade: Braga")

@@ -1,0 +1,12 @@
+algoritmo "VetorDeCompras"
+
+inicio
+    itens:cadeia[5]
+    i:inteiro
+    para i de 0 ate 4 fazer
+        escrever("Item ", i + 1, ": ")
+        ler(itens[i])
+
+    escrever("Lista de compras:")
+    para i de 0 ate 4 fazer
+        escrever("- ", itens[i])

@@ -1,0 +1,23 @@
+digraph EstruturaCopia {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+    edge [fontname="Segoe UI,Arial", fontsize=13, color="#555555"];
+
+    antes [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="10">
+            <tr><td colspan="2" bgcolor="#1a5fb4"><font color="white"><b>antes: b = a</b></font></td></tr>
+            <tr><td bgcolor="#e3f2fd"><b>a.x, a.y</b></td><td>1, 2</td></tr>
+            <tr><td bgcolor="#e3f2fd"><b>b.x, b.y</b></td><td>1, 2 (cópia)</td></tr>
+        </table>
+    >];
+
+    depois [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="10">
+            <tr><td colspan="2" bgcolor="#1a5fb4"><font color="white"><b>depois</b></font></td></tr>
+            <tr><td bgcolor="#e3f2fd"><b>a.x, a.y</b></td><td>1, 2</td></tr>
+            <tr><td bgcolor="#fff3e0"><b>b.x, b.y</b></td><td>99, 2</td></tr>
+        </table>
+    >];
+
+    antes -> depois [label="  b.x = 99  "];
+}

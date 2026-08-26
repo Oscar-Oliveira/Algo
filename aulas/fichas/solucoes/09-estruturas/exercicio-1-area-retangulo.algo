@@ -1,0 +1,17 @@
+algoritmo "AreaRetangulo"
+
+estrutura Retangulo
+    largura:decimal
+    altura:decimal
+
+inicio
+    l:decimal
+    escrever("Largura: ")
+    ler(l)
+
+    a:decimal
+    escrever("Altura: ")
+    ler(a)
+
+    r:Retangulo = {largura: l, altura: a}
+    escrever("Área: ", r.largura * r.altura)

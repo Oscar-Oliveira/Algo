@@ -1,0 +1,16 @@
+algoritmo "IdadeAnimalEstimacao"
+
+constante ANO_ATUAL:inteiro = 2026
+
+inicio
+    nome:cadeia
+    escrever("Nome do animal: ")
+    ler(nome)
+
+    anoNascimento:inteiro
+    escrever("Ano de nascimento: ")
+    ler(anoNascimento)
+
+    idade:inteiro = ANO_ATUAL - anoNascimento
+
+    escrever(nome, " tem ", idade, " anos.")

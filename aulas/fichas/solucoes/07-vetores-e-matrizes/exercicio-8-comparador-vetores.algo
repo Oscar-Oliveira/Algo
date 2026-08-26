@@ -1,0 +1,13 @@
+algoritmo "ComparadorVetores"
+
+inicio
+    a:inteiro[4] = {1, 5, 3, 8}
+    b:inteiro[4] = {1, 2, 3, 9}
+
+    iguais:inteiro = 0
+    i:inteiro
+    para i de 0 ate 3 fazer
+        se a[i] == b[i] entao
+            iguais = iguais + 1
+
+    escrever("Posições iguais: ", iguais)

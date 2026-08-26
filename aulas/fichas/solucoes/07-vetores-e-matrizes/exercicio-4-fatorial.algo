@@ -1,0 +1,13 @@
+algoritmo "Fatorial"
+
+inicio
+    n:inteiro
+    escrever("Número: ")
+    ler(n)
+
+    fatorial:inteiro = 1
+    i:inteiro
+    para i de 1 ate n fazer
+        fatorial = fatorial * i
+
+    escrever(n, "! = ", fatorial)

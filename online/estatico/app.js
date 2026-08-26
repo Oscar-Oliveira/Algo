@@ -691,6 +691,7 @@ const vistaRasto = document.getElementById("vista-rasto");
 const vistaFluxograma = document.getElementById("vista-fluxograma");
 const vistaLinter = document.getElementById("vista-linter");
 const tituloPainelExecucao = document.getElementById("titulo-painel-execucao");
+const seletorRotinaFluxograma = document.getElementById("seletor-rotina-fluxograma");
 const botaoVoltarExecucao = document.getElementById("botao-voltar-execucao");
 const ligacaoAbrirVisualizador = document.getElementById("ligacao-abrir-visualizador");
 
@@ -702,6 +703,7 @@ function mostrarVistaPainelTerminal(nome) {
   vistaFluxograma.classList.toggle("escondido", nome !== "fluxograma");
   vistaLinter.classList.toggle("escondido", nome !== "linter");
   tituloPainelExecucao.textContent = TITULOS_VISTA_PAINEL_TERMINAL[nome];
+  seletorRotinaFluxograma.classList.toggle("escondido", nome !== "fluxograma");
   botaoVoltarExecucao.classList.toggle("escondido", nome === "execucao");
   ligacaoAbrirVisualizador.classList.toggle("escondido", nome !== "rasto");
   atualizarBotaoDescarregarRastoExecucao();

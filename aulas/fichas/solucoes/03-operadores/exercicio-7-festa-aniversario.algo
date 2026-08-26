@@ -1,0 +1,27 @@
+algoritmo "FestaAniversario"
+
+inicio
+    orcamentoTotal:decimal
+    escrever("Orçamento total: ")
+    ler(orcamentoTotal)
+
+    numConvidados:inteiro
+    escrever("Número de convidados: ")
+    ler(numConvidados)
+
+    custoPorConvidado:decimal = orcamentoTotal / numConvidados
+
+    numBaloes:inteiro
+    escrever("Número de balões: ")
+    ler(numBaloes)
+
+    numCriancas:inteiro
+    escrever("Número de crianças: ")
+    ler(numCriancas)
+
+    baloesPorCrianca:inteiro = numBaloes div numCriancas
+    sobraBaloes:inteiro = numBaloes mod numCriancas
+
+    escrever("Custo por convidado: ", custoPorConvidado)
+    escrever("Balões por criança: ", baloesPorCrianca)
+    escrever("Balões que sobram: ", sobraBaloes)

@@ -1,0 +1,23 @@
+algoritmo "CompararPontos"
+
+estrutura Ponto
+    x:inteiro
+    y:inteiro
+
+inicio
+    p1:Ponto
+    escrever("x1: ")
+    ler(p1.x)
+    escrever("y1: ")
+    ler(p1.y)
+
+    p2:Ponto
+    escrever("x2: ")
+    ler(p2.x)
+    escrever("y2: ")
+    ler(p2.y)
+
+    se p1 == p2 entao
+        escrever("Os pontos são iguais")
+    senao
+        escrever("Os pontos são diferentes")

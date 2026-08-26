@@ -1,0 +1,34 @@
+algoritmo "SimuladorCorrida"
+
+importar Matematica
+
+estrutura Corredor
+    nome:cadeia
+    posicao:inteiro
+
+constante DISTANCIA_META:inteiro = 50
+
+inicio
+    n:inteiro
+    escrever("Quantos corredores? ")
+    ler(n)
+
+    corredores:Corredor[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nome do corredor: ")
+        ler(corredores[i].nome)
+        corredores[i].posicao = 0
+
+    vencedor:inteiro = -1
+    volta:inteiro = 0
+
+    enquanto vencedor == -1 fazer
+        volta = volta + 1
+        para i de 0 ate n - 1 fazer
+            avanco:inteiro = matematica.aleatorio(1, 10)
+            corredores[i].posicao = corredores[i].posicao + avanco
+            se corredores[i].posicao >= DISTANCIA_META e vencedor == -1 entao
+                vencedor = i
+
+    escrever("Vencedor: ", corredores[vencedor].nome, " na volta ", volta)

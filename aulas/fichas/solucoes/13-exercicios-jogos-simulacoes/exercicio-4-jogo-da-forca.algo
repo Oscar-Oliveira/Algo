@@ -1,0 +1,47 @@
+algoritmo "JogoDaForca"
+
+importar Cadeia
+
+constante MAX_ERROS:inteiro = 6
+
+inicio
+    palavraSecreta:cadeia = "algo"
+    tamanho:inteiro = cadeia.comprimento(palavraSecreta)
+
+    progresso:caracter[tamanho]
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        progresso[i] = '_'
+
+    erros:inteiro = 0
+    acertou:booleano = falso
+
+    enquanto erros < MAX_ERROS e nao acertou fazer
+        mostrar:cadeia = ""
+        para i de 0 ate tamanho - 1 fazer
+            mostrar = mostrar + progresso[i]
+        escrever("Palavra: ", mostrar)
+
+        letra:caracter
+        escrever("Adivinha uma letra: ")
+        ler(letra)
+
+        encontrou:booleano = falso
+        para i de 0 ate tamanho - 1 fazer
+            se cadeia.caracter(palavraSecreta, i) == letra entao
+                progresso[i] = letra
+                encontrou = verdadeiro
+
+        se nao encontrou entao
+            erros = erros + 1
+            escrever("Letra errada! Erros: ", erros)
+
+        acertou = verdadeiro
+        para i de 0 ate tamanho - 1 fazer
+            se progresso[i] == '_' entao
+                acertou = falso
+
+    se acertou entao
+        escrever("Ganhaste! A palavra era: ", palavraSecreta)
+    senao
+        escrever("Perdeste! A palavra era: ", palavraSecreta)

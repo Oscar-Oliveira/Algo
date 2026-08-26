@@ -1,0 +1,30 @@
+algoritmo "CatalogoDeFilmes"
+
+estrutura Filme
+    titulo:cadeia
+    ano:inteiro
+    visto:booleano
+
+funcao contarVistos(filmes:Filme[], tamanho:inteiro):inteiro
+    total:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se filmes[i].visto entao
+            total = total + 1
+    retornar total
+
+inicio
+    filmes:Filme[3]
+    i:inteiro
+    para i de 0 ate 2 fazer
+        escrever("Título: ")
+        ler(filmes[i].titulo)
+        escrever("Ano: ")
+        ler(filmes[i].ano)
+        escrever("Já viste? (verdadeiro/falso): ")
+        ler(filmes[i].visto)
+
+    para i de 0 ate 2 fazer
+        escrever(filmes[i].titulo, " (", filmes[i].ano, ")")
+
+    escrever("Vistos: ", contarVistos(filmes, 3))

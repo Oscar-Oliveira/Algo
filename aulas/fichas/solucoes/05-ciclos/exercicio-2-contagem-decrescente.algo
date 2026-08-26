@@ -1,0 +1,12 @@
+algoritmo "ContagemDecrescente"
+
+inicio
+    segundos:inteiro
+    escrever("Segundos: ")
+    ler(segundos)
+
+    enquanto segundos > 0 fazer
+        escrever(segundos)
+        segundos = segundos - 1
+
+    escrever("Descolagem!")

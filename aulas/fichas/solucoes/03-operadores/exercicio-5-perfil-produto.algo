@@ -1,0 +1,14 @@
+algoritmo "PerfilProduto"
+
+inicio
+    nome:cadeia = "Cadeira de Escritório"
+    preco:decimal = 89.90
+    stock:inteiro = 12
+    disponivel:booleano = verdadeiro
+    categoria:caracter = 'M'
+
+    escrever("Nome: ", nome)
+    escrever("Preço: ", preco)
+    escrever("Stock: ", stock)
+    escrever("Disponível: ", disponivel)
+    escrever("Categoria: ", categoria)

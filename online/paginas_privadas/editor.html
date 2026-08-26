@@ -15,20 +15,21 @@
     <a href="/editor" class="marca marca-pequena" title="Reiniciar o editor"><img src="/estatico/algo-logo.svg" alt=""
         class="marca-simbolo"> Algo</a>
     <div class="acoes-topo">
-      <a id="botao-admin" href="/admin" target="algo-admin" class="botao-icone escondido" title="Painel de admin"><svg class="icone-botao"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-          stroke-linejoin="round">
+      <a id="botao-admin" href="/admin" target="algo-admin" class="botao-icone escondido" title="Painel de admin"><svg
+          class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6z" />
         </svg></a>
-      <button id="botao-ajuda" type="button" class="botao-icone" title="Ajuda"><svg class="icone-botao" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <button id="botao-ajuda" type="button" class="botao-icone" title="Ajuda"><svg class="icone-botao"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
           <circle cx="12" cy="12" r="10" />
           <path d="M9.1 9a2.9 2.9 0 0 1 5.7.9c0 1.9-2.4 2.1-2.7 3.6" />
           <line x1="12" y1="17.2" x2="12" y2="17.3" />
         </svg></button>
-      <button id="botao-reportar" type="button" class="botao-icone" title="Reportar um problema"><svg class="icone-botao"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-          stroke-linejoin="round">
+      <button id="botao-reportar" type="button" class="botao-icone" title="Reportar um problema"><svg
+          class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 9v4" />
           <path d="M10.3 3.9 1.8 18.5a1.8 1.8 0 0 0 1.6 2.7h17.2a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" />
           <line x1="12" y1="16.3" x2="12" y2="16.4" />
@@ -107,8 +108,8 @@
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg></button>
         <button id="botao-tema" type="button" class="botao-icone botao-icone-pequeno" title="Alternar tema"><svg
-            class="icone-botao icone-tema-escuro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round">
+            class="icone-botao icone-tema-escuro" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="4.5" />
             <line x1="12" y1="1.5" x2="12" y2="3.5" />
             <line x1="12" y1="20.5" x2="12" y2="22.5" />
@@ -130,11 +131,16 @@
 
     <section class="painel painel-terminal">
       <div class="painel-cabecalho">
-        <span id="titulo-painel-execucao">Execução</span>
+        <div class="titulo-painel-terminal">
+          <span id="titulo-painel-execucao">Execução</span>
+          <label id="seletor-rotina-fluxograma" class="seletor-rotina escondido">
+            <select id="campo-rotina-fluxograma" aria-label="Ver fluxograma de"></select>
+          </label>
+        </div>
         <div class="acoes-codigo">
           <button id="botao-descarregar-rasto-execucao" class="botao-icone escondido"
-            title="Gerar e descarregar o rasto desta execução"><svg class="icone-botao" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            title="Gerar e descarregar o rasto desta execução"><svg class="icone-botao" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
@@ -185,9 +191,6 @@
       </div>
 
       <div id="vista-fluxograma" class="vista-fluxograma escondido">
-        <label class="seletor-rotina">Ver fluxograma de:
-          <select id="campo-rotina-fluxograma"></select>
-        </label>
         <div id="conteudo-fluxograma" class="conteudo-fluxograma"></div>
       </div>
 

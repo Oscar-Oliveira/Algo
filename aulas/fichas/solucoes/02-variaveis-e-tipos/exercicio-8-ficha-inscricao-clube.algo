@@ -1,0 +1,34 @@
+algoritmo "FichaInscricaoClube"
+
+constante ANO_ATUAL:inteiro = 2026
+constante QUOTA_MENSAL:decimal = 15.0
+
+inicio
+    nome:cadeia
+    escrever("Nome completo: ")
+    ler(nome)
+
+    inicialCracha:caracter
+    escrever("Inicial para o crachá: ")
+    ler(inicialCracha)
+
+    anoNascimento:inteiro
+    escrever("Ano de nascimento: ")
+    ler(anoNascimento)
+
+    praticaDesporto:booleano
+    escrever("Já praticaste algum desporto? (verdadeiro/falso): ")
+    ler(praticaDesporto)
+
+    alturaMetros:decimal
+    escrever("Altura (em metros, ex. 1.70): ")
+    ler(alturaMetros)
+
+    idadeAproximada:inteiro = ANO_ATUAL - anoNascimento
+    cracha:cadeia = inicialCracha + ". " + nome
+
+    escrever("Crachá: ", cracha)
+    escrever("Idade aproximada: ", idadeAproximada)
+    escrever("Já praticou desporto: ", praticaDesporto)
+    escrever("Altura: ", alturaMetros, "m")
+    escrever("Quota mensal: ", QUOTA_MENSAL)

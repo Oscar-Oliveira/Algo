@@ -1,0 +1,10 @@
+algoritmo "TabuadaDeUmNumero"
+
+inicio
+    numero:inteiro
+    escrever("Número: ")
+    ler(numero)
+
+    i:inteiro
+    para i de 1 ate 10 fazer
+        escrever(numero, " x ", i, " = ", numero * i)

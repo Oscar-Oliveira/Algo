@@ -1,0 +1,35 @@
+algoritmo "InventarioStockBaixo"
+
+estrutura Produto
+    nome:cadeia
+    stock:inteiro
+
+constante STOCK_MINIMO:inteiro = 5
+
+funcao contarStockBaixo(produtos:Produto[], tamanho:inteiro):inteiro
+    total:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se produtos[i].stock < STOCK_MINIMO entao
+            total = total + 1
+    retornar total
+
+inicio
+    n:inteiro
+    escrever("Quantos produtos? ")
+    ler(n)
+
+    produtos:Produto[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Nome: ")
+        ler(produtos[i].nome)
+        escrever("Stock: ")
+        ler(produtos[i].stock)
+
+    escrever("-- Produtos com stock baixo --")
+    para i de 0 ate n - 1 fazer
+        se produtos[i].stock < STOCK_MINIMO entao
+            escrever(produtos[i].nome, ": ", produtos[i].stock)
+
+    escrever("Total com stock baixo: ", contarStockBaixo(produtos, n))

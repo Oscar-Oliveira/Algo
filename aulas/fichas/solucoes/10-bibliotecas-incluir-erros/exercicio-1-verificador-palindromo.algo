@@ -1,0 +1,16 @@
+algoritmo "VerificadorPalindromo"
+
+importar Cadeia
+
+inicio
+    palavra:cadeia
+    escrever("Palavra: ")
+    ler(palavra)
+
+    minuscula:cadeia = cadeia.minusculas(palavra)
+    invertida:cadeia = cadeia.inverter(minuscula)
+
+    se minuscula == invertida entao
+        escrever("É um palíndromo!")
+    senao
+        escrever("Não é um palíndromo.")

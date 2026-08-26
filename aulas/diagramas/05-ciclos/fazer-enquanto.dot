@@ -1,0 +1,16 @@
+digraph FazerEnquanto {
+    rankdir=TB;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=18, style=filled];
+    edge [fontname="Segoe UI,Arial", fontsize=14, color="#555555"];
+
+    inicio [shape=ellipse, label="Início", fillcolor="#e8f5e9", color="#66bb6a"];
+    corpo  [shape=box, label="ler(numero)", fillcolor="#e3f2fd", color="#42a5f5"];
+    cond   [shape=diamond, label="numero <= 0 ?", fillcolor="#fff8e1", color="#f9a825"];
+    fim    [shape=ellipse, label="Fim", fillcolor="#ffebee", color="#ef5350"];
+
+    inicio -> corpo;
+    corpo -> cond;
+    cond -> corpo [label="verdadeiro\n(repete)"];
+    cond -> fim [label="falso\n(sai)"];
+}

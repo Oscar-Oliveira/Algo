@@ -1,0 +1,14 @@
+algoritmo "AumentarRaio"
+
+estrutura Circulo
+    centroX:decimal
+    centroY:decimal
+    raio:decimal
+
+procedimento aumentarRaio(ref c:Circulo, incremento:decimal)
+    c.raio = c.raio + incremento
+
+inicio
+    c:Circulo = {centroX: 0.0, centroY: 0.0, raio: 5.0}
+    aumentarRaio(c, 2.5)
+    escrever("Novo raio: ", c.raio)

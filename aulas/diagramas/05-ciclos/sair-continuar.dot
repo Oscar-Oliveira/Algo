@@ -1,0 +1,24 @@
+digraph SairContinuar {
+    rankdir=TB;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=16, style=filled];
+    edge [fontname="Segoe UI,Arial", fontsize=13, color="#555555"];
+
+    inicio [shape=ellipse, label="Início", fillcolor="#e8f5e9", color="#66bb6a"];
+    cond   [shape=diamond, label="i <= 20 ?", fillcolor="#fff8e1", color="#f9a825"];
+    c1     [shape=diamond, label="i é ímpar ?", fillcolor="#fff3e0", color="#f9a825"];
+    c2     [shape=diamond, label="i > 10 ?", fillcolor="#fff3e0", color="#f9a825"];
+    corpo  [shape=box, label="escrever(i)", fillcolor="#e3f2fd", color="#42a5f5"];
+    incr   [shape=box, label="i = i + 1", fillcolor="#e3f2fd", color="#42a5f5"];
+    fim    [shape=ellipse, label="Fim", fillcolor="#ffebee", color="#ef5350"];
+
+    inicio -> cond;
+    cond -> c1 [label="verdadeiro"];
+    cond -> fim [label="falso"];
+    c1 -> incr [label="verdadeiro\ncontinuar", color="#e65100", fontcolor="#e65100"];
+    c1 -> c2 [label="falso"];
+    c2 -> fim [label="verdadeiro\nsair", color="#c62828", fontcolor="#c62828"];
+    c2 -> corpo [label="falso"];
+    corpo -> incr;
+    incr -> cond;
+}

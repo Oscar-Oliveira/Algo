@@ -1,0 +1,15 @@
+algoritmo "CalculadoraTroco"
+
+inicio
+    preco:decimal
+    escrever("Preço: ")
+    ler(preco)
+
+    pago:decimal
+    escrever("Valor pago: ")
+    ler(pago)
+
+    se pago >= preco entao
+        escrever("Troco: ", pago - preco)
+    senao
+        escrever("Valor insuficiente. Faltam: ", preco - pago)

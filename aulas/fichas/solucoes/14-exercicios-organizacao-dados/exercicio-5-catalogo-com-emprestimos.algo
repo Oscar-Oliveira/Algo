@@ -1,0 +1,34 @@
+algoritmo "CatalogoComEmprestimos"
+
+estrutura Livro
+    titulo:cadeia
+    emprestado:booleano
+
+procedimento emprestar(ref livro:Livro)
+    afirmar nao livro.emprestado, "o livro já está emprestado"
+    livro.emprestado = verdadeiro
+
+procedimento devolver(ref livro:Livro)
+    afirmar livro.emprestado, "o livro não estava emprestado"
+    livro.emprestado = falso
+
+inicio
+    n:inteiro
+    escrever("Quantos livros? ")
+    ler(n)
+
+    livros:Livro[n]
+    i:inteiro
+    para i de 0 ate n - 1 fazer
+        escrever("Título: ")
+        ler(livros[i].titulo)
+        livros[i].emprestado = falso
+
+    emprestar(livros[0])
+
+    escrever("-- Catálogo --")
+    para i de 0 ate n - 1 fazer
+        estado:cadeia = "disponível"
+        se livros[i].emprestado entao
+            estado = "emprestado"
+        escrever(livros[i].titulo, ": ", estado)

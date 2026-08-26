@@ -1,0 +1,18 @@
+algoritmo "ClassificadorNotas"
+
+inicio
+    n1:decimal
+    n2:decimal
+    n3:decimal
+    escrever("Nota 1: ")
+    ler(n1)
+    escrever("Nota 2: ")
+    ler(n2)
+    escrever("Nota 3: ")
+    ler(n3)
+
+    media:decimal = (n1 + n2 + n3) / 3
+    aprovado:booleano = media >= 9.5 e n1 >= 5.0 e n2 >= 5.0 e n3 >= 5.0
+
+    escrever("Média: ", media)
+    escrever("Aprovado: ", aprovado)

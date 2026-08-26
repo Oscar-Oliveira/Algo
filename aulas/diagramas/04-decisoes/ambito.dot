@@ -1,0 +1,25 @@
+digraph Ambito {
+    rankdir=TB;
+    bgcolor="transparent";
+    compound=true;
+    node [fontname="Segoe UI,Arial", fontsize=15, style=filled, shape=box];
+    edge [style=invis];
+
+    subgraph cluster_programa {
+        label="programa principal";
+        fontsize=17; style=filled; fillcolor="#f5f5f5"; color="#999999";
+
+        antes [label="idade:inteiro = 20\nestado:cadeia", fillcolor="#e8f5e9", color="#66bb6a"];
+
+        subgraph cluster_se {
+            label="dentro do 'se'";
+            fontsize=15; style=filled; fillcolor="#fff8e1"; color="#f9a825";
+            dentro [label="estado = \"adulto\"", fillcolor="#e3f2fd", color="#42a5f5"];
+        }
+
+        depois [label="escrever(estado)\nfunciona! 'estado' foi\ndeclarada antes do 'se'", fillcolor="#e8f5e9", color="#66bb6a"];
+
+        antes -> dentro [lhead=cluster_se, style=solid, color="#555555"];
+        dentro -> depois [ltail=cluster_se, style=solid, color="#555555"];
+    }
+}

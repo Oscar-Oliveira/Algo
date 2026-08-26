@@ -1,0 +1,14 @@
+algoritmo "SomaDosPares"
+
+inicio
+    n:inteiro
+    escrever("Até: ")
+    ler(n)
+
+    soma:inteiro = 0
+    i:inteiro
+    para i de 1 ate n fazer
+        se i mod 2 == 0 entao
+            soma = soma + i
+
+    escrever("Soma dos pares: ", soma)
