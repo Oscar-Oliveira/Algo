@@ -1691,9 +1691,9 @@ def test_incluir_funciona_de_ponta_a_ponta(tmp_path):
         encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
-        'incluir "geometria.algo"\n'
+        'incluir "geometria.algo" como geometria\n'
         "inicio\n"
-        "    escrever(areaCirculo(2.0))\n",
+        "    escrever(geometria.areaCirculo(2.0))\n",
         encoding="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
@@ -1705,7 +1705,7 @@ def test_incluir_funciona_de_ponta_a_ponta(tmp_path):
 def test_incluir_ficheiro_inexistente_da_erro(tmp_path):
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
-        'incluir "naoexiste.algo"\n'
+        'incluir "naoexiste.algo" como lib\n'
         "inicio\n"
         "    escrever(1)\n",
         encoding="utf-8")
@@ -1722,7 +1722,7 @@ def test_incluir_estrutura_duplicada_da_erro(tmp_path):
         "estrutura Ponto\n    x:inteiro\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
-        'incluir "lib.algo"\n'
+        'incluir "lib.algo" como lib\n'
         "estrutura Ponto\n    y:inteiro\n"
         "inicio\n"
         "    escrever(1)\n",
@@ -1736,14 +1736,18 @@ def test_incluir_estrutura_duplicada_da_erro(tmp_path):
 
 
 def test_incluir_funcao_duplicada_da_erro(tmp_path):
+    """Com alias obrigatório, o nome de uma função incluída é sempre
+    mangled para '{alias}_{nome}' -- só colide se esse nome mangled já
+    existir no programa principal (aqui, escrito à mão para bater
+    certo: 'lib_f')."""
     (tmp_path / "lib.algo").write_text(
         "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
-        'incluir "lib.algo"\n'
-        "funcao f():inteiro\n    retornar 2\n"
+        'incluir "lib.algo" como lib\n'
+        "funcao lib_f():inteiro\n    retornar 2\n"
         "inicio\n"
-        "    escrever(f())\n",
+        "    escrever(lib_f())\n",
         encoding="utf-8")
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
     resultado = subprocess.run(
@@ -1758,7 +1762,7 @@ def test_incluir_variavel_global_duplicada_da_erro(tmp_path):
         "total:inteiro = 0\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
-        'incluir "lib.algo"\n'
+        'incluir "lib.algo" como lib\n'
         "total:inteiro = 1\n"
         "inicio\n"
         "    escrever(total)\n",
@@ -1776,7 +1780,7 @@ def test_incluir_constante(tmp_path):
         "constante PI:decimal = 3.14\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
-        'incluir "lib.algo"\n'
+        'incluir "lib.algo" como lib\n'
         "inicio\n"
         "    escrever(PI)\n",
         encoding="utf-8")
@@ -1787,7 +1791,7 @@ def test_incluir_constante(tmp_path):
     assert "3.14" in resultado.stdout
 
 
-# ---------- 'incluir ... como <alias>' -- namespace opcional ----------
+# ---------- 'incluir ... como <alias>' -- namespace ----------
 
 def test_incluir_com_alias_chama_funcao_qualificada(tmp_path):
     (tmp_path / "geometria.algo").write_text(
@@ -1937,7 +1941,7 @@ def test_incluir_mesmo_ficheiro_duas_vezes_com_mesmo_alias_continua_a_funcionar(
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
         'incluir "lib.algo" como m\n'
-        'incluir "a.algo"\n'
+        'incluir "a.algo" como x\n'
         "inicio\n"
         "    escrever(m.f())\n",
         encoding="utf-8")
@@ -2492,14 +2496,15 @@ def test_incluir_transitivo_resolve_biblioteca_que_inclui_outra(tmp_path):
     (tmp_path / "fundo.algo").write_text(
         "funcao triplo(n:inteiro):inteiro\n    retornar n * 3\n", encoding="utf-8")
     (tmp_path / "meio.algo").write_text(
-        'incluir "fundo.algo"\nfuncao dobro(n:inteiro):inteiro\n    retornar n * 2\n',
+        'incluir "fundo.algo" como fundo\nfuncao dobro(n:inteiro):inteiro\n    retornar n * 2\n',
         encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
-        'algoritmo "T"\nincluir "meio.algo"\ninicio\n    escrever(dobro(triplo(5)))\n',
+        'algoritmo "T"\nincluir "meio.algo" como meio\ninicio\n'
+        '    escrever(meio.dobro(fundo.triplo(5)))\n',
         encoding="utf-8")
     programa = _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
     nomes = {f.nome for f in programa.funcoes}
-    assert nomes == {"dobro", "triplo"}
+    assert nomes == {"meio_dobro", "fundo_triplo"}
 
 
 def test_incluir_transitivo_circular_nao_entra_em_ciclo_infinito(tmp_path):
@@ -2508,15 +2513,16 @@ def test_incluir_transitivo_circular_nao_entra_em_ciclo_infinito(tmp_path):
     recursão infinita."""
     from algo_lang.cli import _carregar_e_resolver_inclusoes
     (tmp_path / "a.algo").write_text(
-        'incluir "b.algo"\nfuncao fA():inteiro\n    retornar 1\n', encoding="utf-8")
+        'incluir "b.algo" como b\nfuncao fA():inteiro\n    retornar 1\n', encoding="utf-8")
     (tmp_path / "b.algo").write_text(
-        'incluir "a.algo"\nfuncao fB():inteiro\n    retornar 2\n', encoding="utf-8")
+        'incluir "a.algo" como a\nfuncao fB():inteiro\n    retornar 2\n', encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
-        'algoritmo "T"\nincluir "a.algo"\ninicio\n    escrever(fA() + fB())\n',
+        'algoritmo "T"\nincluir "a.algo" como a\ninicio\n'
+        '    escrever(a.fA() + b.fB())\n',
         encoding="utf-8")
     programa = _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
     nomes = {f.nome for f in programa.funcoes}
-    assert nomes == {"fA", "fB"}
+    assert nomes == {"a_fA", "b_fB"}
 
 
 def test_incluir_transitivo_diamante_nao_duplica(tmp_path):
@@ -2525,14 +2531,15 @@ def test_incluir_transitivo_diamante_nao_duplica(tmp_path):
     from algo_lang.cli import _carregar_e_resolver_inclusoes
     (tmp_path / "comum.algo").write_text(
         "funcao fComum():inteiro\n    retornar 42\n", encoding="utf-8")
-    (tmp_path / "b.algo").write_text('incluir "comum.algo"\n', encoding="utf-8")
-    (tmp_path / "c.algo").write_text('incluir "comum.algo"\n', encoding="utf-8")
+    (tmp_path / "b.algo").write_text('incluir "comum.algo" como comum\n', encoding="utf-8")
+    (tmp_path / "c.algo").write_text('incluir "comum.algo" como comum\n', encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
-        'algoritmo "T"\nincluir "b.algo"\nincluir "c.algo"\ninicio\n    escrever(fComum())\n',
+        'algoritmo "T"\nincluir "b.algo" como b\nincluir "c.algo" como c\ninicio\n'
+        '    escrever(comum.fComum())\n',
         encoding="utf-8")
     programa = _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
     nomes = [f.nome for f in programa.funcoes]
-    assert nomes == ["fComum"]
+    assert nomes == ["comum_fComum"]
 
 
 # ---------- AUDIT_PLAN Fase 2: AL-16 -- literais {...} como expressões gerais ----------
@@ -2707,10 +2714,10 @@ def test_incluir_o_mesmo_ficheiro_duas_vezes_nao_da_erro(tmp_path):
         "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "T"\n'
-        'incluir "lib.algo"\n'
-        'incluir "lib.algo"\n'
+        'incluir "lib.algo" como lib\n'
+        'incluir "lib.algo" como lib\n'
         "inicio\n"
-        "    escrever(f())\n",
+        "    escrever(lib.f())\n",
         encoding="utf-8")
     resultado = subprocess.run(
         ["algo", "executa", str(tmp_path / "principal.algo")],
@@ -2932,6 +2939,7 @@ def test_mesclar_biblioteca_deteta_colisao_de_cada_tipo():
             self.estruturas = []
             self.funcoes = []
             self.declaracoes = []
+            self.aliases_inclusao = {}
 
     class NoComNome:
         def __init__(self, nome):
@@ -2940,28 +2948,34 @@ def test_mesclar_biblioteca_deteta_colisao_de_cada_tipo():
     programa = ProgramaFalso()
     programa.estruturas.append(NoComNome("Ponto"))
     with pytest.raises(ColisaoDeInclusao) as exc_info:
-        mesclar_biblioteca_no_programa(programa, "lib.algo", [], [], [NoComNome("Ponto")])
+        mesclar_biblioteca_no_programa(programa, "lib.algo", [], [], [NoComNome("Ponto")], alias="lib")
     assert exc_info.value.tipo == "estrutura"
     assert exc_info.value.nome == "Ponto"
     assert exc_info.value.caminho_origem == "lib.algo"
 
+    # o nome da função já existente tem de ser o MANGLED ('lib_f'), já
+    # que 'f' incluída com 'alias="lib"' só pode colidir depois de
+    # renomeada -- o alias é sempre obrigatório, por isso já não há
+    # forma de uma função incluída colidir com o nome ORIGINAL 'f'.
     programa = ProgramaFalso()
-    programa.funcoes.append(NoComNome("f"))
+    programa.funcoes.append(NoComNome("lib_f"))
     with pytest.raises(ColisaoDeInclusao) as exc_info:
-        mesclar_biblioteca_no_programa(programa, "lib.algo", [], [NoComNome("f")], [])
+        mesclar_biblioteca_no_programa(programa, "lib.algo", [], [NoComNome("f")], [], alias="lib")
     assert exc_info.value.tipo == "função"
 
     programa = ProgramaFalso()
     programa.declaracoes.append(NoComNome("x"))
     with pytest.raises(ColisaoDeInclusao) as exc_info:
-        mesclar_biblioteca_no_programa(programa, "lib.algo", [NoComNome("x")], [], [])
+        mesclar_biblioteca_no_programa(programa, "lib.algo", [NoComNome("x")], [], [], alias="lib")
     assert exc_info.value.tipo == "variável global"
 
-    # sem colisão: acrescenta normalmente
+    # sem colisão: acrescenta normalmente ('b' fica mangled para 'lib_b';
+    # estrutura/variável global continuam planas, sem prefixo)
     programa = ProgramaFalso()
-    mesclar_biblioteca_no_programa(programa, "lib.algo", [NoComNome("a")], [NoComNome("b")], [NoComNome("C")])
+    mesclar_biblioteca_no_programa(
+        programa, "lib.algo", [NoComNome("a")], [NoComNome("b")], [NoComNome("C")], alias="lib")
     assert [e.nome for e in programa.estruturas] == ["C"]
-    assert [f.nome for f in programa.funcoes] == ["b"]
+    assert [f.nome for f in programa.funcoes] == ["lib_b"]
     assert [d.nome for d in programa.declaracoes] == ["a"]
 
 
@@ -2979,7 +2993,7 @@ def test_cli_e_online_produzem_a_mesma_mensagem_de_colisao_de_sempre():
         f.write("estrutura Ponto\n    x:inteiro\n")
     with open(os.path.join(d, "principal.algo"), "w", encoding="utf-8") as f:
         f.write(
-            'algoritmo "Principal"\nincluir "lib.algo"\n'
+            'algoritmo "Principal"\nincluir "lib.algo" como lib\n'
             "estrutura Ponto\n    y:inteiro\ninicio\n    escrever(1)\n"
         )
 
@@ -3764,10 +3778,10 @@ def test_incluir_o_mesmo_ficheiro_com_capitalizacao_diferente_nao_colide(tmp_pat
     principal = tmp_path / "principal.algo"
     principal.write_text(textwrap.dedent("""\
         algoritmo "T"
-        incluir "lib.algo"
-        incluir "LIB.algo"
+        incluir "lib.algo" como lib
+        incluir "LIB.algo" como lib
         inicio
-            escrever(dobro(3))
+            escrever(lib.dobro(3))
     """), encoding="utf-8")
     programa = _carregar_e_verificar(str(principal))
     assert len(programa.funcoes) == 1
@@ -5302,9 +5316,12 @@ def test_inclusao_com_colisao_entre_categorias_diferentes_e_detetada():
     genérica, em semantics.py."""
     from algo_lang.compilador.parser import parse_biblioteca
     from algo_lang.compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
+    # o nome pré-existente já tem de ser o MANGLED ('lib_Ponto'), já que
+    # a função incluída 'Ponto' só colide depois de renomeada -- ver a
+    # mesma nota em test_mesclar_biblioteca_deteta_colisao_de_cada_tipo.
     programa = parse(textwrap.dedent("""
         algoritmo "T"
-        estrutura Ponto
+        estrutura lib_Ponto
             x:inteiro
         inicio
             escrever(1)
@@ -5312,7 +5329,7 @@ def test_inclusao_com_colisao_entre_categorias_diferentes_e_detetada():
     declaracoes, funcoes, estruturas, _inclusoes = parse_biblioteca(
         "funcao Ponto():inteiro\n    retornar 1\n")
     with pytest.raises(ColisaoDeInclusao) as exc:
-        mesclar_biblioteca_no_programa(programa, "lib.algo", declaracoes, funcoes, estruturas)
+        mesclar_biblioteca_no_programa(programa, "lib.algo", declaracoes, funcoes, estruturas, alias="lib")
     assert exc.value.tipo == "função"
     assert exc.value.tipo_existente == "estrutura"
 
@@ -5322,17 +5339,18 @@ def test_inclusao_com_colisao_na_mesma_categoria_continua_igual():
     comportamento com a deteção de colisão entre categorias."""
     from algo_lang.compilador.parser import parse_biblioteca
     from algo_lang.compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
+    # mesma nota: o nome pré-existente tem de já ser o mangled ('lib_f').
     programa = parse(textwrap.dedent("""
         algoritmo "T"
-        funcao f(): inteiro
+        funcao lib_f(): inteiro
             retornar 1
         inicio
-            escrever(f())
+            escrever(lib_f())
     """))
     declaracoes, funcoes, estruturas, _inclusoes = parse_biblioteca(
         "funcao f():inteiro\n    retornar 2\n")
     with pytest.raises(ColisaoDeInclusao) as exc:
-        mesclar_biblioteca_no_programa(programa, "lib.algo", declaracoes, funcoes, estruturas)
+        mesclar_biblioteca_no_programa(programa, "lib.algo", declaracoes, funcoes, estruturas, alias="lib")
     assert exc.value.tipo == "função"
     assert exc.value.tipo_existente == "função"
 
@@ -5795,7 +5813,7 @@ def test_incluir_estrutura_duplicada_da_erro_em_processo(tmp_path, capsys):
         "estrutura Ponto\n    x:inteiro\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
-        'incluir "lib.algo"\n'
+        'incluir "lib.algo" como lib\n'
         "estrutura Ponto\n    y:inteiro\n"
         "inicio\n"
         "    escrever(1)\n",
@@ -5807,13 +5825,15 @@ def test_incluir_estrutura_duplicada_da_erro_em_processo(tmp_path, capsys):
 
 
 def test_incluir_funcao_duplicada_da_erro_em_processo(tmp_path, capsys):
+    """Nome pré-existente já mangled ('lib_f') -- ver a mesma nota em
+    test_incluir_funcao_duplicada_da_erro."""
     from algo_lang.cli import _carregar_e_resolver_inclusoes
     (tmp_path / "lib.algo").write_text(
         "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
-        'incluir "lib.algo"\n'
-        "funcao f():inteiro\n    retornar 2\n"
+        'incluir "lib.algo" como lib\n'
+        "funcao lib_f():inteiro\n    retornar 2\n"
         "inicio\n"
         "    escrever(1)\n",
         encoding="utf-8")
@@ -5858,7 +5878,7 @@ def test_incluir_variavel_global_duplicada_da_erro_em_processo(tmp_path, capsys)
         "total:inteiro = 0\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
-        'incluir "lib.algo"\n'
+        'incluir "lib.algo" como lib\n'
         "total:inteiro = 1\n"
         "inicio\n"
         "    escrever(1)\n",
@@ -6893,7 +6913,7 @@ def test_erro_de_sintaxe_em_ficheiro_incluido_identifica_o_ficheiro(tmp_path):
     (tmp_path / "lib.algo").write_text(
         "funcao f():inteiro\n    retornar +\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
-        'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(1)\n', encoding="utf-8")
+        'algoritmo "T"\nincluir "lib.algo" como lib\ninicio\n    escrever(1)\n', encoding="utf-8")
     with pytest.raises(SystemExit) as exc:
         _carregar_e_resolver_inclusoes(str(tmp_path / "principal.algo"))
     assert exc.value.code == 1
@@ -6908,7 +6928,7 @@ def test_erro_de_sintaxe_em_ficheiro_incluido_identifica_o_ficheiro_via_subproce
     (tmp_path / "lib.algo").write_text(
         "funcao f():inteiro\n    retornar +\n", encoding="utf-8")
     (tmp_path / "principal.algo").write_text(
-        'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(1)\n', encoding="utf-8")
+        'algoritmo "T"\nincluir "lib.algo" como lib\ninicio\n    escrever(1)\n', encoding="utf-8")
     script = (
         "import sys\n"
         f"sys.path.insert(0, {os.getcwd()!r})\n"
@@ -6930,7 +6950,7 @@ def test_incluir_por_engano_o_proprio_ficheiro_principal_identifica_o_ficheiro(t
     ficheiro, mesma causa raiz e correção do bug #15."""
     import os
     (tmp_path / "principal.algo").write_text(
-        'algoritmo "T"\nincluir "principal.algo"\ninicio\n    escrever(1)\n', encoding="utf-8")
+        'algoritmo "T"\nincluir "principal.algo" como p\ninicio\n    escrever(1)\n', encoding="utf-8")
     script = (
         "import sys\n"
         f"sys.path.insert(0, {os.getcwd()!r})\n"

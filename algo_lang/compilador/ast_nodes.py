@@ -38,7 +38,7 @@ class Incluir(No):
     def __init__(self, caminho, linha, como=None):
         self.caminho = caminho
         self.linha = linha
-        self.como = como   # alias opcional ('incluir "x.algo" como alias'), ou None
+        self.como = como   # alias ('incluir "x.algo" como alias') -- o parser exige sempre
 
 
 class Declaracao(No):

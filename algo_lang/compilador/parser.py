@@ -183,10 +183,12 @@ class Parser:
         linha = self.atual().linha
         self.esperar("INCLUIR")
         caminho_tok = self.esperar("STRING")
-        como = None
-        if self.ver("COMO"):
-            self.avancar()
-            como = self.esperar("ID").valor
+        self.esperar(
+            "COMO",
+            msg="'incluir' exige sempre um alias -- usa 'incluir "
+                f"{caminho_tok.valor!r} como <nome>'",
+        )
+        como = self.esperar("ID").valor
         self.esperar("NEWLINE")
         return A.Incluir(caminho_tok.valor, linha, como)
 

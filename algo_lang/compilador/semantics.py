@@ -207,7 +207,7 @@ class VerificadorTipos:
         # o nome MANGLED -- ver inclusoes.py).
         self.aliases_inclusao = programa.aliases_inclusao
         for inc in programa.inclusoes:
-            if inc.como and inc.como.lower() in self.bibliotecas_importadas:
+            if inc.como.lower() in self.bibliotecas_importadas:
                 raise ErroSemantico(
                     f"'{inc.como}' já é o nome de uma biblioteca importada; escolhe "
                     f"outro alias em 'incluir \"{inc.caminho}\" como {inc.como}'",

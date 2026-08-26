@@ -1,6 +1,6 @@
 algoritmo "CalculadoraDeFormas"
 
-incluir "exercicio-8-biblioteca_formas.algo"
+incluir "exercicio-8-biblioteca_formas.algo" como calc
 
 estrutura Forma
     tipo:cadeia
@@ -12,7 +12,7 @@ inicio
     raio:decimal
     escrever("Raio do círculo: ")
     ler(raio)
-    formas[0] = {tipo: "Círculo", area: areaCirculo(raio)}
+    formas[0] = {tipo: "Círculo", area: calc.areaCirculo(raio)}
 
     base:decimal
     altura:decimal
@@ -20,7 +20,7 @@ inicio
     ler(base)
     escrever("Altura do retângulo: ")
     ler(altura)
-    formas[1] = {tipo: "Retângulo", area: areaRetangulo(base, altura)}
+    formas[1] = {tipo: "Retângulo", area: calc.areaRetangulo(base, altura)}
 
     i:inteiro
     para i de 0 ate 1 fazer

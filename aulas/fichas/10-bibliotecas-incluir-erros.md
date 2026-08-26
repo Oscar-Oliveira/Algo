@@ -3,7 +3,7 @@
 ## Antes de começares
 
 - `importar Matematica`/`Cadeia`/`Conversao` no topo do ficheiro; chama-se com `nome_em_minusculas.funcao(...)`.
-- `incluir "ficheiro.algo"` junta as `funcao`/`procedimento`/`constante` de outro ficheiro teu, sem prefixo.
+- `incluir "ficheiro.algo" como <nome>` junta as `funcao`/`procedimento` de outro ficheiro teu (chamas com `<nome>.funcao(...)`); `constante`/variáveis globais continuam sem prefixo.
 - `afirmar condicao, mensagem` para o programa logo se a condição for falsa; nunca é desativado.
 - Os exercícios 2 e 8 precisam de **dois** ficheiros `.algo` (uma "biblioteca" e um "principal") — usa a mesma pasta para os dois, e `incluir` com o nome do ficheiro da biblioteca.
 - Testa sempre o teu programa a correr, não só a lê-lo.

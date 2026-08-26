@@ -1204,7 +1204,10 @@ def test_projeto_download_e_upload_fazem_ida_e_volta(cliente):
 
 def test_ws_executar_com_incluir(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
-    principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(21))\n'
+    principal = (
+        'algoritmo "T"\nincluir "lib.algo" como lib\n'
+        "inicio\n    escrever(lib.dobro(21))\n"
+    )
     biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     with cliente.websocket_connect("/ws/executar") as ws:
         ws.send_json({
@@ -1226,7 +1229,7 @@ def test_ws_executar_com_incluir(cliente):
 
 def test_ws_executar_incluir_ficheiro_em_falta(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
-    principal = 'algoritmo "T"\nincluir "nao_existe.algo"\ninicio\n    escrever(1)\n'
+    principal = 'algoritmo "T"\nincluir "nao_existe.algo" como x\ninicio\n    escrever(1)\n'
     with cliente.websocket_connect("/ws/executar") as ws:
         ws.send_json({"ficheiros": [{"nome": "principal.algo", "conteudo": principal}],
                        "principal": "principal.algo"})
@@ -1272,7 +1275,8 @@ def test_fluxograma_com_incluir(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     r = cliente.post("/api/fluxograma", json={
         "ficheiros": [
-            {"nome": "principal.algo", "conteudo": 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'},
+            {"nome": "principal.algo", "conteudo":
+                'algoritmo "T"\nincluir "lib.algo" como lib\ninicio\n    escrever(lib.dobro(3))\n'},
             {"nome": "lib.algo", "conteudo": "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"},
         ],
         "principal": "principal.algo",
@@ -1285,19 +1289,20 @@ def test_fluxograma_lista_rotinas_e_permite_escolher_uma_de_biblioteca(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     corpo_pedido = {
         "ficheiros": [
-            {"nome": "principal.algo", "conteudo": 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'},
+            {"nome": "principal.algo", "conteudo":
+                'algoritmo "T"\nincluir "lib.algo" como lib\ninicio\n    escrever(lib.dobro(3))\n'},
             {"nome": "lib.algo", "conteudo": "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"},
         ],
         "principal": "principal.algo",
     }
     r = cliente.post("/api/fluxograma", json=corpo_pedido)
     dados = r.json()
-    assert dados["rotinas"] == ["Principal", "dobro"]
+    assert dados["rotinas"] == ["Principal", "lib_dobro"]
     assert dados["rotina_atual"] == "Principal"
 
-    r2 = cliente.post("/api/fluxograma", json={**corpo_pedido, "rotina": "dobro"})
+    r2 = cliente.post("/api/fluxograma", json={**corpo_pedido, "rotina": "lib_dobro"})
     dados2 = r2.json()
-    assert dados2["rotina_atual"] == "dobro"
+    assert dados2["rotina_atual"] == "lib_dobro"
     assert "<svg" in dados2["svg"]
 
 

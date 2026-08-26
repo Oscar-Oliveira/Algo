@@ -1,10 +1,10 @@
 algoritmo "ConversorTemperatura"
 
-incluir "exercicio-2-biblioteca_conversoes.algo"
+incluir "exercicio-2-biblioteca_conversoes.algo" como conv
 
 inicio
     celsius:decimal
     escrever("Temperatura em Celsius: ")
     ler(celsius)
 
-    escrever("Em Fahrenheit: ", celsiusParaFahrenheit(celsius))
+    escrever("Em Fahrenheit: ", conv.celsiusParaFahrenheit(celsius))

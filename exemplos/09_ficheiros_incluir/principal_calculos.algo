@@ -1,8 +1,8 @@
 algoritmo "PrincipalCalculos"
 
-// Foco: DOIS 'incluir' COM alias -- evita colisão de nomes entre
-// 'biblioteca_financas.algo' e 'biblioteca_estatistica.algo' (o linter
-// já avisaria a partir do 2º 'incluir' sem alias no mesmo programa).
+// Foco: DOIS 'incluir', cada um com o seu próprio alias -- evita
+// colisão de nomes entre 'biblioteca_financas.algo' e
+// 'biblioteca_estatistica.algo' ('como' é sempre obrigatório).
 
 incluir "biblioteca_financas.algo" como financas
 incluir "biblioteca_estatistica.algo" como estatistica

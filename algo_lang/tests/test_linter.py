@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from algo_lang.compilador.parser import parse
+from algo_lang.compilador.parser import parse, ErroSintatico
 from algo_lang.compilador.semantics import verificar, ErroSemantico
 from algo_lang.tools.linter import analisar
 
@@ -331,8 +331,8 @@ def test_comparacao_entre_indices_diferentes_nao_e_assinalada():
 def test_inclusao_duplicada_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
-        incluir "biblioteca.algo"
-        incluir "biblioteca.algo"
+        incluir "biblioteca.algo" como b
+        incluir "biblioteca.algo" como b
         inicio
             escrever("ok")
     """)
@@ -346,8 +346,8 @@ def test_inclusao_duplicada_com_caminhos_equivalentes_da_aviso():
     ficheiro -- deve ser detetado apesar do texto literal ser diferente."""
     avisos = _avisos("""
         algoritmo "T"
-        incluir "biblioteca.algo"
-        incluir "./biblioteca.algo"
+        incluir "biblioteca.algo" como b
+        incluir "./biblioteca.algo" como b
         inicio
             escrever("ok")
     """)
@@ -357,48 +357,24 @@ def test_inclusao_duplicada_com_caminhos_equivalentes_da_aviso():
 def test_inclusoes_diferentes_nao_dao_aviso():
     avisos = _avisos("""
         algoritmo "T"
-        incluir "a.algo"
-        incluir "b.algo"
+        incluir "a.algo" como a
+        incluir "b.algo" como b
         inicio
             escrever("ok")
     """)
     assert not any("já tinha sido incluído" in a.mensagem for a in avisos)
 
 
-def test_uma_inclusao_sem_alias_nao_da_aviso():
-    """Só pode colidir com o próprio programa principal -- risco menor,
-    não vale a pena avisar."""
-    avisos = _avisos("""
-        algoritmo "T"
-        incluir "a.algo"
-        inicio
-            escrever("ok")
-    """)
-    assert not any("como <alias>" in a.mensagem for a in avisos)
-
-
-def test_duas_inclusoes_sem_alias_dao_aviso():
-    avisos = _avisos("""
-        algoritmo "T"
-        incluir "a.algo"
-        incluir "b.algo"
-        inicio
-            escrever("ok")
-    """)
-    relevantes = [a for a in avisos if "como <alias>" in a.mensagem]
-    assert len(relevantes) == 2
-    assert any("a.algo" in a.mensagem for a in relevantes)
-
-
-def test_inclusoes_com_alias_nao_dao_aviso():
-    avisos = _avisos("""
-        algoritmo "T"
-        incluir "a.algo" como a
-        incluir "b.algo" como b
-        inicio
-            escrever("ok")
-    """)
-    assert not any("como <alias>" in a.mensagem for a in avisos)
+def test_incluir_sem_como_e_erro_de_sintaxe():
+    """'como <alias>' passou a ser sempre obrigatório em 'incluir' --
+    ver algo_lang/compilador/parser.py:_parse_incluir."""
+    with pytest.raises(ErroSintatico):
+        parse(textwrap.dedent("""
+            algoritmo "T"
+            incluir "a.algo"
+            inicio
+                escrever("ok")
+        """))
 
 
 def test_importar_duplicado_da_aviso():

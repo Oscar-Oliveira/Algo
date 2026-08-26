@@ -86,8 +86,8 @@ def _resolver_lista_de_inclusoes(programa, inclusoes, pasta_base, ja_incluidos):
         if caminho in ja_incluidos:
             alias_anterior = ja_incluidos[caminho]
             if inc.como != alias_anterior:
-                descricao_anterior = f"com o alias '{alias_anterior}'" if alias_anterior else "sem alias"
-                descricao_nova = f"com o alias '{inc.como}'" if inc.como else "sem alias"
+                descricao_anterior = f"com o alias '{alias_anterior}'"
+                descricao_nova = f"com o alias '{inc.como}'"
                 print(
                     f"❌ Erro na linha {inc.linha}: ficheiro incluído '{inc.caminho}' já foi "
                     f"incluído antes {descricao_anterior}; não pode ser incluído outra vez "

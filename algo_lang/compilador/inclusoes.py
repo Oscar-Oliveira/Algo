@@ -38,7 +38,7 @@ class ColisaoDeInclusao(Exception):
 
 def mesclar_biblioteca_no_programa(programa, caminho_origem: str,
                                     declaracoes, funcoes, estruturas,
-                                    alias: str = None) -> None:
+                                    alias: str) -> None:
     """Acrescenta as estruturas/funções/declarações de uma biblioteca
     incluída (já parseada por parse_biblioteca) ao 'programa',
     verificando colisões de nome contra o que já lá está -- mesma
@@ -52,7 +52,8 @@ def mesclar_biblioteca_no_programa(programa, caminho_origem: str,
     encontrada; muta 'programa' em cada acrescento bem-sucedido, tal
     como o código original fazia.
 
-    'alias' (de 'incluir "x.algo" como alias') namespacea só as FUNÇÕES
+    'alias' (de 'incluir "x.algo" como alias', hoje sempre obrigatório
+    no parser -- ver parser.py:_parse_incluir) namespacea só as FUNÇÕES
     desta inclusão -- cada 'FuncaoDef' é renomeada de 'nome' para
     'alias_nome' (mesma convenção de mangling que as bibliotecas
     embutidas já usam para 'biblioteca.metodo', ver
@@ -60,18 +61,17 @@ def mesclar_biblioteca_no_programa(programa, caminho_origem: str,
     colisão abaixo, para que um nome mangled colidir com algo já
     existente seja apanhado pela mesma lógica, de graça. Estruturas e
     variáveis globais desta inclusão continuam a fundir-se de forma
-    plana, mesmo com alias -- bibliotecas embutidas também só expõem
-    funções, nunca globais/estruturas, por isso não há paralelo a
-    seguir para namespacear essas categorias."""
-    if alias is not None:
-        if alias in programa.aliases_inclusao:
-            raise ColisaoDeInclusao("alias", alias, caminho_origem, tipo_existente="alias")
-        mapa_metodos = {}
-        for f in funcoes:
-            nome_mangled = f"{alias}_{f.nome}"
-            mapa_metodos[f.nome] = nome_mangled
-            f.nome = nome_mangled
-        programa.aliases_inclusao[alias] = mapa_metodos
+    plana -- bibliotecas embutidas também só expõem funções, nunca
+    globais/estruturas, por isso não há paralelo a seguir para
+    namespacear essas categorias."""
+    if alias in programa.aliases_inclusao:
+        raise ColisaoDeInclusao("alias", alias, caminho_origem, tipo_existente="alias")
+    mapa_metodos = {}
+    for f in funcoes:
+        nome_mangled = f"{alias}_{f.nome}"
+        mapa_metodos[f.nome] = nome_mangled
+        f.nome = nome_mangled
+    programa.aliases_inclusao[alias] = mapa_metodos
 
     nomes_por_categoria = {
         "estrutura": {e.nome for e in programa.estruturas},

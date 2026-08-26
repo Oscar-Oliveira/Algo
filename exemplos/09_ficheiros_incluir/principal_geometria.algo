@@ -1,9 +1,10 @@
 algoritmo "PrincipalGeometria"
 
-// Foco: 'incluir' SEM alias -- as funções (e a 'constante' global) do
-// ficheiro incluído passam a poder ser usadas diretamente, sem prefixo.
+// Foco: 'incluir ... como' -- as funções do ficheiro incluído só ficam
+// acessíveis com o prefixo do alias; a 'constante' global continua sem
+// prefixo, com qualquer alias.
 
-incluir "biblioteca_geometria.algo"
+incluir "biblioteca_geometria.algo" como geo
 
 inicio
     raio:decimal
@@ -11,8 +12,8 @@ inicio
     ler(raio)
 
     escrever("PI (definido na biblioteca incluída): ", PI)
-    escrever("Área do círculo: ", areaCirculo(raio))
-    escrever("Perímetro do círculo: ", perimetroCirculo(raio))
+    escrever("Área do círculo: ", geo.areaCirculo(raio))
+    escrever("Perímetro do círculo: ", geo.perimetroCirculo(raio))
 
     largura:decimal
     escrever("Largura do retângulo: ")
@@ -20,4 +21,4 @@ inicio
     altura:decimal
     escrever("Altura do retângulo: ")
     ler(altura)
-    escrever("Área do retângulo: ", areaRetangulo(largura, altura))
+    escrever("Área do retângulo: ", geo.areaRetangulo(largura, altura))

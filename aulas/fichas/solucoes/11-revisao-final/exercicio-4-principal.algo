@@ -1,7 +1,7 @@
 algoritmo "GestorContactos"
 
 importar Cadeia
-incluir "exercicio-4-biblioteca_validacoes.algo"
+incluir "exercicio-4-biblioteca_validacoes.algo" como val
 
 estrutura Contacto
     nome:cadeia
@@ -21,7 +21,7 @@ inicio
         telefone:cadeia
         escrever("Telefone (9 dígitos): ")
         ler(telefone)
-        afirmar ehTelefoneValido(telefone), "telefone tem de ter 9 dígitos"
+        afirmar val.ehTelefoneValido(telefone), "telefone tem de ter 9 dígitos"
         contactos[i].telefone = telefone
 
     para i de 0 ate n - 1 fazer

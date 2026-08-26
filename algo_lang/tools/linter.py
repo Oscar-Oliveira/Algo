@@ -32,7 +32,6 @@ class Linter:
         self.avisos = []
         self._verificar_rotinas_nunca_chamadas()
         self._verificar_inclusoes_duplicadas()
-        self._verificar_inclusoes_sem_alias()
         self._verificar_importares_duplicados()
         self._verificar_casos_duplicados_em_escolha()
         self._verificar_escolha_sem_casos()
@@ -239,6 +238,21 @@ class Linter:
         elif isinstance(expr, A.Chamada):
             if "." not in expr.nome:
                 destino_chamadas.add(expr.nome)
+            else:
+                # 'alias.metodo(...)' -- se 'alias' vem de 'incluir ...
+                # como alias' (agora sempre obrigatório), o nome real da
+                # função é o MANGLED ('alias_metodo', ver inclusoes.py),
+                # não o texto literal escrito na chamada; sem isto, toda
+                # função incluída parecia "nunca chamada" mesmo quando
+                # era, porque só se comparava contra o texto cru. Uma
+                # biblioteca embutida (ex.: 'matematica.raiz') nunca
+                # aparece em 'aliases_inclusao', por isso continua a ser
+                # ignorada como antes (não é uma rotina do próprio
+                # programa a rastrear aqui).
+                alias, _, metodo = expr.nome.partition(".")
+                mapa_metodos = self.programa.aliases_inclusao.get(alias)
+                if mapa_metodos is not None and metodo in mapa_metodos:
+                    destino_chamadas.add(mapa_metodos[metodo])
             for a in expr.args:
                 self._extrair_lvalues_e_chamadas(a, destino_vars, destino_chamadas)
         elif isinstance(expr, A.VetorLiteral):
@@ -441,26 +455,6 @@ class Linter:
                     inc.linha))
             else:
                 primeira_ocorrencia[caminho] = inc.linha
-
-    def _verificar_inclusoes_sem_alias(self):
-        """Duas ou mais 'incluir' sem 'como <alias>' partilham o mesmo
-        espaço de nomes plano do programa principal -- uma colisão de
-        nome entre elas (ou com o programa principal) é erro fatal de
-        compilação, sem forma de desambiguar (ver 'incluir ... como
-        alias', que resolve isto para funções). Com 1 só inclusão sem
-        alias o risco é menor (só pode colidir com o próprio programa
-        principal), por isso só avisa a partir de 2."""
-        sem_alias = [inc for inc in self.programa.inclusoes if not inc.como]
-        if len(sem_alias) < 2:
-            return
-        for inc in sem_alias:
-            self.avisos.append(Aviso(
-                f"'{inc.caminho}' incluído sem 'como <alias>' -- com "
-                f"{len(sem_alias)} ficheiros incluídos sem alias, uma colisão "
-                f"de nome entre eles (ou com o programa principal) é erro "
-                f"fatal sem forma de desambiguar; considera "
-                f"'incluir \"{inc.caminho}\" como <nome>'",
-                inc.linha))
 
     def _verificar_importares_duplicados(self):
         """Mesma situação que _verificar_inclusoes_duplicadas, mas para

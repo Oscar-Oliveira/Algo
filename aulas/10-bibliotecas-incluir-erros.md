@@ -157,54 +157,44 @@ funcao areaCirculo(raio:decimal):decimal
 // principal.algo
 algoritmo "Principal"
 
-incluir "geometria.algo"
+incluir "geometria.algo" como geo
 
 inicio
-    escrever(areaCirculo(2.0))     // 12.56636
+    escrever(geo.areaCirculo(2.0))     // 12.56636
 ```
+
+- `incluir "ficheiro.algo" como <nome>` — o `como <nome>` é **sempre obrigatório**
+- Cada `funcao`/`procedimento` do ficheiro incluído passa a chamar-se `<nome>.funcao(...)`
+- `constante`/variáveis globais **não** levam prefixo: `PI` continua a ser só `PI`
 
 ---
 
 ## Em diagrama
 
-![Diagrama mostrando principal.algo com incluir geometria.algo, e geometria.algo com a constante PI e a função areaCirculo, a fundirem-se num resultado onde PI e areaCirculo já existem como se estivessem no mesmo ficheiro](diagramas/10-bibliotecas-incluir-erros/incluir-merge.svg)
+![Diagrama mostrando principal.algo com incluir geometria.algo como geo, e geometria.algo com a constante PI e a função areaCirculo; funções ganham o prefixo do alias (geo.areaCirculo), constante/variável global continuam sem prefixo (PI)](diagramas/10-bibliotecas-incluir-erros/incluir-merge.svg)
 
-As funções/`constante` do ficheiro incluído passam a existir **sem prefixo**, tal como se estivessem escritas ali.
+Só as **funções/procedimentos** ganham o prefixo do alias — `PI` (constante) fica acessível tal como está escrita no ficheiro incluído.
 
 ---
 
 ## Diferente de `importar`!
 
-- `importar` é só para as 3 bibliotecas **embutidas** da linguagem
-- `incluir "ficheiro.algo"` é para **os teus próprios** ficheiros `.algo`
+- `importar` é só para as 3 bibliotecas **embutidas** da linguagem, com nome fixo (`Matematica`, `Cadeia`, `Conversao`)
+- `incluir "ficheiro.algo" como <nome>` é para **os teus próprios** ficheiros `.algo`, com o nome à tua escolha
 
 Um ficheiro pensado para incluir **não tem** `algoritmo "Nome"` nem `inicio` — só `constante`, variáveis globais, `estrutura`, `funcao`/`procedimento`.
-
----
-
-## `incluir ... como <alias>`
-
-```algo
-incluir "geometria.algo" como geo
-
-inicio
-    escrever(geo.areaCirculo(2.0))
-```
-
-Com `como`, só `geo.areaCirculo(...)` funciona — `areaCirculo(...)` sozinho deixa de existir. Útil para evitar colisões de nomes.
 
 ---
 
 ## Armadilha: colisões de nomes
 
 ```algo
-incluir "geometria.algo"
+incluir "geometria.algo" como geo
 
-funcao areaCirculo(raio:decimal):decimal    // ERRO! colide com a incluída
-    retornar 0.0
+constante PI:decimal = 3.14    // ERRO! colide com o PI de geometria.algo
 ```
 
-Um nome incluído que colide com algo já existente no programa principal é erro de compilação.
+`constante`/variáveis globais não têm prefixo, por isso podem mesmo colidir com o programa principal (ou entre duas inclusões) — é erro de compilação. As **funções**, por teres sempre um `como <nome>`, já nunca colidem por acidente.
 
 ---
 
@@ -306,7 +296,7 @@ Com `b = 0`, o `afirmar` para o programa com uma mensagem clara — antes mesmo 
 ## Resumo
 
 - `importar Matematica/Cadeia/Conversao` — bibliotecas embutidas, `nome.funcao(...)`
-- `incluir "ficheiro.algo"` — os teus próprios ficheiros, sem prefixo (ou `como alias`)
+- `incluir "ficheiro.algo" como <nome>` — os teus próprios ficheiros, sempre com um alias (`<nome>.funcao(...)`)
 - `afirmar condicao, mensagem` — as tuas verificações, nunca desativado
 - 3 momentos: compilação (sempre), runtime (com certos dados), `afirmar` (verificação tua)
 

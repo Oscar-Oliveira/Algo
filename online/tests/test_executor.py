@@ -101,7 +101,10 @@ def test_nome_de_ficheiro_com_separador_e_rejeitado(tmp_path):
 # ---------- incluir (bibliotecas próprias) ----------
 
 def test_incluir_resolve_funcao_de_outro_ficheiro(tmp_path):
-    principal = 'algoritmo "T"\nincluir "biblioteca.algo"\ninicio\n    escrever(dobro(21))\n'
+    principal = (
+        'algoritmo "T"\nincluir "biblioteca.algo" como b\n'
+        "inicio\n    escrever(b.dobro(21))\n"
+    )
     biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     caminho_py = executor.compilar_codigo(
         [{"nome": "principal.algo", "conteudo": principal},
@@ -109,14 +112,20 @@ def test_incluir_resolve_funcao_de_outro_ficheiro(tmp_path):
         "principal.algo", str(tmp_path))
     with open(caminho_py, encoding="utf-8") as f:
         conteudo = f.read()
-    assert "def dobro(n):" in conteudo
+    assert "def b_dobro(n):" in conteudo
 
 
 # ---------- AL-36: 'incluir' transitivo ----------
 
 def test_incluir_transitivo_biblioteca_que_inclui_outra(tmp_path):
-    principal = 'algoritmo "T"\nincluir "meio.algo"\ninicio\n    escrever(dobro(triplo(5)))\n'
-    meio = 'incluir "fundo.algo"\nfuncao dobro(n:inteiro):inteiro\n    retornar n * 2\n'
+    principal = (
+        'algoritmo "T"\nincluir "meio.algo" como meio\n'
+        "inicio\n    escrever(meio.dobro(fundo.triplo(5)))\n"
+    )
+    meio = (
+        'incluir "fundo.algo" como fundo\n'
+        "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
+    )
     fundo = "funcao triplo(n:inteiro):inteiro\n    retornar n * 3\n"
     caminho_py = executor.compilar_codigo(
         [{"nome": "principal.algo", "conteudo": principal},
@@ -125,14 +134,17 @@ def test_incluir_transitivo_biblioteca_que_inclui_outra(tmp_path):
         "principal.algo", str(tmp_path))
     with open(caminho_py, encoding="utf-8") as f:
         conteudo = f.read()
-    assert "def dobro(n):" in conteudo
-    assert "def triplo(n):" in conteudo
+    assert "def meio_dobro(n):" in conteudo
+    assert "def fundo_triplo(n):" in conteudo
 
 
 def test_incluir_transitivo_circular_nao_entra_em_ciclo_infinito(tmp_path):
-    principal = 'algoritmo "T"\nincluir "a.algo"\ninicio\n    escrever(fA() + fB())\n'
-    a = 'incluir "b.algo"\nfuncao fA():inteiro\n    retornar 1\n'
-    b = 'incluir "a.algo"\nfuncao fB():inteiro\n    retornar 2\n'
+    principal = (
+        'algoritmo "T"\nincluir "a.algo" como a\n'
+        "inicio\n    escrever(a.fA() + b.fB())\n"
+    )
+    a = 'incluir "b.algo" como b\nfuncao fA():inteiro\n    retornar 1\n'
+    b = 'incluir "a.algo" como a\nfuncao fB():inteiro\n    retornar 2\n'
     caminho_py = executor.compilar_codigo(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "a.algo", "conteudo": a},
@@ -140,12 +152,12 @@ def test_incluir_transitivo_circular_nao_entra_em_ciclo_infinito(tmp_path):
         "principal.algo", str(tmp_path))
     with open(caminho_py, encoding="utf-8") as f:
         conteudo = f.read()
-    assert "def fA():" in conteudo
-    assert "def fB():" in conteudo
+    assert "def a_fA():" in conteudo
+    assert "def b_fB():" in conteudo
 
 
 def test_incluir_ficheiro_em_falta_da_erro_claro(tmp_path):
-    principal = 'algoritmo "T"\nincluir "nao_existe.algo"\ninicio\n    escrever(1)\n'
+    principal = 'algoritmo "T"\nincluir "nao_existe.algo" como x\ninicio\n    escrever(1)\n'
     with pytest.raises(executor.ErroCompilacao, match="não encontrado"):
         executor.compilar_codigo(
             [{"nome": "principal.algo", "conteudo": principal}], "principal.algo", str(tmp_path))
@@ -158,7 +170,10 @@ def test_incluir_caminho_absoluto_fora_da_pasta_e_rejeitado(tmp_path):
     inexistência do ficheiro que está a ser apanhada."""
     alvo = tmp_path.parent / "segredo.algo"
     alvo.write_text("funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
-    principal = f'algoritmo "T"\nincluir "{alvo.as_posix()}"\ninicio\n    escrever(f())\n'
+    principal = (
+        f'algoritmo "T"\nincluir "{alvo.as_posix()}" como s\n'
+        "inicio\n    escrever(s.f())\n"
+    )
     with pytest.raises(executor.ErroCompilacao, match="não encontrado"):
         executor.compilar_codigo(
             [{"nome": "principal.algo", "conteudo": principal}], "principal.algo", str(tmp_path))
@@ -169,17 +184,22 @@ def test_incluir_travessia_de_caminho_fora_da_pasta_e_rejeitado(tmp_path):
     ficheiro irmão de outra pasta."""
     alvo = tmp_path.parent / "outra_pasta_segredo.algo"
     alvo.write_text("funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
-    principal = f'algoritmo "T"\nincluir "../{alvo.name}"\ninicio\n    escrever(f())\n'
+    principal = (
+        f'algoritmo "T"\nincluir "../{alvo.name}" como s\n'
+        "inicio\n    escrever(s.f())\n"
+    )
     with pytest.raises(executor.ErroCompilacao, match="não encontrado"):
         executor.compilar_codigo(
             [{"nome": "principal.algo", "conteudo": principal}], "principal.algo", str(tmp_path))
 
 
 def test_incluir_colisao_de_funcao_da_erro_claro(tmp_path):
+    """Nome pré-existente já mangled ('b_f') -- com alias obrigatório, a
+    função incluída 'f' só colide depois de renomeada para '{alias}_f'."""
     principal = (
-        'algoritmo "T"\nincluir "b.algo"\n'
-        "funcao f():inteiro\n    retornar 1\n"
-        "inicio\n    escrever(f())\n"
+        'algoritmo "T"\nincluir "b.algo" como b\n'
+        "funcao b_f():inteiro\n    retornar 1\n"
+        "inicio\n    escrever(b_f())\n"
     )
     biblioteca = "funcao f():inteiro\n    retornar 2\n"
     with pytest.raises(executor.ErroCompilacao, match="colide"):
@@ -191,7 +211,7 @@ def test_incluir_colisao_de_funcao_da_erro_claro(tmp_path):
 
 def test_incluir_colisao_de_estrutura_da_erro_claro(tmp_path):
     principal = (
-        'algoritmo "T"\nincluir "b.algo"\n'
+        'algoritmo "T"\nincluir "b.algo" como b\n'
         "estrutura Ponto\n    x:inteiro\n"
         "inicio\n    escrever(1)\n"
     )
@@ -203,7 +223,7 @@ def test_incluir_colisao_de_estrutura_da_erro_claro(tmp_path):
             "principal.algo", str(tmp_path))
 
 
-# ---------- 'incluir ... como <alias>' -- namespace opcional ----------
+# ---------- 'incluir ... como <alias>' -- namespace ----------
 
 def test_incluir_com_alias_gera_funcao_com_nome_mangled(tmp_path):
     principal = (
@@ -250,7 +270,10 @@ def test_incluir_alias_colide_com_biblioteca_importada_da_erro_claro(tmp_path):
 
 def test_execucao_completa_com_incluir(tmp_path):
     async def cenario():
-        principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(triplo(4))\n'
+        principal = (
+            'algoritmo "T"\nincluir "lib.algo" como lib\n'
+            "inicio\n    escrever(lib.triplo(4))\n"
+        )
         biblioteca = "funcao triplo(n:inteiro):inteiro\n    retornar n * 3\n"
         caminho_py = executor.compilar_codigo(
             [{"nome": "principal.algo", "conteudo": principal},
@@ -579,7 +602,10 @@ inicio
 
 
 def test_fluxograma_com_incluir(tmp_path):
-    principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'
+    principal = (
+        'algoritmo "T"\nincluir "lib.algo" como lib\n'
+        "inicio\n    escrever(lib.dobro(3))\n"
+    )
     biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     resultado = executor.gerar_fluxograma_svg(
         [{"nome": "principal.algo", "conteudo": principal},
@@ -590,7 +616,7 @@ def test_fluxograma_com_incluir(tmp_path):
 
 def test_fluxograma_lista_todas_as_rotinas_incluindo_de_bibliotecas(tmp_path):
     principal = (
-        'algoritmo "T"\nincluir "lib.algo"\n'
+        'algoritmo "T"\nincluir "lib.algo" como lib\n'
         "funcao local():inteiro\n    retornar 1\n"
         "inicio\n    escrever(local())\n"
     )
@@ -599,17 +625,20 @@ def test_fluxograma_lista_todas_as_rotinas_incluindo_de_bibliotecas(tmp_path):
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "lib.algo", "conteudo": biblioteca}],
         "principal.algo", str(tmp_path))
-    assert resultado["rotinas"] == ["Principal", "dobro", "local"]
+    assert resultado["rotinas"] == ["Principal", "lib_dobro", "local"]
 
 
 def test_fluxograma_de_uma_rotina_especifica_de_biblioteca_incluida(tmp_path):
-    principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(3))\n'
+    principal = (
+        'algoritmo "T"\nincluir "lib.algo" como lib\n'
+        "inicio\n    escrever(lib.dobro(3))\n"
+    )
     biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     resultado = executor.gerar_fluxograma_svg(
         [{"nome": "principal.algo", "conteudo": principal},
          {"nome": "lib.algo", "conteudo": biblioteca}],
-        "principal.algo", str(tmp_path), nome_rotina="dobro")
-    assert resultado["rotina_atual"] == "dobro"
+        "principal.algo", str(tmp_path), nome_rotina="lib_dobro")
+    assert resultado["rotina_atual"] == "lib_dobro"
     assert "<svg" in resultado["svg"]
 
 
@@ -664,7 +693,10 @@ def test_gerar_rasto_variaveis_aparecem_na_pilha(tmp_path):
 
 
 def test_gerar_rasto_com_incluir(tmp_path):
-    principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(5))\n'
+    principal = (
+        'algoritmo "T"\nincluir "lib.algo" como lib\n'
+        "inicio\n    escrever(lib.dobro(5))\n"
+    )
     biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     rasto = executor.gerar_rasto(
         [{"nome": "principal.algo", "conteudo": principal},
@@ -721,7 +753,10 @@ def test_analisar_linter_recursion_error_vira_erro_compilacao_amigavel(tmp_path,
 
 
 def test_analisar_linter_com_incluir(tmp_path):
-    principal = 'algoritmo "T"\nincluir "lib.algo"\ninicio\n    escrever(dobro(5))\n'
+    principal = (
+        'algoritmo "T"\nincluir "lib.algo" como lib\n'
+        "inicio\n    escrever(lib.dobro(5))\n"
+    )
     biblioteca = "funcao dobro(n:inteiro):inteiro\n    retornar n * 2\n"
     avisos = executor.analisar_linter(
         [{"nome": "principal.algo", "conteudo": principal},

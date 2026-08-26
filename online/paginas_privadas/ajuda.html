@@ -1505,9 +1505,9 @@ inicio
     escrever("Raiz quadrada do comprimento: ", raizComprimento)</code></pre>
 
           <h2 id="9-ficheiros-e-incluir">9. Ficheiros e incluir</h2>
-          <p><code>incluir "ficheiro.algo"</code> junta o conteúdo de outro ficheiro <code>.algo</code> teu
-            ao programa principal — diferente de <code>importar</code> (capítulo 8), que só serve para as
-            três bibliotecas embutidas da linguagem.</p>
+          <p><code>incluir "ficheiro.algo" como &lt;alias&gt;</code> junta o conteúdo de outro ficheiro
+            <code>.algo</code> teu ao programa principal — diferente de <code>importar</code> (capítulo 8),
+            que só serve para as três bibliotecas embutidas da linguagem.</p>
 
           <h3>9.1 Um ficheiro incluído não é um programa completo</h3>
           <p>Um ficheiro pensado para ser incluído <strong>não tem</strong> <code>algoritmo "Nome"</code>
@@ -1523,42 +1523,43 @@ funcao areaCirculo(raio:decimal):decimal
           <pre><code>// principal.algo
 algoritmo "Principal"
 
-incluir "geometria.algo"
+incluir "geometria.algo" como geo
 
 inicio
-    escrever(areaCirculo(2.0))     // 12.56636</code></pre>
-          <p>As funções/<code>constante</code>/variáveis do ficheiro incluído passam a existir <strong>tal
-              como se estivessem definidas diretamente no programa principal</strong> — chamam-se sem
-            prefixo nenhum (<code>areaCirculo(...)</code>, não <code>geometria.areaCirculo(...)</code>), a
-            não ser que uses <code>como</code> (9.2).</p>
+    escrever(geo.areaCirculo(2.0))     // 12.56636</code></pre>
           <p>O caminho em <code>incluir "..."</code> é relativo à <strong>pasta do ficheiro que tem o
               <code>incluir</code></strong> — não necessariamente a pasta do programa principal (ver 9.3
             para inclusões encadeadas).
           </p>
 
-          <h3>9.2 <code>incluir ... como &lt;alias&gt;</code></h3>
-          <p>Junta um prefixo às funções do ficheiro incluído, para evitar colisão de nomes ou só para
-            deixar claro de onde vêm:</p>
+          <h3>9.2 <code>como &lt;nome&gt;</code> é sempre obrigatório</h3>
+          <p><code>incluir</code> exige sempre um alias — não há forma de incluir um ficheiro sem escolher
+            o nome pelo qual as suas funções ficam acessíveis:</p>
+          <ul>
+            <li><strong>Funções/procedimentos</strong> do ficheiro incluído passam a chamar-se
+              <code>&lt;nome&gt;.funcao(...)</code> — nunca <code>funcao(...)</code> sozinho.</li>
+            <li><strong><code>constante</code> e variáveis globais</strong> do ficheiro incluído
+              <strong>não</strong> levam prefixo nenhum, com qualquer alias — ficam acessíveis tal como estão
+              escritas no ficheiro incluído (<code>PI</code>, não <code>geo.PI</code>).</li>
+          </ul>
           <pre><code>algoritmo "Principal"
 
 incluir "geometria.algo" como geo
 
 inicio
-    escrever(geo.areaCirculo(2.0))     // 12.56636</code></pre>
-          <p>Com <code>como</code>, o nome <strong>sem</strong> prefixo deixa de existir — só
-            <code>geo.areaCirculo(...)</code> funciona, <code>areaCirculo(...)</code> sozinho já não. O
-            alias namespacea só as <strong>funções</strong>; uma <code>estrutura</code> ou variável global do
-            ficheiro incluído continua a juntar-se sem prefixo, com ou sem <code>como</code>.
-          </p>
+    escrever(geo.areaCirculo(2.0))     // 12.56636 -- função, com prefixo
+    escrever(PI)                        // 3.14159  -- constante, sem prefixo</code></pre>
 
           <h3>9.3 Colisões e inclusões repetidas</h3>
           <ul>
-            <li>Um <code>funcao</code>/<code>estrutura</code>/variável global incluído com o mesmo nome de
-              algo que já existe no programa principal (ou noutra inclusão já processada) é erro de
-              compilação — mesmo entre categorias diferentes.</li>
-            <li>Incluir o <strong>mesmo ficheiro duas vezes com o mesmo alias</strong> (ou sem alias nas
-              duas vezes) é inofensivo — a segunda vez é ignorada. Com um alias <strong>diferente</strong> da
-              primeira vez, é erro de compilação.</li>
+            <li>Uma <code>estrutura</code>/variável global incluída com o mesmo nome de algo que já existe
+              no programa principal (ou noutra inclusão já processada) é erro de compilação — mesmo entre
+              categorias diferentes. Como o alias é sempre obrigatório, uma <strong>função</strong> incluída
+              só colide se o seu nome mangled (<code>&lt;nome&gt;_funcao</code>) já existir no programa
+              principal.</li>
+            <li>Incluir o <strong>mesmo ficheiro duas vezes com o mesmo alias</strong> é inofensivo — a
+              segunda vez é ignorada. Com um alias <strong>diferente</strong> da primeira vez, é erro de
+              compilação.</li>
             <li>Um ficheiro incluído pode ele próprio ter <code>incluir</code> (inclusão transitiva) — o
               caminho desse <code>incluir</code> aninhado é relativo à pasta <strong>desse</strong> ficheiro,
               não à do programa principal. Um ciclo (A inclui B, B inclui A) não trava o compilador — o mesmo
@@ -1568,13 +1569,9 @@ inicio
           </ul>
           <pre><code>algoritmo "Principal"
 
-incluir "geometria.algo"
+incluir "geometria.algo" como geo
 
-funcao areaCirculo(raio:decimal):decimal    // ERRO: colide com a incluída
-    retornar 0.0
-
-inicio
-    escrever(areaCirculo(2.0))</code></pre>
+constante PI:decimal = 3.14    // ERRO: colide com o PI de geometria.algo</code></pre>
 
           <h3>Exemplo completo</h3>
           <pre><code>// validacoes.algo
@@ -1586,16 +1583,16 @@ funcao dentroDoIntervalo(x:decimal, minimo:decimal, maximo:decimal):booleano
           <pre><code>// principal.algo
 algoritmo "NotaValida"
 
-incluir "validacoes.algo"
+incluir "validacoes.algo" como val
 
 inicio
     nota:decimal
     escrever("Nota (0 a 20): ")
     ler(nota)
 
-    se nao ehPositivo(nota) entao
+    se nao val.ehPositivo(nota) entao
         escrever("A nota não pode ser negativa")
-    senao se nao dentroDoIntervalo(nota, 0.0, 20.0) entao
+    senao se nao val.dentroDoIntervalo(nota, 0.0, 20.0) entao
         escrever("A nota tem de estar entre 0 e 20")
     senao
         escrever("Nota válida: ", nota)</code></pre>
@@ -1846,7 +1843,7 @@ inicio
               </tr>
               <tr>
                 <td>Incluir ficheiro</td>
-                <td><code>incluir "caminho.algo" [como alias]</code></td>
+                <td><code>incluir "caminho.algo" como alias</code></td>
               </tr>
               <tr>
                 <td>afirmar</td>
