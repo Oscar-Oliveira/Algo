@@ -652,8 +652,12 @@ def cmd_consola(parser):
             args = parser.parse_args([comando] + resto)
         except SystemExit:
             # o argparse já escreveu a mensagem de erro/ajuda -- só não
-            # deixamos que feche a consola
-            if comando not in ("-h", "--help"):
+            # deixamos que feche a consola. Sem "-h"/"--help" em
+            # QUALQUER posição (não só como o próprio 'comando'), uma
+            # linha como 'executa -h' mostrava a ajuda completa da
+            # subopção e LOGO A SEGUIR esta dica -- redundante, a ajuda
+            # já tinha sido mostrada por pedido explícito, não por erro.
+            if "-h" not in ([comando] + resto) and "--help" not in ([comando] + resto):
                 print(
                     "(escreve 'ajuda' para veres os comandos disponíveis e as suas opções)"
                 )

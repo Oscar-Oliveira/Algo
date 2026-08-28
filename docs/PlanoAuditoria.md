@@ -78,8 +78,14 @@ quando o PRÓPRIO parâmetro é reatribuído (continua correto), testes
 atualizados em `test_linter.py`. `flowchart.py` — testado com ciclos
 aninhados + `sair`/`continuar`, sem problemas encontrados (a
 duplicação de aresta a seguir a `sair`/`retornar` é intencional, já
-documentada no código). Por cobrir ainda: `cli.py` com flags
-inválidas/combinações raras, mais casos de `flowchart.py`.
+documentada no código). `cli.py` (consola interativa) — uma linha como
+`executa -h` mostrava a ajuda completa do argparse e LOGO A SEGUIR a
+dica genérica "escreve 'ajuda'..." (a guarda só verificava
+`comando in ("-h", "--help")`, não apanhava `-h` como flag de um
+subcomando); corrigido para verificar `-h`/`--help` em qualquer posição
+da linha, teste de regressão em `test_consola.py`. Por cobrir ainda:
+mais combinações de flags inválidas em `cli.py`, mais casos de
+`flowchart.py`.
 
 ### Fase 3 — Documentos: consistência e referências
 Verificar que `docs/`, `context/project-overview.md` e `CLAUDE.md`

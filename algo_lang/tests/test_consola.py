@@ -151,6 +151,19 @@ def test_consola_comando_desconhecido_sugere_ajuda():
     assert "ajuda" in resultado.stdout.lower()
 
 
+def test_consola_h_de_subcomando_nao_duplica_a_dica_de_ajuda():
+    """'executa -h' já mostra a ajuda completa do argparse para essa
+    subopção -- a dica genérica ("escreve 'ajuda'...") só faz sentido a
+    seguir a um ERRO real (flag inválida, etc.), não a um pedido de
+    ajuda explícito e bem-sucedido. Antes, a guarda só verificava
+    comando in ("-h", "--help") -- só apanhava a linha '-h' sozinha, não
+    'executa -h' (onde 'comando' é 'executa', não '-h')."""
+    resultado = _correr_consola("executa -h\nsair\n")
+    assert resultado.returncode == 0
+    assert "usage: algo executa" in resultado.stdout  # ajuda real do argparse
+    assert "escreve 'ajuda'" not in resultado.stdout.lower()
+
+
 def test_consola_flag_com_valor_nao_e_confundida_com_ficheiro(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
