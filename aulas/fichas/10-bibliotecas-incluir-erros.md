@@ -30,7 +30,7 @@ Define uma `estrutura Aluno` com `nome` (`cadeia`) e `nota` (`decimal`). Pede qu
 
 ### Exercício 5 — Renomear por referência
 
-Define uma `estrutura Pessoa` com `nome` e `idade`. Escreve um `procedimento renomear(ref pessoa:Pessoa, novoNome:cadeia)` que muda o nome. Testa mostrando o nome antes e depois.
+Define uma `estrutura Pessoa` com `nome` e `idade`. Escreve um `procedimento renomear(pessoa:Pessoa, novoNome:cadeia)` que muda o nome. Testa mostrando o nome antes e depois.
 
 ## Parte 3 — Consolidação (Aulas 1 a 10)
 

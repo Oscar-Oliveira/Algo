@@ -415,3 +415,154 @@ def test_estrutura_literal_tipo_de_campo_incompativel_da_erro():
             inicio
                 p:Ponto = {x: "texto"}
         """)
+
+
+# ---------- atribuição direta entre vetores (alinhado com 'estrutura') ----------
+
+def test_atribuicao_direta_entre_vetores_e_aliasing():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            v1:inteiro[3] = {1, 2, 3}
+            v2:inteiro[3]
+            v2 = v1
+            v2[0] = 99
+            escrever(v1[0], " ", v2[0])
+    """)
+    assert saida.strip() == "99 99"
+
+
+def test_declaracao_a_partir_de_outro_vetor_e_aliasing():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            v1:inteiro[3] = {1, 2, 3}
+            v2:inteiro[3] = v1
+            v2[0] = 99
+            escrever(v1[0], " ", v2[0])
+    """)
+    assert saida.strip() == "99 99"
+
+
+def test_atribuicao_de_linha_de_matriz_e_aliasing():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            m:inteiro[2][2] = {{1, 2}, {3, 4}}
+            linha:inteiro[2] = {9, 9}
+            m[0] = linha
+            linha[0] = 77
+            escrever(m[0][0], " ", m[0][1], " ", linha[0])
+    """)
+    assert saida.strip() == "77 9 77"
+
+
+def test_atribuicao_entre_vetores_de_tipo_diferente_da_erro():
+    with pytest.raises(ErroSemantico, match="não são alargados/estreitados"):
+        compilar("""
+            algoritmo "T"
+            inicio
+                v1:decimal[3] = {1.0, 2.0, 3.0}
+                v2:inteiro[3]
+                v2 = v1
+        """)
+
+
+def test_atribuir_vetor_a_escalar_continua_erro():
+    with pytest.raises(ErroSemantico):
+        compilar("""
+            algoritmo "T"
+            inicio
+                v1:inteiro[3] = {1, 2, 3}
+                x:inteiro
+                x = v1
+        """)
+
+
+def test_atribuir_escalar_a_vetor_continua_erro():
+    with pytest.raises(ErroSemantico):
+        compilar("""
+            algoritmo "T"
+            inicio
+                x:inteiro = 5
+                v1:inteiro[3]
+                v1 = x
+        """)
+
+
+def test_atribuicao_entre_vetores_de_tamanho_diferente_da_erro_amigavel_em_runtime():
+    """O tamanho declarado ('v2:inteiro[3]') não é parte do tipo em ALGO --
+    só é conhecido em runtime, tal como uma chamada que devolve vetor (ver
+    _algo_verificar_tamanho_vetor_resultado). Um vetor de tamanho errado
+    atribuído por cima não pode ficar silenciosamente com o tamanho
+    errado."""
+    resultado = subprocess.run(
+        [sys.executable, "-c", compilar("""
+            algoritmo "T"
+            inicio
+                v1:inteiro[5] = {1, 2, 3, 4, 5}
+                v2:inteiro[3]
+                v2 = v1
+                escrever(v2[0])
+        """)],
+        capture_output=True, text=True,
+    )
+    assert resultado.returncode == 1
+    assert "5 elemento" in resultado.stdout
+    assert "tamanho 3" in resultado.stdout
+
+
+def test_vetor_de_estruturas_atribuido_diretamente_e_aliasing():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            v1:Ponto[2] = {{x: 1}, {x: 2}}
+            v2:Ponto[2]
+            v2 = v1
+            v2[0].x = 99
+            escrever(v1[0].x, " ", v2[0].x)
+    """)
+    assert saida.strip() == "99 99"
+
+
+# ---------- ponto 7: 'nulo' também compatível com 'vetor', não só 'estrutura' ----------
+
+def test_nulo_passado_a_parametro_vetor_compila_e_compara_igual():
+    saida = executar("""
+        algoritmo "T"
+        procedimento f(v:inteiro[])
+            escrever(v == nulo)
+        inicio
+            f(nulo)
+    """)
+    assert saida.strip() == "verdadeiro"
+
+
+def test_declaracao_a_partir_de_funcao_que_devolve_vetor_nulo():
+    """Regressão: o guarda de tamanho em runtime que embrulha o valor de
+    uma declaração vinda doutra variável/chamada vetor
+    (_algo_verificar_tamanho_vetor_resultado) chamava len() no resultado
+    incondicionalmente -- rebentava com TypeError se a função devolvesse
+    'nulo' (agora um valor legítimo para um vetor, ver ponto 7)."""
+    saida = executar("""
+        algoritmo "T"
+        funcao g():inteiro[]
+            retornar nulo
+        inicio
+            r:inteiro[2] = g()
+            escrever(r == nulo)
+    """)
+    assert saida.strip() == "verdadeiro"
+
+
+def test_atribuir_nulo_a_vetor_ja_declarado():
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            v:inteiro[3]
+            v = nulo
+            escrever(v == nulo)
+    """)
+    assert saida.strip() == "verdadeiro"

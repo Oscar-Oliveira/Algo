@@ -1,8 +1,9 @@
 # 07 — Estruturas
 
 Assunto: `estrutura`, acesso a campo com `.`, estruturas aninhadas,
-estrutura passada por valor vs `ref`, vetor de estruturas, campo do
-próprio tipo (estrutura recursiva) e comparação com `nulo`.
+estrutura sempre aliasada como parâmetro vs `ref` para reatribuição
+completa, vetor de estruturas, campo do próprio tipo (estrutura
+recursiva) e comparação com `nulo`.
 
 ## `catalogo_produtos.algo`
 
@@ -11,20 +12,22 @@ caro, aplicar desconto a todos.
 
 Demonstra: vetor de `estrutura` (`Produto[3]`), acesso a campo por índice
 (`catalogo[i].preco`), e funções/procedimentos sobre vetor de estruturas
-(assunto 06) — incluindo `ref` (`aplicarDesconto`) para mutar os preços
-de todo o catálogo do próprio vetor do chamador.
+(assunto 06) — `aplicarDesconto` muta os preços de todo o catálogo do
+próprio vetor do chamador sem precisar de `ref` (vetor já é aliasado por
+omissão; `ref` só seria preciso para reatribuir o parâmetro `produtos`
+a outro vetor inteiro).
 
 ## `geometria_pontos.algo`
 
 Pontos, segmentos, e distância entre dois pontos.
 
 Demonstra: `estrutura` aninhada dentro de outra (`Segmento` tem dois
-campos `Ponto`), estrutura passada por **valor** como parâmetro (copiada
-— alterar `p1`/`p2` dentro de `distancia` não afetaria os originais) vs
-`ref` (`deslocar` muta o `Ponto` do chamador), e reforça que
-`matematica.raiz` só existe a partir do assunto 08: a raiz quadrada é
-aproximada aqui com o método de Newton, escrito à mão com `para`
-(assunto 04).
+campos `Ponto`), que uma `estrutura` é sempre aliasada como parâmetro —
+`deslocar` muta um campo do `Ponto` do chamador **sem** `ref` — e que
+`ref` só é necessário para uma **reatribuição completa** do parâmetro
+(`reiniciar`), e reforça que `matematica.raiz` só existe a partir do
+assunto 08: a raiz quadrada é aproximada aqui com o método de Newton,
+escrito à mão com `para` (assunto 04).
 
 ## `lista_ligada_fixa.algo`
 

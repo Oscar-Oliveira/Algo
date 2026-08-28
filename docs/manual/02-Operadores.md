@@ -47,15 +47,17 @@ dividendo), e vale sempre `a == (a div b) * b + (a mod b)`.
 
 - `==`/`<>` comparam dois numéricos (`inteiro`/`decimal` cruzados
   incluídos: `1 == 1.0` é `verdadeiro`), dois textos
-  (`cadeia`/`caracter` cruzados incluídos), ou `nulo` com uma variável de
-  tipo `estrutura` (capítulo 7). Comparar tipos incompatíveis
-  (`5 == "5"`, por exemplo) é erro de compilação.
+  (`cadeia`/`caracter` cruzados incluídos), dois `vetor`/`estrutura` do
+  mesmo tipo, ou `nulo` com uma variável de tipo `vetor`/`estrutura`
+  (capítulos 5 e 7). Comparar tipos incompatíveis (`5 == "5"`, por
+  exemplo) é erro de compilação.
 - `<`/`>`/`<=`/`>=` aceitam dois numéricos ou dois textos — texto compara
   por ordem de código Unicode, não ordem alfabética portuguesa (ex.:
   `"Z" < "a"` é `verdadeiro`, porque maiúsculas vêm antes de minúsculas
   em Unicode).
-- Duas `estrutura` comparam-se campo a campo com `==`/`<>` (não por
-  identidade) — ver capítulo 7.
+- Dois `vetor`/`estrutura` comparam-se com `==`/`<>` por **referência**
+  (são o mesmo, não têm os mesmos elementos/campos) — ver capítulos 5 e
+  7.
 
 **Não é possível encadear comparações**: `a < b < c` é erro de
 compilação (a maioria dos alunos espera "a < b e b < c"; a linguagem

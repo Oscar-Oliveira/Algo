@@ -12,6 +12,7 @@ inicio
     alunos:Aluno[n]
     i:inteiro
     para i de 0 ate n - 1 fazer
+        alunos[i] = {}
         escrever("Nome: ")
         ler(alunos[i].nome)
         escrever("Média: ")

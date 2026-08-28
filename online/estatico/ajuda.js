@@ -100,7 +100,7 @@ function mostrarTema(pasta) {
 
   // índice do bloco (se algum) que contém cada ficheiro -- usado tanto
   // pela lista compacta como para saber se um bloco cobre mais do que
-  // 1 ficheiro (caso do tema "Ficheiros e incluir", ver ACHADOS.md).
+  // 1 ficheiro (caso do tema "Ficheiros e incluir", ver docs/PlanoAuditoria.md).
   const blocoDoFicheiro = (nome) => blocos.findIndex((b) => b.ficheiros.includes(nome));
 
   let html = `<h2>${escaparHtml(pasta.titulo)}</h2>`;

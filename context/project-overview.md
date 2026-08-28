@@ -80,7 +80,6 @@ lexer.py (tokenizar) → parser.py (parse/parse_biblioteca, recursive-descent)
 * `algo_lang/tests/apoio.py` provides `compilar(codigo_algo)` and `executar(codigo_algo, entrada="")` helpers used throughout the compiler suite. They compile/run a string of Algo source and return generated Python or captured stdout.
 * Console integration tests (`algo_lang/tests/test_consola.py`) run the real `algo` command in a subprocess against a temporary copy of `algo_lang/`.
 * `alguem/tests/` and `online/tests/` isolate logs/DB into temporary directories via `monkeypatch` on the relevant module constants (not env vars). No test in the repository writes to the real `alguem/logs/` or a real database.
-* `docs/bin/RoteiroTestesManualALGO.md` is a manual test script for the compiler (not automated, archived).
 
 ## Cross-cutting gotcha
 

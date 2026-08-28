@@ -4,8 +4,8 @@
 
 - `funcao nome(parametros):tipo` — devolve sempre um valor; todo caminho tem de acabar em `retornar <expressão>`.
 - `procedimento nome(parametros)` — não devolve valor; `retornar` sem expressão é opcional.
-- Sem `ref`, um parâmetro é uma **cópia** — mudanças não saem da função.
-- Com `ref`, o parâmetro aponta para a **mesma** variável do chamador — mudanças são visíveis depois.
+- Sem `ref`, um parâmetro **escalar** é uma **cópia** — mudanças não saem da função. Um parâmetro **vetor/estrutura** sem `ref` NÃO é cópia — mutar um elemento/campo sai da função; só reatribuir o parâmetro inteiro é que não sai.
+- Com `ref`, o parâmetro aponta para a **mesma** variável do chamador — mudanças (incluindo reatribuir tudo) são visíveis depois.
 - Um vetor como parâmetro usa colchetes vazios: `v:tipo[]`.
 - Testa sempre o teu programa a correr, não só a lê-lo.
 

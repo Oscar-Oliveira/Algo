@@ -98,7 +98,7 @@ m:inteiro[2][2] = {{1, 2}, {3, 4}}
 
 - Índice inválido é erro em **runtime**, não em compilação
 - Índice **negativo** não conta a partir do fim (diferente de Python)
-- Um vetor **não** se copia com `=` — copia elemento a elemento
+- `=` **não** copia um vetor — as duas variáveis passam a apontar para o mesmo vetor; `==` compara se é o mesmo vetor, não o conteúdo
 
 ---
 
@@ -155,15 +155,28 @@ p.x = 10
 
 ---
 
-## `estrutura` copia por valor (ao contrário de vetor!)
+## `estrutura` é um tipo por referência (tal como vetor!)
 
-![Antes e depois de b = a e b.x = 99: a mantém-se x=1,y=2, b muda para x=99,y=2 -- independentes](diagramas/09-estruturas/estrutura-copia.svg)
+```algo
+a:Ponto = {x: 1, y: 2}
+b:Ponto = a
+b.x = 99
+escrever(a.x, " ", b.x)       // 99 99 -- é a MESMA instância
+```
+
+`=`, declaração, `retornar`, argumento sem `ref`, e popular um campo/elemento a partir de uma variável existente num literal `{...}` nunca copiam — vetor e `estrutura` comportam-se da mesma forma em todo o lado. Isto já basta para ligar nós de uma lista ligada dinamicamente (`no.seguinte = outroNo`), sem precisar de `ref` nenhum em campos.
 
 ---
 
-## Campo `ref`: a única forma de "ligar" sem copiar
+## `==` compara por referência, não por conteúdo
 
-![Comparação: sem ref a.seguinte.valor não muda quando b.valor muda; com ref, muda](diagramas/09-estruturas/lista-com-ref.svg)
+```algo
+a:Ponto = {x: 1, y: 2}
+b:Ponto = {x: 1, y: 2}
+escrever(a == b)      // falso! mesmo conteúdo, instâncias diferentes
+```
+
+Para comparar conteúdo, escreve a tua própria função campo a campo.
 
 ---
 
@@ -208,10 +221,10 @@ afirmar condicao, "mensagem"    // para logo se for falsa; nunca desativado
 ## Mais 5
 
 6. Índice de vetor inválido (incluindo negativo) — só dá erro ao correr
-7. Vetor copiado com `=` (não funciona — é elemento a elemento)
+7. Usar `==` para comparar o **conteúdo** de dois vetores/estruturas (compara se é o mesmo, não o conteúdo — falso mesmo com valores iguais)
 8. `funcao` sem `retornar` em todos os caminhos
 9. Esperar que mudar uma variável `ref` de uma função **não** mude o original
-10. Esperar que copiar uma `estrutura` **não** seja independente (é sempre independente, a menos que uses `ref`)
+10. Esperar que `b = a` (vetor/`estrutura`) dê uma cópia independente — não dá; `b` fica ligado ao mesmo `a`
 
 ---
 
@@ -252,6 +265,7 @@ inicio
     produtos:Produto[n]
     i:inteiro
     para i de 0 ate n - 1 fazer
+        produtos[i] = {}      // vetor de 'estrutura' começa com posições 'nulo'; constrói cada uma
         escrever("Nome: ")
         ler(produtos[i].nome)
         escrever("Preço: ")
@@ -274,9 +288,9 @@ inicio
 ## Resumo geral
 
 - Base: tipos, `constante`, operadores, `se`/`escolher`, `para`/`enquanto`
-- Vetores/matrizes: índices desde 0, não copiam com `=`
+- Vetores/matrizes: índices desde 0; `=` não copia, `==` compara por referência
 - Funções: por valor vs `ref`, `retornar` obrigatório, recursão
-- Estruturas: copiam por valor (ao contrário de vetor), `ref` para ligar
+- Estruturas: tipo por referência em toda a parte, tal como vetor; `ref` num parâmetro propaga reatribuições completas
 - Bibliotecas/`incluir`/`afirmar`: ferramentas prontas, organização, verificação
 
 ---

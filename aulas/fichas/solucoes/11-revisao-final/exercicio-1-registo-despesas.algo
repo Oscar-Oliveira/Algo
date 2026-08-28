@@ -23,6 +23,7 @@ inicio
     despesas:Despesa[n]
     i:inteiro
     para i de 0 ate n - 1 fazer
+        despesas[i] = {}
         escrever("Descrição: ")
         ler(despesas[i].descricao)
         escrever("Valor: ")

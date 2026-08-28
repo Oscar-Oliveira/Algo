@@ -22,6 +22,7 @@ inicio
     produtos:Produto[n]
     i:inteiro
     para i de 0 ate n - 1 fazer
+        produtos[i] = {}
         escrever("Nome: ")
         ler(produtos[i].nome)
         escrever("Stock: ")

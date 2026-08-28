@@ -15,9 +15,12 @@ from algo_lang.compilador.lexer import ErroLexico, tokenizar
 from algo_lang.compilador.ast_nodes import coletar_identificadores
 
 
-# ---------- #1 estruturas comparadas por valor ----------
+# ---------- #1 estruturas comparadas por referência (ponto 8) ----------
 
-def test_estruturas_iguais_em_valor_comparam_como_iguais():
+def test_estruturas_com_mesmo_valor_mas_instancias_diferentes_comparam_como_diferentes():
+    """'==' entre 'estrutura' é referencial, não estrutural -- duas
+    instâncias construídas separadamente, mesmo com exatamente os mesmos
+    campos, não são a mesma instância."""
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -30,7 +33,23 @@ def test_estruturas_iguais_em_valor_comparam_como_iguais():
             senao
                 escrever("diferentes")
     """)
-    assert saida.strip() == "iguais"
+    assert saida.strip() == "diferentes"
+
+
+def test_estrutura_comparada_consigo_propria_ou_com_alias_da_igual():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            a:Ponto = {x: 1}
+            b:Ponto = a
+            se a == a entao
+                escrever("a==a")
+            se a == b entao
+                escrever("a==b")
+    """)
+    assert saida.strip() == "a==a\na==b"
 
 
 def test_estruturas_diferentes_em_valor_comparam_como_diferentes():
@@ -49,7 +68,11 @@ def test_estruturas_diferentes_em_valor_comparam_como_diferentes():
     assert saida.strip() == "diferentes"
 
 
-def test_estruturas_aninhadas_comparam_recursivamente():
+def test_estruturas_aninhadas_comparam_por_referencia():
+    """Mesmo aninhada dentro doutra, '==' entre 'estrutura' continua
+    referencial -- dois campos com o mesmo valor mas construídos em
+    literais separados não são iguais; o mesmo campo comparado consigo
+    próprio é."""
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -57,20 +80,16 @@ def test_estruturas_aninhadas_comparam_recursivamente():
         estrutura Retangulo
             canto:Ponto
         inicio
-            a:Retangulo
-            a.canto.x = 1
-            b:Retangulo
-            b.canto.x = 1
-            c:Retangulo
-            c.canto.x = 2
-            se a == b entao
-                escrever("a==b")
-            se a == c entao
-                escrever("a==c (nao devia acontecer)")
+            a:Retangulo = {canto: {x: 1}}
+            b:Retangulo = {canto: {x: 1}}
+            se a.canto == a.canto entao
+                escrever("a.canto==a.canto")
+            se a.canto == b.canto entao
+                escrever("a.canto==b.canto (nao devia acontecer)")
             senao
-                escrever("a<>c")
+                escrever("a.canto<>b.canto")
     """)
-    assert saida.strip() == "a==b\na<>c"
+    assert saida.strip() == "a.canto==a.canto\na.canto<>b.canto"
 
 
 # ---------- #2 caracter/cadeia: direção da compatibilidade ----------
@@ -291,11 +310,15 @@ def test_erro_de_tipo_desconhecido_nao_menciona_dois_pontos():
 # ---------- #11 (encontrado ao testar o #1): campos de tipo estrutura
 # não podiam partilhar objeto por omissão entre instâncias ----------
 
-def test_campo_de_tipo_estrutura_nao_e_partilhado_entre_instancias():
-    """Bug encontrado ao escrever os testes do #1: o valor por omissão de
-    um campo cujo tipo é outra estrutura era um 'mutable default
-    argument' clássico do Python -- todas as instâncias sem inicializador
-    explícito ficavam a apontar para o MESMO objeto interior."""
+def test_campo_de_tipo_estrutura_com_literal_nao_e_partilhado_entre_instancias():
+    """Bug original: o valor por omissão de um campo cujo tipo é outra
+    estrutura era um 'mutable default argument' clássico do Python --
+    todas as instâncias sem inicializador explícito ficavam a apontar
+    para o MESMO objeto interior. Já não é possível hoje (o valor por
+    omissão do campo é sempre 'nulo', ver ponto 5 -- 'None' é imutável,
+    não há nada a partilhar); o que continua a precisar de instâncias
+    independentes é quando o literal DÁ um '{}' para o campo em cada
+    construção."""
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -303,8 +326,8 @@ def test_campo_de_tipo_estrutura_nao_e_partilhado_entre_instancias():
         estrutura Retangulo
             canto:Ponto
         inicio
-            a:Retangulo
-            c:Retangulo
+            a:Retangulo = {canto: {}}
+            c:Retangulo = {canto: {}}
             a.canto.x = 999
             escrever("a=", a.canto.x, " c=", c.canto.x)
     """)
@@ -533,14 +556,29 @@ def test_campo_vetor_pode_ser_inicializado_com_literal_vetor_em_literal_de_estru
     assert saida.strip() == "123"
 
 
-def test_campo_vetor_com_tamanho_errado_em_literal_de_estrutura_da_erro():
+def test_campo_vetor_com_menos_elementos_em_literal_de_estrutura_preenche_com_omissao():
+    """Ponto 6: um literal de vetor com MENOS elementos do que o tamanho
+    declarado já não é erro -- as posições em falta ficam com o valor por
+    omissão do elemento (preenchimento posicional pelo início)."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura P
+            v:inteiro[3]
+        inicio
+            p:P = {v: {1, 2}}
+            escrever(p.v[0], p.v[1], p.v[2])
+    """)
+    assert saida.strip() == "120"
+
+
+def test_campo_vetor_com_mais_elementos_em_literal_de_estrutura_continua_erro():
     with pytest.raises(ErroSemantico, match="tamanho declarado 3"):
         compilar("""
             algoritmo "T"
             estrutura P
                 v:inteiro[3]
             inicio
-                p:P = {v: {1, 2}}
+                p:P = {v: {1, 2, 3, 4}}
         """)
 
 
@@ -1480,15 +1518,17 @@ def test_nome_igual_a_funcao_de_biblioteca_nao_importada_e_permitido():
 # ---------- AUDITORIA_2026-08-19 Fase 2.3: colisão com nomes que o
 # próprio codegen usa (bugs #23 e #27) ----------
 
-@pytest.mark.parametrize("nome_reservado", ["sys", "copy", "print", "input"])
+@pytest.mark.parametrize("nome_reservado", ["sys", "print", "input"])
 def test_variavel_global_com_nome_reservado_pelo_codegen_da_erro(nome_reservado):
-    """bug #23: 'sys'/'copy' vêm do cabeçalho do próprio codegen.py;
-    'print'/'input' são builtins que o código gerado chama diretamente.
-    Antes, só palavras-chave do Python eram rejeitadas -- estes nomes
-    perfeitamente normais rebatiam o import/builtin correspondente no
-    módulo Python gerado, partindo o compilador de formas diferentes
-    (a pior: 'copy' fazia o handler de AttributeError mentir ao
-    estudante, dizendo 'acesso a campo de nulo')."""
+    """bug #23: 'sys' vem do cabeçalho do próprio codegen.py; 'print'/
+    'input' são builtins que o código gerado chama diretamente. Antes, só
+    palavras-chave do Python eram rejeitadas -- estes nomes perfeitamente
+    normais rebatiam o import/builtin correspondente no módulo Python
+    gerado, partindo o compilador de formas diferentes. ('copy' também
+    era reservado por esta razão enquanto o cabeçalho gerado importava
+    esse módulo para copy.deepcopy -- deixou de ser preciso desde que
+    'estrutura'/'vetor' passaram a ser tipos por referência, ver ponto 1
+    da mudança de semântica.)"""
     with pytest.raises(ErroSemantico, match="nome interno"):
         compilar(f"""
             algoritmo "T"
@@ -1513,7 +1553,7 @@ def test_estrutura_com_nome_reservado_pelo_codegen_da_erro():
     with pytest.raises(ErroSemantico, match="nome interno"):
         compilar("""
             algoritmo "T"
-            estrutura copy
+            estrutura sys
                 x:inteiro
             inicio
                 escrever(1)
@@ -1601,7 +1641,7 @@ def test_codegen_ler_campo_de_estrutura_aninhado():
         estrutura Retangulo
             canto:Ponto
         inicio
-            r:Retangulo
+            r:Retangulo = {canto: {}}
             ler(r.canto.x)
             escrever(r.canto.x)
     """, entrada="42\n")
@@ -1630,8 +1670,8 @@ def test_codegen_campo_de_estrutura_que_e_vetor_nao_e_partilhado():
         estrutura Turma
             notas:inteiro[3]
         inicio
-            a:Turma
-            b:Turma
+            a:Turma = {}
+            b:Turma = {}
             a.notas[0] = 99
             escrever("a=", a.notas[0], " b=", b.notas[0])
     """)
@@ -3179,14 +3219,16 @@ def test_blocos_aninhados_dentro_do_limite_continuam_a_compilar():
 
 # ---------- B5 (AL-45): '{}' nunca interpretado como vetor literal vazio ----------
 
-def test_chaveta_vazia_inicializa_vetor_vazio_sem_erro():
-    codigo_py = compilar("""
+def test_chaveta_vazia_inicializa_vetor_com_valores_por_omissao_sem_erro():
+    """Ponto 6: '{}' para um vetor significa zero elementos DADOS -- cada
+    posição fica com o valor por omissão do elemento, não um vetor vazio."""
+    saida = executar("""
         algoritmo "T"
         inicio
             v:inteiro[3] = {}
-            escrever("ok")
+            escrever(v[0], v[1], v[2])
     """)
-    assert "v = []" in codigo_py
+    assert saida.strip() == "000"
 
 
 def test_chaveta_vazia_com_campos_de_estrutura_continua_a_dar_erro_claro():
@@ -3327,7 +3369,10 @@ def test_parametro_com_nome_de_tipo_primitivo_e_erro_semantico():
 
 # ---------- B11 (AL-52): estruturas por valor não são copiadas ----------
 
-def test_estrutura_passada_por_valor_nao_e_mutada_no_chamador():
+def test_estrutura_passada_sem_ref_e_mutada_no_chamador():
+    """Ponto 3: sem 'ref', o parâmetro recebe a MESMA referência que o
+    chamador passou -- mutar um campo dentro do procedimento é visível
+    para o chamador (ao contrário do antigo modelo por valor)."""
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -3337,6 +3382,25 @@ def test_estrutura_passada_por_valor_nao_e_mutada_no_chamador():
         inicio
             a:Ponto = {x: 1}
             muda(a)
+            escrever(a.x)
+    """)
+    assert saida.strip() == "99"
+
+
+def test_estrutura_passada_sem_ref_reatribuida_nao_afeta_o_chamador():
+    """Ponto 3: reatribuir o PRÓPRIO parâmetro (não um campo seu) dentro
+    do procedimento não propaga para o chamador -- sem 'ref' não corre
+    nenhum mecanismo de escrita de volta, é só um rebind local do nome
+    do parâmetro."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento troca(p:Ponto)
+            p = {x: 99}
+        inicio
+            a:Ponto = {x: 1}
+            troca(a)
             escrever(a.x)
     """)
     assert saida.strip() == "1"
@@ -3571,7 +3635,7 @@ def test_encadear_indice_e_campo_apos_chamada():
         estrutura No
             valor:inteiro
         funcao vet(): No[]
-            v:No[2]
+            v:No[2] = {{}, {}}
             v[0].valor = 42
             retornar v
         inicio
@@ -3989,23 +4053,6 @@ def test_procedimento_so_com_ref_nao_salta_linha_para_tras_no_trace(tmp_path):
 
 # ---------- B29 (AL-69): linter -- campos em falta não cobre literais em argumento ----------
 
-def test_campo_em_falta_em_literal_passado_como_argumento_da_aviso():
-    from algo_lang.tools.linter import analisar
-    programa = parse(textwrap.dedent("""
-        algoritmo "T"
-        estrutura Ponto
-            x:inteiro
-            y:inteiro
-        funcao soma(p:Ponto):inteiro
-            retornar p.x + p.y
-        inicio
-            escrever(soma({x: 3}))
-    """))
-    verificar(programa)
-    avisos = analisar(programa)
-    assert any("não define o(s) campo(s) 'y'" in a.mensagem for a in avisos)
-
-
 # ---------- B30 (AL-70): linter -- atribuição a parâmetro por valor não cobre 'ler(...)' ----------
 
 def test_ler_para_parametro_por_valor_da_aviso_especifico():
@@ -4076,14 +4123,27 @@ def test_colisao_de_campo_de_estrutura_reporta_a_linha_do_campo():
 
 # ---------- B7 (AL-79): semantics -- tamanho declarado de vetor nunca validado contra o literal ----------
 
-def test_vetor_com_literal_de_tamanho_diferente_do_declarado_da_erro():
-    with pytest.raises(ErroSemantico, match="tamanho declarado 5.*3 elemento"):
+def test_vetor_com_literal_maior_do_que_o_declarado_da_erro():
+    with pytest.raises(ErroSemantico, match="tamanho declarado 3.*5 elemento"):
         compilar("""
             algoritmo "T"
             inicio
-                v:inteiro[5] = {1, 2, 3}
+                v:inteiro[3] = {1, 2, 3, 4, 5}
                 escrever(v[0])
         """)
+
+
+def test_vetor_com_literal_menor_do_que_o_declarado_preenche_com_omissao():
+    """Ponto 6: um literal com MENOS elementos do que o tamanho declarado
+    já não é erro -- as posições em falta ficam com o valor por omissão
+    do elemento (preenchimento posicional pelo início)."""
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            v:inteiro[5] = {1, 2, 3}
+            escrever(v[0], v[1], v[2], v[3], v[4])
+    """)
+    assert saida.strip() == "12300"
 
 
 def test_vetor_com_literal_de_tamanho_igual_ao_declarado_compila():
@@ -4380,7 +4440,7 @@ def test_vetor_de_estrutura_com_campo_multidimensional_continua_a_funcionar():
         estrutura Turma
             notas:inteiro[3]
         inicio
-            t:Turma
+            t:Turma = {}
             t.notas[0] = 9
             escrever(t.notas[0])
             escrever(t.notas[1])
@@ -4894,7 +4954,10 @@ def test_parametro_vetor_pode_ser_indexado_e_mutado_no_corpo():
     assert saida.strip() == "2"
 
 
-def test_vetor_passado_por_valor_nao_e_mutado_no_chamador():
+def test_vetor_passado_sem_ref_e_mutado_no_chamador():
+    """Ponto 3: sem 'ref', o parâmetro recebe a MESMA referência que o
+    chamador passou -- mutar um elemento dentro do procedimento é visível
+    para o chamador (ao contrário do antigo modelo por valor)."""
     saida = executar("""
         algoritmo "T"
         procedimento muda(v: inteiro[])
@@ -4904,7 +4967,7 @@ def test_vetor_passado_por_valor_nao_e_mutado_no_chamador():
             muda(a)
             escrever(a[0])
     """)
-    assert saida.strip() == "1"
+    assert saida.strip() == "99"
 
 
 def test_vetor_passado_por_ref_muta_no_chamador():
@@ -5054,9 +5117,10 @@ def test_declaracao_a_partir_de_funcao_ref_que_devolve_vetor_com_dims_erradas_e_
 
 
 def test_escrever_de_vetor_continua_rejeitado_regressao():
-    """Regressão: 'permitir_vetor' só é passado True nos dois sítios
-    legítimos (argumento de chamada, 'retornar') -- escrever() continua a
-    rejeitar um vetor nu como antes desta funcionalidade existir."""
+    """Regressão: 'permitir_vetor' só é passado True nos sítios legítimos
+    (argumento de chamada, 'retornar', lado direito de uma
+    atribuição/declaração a um vetor) -- escrever() continua a rejeitar
+    um vetor nu como antes desta funcionalidade existir."""
     with pytest.raises(ErroSemantico, match="falta indexá-lo"):
         compilar("""
             algoritmo "T"
@@ -5078,7 +5142,7 @@ def test_parametro_vetor_2d_indexado_no_corpo():
     assert saida.strip() == "5"
 
 
-def test_vetor_de_estruturas_por_valor_faz_deep_copy():
+def test_vetor_de_estruturas_passado_sem_ref_e_mutado_no_chamador():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -5090,7 +5154,7 @@ def test_vetor_de_estruturas_por_valor_faz_deep_copy():
             muda(a)
             escrever(a[0].x)
     """)
-    assert saida.strip() == "1"
+    assert saida.strip() == "99"
 
 
 # ---------- AUDITORIA.md secção 2 -- UX de erros/robustez ----------
@@ -5862,7 +5926,7 @@ procedimento somar(ref a:inteiro, ref b:inteiro)
     a = a + 1
     b = b + 1
 inicio
-    pontos:Ponto[2]
+    pontos:Ponto[2] = {{}, {}}
     pontos[0].x = 5
     somar(pontos[0].x, pontos[0].x)
     escrever(pontos[0].x)
@@ -5938,7 +6002,7 @@ estrutura No
     valor:inteiro
     seguinte:No
 inicio
-    n:No
+    n:No = {}
     escrever(n.seguinte.valor)
 """)
     assert resultado.returncode == 1
@@ -5990,18 +6054,20 @@ def test_matematica_potencia_com_expoente_grande_calcula_e_imprime_sem_overflow(
     assert saida.strip() == str(10 ** 1000)
 
 
-# ---------- AUDITORIA_2026-08-19 Fase 1.1: bug #1 -- cópia por valor de
-# estruturas/vetores (9 caminhos confirmados) ----------
+# ---------- AUDITORIA_2026-08-19 Fase 1.1 (mudança de semântica:
+# 'estrutura'/'vetor' passaram de tipos por VALOR para tipos por
+# REFERÊNCIA, ponto 1) -- os mesmos 9 caminhos, agora confirmando
+# ALIASING em vez de cópia ----------
 
-def test_atribuicao_simples_de_estrutura_nao_e_partilhada():
+def test_atribuicao_simples_de_estrutura_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
             x:inteiro
             y:inteiro
         inicio
-            p1:Ponto
-            p2:Ponto
+            p1:Ponto = {}
+            p2:Ponto = {}
             p1.x = 1
             p1.y = 2
             p2 = p1
@@ -6009,10 +6075,10 @@ def test_atribuicao_simples_de_estrutura_nao_e_partilhada():
             escrever(p1.x)
             escrever(p2.x)
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_declaracao_com_inicializador_de_estrutura_nao_e_partilhada():
+def test_declaracao_com_inicializador_de_estrutura_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6024,15 +6090,15 @@ def test_declaracao_com_inicializador_de_estrutura_nao_e_partilhada():
             escrever(p1.x)
             escrever(p2.x)
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_retornar_variavel_de_estrutura_existente_nao_e_partilhada():
+def test_retornar_variavel_de_estrutura_existente_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
             x:inteiro
-        g:Ponto
+        g:Ponto = {}
         funcao pegaG():Ponto
             retornar g
         inicio
@@ -6042,10 +6108,10 @@ def test_retornar_variavel_de_estrutura_existente_nao_e_partilhada():
             escrever(g.x)
             escrever(p.x)
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_retornar_vetor_inteiro_existente_nao_e_partilhado():
+def test_retornar_vetor_inteiro_existente_e_aliasing():
     saida = executar("""
         algoritmo "T"
         v:inteiro[3]
@@ -6058,10 +6124,10 @@ def test_retornar_vetor_inteiro_existente_nao_e_partilhado():
             escrever(v[0])
             escrever(a[0])
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_atribuicao_a_campo_de_estrutura_aninhada_nao_e_partilhada():
+def test_atribuicao_a_campo_de_estrutura_aninhada_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6070,16 +6136,16 @@ def test_atribuicao_a_campo_de_estrutura_aninhada_nao_e_partilhada():
             canto:Ponto
         inicio
             p1:Ponto = {x: 1}
-            r:Retangulo
+            r:Retangulo = {canto: {}}
             r.canto = p1
             r.canto.x = 99
             escrever(p1.x)
             escrever(r.canto.x)
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_literal_de_vetor_com_elementos_variaveis_estrutura_nao_e_partilhado():
+def test_literal_de_vetor_com_elementos_variaveis_estrutura_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6092,16 +6158,16 @@ def test_literal_de_vetor_com_elementos_variaveis_estrutura_nao_e_partilhado():
             escrever(p1.x)
             escrever(v[0].x)
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_elemento_a_elemento_num_vetor_de_estruturas_nao_e_partilhado():
+def test_elemento_a_elemento_num_vetor_de_estruturas_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
             x:inteiro
         inicio
-            arr:Ponto[2]
+            arr:Ponto[2] = {{}, {}}
             arr[0].x = 1
             arr[1].x = 2
             arr[0] = arr[1]
@@ -6109,26 +6175,26 @@ def test_elemento_a_elemento_num_vetor_de_estruturas_nao_e_partilhado():
             escrever(arr[1].x)
             escrever(arr[0].x)
     """)
-    assert saida.strip() == "2\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_elemento_de_vetor_a_partir_de_variavel_estrutura_nao_e_partilhado():
+def test_elemento_de_vetor_a_partir_de_variavel_estrutura_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
             x:inteiro
         inicio
             p1:Ponto = {x: 1}
-            arr:Ponto[1]
+            arr:Ponto[1] = {{}}
             arr[0] = p1
             arr[0].x = 99
             escrever(p1.x)
             escrever(arr[0].x)
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_campo_de_literal_de_estrutura_a_partir_de_variavel_nao_e_partilhado():
+def test_campo_de_literal_de_estrutura_a_partir_de_variavel_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6142,10 +6208,10 @@ def test_campo_de_literal_de_estrutura_a_partir_de_variavel_nao_e_partilhado():
             escrever(p1.x)
             escrever(r.canto.x)
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_literal_de_vetor_como_argumento_direto_nao_partilha_elementos():
+def test_literal_de_vetor_como_argumento_direto_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6158,10 +6224,10 @@ def test_literal_de_vetor_como_argumento_direto_nao_partilha_elementos():
             muda({p1, p2})
             escrever(p1.x)
     """)
-    assert saida.strip() == "1"
+    assert saida.strip() == "99"
 
 
-def test_literal_de_estrutura_como_argumento_direto_nao_partilha_campo():
+def test_literal_de_estrutura_como_argumento_direto_e_aliasing():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6175,10 +6241,13 @@ def test_literal_de_estrutura_como_argumento_direto_nao_partilha_campo():
             muda({canto: p1})
             escrever(p1.x)
     """)
-    assert saida.strip() == "1"
+    assert saida.strip() == "99"
 
 
-def test_copia_de_estrutura_e_profunda_nao_superficial_em_campo_vetor():
+def test_atribuicao_de_estrutura_alia_tambem_os_seus_campos_vetor():
+    """Sem cópia nenhuma, 'b:Poligono = a' torna 'b' e 'a' o MESMO
+    objeto -- não há distinção "rasa vs profunda" a fazer, mutar através
+    de 'b' (a qualquer profundidade) é sempre visível através de 'a'."""
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6188,7 +6257,7 @@ def test_copia_de_estrutura_e_profunda_nao_superficial_em_campo_vetor():
         inicio
             p1:Ponto = {x: 1}
             p2:Ponto = {x: 2}
-            a:Poligono
+            a:Poligono = {}
             a.pontos[0] = p1
             a.pontos[1] = p2
             b:Poligono = a
@@ -6196,10 +6265,14 @@ def test_copia_de_estrutura_e_profunda_nao_superficial_em_campo_vetor():
             escrever(a.pontos[0].x)
             escrever(b.pontos[0].x)
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_bug14_atribuir_constante_a_variavel_normal_nao_quebra_a_constante():
+def test_atribuir_constante_de_estrutura_a_variavel_normal_cria_alias():
+    """'constante' só impede REATRIBUIR o nome 'c' -- não protege o
+    objeto que 'c' aponta de ser mutado através doutra variável que lhe
+    faça alias (ponto 1), exatamente como 'final'/'readonly' nas
+    linguagens de referência mais comuns."""
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6212,10 +6285,10 @@ def test_bug14_atribuir_constante_a_variavel_normal_nao_quebra_a_constante():
             escrever(c.x)
             escrever(p.x)
     """)
-    assert saida.strip() == "1\n99"
+    assert saida.strip() == "99\n99"
 
 
-def test_ref_continua_a_ser_aliasing_intencional_apos_copia_por_valor():
+def test_ref_continua_a_mutar_so_a_variavel_passada():
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -6224,7 +6297,7 @@ def test_ref_continua_a_ser_aliasing_intencional_apos_copia_por_valor():
             p.x = 99
         inicio
             p1:Ponto = {x: 1}
-            p2:Ponto = p1
+            p2:Ponto = {x: 1}
             muda(p2)
             escrever(p1.x)
             escrever(p2.x)
@@ -6310,7 +6383,7 @@ algoritmo "T"
 estrutura Ponto
     x:inteiro
 inicio
-    arr:Ponto[2]
+    arr:Ponto[2] = {{}, {}}
     arr[0].x = 1
     i:inteiro = -1
     escrever(arr[i].x)
@@ -6397,7 +6470,7 @@ def test_indice_com_efeito_lateral_apos_campo_de_estrutura_em_ref_e_avaliado_uma
         procedimento incrementa(ref x:inteiro)
             x = x + 100
         inicio
-            arr:Ponto[2]
+            arr:Ponto[2] = {{}, {}}
             arr[0].x = 1
             arr[1].x = 2
             contador = 0
@@ -6841,17 +6914,32 @@ def test_constante_multi_nivel_como_tamanho_negativo_da_erro_em_compilacao():
         """)
 
 
-def test_constante_como_tamanho_incompativel_com_literal_da_erro_em_compilacao():
-    """Antes, 'constante N:inteiro = 3; v:inteiro[N] = {1,2}' compilava
-    sem erro (o equivalente literal 'v:inteiro[3] = {1,2}' já dava erro
-    de compilação) -- só se notava ao aceder ao elemento em falta, em
-    runtime."""
+def test_constante_como_tamanho_com_literal_parcial_preenche_com_omissao():
+    """Ponto 6: mesmo com o tamanho vindo de uma 'constante' (resolvida
+    em compilação, ver _tamanho_estatico), um literal com menos elementos
+    do que o tamanho declarado preenche as posições em falta, tal como
+    com um tamanho literal direto."""
+    saida = executar("""
+        algoritmo "T"
+        inicio
+            constante N:inteiro = 3
+            v:inteiro[N] = {1, 2}
+            escrever(v[0], v[1], v[2])
+    """)
+    assert saida.strip() == "120"
+
+
+def test_constante_como_tamanho_com_literal_a_mais_da_erro_em_compilacao():
+    """Antes, 'constante N:inteiro = 3; v:inteiro[N] = {1,2,3,4}' compilava
+    sem erro (o equivalente literal 'v:inteiro[3] = {1,2,3,4}' já dava erro
+    de compilação) -- só se notava ao aceder a um índice fora dos limites,
+    em runtime."""
     with pytest.raises(ErroSemantico, match="tamanho declarado 3"):
         compilar("""
             algoritmo "T"
             inicio
                 constante N:inteiro = 3
-                v:inteiro[N] = {1, 2}
+                v:inteiro[N] = {1, 2, 3, 4}
                 escrever(1)
         """)
 

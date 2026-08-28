@@ -5,7 +5,7 @@ estrutura Circulo
     centroY:decimal
     raio:decimal
 
-procedimento aumentarRaio(ref c:Circulo, incremento:decimal)
+procedimento aumentarRaio(c:Circulo, incremento:decimal)
     c.raio = c.raio + incremento
 
 inicio

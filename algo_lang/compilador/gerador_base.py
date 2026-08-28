@@ -61,6 +61,15 @@ class GeradorCodigoBase:
         # que precisa de sobreviver a toda a vida do ciclo, incluindo
         # através de ciclos aninhados.
         self._contador_faz_enquanto = 0
+        # Idem para as temporárias de dimensão de _construir_vetor_aninhado
+        # (codegen.py) -- nomes ÚNICOS em todo o programa, não reaproveitados
+        # por índice (0, 1, ...) dentro de cada chamada: uma única instrução
+        # pode invocar _construir_vetor_aninhado mais do que uma vez (ex.:
+        # preenchimento de várias linhas em falta num literal de vetor
+        # multidimensional parcial, ver _expr_vetor_literal) antes de a
+        # instrução final ser emitida -- nomes fixos colidiriam entre essas
+        # chamadas irmãs.
+        self._contador_dim_vetor = 0
 
     def emit(self, texto, nivel):
         self.linhas.append("    " * nivel + texto)
@@ -71,40 +80,7 @@ class GeradorCodigoBase:
     def _valor_default(self, tipo):
         if tipo in DEFAULT_POR_TIPO:
             return DEFAULT_POR_TIPO[tipo]
-        return f"{tipo}()"   # instância por omissão de uma estrutura
-
-    def _estruturas_recursivas(self):
-        """Nomes de estrutura que são (direta ou mutuamente) recursivas --
-        ex.: 'No' com um campo 'seguinte: No' (lista ligada), 'No' com um
-        campo 'filhos: No[2]' (árvore), ou duas estruturas com campos
-        cruzados. self._valor_default(tipo) para um desses nomes nunca
-        termina (o valor por omissão de um campo do próprio tipo seria
-        outra instância, com outro campo do próprio tipo, ad infinitum)
-        -- por isso os SEUS campos desse tipo têm de ficar 'None' (nulo,
-        campo escalar) ou '[]' (vazio, campo vetor) em vez de construídos
-        eagerly; ver o uso em _gerar_estrutura (codegen.py). Um campo
-        vetor entra no grafo tal como um campo escalar -- 'filhos: No[2]'
-        também recursaria infinitamente se construído eagerly (cada 'No'
-        tentaria construir os seus próprios 'filhos', ad infinitum)."""
-        grafo = {
-            nome: [tipo for tipo, dims_n, _por_referencia in campos.values()
-                   if tipo in self.estruturas]
-            for nome, campos in self.estruturas.items()
-        }
-        recursivas = set()
-        for origem in grafo:
-            pilha = list(grafo[origem])
-            vistos = set()
-            while pilha:
-                atual = pilha.pop()
-                if atual == origem:
-                    recursivas.add(origem)
-                    break
-                if atual in vistos:
-                    continue
-                vistos.add(atual)
-                pilha.extend(grafo.get(atual, []))
-        return recursivas
+        return "None"   # 'estrutura' sem literal fica 'nulo' por omissão -- ver ponto 5
 
     def _coagir_decimal(self, expr_py: str, tipo_alvo, expr_no) -> str:
         """'decimal' aceita um valor 'inteiro' (_compativel em semantics.py),
@@ -117,17 +93,6 @@ class GeradorCodigoBase:
         if tipo_alvo == "decimal" and getattr(expr_no, "_tipo_inferido", None) == "inteiro":
             return f"float({expr_py})"
         return expr_py
-
-    def _copiar_se_necessario(self, expr_python, tipo, dims):
-        """'estrutura' e vetor são tipos por VALOR em ALGO; listas e
-        instâncias de classe do Python gerado são sempre referências.
-        Ponto único de cópia (copy.deepcopy, cobrindo níveis aninhados),
-        chamado em todos os caminhos que podem ler o valor de uma variável
-        já existente. Não se aplica a passagem 'ref' -- aliasing é
-        intencional aí."""
-        if dims > 0 or tipo in self.estruturas:
-            return f"copy.deepcopy({expr_python})"
-        return expr_python
 
     # -------- statements --------
     def _gerar_corpo(self, corpo, nivel, tipos):
@@ -161,17 +126,32 @@ class GeradorCodigoBase:
             # extinto codegen_minimo.py.
             expr = self._expr_estrutura_literal(stmt.expr, tipo_alvo, tipos)
         elif isinstance(stmt.expr, A.VetorLiteral):
-            # Mesma lacuna, lado vetor -- 'v = {{nome: "Ana"}}' com 'v' já
-            # declarado como vetor de estruturas.
-            expr = self._expr_vetor_literal(stmt.expr, tipo_alvo, tipos)
+            # 'v = {1, 2, 3}' com 'v' já declarado como vetor -- ao
+            # contrário de uma declaração, não há aqui o tamanho DECLARADO
+            # de 'v' à mão (só o nome do tipo, em 'tipos'), por isso não
+            # há tamanho-alvo para preencher em falta (dims_exprs=None,
+            # ver _expr_vetor_literal) -- fica só com os elementos dados,
+            # como sempre.
+            expr = self._expr_vetor_literal(stmt.expr, tipo_alvo, None, tipos)
         else:
             expr = self._coagir_decimal(self._expr(stmt.expr, tipos), tipo_alvo, stmt.expr)
-            # semantics.py já rejeita atribuir um vetor inteiro diretamente
-            # (o alvo aqui é sempre dims==0), por isso só 'estrutura'
-            # importa neste caminho -- exceto se o alvo for um campo 'ref',
-            # onde aliasing é intencional (ver _alvo_e_campo_ref).
-            if not self._alvo_e_campo_ref(stmt.alvo, tipos):
-                expr = self._copiar_se_necessario(expr, tipo_alvo, 0)
+            # O alvo pode ser um vetor inteiro (dims > 0) desde a
+            # introdução de atribuição direta entre vetores -- 'tipos' aqui
+            # só guarda o NOME do tipo, por isso as dimensões vêm anotadas
+            # por semantics.py em 'stmt.alvo._dims_inferido'.
+            dims_alvo = getattr(stmt.alvo, "_dims_inferido", 0)
+            if dims_alvo == 1:
+                # O lado direito (variável ou chamada sem 'ref') só tem o
+                # tamanho REAL conhecido em runtime -- tal como em
+                # _gerar_declaracao, mas aqui não há 'd.dims[0]' para
+                # consultar (o alvo já existia antes desta instrução).
+                # 'len(alvo)' ANTES da atribuição é o próprio tamanho
+                # declarado do alvo: só chega aqui depois de já ter sido
+                # construído com o tamanho certo (declaração, ou uma
+                # atribuição anterior que já passou por este mesmo guarda)
+                # -- e o Python avalia todo o lado direito antes de
+                # reatribuir 'alvo'.
+                expr = f"_algo_verificar_tamanho_vetor_resultado({expr}, len({alvo}))"
         self.emit(f"{alvo} = {expr}", nivel)
 
     def _gerar_se(self, stmt: A.Se, nivel, tipos):
@@ -264,24 +244,8 @@ class GeradorCodigoBase:
         for tag, valor in lv.acessos:
             if tag == "campo":
                 campos = self.estruturas.get(tipo_atual, {})
-                tipo_atual = campos.get(valor, ("cadeia", 0, False))[0]
+                tipo_atual = campos.get(valor, ("cadeia", 0))[0]
         return tipo_atual
-
-    def _alvo_e_campo_ref(self, lv: A.LValue, tipos):
-        """True se o ÚLTIMO acesso de 'lv' for um campo 'ref' -- usado para
-        saltar _copiar_se_necessario ao atribuir a um campo 'ref' (aliasing
-        intencional, tal como um parâmetro 'ref'). Mesmo percurso que
-        _tipo_final_lvalue, só que para no penúltimo acesso e olha para o
-        3º elemento (por_referencia) da entrada do campo final."""
-        if not lv.acessos or lv.acessos[-1][0] != "campo":
-            return False
-        tipo_atual = tipos.get(lv.nome, "cadeia")
-        for tag, valor in lv.acessos[:-1]:
-            if tag == "campo":
-                campos = self.estruturas.get(tipo_atual, {})
-                tipo_atual = campos.get(valor, ("cadeia", 0, False))[0]
-        campos = self.estruturas.get(tipo_atual, {})
-        return campos.get(lv.acessos[-1][1], ("cadeia", 0, False))[2]
 
     # -------- funções --------
     def _gerar_funcao(self, f: A.FuncaoDef):

@@ -18,7 +18,7 @@ def test_declaracao_e_acesso_a_campos():
             x:inteiro
             y:inteiro
         inicio
-            p:Ponto
+            p:Ponto = {}
             p.x = 3
             p.y = 4
             escrever(p.x, ",", p.y)
@@ -27,6 +27,10 @@ def test_declaracao_e_acesso_a_campos():
 
 
 def test_campos_tem_valor_por_omissao():
+    """'{}' constrói uma instância real, com cada campo no seu próprio
+    valor por omissão -- ao contrário de uma declaração 'c:Conta' sem
+    literal nenhum, que fica 'nulo' (ver test_declaracao_sem_literal_
+    fica_nula, mais abaixo)."""
     saida = executar("""
         algoritmo "T"
         estrutura Conta
@@ -34,13 +38,29 @@ def test_campos_tem_valor_por_omissao():
             nome:cadeia
             ativa:booleano
         inicio
-            c:Conta
+            c:Conta = {}
             escrever(c.saldo, "|", c.nome, "|", c.ativa)
     """)
     assert saida.strip() == "0.0||falso"
 
 
+def test_declaracao_sem_literal_fica_nula():
+    saida = executar("""
+        algoritmo "T"
+        estrutura Conta
+            saldo:decimal
+        inicio
+            c:Conta
+            escrever(c == nulo)
+    """)
+    assert saida.strip() == "verdadeiro"
+
+
 def test_estrutura_aninhada():
+    """Um campo do tipo 'estrutura' segue a mesma regra que a variável
+    top-level: fica 'nulo' por omissão, mesmo dentro de um '{}' -- por
+    isso 'r.canto' também precisa do seu próprio '{}' explícito antes de
+    se lhe poder aceder a campos."""
     saida = executar("""
         algoritmo "T"
         estrutura Ponto
@@ -50,7 +70,7 @@ def test_estrutura_aninhada():
             canto:Ponto
             largura:inteiro
         inicio
-            r:Retangulo
+            r:Retangulo = {canto: {}, largura: 0}
             r.canto.x = 10
             r.canto.y = 20
             escrever(r.canto.x, ",", r.canto.y)
@@ -67,12 +87,27 @@ def test_ref_com_estrutura_altera_o_original():
         procedimento deslocar(ref p:Ponto, dx:inteiro)
             p.x = p.x + dx
         inicio
-            p:Ponto
+            p:Ponto = {}
             p.x = 5
             deslocar(p, 100)
             escrever(p.x)
     """)
     assert saida.strip() == "105"
+
+
+def test_vetor_de_estruturas_bare_fica_com_elementos_nulos():
+    """Ponto 5: o valor por omissão de um vetor continua a ser preenchido
+    eagerly (ao contrário de uma 'estrutura' sozinha), mas cada elemento
+    de tipo 'estrutura' é, ele próprio, 'nulo' -- não uma instância nova."""
+    saida = executar("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        inicio
+            pontos:Ponto[3]
+            escrever(pontos[0] == nulo, ",", pontos[1] == nulo, ",", pontos[2] == nulo)
+    """)
+    assert saida.strip() == "verdadeiro,verdadeiro,verdadeiro"
 
 
 def test_vetor_de_estruturas_tem_instancias_independentes():
@@ -81,7 +116,7 @@ def test_vetor_de_estruturas_tem_instancias_independentes():
         estrutura Ponto
             x:inteiro
         inicio
-            pontos:Ponto[3]
+            pontos:Ponto[3] = {{}, {}, {}}
             pontos[0].x = 100
             escrever(pontos[0].x, ",", pontos[1].x, ",", pontos[2].x)
     """)
@@ -97,7 +132,7 @@ def test_estrutura_como_parametro_e_retorno_de_funcao():
         funcao somaCoordenadas(p:Ponto):inteiro
             retornar p.x + p.y
         inicio
-            p:Ponto
+            p:Ponto = {}
             p.x = 3
             p.y = 4
             escrever(somaCoordenadas(p))
@@ -167,40 +202,38 @@ def test_campo_duplicado_da_erro():
 # ---------- 'nulo' e estruturas auto-referenciadas (listas ligadas, árvores) ----------
 
 def test_estrutura_auto_referenciada_nao_recursa_infinitamente():
-    """Antes, declarar 'n:No' com um campo 'seguinte:No' rebentava com
-    RecursionError -- o valor por omissão de um campo do próprio tipo
-    era sempre construído eagerly. Agora o campo fica 'nulo'."""
+    """'{}' preenche cada campo com o SEU PRÓPRIO valor por omissão --
+    para um campo de tipo 'estrutura' isso é sempre 'nulo' (ponto 5),
+    recursivo ou não, por isso não há recursão nenhuma a evitar aqui:
+    'seguinte' fica 'nulo' tal e qual um campo escalar ficaria 0."""
     saida = executar("""
         algoritmo "T"
         estrutura No
             valor:inteiro
             seguinte:No
         inicio
-            n:No
+            n:No = {}
             escrever(n.valor, "|", n.seguinte == nulo)
     """)
     assert saida.strip() == "0|verdadeiro"
 
 
 def test_lista_ligada_construida_e_percorrida_com_nulo():
-    """Atribuição de estrutura copia por valor -- por isso 'b' tem de
-    estar com os seus campos finais ANTES de 'a.seguinte = b', senão
-    'a.seguinte' fica com a cópia de 'b' como estava nesse momento
-    (valor=0), não com o valor atribuído depois. Constrói-se sempre de
-    trás para a frente, tal como não há alocação dinâmica em ALGO."""
+    """Ao contrário de uma cópia por valor, aliasing permite ligar
+    'a.seguinte = b' e só DEPOIS mutar 'b.valor' -- a mutação aparece
+    através de 'a.seguinte', porque é o MESMO objeto (ponto 1)."""
     saida = executar("""
         algoritmo "T"
         estrutura No
             valor:inteiro
             seguinte:No
         inicio
-            b:No
-            b.valor = 2
-            b.seguinte = nulo
-
-            a:No
+            a:No = {}
             a.valor = 1
+
+            b:No = {}
             a.seguinte = b
+            b.valor = 2
 
             atual:No = a
             enquanto atual <> nulo fazer
@@ -218,7 +251,7 @@ def test_aceder_a_campo_de_nulo_da_erro_amigavel_nao_traceback(tmp_path):
         '    valor:inteiro\n'
         '    seguinte:No\n'
         'inicio\n'
-        '    n:No\n'
+        '    n:No = {}\n'
         '    escrever(n.seguinte.valor)\n',
         encoding="utf-8")
     resultado = subprocess.run(
@@ -255,7 +288,7 @@ def test_mutuamente_recursivas_tambem_nao_recursam_infinitamente():
         estrutura B
             a:A
         inicio
-            x:A
+            x:A = {}
             escrever(x.b == nulo)
     """)
     assert saida.strip() == "verdadeiro"
@@ -266,19 +299,20 @@ def test_campo_vetor_do_proprio_tipo_nao_recursa_infinitamente():
     PRÓPRIO tipo) compilava, mas construir a instância por omissão
     tentava eagerly popular os 2 elementos de 'filhos', cada um dos quais
     tentava construir os seus próprios 2 elementos, ad infinitum --
-    RecursionError em runtime, sem workaround nenhum. Um campo-vetor
-    recursivo agora fica vazio por omissão, tal como um campo escalar
-    recursivo (ex.: 'seguinte:No') já ficava 'nulo'."""
+    RecursionError em runtime, sem workaround nenhum. Hoje um campo-vetor
+    NUNCA recursa, mesmo do próprio tipo: cada elemento é preenchido
+    eagerly, mas um elemento de tipo 'estrutura' é sempre 'nulo' (ponto
+    5), nunca uma instância nova."""
     saida = executar("""
         algoritmo "T"
         estrutura No
             valor:inteiro
             filhos:No[2]
         inicio
-            x:No
-            escrever(x.valor)
+            x:No = {}
+            escrever(x.valor, "|", x.filhos[0] == nulo, ",", x.filhos[1] == nulo)
     """)
-    assert saida.strip() == "0"
+    assert saida.strip() == "0|verdadeiro,verdadeiro"
 
 
 def test_campo_vetor_mutuamente_recursivo_tambem_nao_recursa_infinitamente():
@@ -296,6 +330,9 @@ def test_campo_vetor_mutuamente_recursivo_tambem_nao_recursa_infinitamente():
 
 
 def test_aceder_a_campo_vetor_recursivo_vazio_da_erro_amigavel_nao_traceback(tmp_path):
+    """'filhos' fica preenchido (2 elementos), mas cada elemento é 'nulo'
+    -- '.valor' sobre o elemento é que dá o erro amigável (ver
+    test_campo_vetor_do_proprio_tipo_nao_recursa_infinitamente)."""
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
         'algoritmo "T"\n'
@@ -303,7 +340,7 @@ def test_aceder_a_campo_vetor_recursivo_vazio_da_erro_amigavel_nao_traceback(tmp
         '    valor:inteiro\n'
         '    filhos:No[2]\n'
         'inicio\n'
-        '    x:No\n'
+        '    x:No = {}\n'
         '    escrever(x.filhos[0].valor)\n',
         encoding="utf-8")
     import os
@@ -311,22 +348,26 @@ def test_aceder_a_campo_vetor_recursivo_vazio_da_erro_amigavel_nao_traceback(tmp
     resultado = subprocess.run(
         ["algo", "executa", str(algo_path)], capture_output=True, encoding="utf-8", env=env)
     assert "Traceback" not in resultado.stdout
-    assert "posição de vetor" in resultado.stdout
+    assert "campo 'valor' de um valor nulo" in resultado.stdout
 
 
-# ---------- campo 'ref' (aliasing em vez de cópia por valor) ----------
-
-def test_campo_ref_compila_e_fica_nulo_por_omissao():
-    saida = executar("""
-        algoritmo "T"
-        estrutura No
-            valor:inteiro
-            seguinte:ref No
-        inicio
-            n:No
-            escrever(n.seguinte == nulo)
-    """)
-    assert saida.strip() == "verdadeiro"
+def test_aceder_a_posicao_de_vetor_nulo_da_erro_amigavel_nao_traceback(tmp_path):
+    """Um 'vetor' pode ficar 'nulo' tal como uma 'estrutura' (declaração
+    sem literal, ou 'nulo' explícito) -- indexá-lo dá um erro amigável
+    dedicado, não o traceback cru do Python."""
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\n'
+        'inicio\n'
+        '    v:inteiro[3] = nulo\n'
+        '    escrever(v[0])\n',
+        encoding="utf-8")
+    import os
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    resultado = subprocess.run(
+        ["algo", "executa", str(algo_path)], capture_output=True, encoding="utf-8", env=env)
+    assert "Traceback" not in resultado.stdout
+    assert "posição de um vetor nulo" in resultado.stdout
 
 
 def test_ref_em_declaracao_local_continua_erro_sintatico():
@@ -348,151 +389,17 @@ def test_ref_em_declaracao_global_continua_erro_sintatico():
         """)
 
 
-def test_campo_ref_de_tipo_primitivo_da_erro_semantico():
-    with pytest.raises(ErroSemantico, match="ref"):
-        compilar("""
-            algoritmo "T"
-            estrutura No
-                valor:ref inteiro
-            inicio
-                n:No
-        """)
-
-
-def test_campo_ref_vetor_da_erro_semantico():
-    with pytest.raises(ErroSemantico, match="ref"):
+def test_ref_em_campo_de_estrutura_e_erro_sintatico():
+    """'ref' num campo de 'estrutura' já não existe como funcionalidade
+    (aliasing é agora o comportamento normal de QUALQUER campo, ver
+    test_lista_ligada_construida_e_percorrida_com_nulo) -- volta a ser
+    exatamente o mesmo erro sintático que uma declaração local/global."""
+    with pytest.raises(ErroSintatico):
         compilar("""
             algoritmo "T"
             estrutura No
                 valor:inteiro
-                seguinte:ref No[3]
+                seguinte:ref No
             inicio
-                n:No
+                escrever(1)
         """)
-
-
-def test_lista_ligada_com_ref_permite_ligar_e_mutar_depois():
-    """Ao contrário de test_lista_ligada_construida_e_percorrida_com_nulo
-    (campo simples, cópia por valor, tem de se construir de trás para a
-    frente), um campo 'ref' é um alias -- ligar 'a.seguinte = b' e só
-    depois mutar 'b.valor' propaga através de 'a.seguinte'."""
-    saida = executar("""
-        algoritmo "T"
-        estrutura No
-            valor:inteiro
-            seguinte:ref No
-        inicio
-            b:No
-            b.valor = 2
-
-            a:No
-            a.valor = 1
-            a.seguinte = b
-
-            b.valor = 99
-            escrever(a.seguinte.valor)
-    """)
-    assert saida.strip() == "99"
-
-
-def test_copia_por_valor_de_estrutura_preserva_identidade_de_campo_ref():
-    """Copiar 'a' por valor (declaração a partir doutra variável) não deve
-    quebrar o aliasing do seu campo 'ref' -- prova o __deepcopy__ gerado
-    (codegen.py:_gerar_estrutura), não só a atribuição direta ao campo."""
-    saida = executar("""
-        algoritmo "T"
-        estrutura No
-            valor:inteiro
-            seguinte:ref No
-        inicio
-            b:No
-            b.valor = 2
-
-            a:No
-            a.seguinte = b
-
-            c:No = a
-            b.valor = 77
-            escrever(c.seguinte.valor)
-    """)
-    assert saida.strip() == "77"
-
-
-def test_campo_normal_continua_copiado_por_valor_mesmo_com_irmao_ref():
-    """Regressão: um campo simples ao lado de um campo 'ref' na mesma
-    estrutura continua a copiar por valor -- só o campo 'ref' faz alias."""
-    saida = executar("""
-        algoritmo "T"
-        estrutura Par
-            a:inteiro
-            seguinte:ref Par
-        inicio
-            x:Par
-            x.a = 1
-
-            y:Par = x
-            x.a = 999
-            escrever(y.a)
-    """)
-    assert saida.strip() == "1"
-
-
-def test_ciclo_de_dois_nos_via_ref_sobrevive_a_copia_por_valor():
-    """Um ciclo de referências real só é possível através de campos 'ref'
-    (cópia por valor sozinha cortava sempre qualquer ciclo antes desta
-    funcionalidade) -- passar um nó do ciclo por valor a um procedimento
-    tem de terminar sem RecursionError, graças ao 'memo' do __deepcopy__
-    gerado."""
-    saida = executar("""
-        algoritmo "T"
-        estrutura No
-            valor:inteiro
-            seguinte:ref No
-
-        procedimento imprimir(n:No)
-            escrever(n.valor)
-
-        inicio
-            a:No
-            a.valor = 1
-            b:No
-            b.valor = 2
-            a.seguinte = b
-            b.seguinte = a
-            imprimir(a)
-    """)
-    assert saida.strip() == "1"
-
-
-def test_comparar_dois_ciclos_de_dois_nos_via_ref_nao_rebenta_e_da_igual():
-    """Mesmo cenário do teste acima, mas para '==' em vez de cópia: sem
-    deteção de ciclo no '__eq__' gerado, comparar dois nós que formam um
-    ciclo via 'ref' entrava em RecursionError (o 'memo' do __deepcopy__
-    não protegia '__eq__')."""
-    saida = executar("""
-        algoritmo "T"
-        estrutura No
-            valor:inteiro
-            seguinte:ref No
-
-        inicio
-            a1:No
-            a1.valor = 1
-            b1:No
-            b1.valor = 2
-            a1.seguinte = b1
-            b1.seguinte = a1
-
-            a2:No
-            a2.valor = 1
-            b2:No
-            b2.valor = 2
-            a2.seguinte = b2
-            b2.seguinte = a2
-
-            escrever(a1 == a1)
-            escrever(a1 == a2)
-            b2.valor = 99
-            escrever(a1 == a2)
-    """)
-    assert saida.strip() == "verdadeiro\nverdadeiro\nfalso"

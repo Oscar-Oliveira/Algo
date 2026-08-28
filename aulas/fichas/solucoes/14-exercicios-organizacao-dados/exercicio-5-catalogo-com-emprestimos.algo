@@ -4,11 +4,11 @@ estrutura Livro
     titulo:cadeia
     emprestado:booleano
 
-procedimento emprestar(ref livro:Livro)
+procedimento emprestar(livro:Livro)
     afirmar nao livro.emprestado, "o livro já está emprestado"
     livro.emprestado = verdadeiro
 
-procedimento devolver(ref livro:Livro)
+procedimento devolver(livro:Livro)
     afirmar livro.emprestado, "o livro não estava emprestado"
     livro.emprestado = falso
 
@@ -20,6 +20,7 @@ inicio
     livros:Livro[n]
     i:inteiro
     para i de 0 ate n - 1 fazer
+        livros[i] = {}
         escrever("Título: ")
         ler(livros[i].titulo)
         livros[i].emprestado = falso

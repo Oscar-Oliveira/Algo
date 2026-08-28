@@ -11,8 +11,9 @@ partes. Os exemplos de código são escritos de raiz para este manual
 
 Achados (melhorias conceptuais, inconsistências, bugs) encontrados ao
 escrever cada capítulo ficam registados num único documento,
-[`ACHADOS.md`](ACHADOS.md) — não espalhados por cada capítulo — porque um
-achado grande pode obrigar a rever capítulos já escritos.
+[`PlanoAuditoria.md`](../PlanoAuditoria.md) (secção "Achados") — não
+espalhados por cada capítulo — porque um achado grande pode obrigar a
+rever capítulos já escritos.
 
 ## Capítulos
 
@@ -38,7 +39,7 @@ Rascunho completo dos 10 capítulos. Todos os exemplos de código deste
 manual foram executados contra o compilador real (não só escritos de
 cabeça) para confirmar que compilam e produzem a saída mostrada.
 
-7 achados registados em [`ACHADOS.md`](ACHADOS.md) — 6 já corrigidos
+7 achados registados em [`PlanoAuditoria.md`](../PlanoAuditoria.md) — 6 já corrigidos
 (3 deles com mudança real de comportamento do compilador: valor por
 omissão de `caracter`, tipagem de `^` encadeado, `conversao.paraBooleano("0")`;
 os outros 3 eram só documentação/comentários desatualizados). 1 fica

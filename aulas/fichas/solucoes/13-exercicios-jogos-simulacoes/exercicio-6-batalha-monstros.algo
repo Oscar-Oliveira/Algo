@@ -5,7 +5,7 @@ estrutura Monstro
     vida:inteiro
     ataque:inteiro
 
-procedimento atacar(ref atacante:Monstro, ref defensor:Monstro)
+procedimento atacar(atacante:Monstro, defensor:Monstro)
     defensor.vida = defensor.vida - atacante.ataque
     escrever(atacante.nome, " ataca ", defensor.nome, " e causa ", atacante.ataque, " de dano")
 

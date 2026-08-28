@@ -424,15 +424,17 @@ escrever(7 mod -2)     // 1</code></pre>
           <ul>
             <li><code>==</code>/<code>&lt;&gt;</code> comparam dois numéricos (<code>inteiro</code>/<code>decimal</code>
               cruzados incluídos: <code>1 == 1.0</code> é <code>verdadeiro</code>), dois textos
-              (<code>cadeia</code>/<code>caracter</code> cruzados incluídos), ou <code>nulo</code> com uma
-              variável de tipo <code>estrutura</code> (capítulo 7). Comparar tipos incompatíveis (<code>5 ==
+              (<code>cadeia</code>/<code>caracter</code> cruzados incluídos), dois <code>vetor</code>/<code>estrutura</code>
+              do mesmo tipo, ou <code>nulo</code> com uma variável de tipo <code>vetor</code>/<code>estrutura</code>
+              (capítulos 5 e 7). Comparar tipos incompatíveis (<code>5 ==
                 "5"</code>, por exemplo) é erro de compilação.</li>
             <li><code>&lt;</code>/<code>&gt;</code>/<code>&lt;=</code>/<code>&gt;=</code> aceitam dois
               numéricos ou dois textos — texto compara por ordem de código Unicode, não ordem alfabética
               portuguesa (ex.: <code>"Z" &lt; "a"</code> é <code>verdadeiro</code>, porque maiúsculas vêm
               antes de minúsculas em Unicode).</li>
-            <li>Duas <code>estrutura</code> comparam-se campo a campo com <code>==</code>/<code>&lt;&gt;</code>
-              (não por identidade) — ver capítulo 7.</li>
+            <li>Dois <code>vetor</code>/<code>estrutura</code> comparam-se com <code>==</code>/<code>&lt;&gt;</code>
+              por <strong>referência</strong> (são o mesmo, não têm os mesmos elementos/campos) — ver
+              capítulos 5 e 7.</li>
           </ul>
           <p><strong>Não é possível encadear comparações</strong>: <code>a &lt; b &lt; c</code> é erro de
             compilação (a maioria dos alunos espera "a &lt; b e b &lt; c"; a linguagem recusa em vez de
@@ -823,8 +825,14 @@ escrever(notas[0])</code></pre>
           <h3>Literal <code>{ }</code></h3>
           <pre><code>primos:inteiro[5] = {2, 3, 5, 7, 11}
 escrever(primos[0], primos[4])</code></pre>
-          <p>O literal tem de ter exatamente o número de elementos do tamanho declarado — nem a mais, nem a
-            menos (erro de compilação, não preenchimento/corte silencioso).</p>
+          <p>O literal pode ter <strong>menos</strong> elementos do que o tamanho declarado — os valores
+            dados ocupam as primeiras posições (<code>0</code>, <code>1</code>, ...) e as que faltam, no
+            fim, ficam com o valor por omissão do tipo:</p>
+          <pre><code>v:inteiro[5] = {1, 2, 3}
+escrever(v[0], " ", v[3], " ", v[4])    // 1 0 0</code></pre>
+          <p>Ter <strong>mais</strong> elementos do que o tamanho declarado continua a ser erro de
+            compilação — não há onde os pôr:</p>
+          <pre><code>// v:inteiro[3] = {1, 2, 3, 4}    // ERRO! 4 valores para 3 posições</code></pre>
 
           <h3>Percorrer um vetor</h3>
           <pre><code>notas:decimal[5] = {14.0, 9.5, 18.0, 12.5, 16.0}
@@ -890,30 +898,61 @@ para i de 0 ate n - 1 fazer
             <code>MemoryError</code>/travamento cru.
           </p>
 
-          <h3>5.4 Um vetor não se copia com <code>=</code></h3>
-          <p>Ao contrário de <code>estrutura</code> (capítulo 7), que copia por valor tanto com
-            <code>=</code> como ao declarar <code>p2:Ponto = p1</code>, um vetor <strong>não pode ser o valor
-              de uma atribuição nem de uma declaração</strong> — nenhuma das duas formas abaixo compila:
+          <h3>5.4 Um vetor é um tipo por referência: <code>=</code> não copia</h3>
+          <p>Tal como <code>estrutura</code> (capítulo 7), um vetor é um tipo <strong>por referência</strong>:
+            <code>=</code>, uma declaração a partir de outra variável, <code>retornar</code>, um argumento
+            passado sem <code>ref</code> a uma função/procedimento (capítulo 6), e um elemento/campo
+            populado a partir de uma variável existente num literal — todos fazem as duas variáveis
+            apontarem para o <strong>mesmo</strong> vetor por baixo, não para duas cópias independentes.
+            Mudar uma é mudar a outra:
           </p>
           <pre><code>v1:inteiro[3] = {1, 2, 3}
+v2:inteiro[3] = v1
+v2[0] = 99
+escrever(v1[0], " ", v2[0])    // 99 99 -- é o MESMO vetor</code></pre>
+          <p>O tamanho declarado (<code>inteiro[3]</code>) não faz parte do <em>tipo</em> de um vetor — só é
+            validado contra o valor real quando esse valor vem de outra variável ou de uma chamada (nunca de
+            um literal <code>{...}</code>, cujo tamanho já é validado em compilação). Se não coincidir, é um
+            erro amigável em <strong>runtime</strong>, não em compilação:</p>
+          <pre><code>v1:inteiro[5] = {1, 2, 3, 4, 5}
 v2:inteiro[3]
-// v2 = v1                    // ERRO: 'v2' é um vetor; não pode ser atribuído diretamente
-// v3:inteiro[3] = v1         // ERRO: 'v1' é um vetor; falta indexá-lo</code></pre>
-          <p>As únicas formas de obter uma cópia independente de um vetor são: uma <strong>função que o
-              devolve</strong> (<code>retornar</code>), um <strong>literal</strong> <code>{...}</code>, ou
-            passá-lo como argumento normal (sem <code>ref</code>) a uma função/procedimento — os três copiam
-            por valor (capítulo 6). Sem nenhuma dessas, a única alternativa é copiar elemento a elemento:</p>
+v2 = v1
+// erro em runtime: "este valor tem 5 elemento(s), mas o vetor de
+// destino tem tamanho 3"</code></pre>
+          <p>Para obter uma cópia <strong>independente</strong> de um vetor (ou só de parte dele), copia
+            elemento a elemento com um ciclo — é a única forma:</p>
           <pre><code>algoritmo "CopiaDeVetor"
 
 inicio
-    v1:inteiro[3] = {1, 2, 3}
-    v2:inteiro[3]
+    v1:inteiro[5] = {1, 2, 3, 4, 5}
+    copia:inteiro[5]
     i:inteiro
-    para i de 0 ate 2 fazer
-        v2[i] = v1[i]
+    para i de 0 ate 4 fazer
+        copia[i] = v1[i]
 
-    v2[0] = 99
-    escrever(v1[0], " ", v2[0])    // 1 99 -- independentes</code></pre>
+    copia[0] = 99
+    escrever(v1[0], " ", copia[0])    // 1 99 -- agora sim, independentes</code></pre>
+
+          <h3>5.5 Igualdade compara por referência, não por conteúdo</h3>
+          <p><code>==</code>/<code>&lt;&gt;</code> entre dois vetores comparam se são <strong>o mesmo
+              vetor</strong>, não se têm os mesmos elementos — mesmo com conteúdo idêntico, dois vetores
+            construídos separadamente são considerados diferentes:</p>
+          <pre><code>a:inteiro[3] = {1, 2, 3}
+b:inteiro[3] = {1, 2, 3}
+escrever(a == b)      // falso -- mesmo conteúdo, mas vetores diferentes
+c:inteiro[3] = a
+escrever(a == c)      // verdadeiro -- 'c' é o MESMO vetor que 'a'</code></pre>
+          <p><code>x == nulo</code>/<code>x &lt;&gt; nulo</code> continuam a funcionar normalmente para
+            testar se uma variável de vetor ainda não foi construída. Para comparar o
+            <strong>conteúdo</strong> de dois vetores, escreve a tua própria comparação elemento a elemento:</p>
+          <pre><code>funcao mesmoConteudo(a:inteiro[], tamA:inteiro, b:inteiro[], tamB:inteiro):booleano
+    i:inteiro
+    se tamA <> tamB entao
+        retornar falso
+    para i de 0 ate tamA - 1 fazer
+        se a[i] <> b[i] entao
+            retornar falso
+    retornar verdadeiro</code></pre>
 
           <h3>Exemplo completo</h3>
           <pre><code>algoritmo "NotasDaTurma"
@@ -964,17 +1003,21 @@ inicio
             umas dentro das outras recursivamente — ver 6.5).</p>
 
           <h3>6.2 Parâmetros por valor (padrão)</h3>
-          <p>Sem <code>ref</code>, um parâmetro é uma <strong>cópia</strong> — alterar o parâmetro dentro da
-            função nunca afeta a variável do chamador (mesma regra de cópia por valor que uma atribuição
-            normal, capítulo 5). O tipo do argumento só precisa de ser <em>compatível</em> com o do
-            parâmetro, não exatamente igual — as mesmas promoções de sempre (<code>inteiro</code> →
-            <code>decimal</code>, <code>caracter</code> → <code>cadeia</code>):
+          <p>Sem <code>ref</code>, um parâmetro <strong>escalar</strong> (<code>inteiro</code>,
+            <code>decimal</code>, <code>booleano</code>, <code>cadeia</code>, <code>caracter</code>) é uma
+            <strong>cópia</strong> — alterar o parâmetro dentro da função nunca afeta a variável do chamador.
+            O tipo do argumento só precisa de ser <em>compatível</em> com o do parâmetro, não exatamente
+            igual — as mesmas promoções de sempre (<code>inteiro</code> → <code>decimal</code>,
+            <code>caracter</code> → <code>cadeia</code>):
           </p>
           <pre><code>funcao meio(x:decimal):decimal
     retornar x / 2
 
 inicio
     escrever(meio(5))     // 2.5 -- '5' (inteiro) promovido a 'decimal'</code></pre>
+          <p>Um parâmetro <code>vetor</code> ou <code>estrutura</code> sem <code>ref</code>
+            <strong>não</strong> é uma cópia — esses dois tipos são por referência (capítulos 5 e 7); ver
+            6.7 para o que isso muda na prática.</p>
 
           <h3>6.3 Parâmetros por referência (<code>ref</code>)</h3>
           <p><code>ref</code> faz o parâmetro apontar para a MESMA variável do chamador — uma alteração
@@ -1068,9 +1111,23 @@ inicio
     escrever(soma(numeros, 4))     // 10</code></pre>
           <p>O tipo do elemento tem de ser <strong>exatamente igual</strong> ao declarado no parâmetro (sem
             promoção <code>inteiro</code>→<code>decimal</code>, nem por valor nem por <code>ref</code>) — um
-            vetor não é alargado elemento a elemento só para caber noutro parâmetro. Um vetor passado por
-            valor (sem <code>ref</code>) continua a ser copiado inteiro para dentro da função (capítulo 5).
+            vetor não é alargado elemento a elemento só para caber noutro parâmetro.
           </p>
+          <p>Um vetor passado sem <code>ref</code> <strong>não</strong> é copiado (capítulo 5: <code>vetor</code>
+            é um tipo por referência) — <code>v</code>, dentro de <code>soma</code>, é o MESMO vetor que
+            <code>numeros</code> no chamador. Mutar um elemento (<code>v[i] = ...</code>) é visível fora da
+            função; só uma <strong>reatribuição completa</strong> do parâmetro (<code>v = {...}</code>,
+            trocar por outro vetor) é que fica presa à função, sem afetar o <code>numeros</code> do chamador
+            — só um parâmetro <code>ref</code> (6.3) faz uma reatribuição completa propagar de volta:</p>
+          <pre><code>procedimento dobrarElementos(v:inteiro[], tamanho:inteiro)
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        v[i] = v[i] * 2
+
+inicio
+    numeros:inteiro[3] = {1, 2, 3}
+    dobrarElementos(numeros, 3)
+    escrever(numeros[0], " ", numeros[1], " ", numeros[2])   // 2 4 6 -- mutado!</code></pre>
 
           <h3>Exemplo completo</h3>
           <pre><code>algoritmo "MaiorDivisorComum"
@@ -1116,31 +1173,58 @@ inicio
             <li>Um campo lê-se e atribui-se com <code>.</code>: <code>p.x</code>, <code>p.x = 10</code>.</li>
           </ul>
 
-          <h3>Campos omitidos ficam com o valor por omissão</h3>
+          <h3>Declaração sem literal fica <code>nulo</code>; o literal <code>{...}</code> pode omitir campos</h3>
+          <p>Uma declaração <strong>sem</strong> <code>={...}</code> nenhum não constrói nenhuma instância —
+            fica <code>nulo</code> (por omissão de qualquer <code>estrutura</code> sem valor inicial):</p>
+          <pre><code>p:Ponto              // p fica 'nulo', NÃO um Ponto com x=0, y=0
+// escrever(p.x)      // ERRO em runtime: tentaste aceder ao campo 'x' de um valor nulo</code></pre>
+          <p>Um literal <code>{...}</code> pode omitir campos — cada campo em falta recebe o valor por
+            omissão do seu próprio tipo (o mesmo que uma declaração sem literal desse tipo daria:
+            <code>0</code>/<code>0.0</code>/<code>falso</code>/<code>""</code>/<code>' '</code> para um tipo
+            primitivo, <code>nulo</code> para um campo <code>estrutura</code>, um vetor já preenchido para
+            um campo vetor):</p>
           <pre><code>p:Ponto = {x: 3}
 escrever(p.x, ", ", p.y)      // 3, 0 -- 'y' não foi dado, fica 0</code></pre>
+          <p>Um literal <strong>vazio</strong> <code>{}</code> constrói explicitamente uma instância com
+            todos os campos por omissão — é a forma de obter o que uma declaração sem literal costumava dar
+            antigamente:</p>
+          <pre><code>p:Ponto = {}
+escrever(p.x, ", ", p.y)      // 0, 0</code></pre>
 
-          <h3>7.2 Igualdade compara campo a campo</h3>
-          <p><code>==</code>/<code>&lt;&gt;</code> entre dois valores do mesmo tipo <code>estrutura</code>
-            comparam todos os campos, não a identidade do objeto:</p>
+          <h3>7.2 Igualdade compara por referência, não por conteúdo</h3>
+          <p><code>==</code>/<code>&lt;&gt;</code> entre dois valores <code>estrutura</code> comparam se são
+            <strong>a mesma instância</strong>, não se têm os mesmos campos — mesmo com conteúdo idêntico,
+            duas instâncias construídas separadamente são diferentes:</p>
           <pre><code>a:Ponto = {x: 1, y: 2}
 b:Ponto = {x: 1, y: 2}
-escrever(a == b)              // verdadeiro -- mesmos valores, variáveis diferentes</code></pre>
+escrever(a == b)              // falso -- mesmo conteúdo, instâncias diferentes
+c:Ponto = a
+escrever(a == c)              // verdadeiro -- 'c' é a MESMA instância que 'a'</code></pre>
+          <p><code>x == nulo</code>/<code>x &lt;&gt; nulo</code> continuam a funcionar normalmente para
+            testar se uma variável <code>estrutura</code> ainda não foi construída (é exatamente o que uma
+            comparação de identidade contra "nada" deve ser). Para comparar o <strong>conteúdo</strong> de
+            duas instâncias, escreve a tua própria função de comparação, campo a campo:</p>
+          <pre><code>funcao mesmoPonto(a:Ponto, b:Ponto):booleano
+    retornar a.x == b.x e a.y == b.y</code></pre>
 
-          <h3>7.3 <code>estrutura</code> é sempre copiada por valor</h3>
-          <p>Ao contrário de <code>vetor</code> (capítulo 5), <code>estrutura</code> copia normalmente com
-            <code>=</code> e com uma declaração a partir de outra variável — as duas variáveis ficam
-            completamente independentes a seguir:
+          <h3>7.3 <code>estrutura</code> é um tipo por referência</h3>
+          <p>Tal como <code>vetor</code> (capítulo 5), <code>estrutura</code> é um tipo <strong>por
+              referência</strong>: <code>=</code> e uma declaração a partir de outra variável não copiam —
+            as duas variáveis passam a apontar para a <strong>mesma</strong> instância:
           </p>
           <pre><code>a:Ponto = {x: 1, y: 2}
 b:Ponto = a
 b.x = 99
-escrever(a.x, " ", b.x)       // 1 99 -- independentes</code></pre>
+escrever(a.x, " ", b.x)       // 99 99 -- é a MESMA instância</code></pre>
           <p>Isto vale em <strong>todo</strong> o sítio onde um valor <code>estrutura</code> circula:
             atribuição, declaração, <code>retornar</code>, passar como argumento por valor (sem
-            <code>ref</code>), e <strong>atribuir a um campo</strong> — <code>no.seguinte = outroNo</code>
-            copia <code>outroNo</code> para dentro do campo, não guarda uma referência a ele (mais em 7.5).
-            Só um parâmetro <code>ref</code> (7.4) ou um campo <code>ref</code> (7.5) evita a cópia.
+            <code>ref</code>), e <strong>popular um campo/elemento a partir de uma variável existente</strong>
+            num literal — <code>no.seguinte = outroNo</code> guarda no campo uma referência a
+            <code>outroNo</code>, não uma cópia dele (mais em 7.5) — exatamente os mesmos sítios onde um
+            vetor também aliasa. Um parâmetro sem <code>ref</code> já recebe essa mesma instância partilhada
+            (mutar um campo dela é visto pelo chamador); só uma <strong>reatribuição completa</strong> do
+            parâmetro (<code>p = {...}</code>, trocar por outra instância) precisa de <code>ref</code> para
+            ser vista pelo chamador — ver 7.4.
           </p>
 
           <h3>7.4 Passar por referência</h3>
@@ -1161,9 +1245,12 @@ inicio
           <pre><code>estrutura No
     valor:inteiro
     seguinte:No</code></pre>
-          <p>Um campo desse tipo, se omitido no literal, fica <code>nulo</code> por omissão — nunca tenta
-            construir-se a si próprio infinitamente. <code>nulo</code> é o único valor que se pode comparar
-            com <code>==</code>/<code>&lt;&gt;</code> contra qualquer tipo <code>estrutura</code>, o que dá o
+          <p>Um campo desse tipo pode ser omitido no literal — fica <code>nulo</code> por omissão, tal como
+            qualquer campo <code>estrutura</code> (7.1) — ou dado explicitamente como <code>nulo</code> para
+            deixar claro "sem próximo nó". Nunca se tenta construir a estrutura a si própria infinitamente.
+            <code>nulo</code> é o único valor que se pode comparar com <code>==</code>/<code>&lt;&gt;</code>
+            contra qualquer tipo <code>estrutura</code> (7.2 é sobre comparar duas instâncias; contra
+            <code>nulo</code> a comparação continua por identidade, exatamente o que se quer), o que dá o
             idioma habitual de percorrer até ao fim:</p>
           <pre><code>procedimento imprimir(lista:No)
     n:No = lista
@@ -1171,43 +1258,9 @@ inicio
         escrever(n.valor)
         n = n.seguinte</code></pre>
 
-          <h3>Constrói-se de uma vez, não por "apontadores" a mutar depois</h3>
-          <p>Como todo o valor <code>estrutura</code> copia por valor (7.3) — <strong>incluindo ao atribuir a
-              um campo</strong> — não há forma de duas variáveis partilharem o "mesmo" nó, ao contrário de
-            listas ligadas em Java/C/Python (onde um campo guarda uma referência real, e mutar o nó original
-            propaga a quem já apontava para ele) — a menos que o campo seja <code>ref</code> (ver abaixo):</p>
-          <pre><code>b:No = {valor: 2, seguinte: nulo}
-a:No = {valor: 1, seguinte: b}    // copia 'b' para dentro de a.seguinte
-b.valor = 99                      // só muda a variável 'b'
-escrever(a.seguinte.valor)        // 2 -- NÃO 99: a.seguinte já era outra cópia</code></pre>
-
-          <h3>Campo <code>ref</code>: ligar sem copiar</h3>
-          <p>Um campo pode ser marcado <code>ref</code> — tal como um parâmetro <code>ref</code> (7.4),
-            guarda um alias para OUTRA instância já existente em vez de copiar o valor para dentro de si:</p>
-          <pre><code>estrutura No
-    valor:inteiro
-    seguinte:ref No</code></pre>
-          <p>Com isto, já é possível ligar um nó já existente e mutá-lo depois, ao contrário do exemplo
-            anterior:</p>
-          <pre><code>b:No
-b.valor = 2
-
-a:No
-a.valor = 1
-a.seguinte = b               // agora ALIAS, não cópia
-
-b.valor = 99
-escrever(a.seguinte.valor)   // 99 -- reflete a mutação de 'b'</code></pre>
-          <p><code>ref</code> só é permitido num campo escalar (sem <code>[]</code>) cujo tipo seja outra
-            <code>estrutura</code> — não num campo de tipo primitivo, nem num campo-vetor. Uma cópia por
-            valor da estrutura inteira (<code>c:No = a</code>, passar por valor, <code>retornar</code>)
-            continua a preservar esse aliasing — só o valor do próprio campo <code>ref</code> nunca é
-            copiado.
-          </p>
-          <p>A forma correta de construir uma lista/árvore com campos SIMPLES (sem <code>ref</code>) em ALGO
-            é <strong>de uma vez, de baixo para cima</strong> (o último nó primeiro, ou recursivamente) —
-            nunca ligar um nó já existente e mutá-lo depois à espera que isso se reflita por onde já passou:
-          </p>
+          <h3>Construir de uma vez, recursivamente</h3>
+          <p>Uma forma comum de construir uma lista é de baixo para cima (o último nó primeiro),
+            recursivamente:</p>
           <pre><code>algoritmo "ListaLigada"
 
 estrutura No
@@ -1229,17 +1282,33 @@ inicio
     v:inteiro[3] = {10, 20, 30}
     lista:No = construir(v, 0, 3)
     imprimir(lista)</code></pre>
-          <p>Para ligar nós dinamicamente (inserir/remover num nó já ligado, percorrer e reatribuir
-            livremente quem aponta para quem), um campo <code>ref</code> já resolve a maior parte dos casos.
-            Para cenários que precisem de enumerar/gerir muitos nós por posição, o padrão alternativo
-            continua a ser representá-los num <strong>vetor</strong> de nós, em que <code>seguinte</code> é
-            um <strong>índice</strong> (<code>inteiro</code>) para outra posição do vetor, não outra
-            <code>estrutura</code>.
-          </p>
+
+          <h3>Ligar nós dinamicamente</h3>
+          <p>Como um campo <code>estrutura</code> aliasa (7.3) em vez de copiar, também é possível
+            ligar/desligar nós <strong>depois</strong> de construídos — atribuir a <code>no.seguinte</code>
+            guarda uma referência ao nó dado, e mutar esse nó por qualquer um dos dois nomes é visível no
+            outro:</p>
+          <pre><code>b:No = {valor: 2, seguinte: nulo}
+a:No = {valor: 1, seguinte: b}
+imprimir(a)                        // 1 depois 2
+
+meio:No = {valor: 99, seguinte: b}
+a.seguinte = meio                  // insere 'meio' entre 'a' e 'b'
+imprimir(a)                        // 1, 99, 2
+
+b.valor = 0
+escrever(meio.seguinte.valor)      // 0 -- meio.seguinte é a MESMA instância que 'b'</code></pre>
 
           <h3>7.6 Vetor de estruturas, estrutura com campo vetor</h3>
           <pre><code>pontos:Ponto[2] = {{x: 1, y: 1}, {x: 2, y: 2}}
 escrever(pontos[0].x, ", ", pontos[1].y)</code></pre>
+          <p>Um vetor em si (capítulo 5) continua a preencher-se sozinho quando declarado sem literal — mas,
+            para um vetor de <code>estrutura</code>, cada posição fica com o valor por omissão do
+            <strong>tipo do elemento</strong>, que para <code>estrutura</code> é <code>nulo</code> (7.1), não
+            uma instância já construída:</p>
+          <pre><code>pontos:Ponto[2]           // {nulo, nulo} -- NÃO duas instâncias de Ponto
+pontos[0] = {x: 1, y: 1}  // constrói a instância antes de a usar
+escrever(pontos[0].x)</code></pre>
           <pre><code>estrutura Poligono
     lados:inteiro[3]
 
@@ -1259,6 +1328,7 @@ inicio
     livros:Livro[3]
     i:inteiro
     para i de 0 ate 2 fazer
+        livros[i] = {}      // vetor de 'estrutura' começa com posições 'nulo' (7.6); constrói cada uma
         escrever("Título do livro ", i + 1, ": ")
         ler(livros[i].titulo)
         escrever("Ano: ")
@@ -1822,10 +1892,6 @@ inicio
                 <td><code>estrutura Nome  campo:tipo ...</code></td>
               </tr>
               <tr>
-                <td>Campo por referência</td>
-                <td><code>campo:ref TipoEstrutura</code></td>
-              </tr>
-              <tr>
                 <td>Literal de array</td>
                 <td><code>{valor, valor, ...}</code></td>
               </tr>
@@ -1835,7 +1901,8 @@ inicio
               </tr>
               <tr>
                 <td>Valor nulo</td>
-                <td><code>nulo</code> (só comparável com variáveis de tipo <code>estrutura</code>)</td>
+                <td><code>nulo</code> (comparável com variáveis de tipo <code>vetor</code> ou
+                  <code>estrutura</code>)</td>
               </tr>
               <tr>
                 <td>Importar biblioteca</td>

@@ -20,7 +20,22 @@ inicio
   não têm de vir pela ordem da definição.
 - Um campo lê-se e atribui-se com `.`: `p.x`, `p.x = 10`.
 
-### Campos omitidos ficam com o valor por omissão
+### Declaração sem literal fica `nulo`; o literal `{...}` pode omitir campos
+
+Uma declaração **sem** `={...}` nenhum não constrói nenhuma instância —
+fica `nulo` (por omissão de qualquer `estrutura` sem valor inicial):
+
+```algo
+inicio
+    p:Ponto              // p fica 'nulo', NÃO um Ponto com x=0, y=0
+    // escrever(p.x)      // ERRO em runtime: tentaste aceder ao campo 'x' de um valor nulo
+```
+
+Um literal `{...}` pode omitir campos — cada campo em falta recebe o
+valor por omissão do seu próprio tipo (o mesmo que uma declaração sem
+literal desse tipo daria: `0`/`0.0`/`falso`/`""`/`' '` para um tipo
+primitivo, `nulo` para um campo `estrutura`, um vetor já preenchido
+para um campo vetor):
 
 ```algo
 inicio
@@ -28,54 +43,107 @@ inicio
     escrever(p.x, ", ", p.y)      // 3, 0 -- 'y' não foi dado, fica 0
 ```
 
-## 7.2 Igualdade compara campo a campo
+Um literal **vazio** `{}` constrói explicitamente uma instância com
+todos os campos por omissão — é a forma de obter o que uma declaração
+sem literal costumava dar antigamente:
 
-`==`/`<>` entre dois valores do mesmo tipo `estrutura` comparam todos
-os campos, não a identidade do objeto:
+```algo
+inicio
+    p:Ponto = {}
+    escrever(p.x, ", ", p.y)      // 0, 0
+```
+
+## 7.2 Igualdade compara por referência, não por conteúdo
+
+`==`/`<>` entre dois valores `estrutura` comparam se são **a mesma
+instância**, não se têm os mesmos campos — mesmo com conteúdo
+idêntico, duas instâncias construídas separadamente são diferentes:
 
 ```algo
 inicio
     a:Ponto = {x: 1, y: 2}
     b:Ponto = {x: 1, y: 2}
-    escrever(a == b)              // verdadeiro -- mesmos valores, variáveis diferentes
+    escrever(a == b)              // falso -- mesmo conteúdo, instâncias diferentes
+    c:Ponto = a
+    escrever(a == c)              // verdadeiro -- 'c' é a MESMA instância que 'a'
 ```
 
-## 7.3 `estrutura` é sempre copiada por valor
+`x == nulo`/`x <> nulo` continuam a funcionar normalmente para testar
+se uma variável `estrutura` ainda não foi construída (é exatamente o
+que uma comparação de identidade contra "nada" deve ser). Para
+comparar o **conteúdo** de duas instâncias, escreve a tua própria
+função de comparação, campo a campo:
 
-Ao contrário de `vetor` (capítulo 5), `estrutura` copia normalmente com
-`=` e com uma declaração a partir de outra variável — as duas variáveis
-ficam completamente independentes a seguir:
+```algo
+funcao mesmoPonto(a:Ponto, b:Ponto):booleano
+    retornar a.x == b.x e a.y == b.y
+```
+
+## 7.3 `estrutura` é um tipo por referência
+
+Tal como `vetor` (capítulo 5), `estrutura` é um tipo **por
+referência**: `=` e uma declaração a partir de outra variável não
+copiam — as duas variáveis passam a apontar para a **mesma** instância:
 
 ```algo
 inicio
     a:Ponto = {x: 1, y: 2}
     b:Ponto = a
     b.x = 99
-    escrever(a.x, " ", b.x)       // 1 99 -- independentes
+    escrever(a.x, " ", b.x)       // 99 99 -- é a MESMA instância
 ```
 
 Isto vale em **todo** o sítio onde um valor `estrutura` circula:
 atribuição, declaração, `retornar`, passar como argumento por valor
-(sem `ref`), e **atribuir a um campo** — `no.seguinte = outroNo` copia
-`outroNo` para dentro do campo, não guarda uma referência a ele (mais
-em 7.5). Só um parâmetro `ref` (7.4) ou um campo `ref` (7.5) evita a
-cópia.
+(sem `ref`), e **popular um campo/elemento a partir de uma variável
+existente** num literal — `no.seguinte = outroNo` guarda no campo uma
+referência a `outroNo`, não uma cópia dele (mais em 7.5) — exatamente
+os mesmos sítios onde um vetor também aliasa. Um parâmetro sem `ref`
+já recebe essa mesma instância partilhada (mutar um campo dela é
+visto pelo chamador); só uma **reatribuição completa** do parâmetro
+(`p = {...}`, trocar por outra instância) precisa de `ref` para ser
+vista pelo chamador — ver 7.4.
 
 ## 7.4 Passar por referência
 
-Tal como um parâmetro escalar, um parâmetro `estrutura` pode ser `ref`
-— a função passa a mutar diretamente a variável do chamador, sem
-devolver nada:
+Como visto em 7.3, mutar um campo não precisa de `ref` — um parâmetro
+`estrutura` sem `ref` já aponta para a mesma instância do chamador:
 
 ```algo
-procedimento deslocar(ref p:Ponto, dx:inteiro, dy:inteiro)
+procedimento deslocar(p:Ponto, dx:inteiro, dy:inteiro)
     p.x = p.x + dx
     p.y = p.y + dy
 
 inicio
     p:Ponto = {x: 0, y: 0}
     deslocar(p, 5, 3)
-    escrever(p.x, " ", p.y)       // 5 3
+    escrever(p.x, " ", p.y)       // 5 3 -- sem 'ref'!
+```
+
+`ref` só faz diferença quando o próprio parâmetro é **reatribuído** a
+outra instância (`p = {...}`), não um dos seus campos:
+
+```algo
+procedimento reiniciar(ref p:Ponto)
+    p = {x: 0, y: 0}          // troca a instância a que 'p' aponta
+
+inicio
+    p:Ponto = {x: 9, y: 9}
+    reiniciar(p)
+    escrever(p.x, " ", p.y)       // 0 0 -- só com 'ref'
+```
+
+Sem `ref`, essa reatribuição fica presa à função — o chamador continua
+a ver a instância original:
+
+```algo
+procedimento reiniciarSemRef(p:Ponto)
+    p = {x: 0, y: 0}          // só troca a cópia local de 'p'
+
+inicio
+    p:Ponto = {x: 9, y: 9}
+    reiniciarSemRef(p)
+    escrever(p.x, " ", p.y)       // 9 9 -- sem 'ref', não propaga
 ```
 
 ## 7.5 Estruturas recursivas (árvores, listas)
@@ -89,10 +157,14 @@ estrutura No
     seguinte:No
 ```
 
-Um campo desse tipo, se omitido no literal, fica `nulo` por omissão —
-nunca tenta construir-se a si próprio infinitamente. `nulo` é o único
-valor que se pode comparar com `==`/`<>` contra qualquer tipo
-`estrutura`, o que dá o idioma habitual de percorrer até ao fim:
+Um campo desse tipo pode ser omitido no literal — fica `nulo` por
+omissão, tal como qualquer campo `estrutura` (7.1) — ou dado
+explicitamente como `nulo` para deixar claro "sem próximo nó". Nunca
+se tenta construir a estrutura a si própria infinitamente. `nulo` é o
+único valor que se pode comparar com `==`/`<>` contra qualquer tipo
+`estrutura` (7.2 é sobre comparar duas instâncias; contra `nulo` a
+comparação continua por identidade, exatamente o que se quer), o que
+dá o idioma habitual de percorrer até ao fim:
 
 ```algo
 procedimento imprimir(lista:No)
@@ -102,61 +174,10 @@ procedimento imprimir(lista:No)
         n = n.seguinte
 ```
 
-### Constrói-se de uma vez, não por "apontadores" a mutar depois
+### Construir de uma vez, recursivamente
 
-Como todo o valor `estrutura` copia por valor (7.3) — **incluindo ao
-atribuir a um campo** — não há forma de duas variáveis partilharem o
-"mesmo" nó, ao contrário de listas ligadas em Java/C/Python (onde um
-campo guarda uma referência real, e mutar o nó original propaga a
-quem já apontava para ele) — a menos que o campo seja `ref` (ver
-abaixo):
-
-```algo
-inicio
-    b:No = {valor: 2, seguinte: nulo}
-    a:No = {valor: 1, seguinte: b}    // copia 'b' para dentro de a.seguinte
-    b.valor = 99                      // só muda a variável 'b'
-    escrever(a.seguinte.valor)        // 2 -- NÃO 99: a.seguinte já era outra cópia
-```
-
-### Campo `ref`: ligar sem copiar
-
-Um campo pode ser marcado `ref` — tal como um parâmetro `ref` (7.4),
-guarda um alias para OUTRA instância já existente em vez de copiar o
-valor para dentro de si:
-
-```algo
-estrutura No
-    valor:inteiro
-    seguinte:ref No
-```
-
-Com isto, já é possível ligar um nó já existente e mutá-lo depois, ao
-contrário do exemplo anterior:
-
-```algo
-inicio
-    b:No
-    b.valor = 2
-
-    a:No
-    a.valor = 1
-    a.seguinte = b               // agora ALIAS, não cópia
-
-    b.valor = 99
-    escrever(a.seguinte.valor)   // 99 -- reflete a mutação de 'b'
-```
-
-`ref` só é permitido num campo escalar (sem `[]`) cujo tipo seja outra
-`estrutura` — não num campo de tipo primitivo, nem num campo-vetor.
-Uma cópia por valor da estrutura inteira (`c:No = a`, passar por
-valor, `retornar`) continua a preservar esse aliasing — só o valor do
-próprio campo `ref` nunca é copiado.
-
-A forma correta de construir uma lista/árvore com campos SIMPLES (sem
-`ref`) em ALGO é **de uma vez, de baixo para cima** (o último nó
-primeiro, ou recursivamente) — nunca ligar um nó já existente e
-mutá-lo depois à espera que isso se reflita por onde já passou:
+Uma forma comum de construir uma lista é de baixo para cima (o último
+nó primeiro), recursivamente:
 
 ```algo
 algoritmo "ListaLigada"
@@ -182,14 +203,26 @@ inicio
     imprimir(lista)
 ```
 
-Para ligar nós dinamicamente (inserir/remover num nó já ligado,
-percorrer e reatribuir livremente quem aponta para quem), um campo
-`ref` já resolve a maior parte dos casos. Para cenários que precisem
-de enumerar/gerir muitos nós por posição, o padrão alternativo
-continua a ser representá-los num **vetor** de nós, em que `seguinte`
-é um **índice** (`inteiro`) para outra posição do vetor, não outra
-`estrutura` — um vetor pode ser mutado por `ref` livremente, ao
-contrário de um campo `estrutura` sem `ref`.
+### Ligar nós dinamicamente
+
+Como um campo `estrutura` aliasa (7.3) em vez de copiar, também é
+possível ligar/desligar nós **depois** de construídos — atribuir a
+`no.seguinte` guarda uma referência ao nó dado, e mutar esse nó por
+qualquer um dos dois nomes é visível no outro:
+
+```algo
+inicio
+    b:No = {valor: 2, seguinte: nulo}
+    a:No = {valor: 1, seguinte: b}
+    imprimir(a)                        // 1 depois 2
+
+    meio:No = {valor: 99, seguinte: b}
+    a.seguinte = meio                  // insere 'meio' entre 'a' e 'b'
+    imprimir(a)                        // 1, 99, 2
+
+    b.valor = 0
+    escrever(meio.seguinte.valor)      // 0 -- meio.seguinte é a MESMA instância que 'b'
+```
 
 ## 7.6 Vetor de estruturas, estrutura com campo vetor
 
@@ -197,6 +230,18 @@ contrário de um campo `estrutura` sem `ref`.
 inicio
     pontos:Ponto[2] = {{x: 1, y: 1}, {x: 2, y: 2}}
     escrever(pontos[0].x, ", ", pontos[1].y)
+```
+
+Um vetor em si (capítulo 5) continua a preencher-se sozinho quando
+declarado sem literal — mas, para um vetor de `estrutura`, cada
+posição fica com o valor por omissão do **tipo do elemento**, que para
+`estrutura` é `nulo` (7.1), não uma instância já construída:
+
+```algo
+inicio
+    pontos:Ponto[2]           // {nulo, nulo} -- NÃO duas instâncias de Ponto
+    pontos[0] = {x: 1, y: 1}  // constrói a instância antes de a usar
+    escrever(pontos[0].x)
 ```
 
 ```algo
@@ -222,6 +267,7 @@ inicio
     livros:Livro[3]
     i:inteiro
     para i de 0 ate 2 fazer
+        livros[i] = {}      // vetor de 'estrutura' começa com posições 'nulo' (7.6); constrói cada uma
         escrever("Título do livro ", i + 1, ": ")
         ler(livros[i].titulo)
         escrever("Ano: ")

@@ -29,9 +29,9 @@ recursivamente — ver 6.5).
 
 ## 6.2 Parâmetros por valor (padrão)
 
-Sem `ref`, um parâmetro é uma **cópia** — alterar o parâmetro dentro da
-função nunca afeta a variável do chamador (mesma regra de cópia por
-valor que uma atribuição normal, capítulo 5). O tipo do argumento só
+Sem `ref`, um parâmetro **escalar** (`inteiro`, `decimal`, `booleano`,
+`cadeia`, `caracter`) é uma **cópia** — alterar o parâmetro dentro da
+função nunca afeta a variável do chamador. O tipo do argumento só
 precisa de ser *compatível* com o do parâmetro, não exatamente igual —
 as mesmas promoções de sempre (`inteiro` → `decimal`, `caracter` →
 `cadeia`):
@@ -43,6 +43,10 @@ funcao meio(x:decimal):decimal
 inicio
     escrever(meio(5))     // 2.5 -- '5' (inteiro) promovido a 'decimal'
 ```
+
+Um parâmetro `vetor` ou `estrutura` sem `ref` **não** é uma cópia —
+esses dois tipos são por referência (capítulos 5 e 7); ver 6.7 para o
+que isso muda na prática.
 
 ## 6.3 Parâmetros por referência (`ref`)
 
@@ -164,9 +168,27 @@ inicio
 O tipo do elemento tem de ser **exatamente igual** ao declarado no
 parâmetro (sem promoção `inteiro`→`decimal`, nem por valor nem por
 `ref`) — um vetor não é alargado elemento a elemento só para caber
-noutro parâmetro. Um vetor passado por valor (sem `ref`) continua a ser
-copiado inteiro para dentro da função (capítulo 5) — `soma` acima
-podia mutar `v` livremente sem afetar `numeros` no chamador.
+noutro parâmetro.
+
+Um vetor passado sem `ref` **não** é copiado (capítulo 5: `vetor` é um
+tipo por referência) — `v`, dentro de `soma`, é o MESMO vetor que
+`numeros` no chamador. Mutar um elemento (`v[i] = ...`) é visível fora
+da função; só uma **reatribuição completa** do parâmetro (`v = {...}`,
+trocar por outro vetor) é que fica presa à função, sem afetar o
+`numeros` do chamador — só um parâmetro `ref` (6.3) faz uma
+reatribuição completa propagar de volta:
+
+```algo
+procedimento dobrarElementos(v:inteiro[], tamanho:inteiro)
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        v[i] = v[i] * 2
+
+inicio
+    numeros:inteiro[3] = {1, 2, 3}
+    dobrarElementos(numeros, 3)
+    escrever(numeros[0], " ", numeros[1], " ", numeros[2])   // 2 4 6 -- mutado!
+```
 
 ## Exemplo completo
 

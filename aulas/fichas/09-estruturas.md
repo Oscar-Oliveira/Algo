@@ -3,8 +3,9 @@
 ## Antes de começares
 
 - `estrutura Nome` com campos `nome:tipo`, um por linha; literal `{campo: valor, ...}`; acede-se com `.`.
-- Campo omitido no literal fica com o valor por omissão do seu tipo.
-- `estrutura` copia por valor em toda a parte (ao contrário de vetor) — `ref` evita a cópia.
+- Uma declaração sem literal (`p:Ponto`) fica `nulo`; o literal `{...}` pode omitir campos (ficam por omissão) e `{}` constrói tudo por omissão.
+- `estrutura` (e vetor) é um tipo por referência em toda a parte, incluindo `=` — as duas variáveis passam a apontar para a mesma instância. `==`/`<>` comparam se é a mesma instância, não os campos.
+- Um vetor de `estrutura` sem literal (`v:Tipo[n]`) começa com todas as posições `nulo` — constrói cada uma (`v[i] = {...}`) antes de usar os seus campos.
 - Testa sempre o teu programa a correr, não só a lê-lo.
 
 ## Parte 1 — Exercícios desta aula
@@ -15,7 +16,7 @@ Define uma `estrutura Retangulo` com os campos `largura` e `altura` (`decimal`).
 
 ### Exercício 2 — Comparar dois pontos
 
-Define uma `estrutura Ponto` com os campos `x` e `y` (`inteiro`). Pede as coordenadas de dois pontos e usa `==` para escrever se são iguais ou diferentes.
+Define uma `estrutura Ponto` com os campos `x` e `y` (`inteiro`). Pede as coordenadas de dois pontos. `==` entre duas `estrutura` compara se é a mesma instância, não os campos — por isso dois pontos lidos separadamente dão sempre "diferentes" com `==`, mesmo com as mesmas coordenadas. Escreve uma `funcao mesmoPonto(a:Ponto, b:Ponto):booleano` que compara `x` e `y` campo a campo, e usa-a para escrever se os pontos são iguais ou diferentes.
 
 ### Exercício 3 — Agenda de contactos
 
@@ -39,7 +40,7 @@ Define uma `estrutura Equipa` com um campo `nome` (`cadeia`) e um campo `jogador
 
 ### Exercício 7 — Aumentar o raio de um círculo
 
-Define uma `estrutura Circulo` com `centroX`, `centroY` e `raio` (todos `decimal`). Escreve um `procedimento aumentarRaio(ref c:Circulo, incremento:decimal)` que soma o incremento ao raio. Testa com um círculo e um incremento.
+Define uma `estrutura Circulo` com `centroX`, `centroY` e `raio` (todos `decimal`). Escreve um `procedimento aumentarRaio(c:Circulo, incremento:decimal)` que soma o incremento ao raio. Testa com um círculo e um incremento.
 
 ### Exercício 8 — Catálogo de filmes
 

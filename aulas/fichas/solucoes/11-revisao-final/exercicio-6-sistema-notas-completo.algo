@@ -28,6 +28,7 @@ inicio
     i:inteiro
     j:inteiro
     para i de 0 ate n - 1 fazer
+        alunos[i] = {}
         escrever("Nome: ")
         ler(alunos[i].nome)
         para j de 0 ate 2 fazer

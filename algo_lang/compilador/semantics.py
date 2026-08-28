@@ -13,12 +13,12 @@ PRIMITIVOS = NUMERICOS | TEXTUAIS | {"booleano"}
 
 # Nomes que o PRÓPRIO código gerado usa sem qualificação, fora de
 # qualquer 'global' do estudante -- uma global com um destes nomes rebate
-# o import/builtin correspondente no módulo Python gerado. 'sys'/'copy'
-# vêm do cabeçalho do próprio codegen.py (CABECALHO_RUNTIME); 'print'/
-# 'input' são builtins que o código gerado chama diretamente. Fixo,
-# porque está sempre presente, independente de bibliotecas ALGO
-# importadas (ver _nomes_importados_no_cabecalho para essas).
-NOMES_RESERVADOS_CODEGEN = {"sys", "copy", "print", "input"}
+# o import/builtin correspondente no módulo Python gerado. 'sys' vem do
+# cabeçalho do próprio codegen.py (CABECALHO_RUNTIME); 'print'/'input'
+# são builtins que o código gerado chama diretamente. Fixo, porque está
+# sempre presente, independente de bibliotecas ALGO importadas (ver
+# _nomes_importados_no_cabecalho para essas).
+NOMES_RESERVADOS_CODEGEN = {"sys", "print", "input"}
 
 
 def _nomes_importados_no_cabecalho(cabecalho):
@@ -281,7 +281,7 @@ class VerificadorTipos:
         # antecipada entre declarações de topo fora de ordem).
         self._nomes_globais_eventuais = self._nomes_globais_top_level
 
-        self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims, dims_exprs, por_referencia)}
+        self.estruturas = {}   # nome_estrutura -> {campo: (tipo, dims, dims_exprs)}
         linhas_dos_campos = {}   # (nome_estrutura, nome_campo) -> linha (só para mensagens de erro)
         for e in programa.estruturas:
             if e.nome in self.estruturas:
@@ -324,7 +324,7 @@ class VerificadorTipos:
                     # nomes fazem sentido aqui.
                     self._validar_dims(c.dims, {}, c.linha, contexto_campo=True)
                 dims_n = 0 if c.dims is None else len(c.dims)
-                campos[c.nome] = (c.tipo, dims_n, c.dims, c.por_referencia)
+                campos[c.nome] = (c.tipo, dims_n, c.dims)
                 linhas_dos_campos[(e.nome, c.nome)] = c.linha
             self.estruturas[e.nome] = campos
 
@@ -332,23 +332,12 @@ class VerificadorTipos:
         # registadas, para permitir referências cruzadas entre estruturas
         # (ex: 'estrutura A' pode ter um campo do tipo 'B', definida a seguir)
         for nome_estrutura, campos in self.estruturas.items():
-            for nome_campo, (tipo, dims_n, _dims_exprs, por_referencia) in campos.items():
+            for nome_campo, (tipo, _dims_n, _dims_exprs) in campos.items():
                 if tipo not in PRIMITIVOS and tipo not in self.estruturas:
                     linha = linhas_dos_campos[(nome_estrutura, nome_campo)]
                     raise ErroSemantico(
                         f"o campo '{nome_campo}' da estrutura '{nome_estrutura}' tem tipo "
                         f"desconhecido '{tipo}'", linha)
-                if por_referencia:
-                    linha = linhas_dos_campos[(nome_estrutura, nome_campo)]
-                    if tipo in PRIMITIVOS:
-                        raise ErroSemantico(
-                            f"o campo '{nome_campo}' da estrutura '{nome_estrutura}' é 'ref' "
-                            f"mas '{tipo}' é um tipo primitivo; 'ref' só é permitido num campo "
-                            f"cujo tipo seja outra 'estrutura'", linha)
-                    if dims_n != 0:
-                        raise ErroSemantico(
-                            f"o campo '{nome_campo}' da estrutura '{nome_estrutura}' não pode "
-                            f"ser 'ref' e vetor ao mesmo tempo", linha)
 
     def _validar_tipo(self, tipo, linha):
         if tipo in PRIMITIVOS:
@@ -667,8 +656,27 @@ class VerificadorTipos:
                 # de gerar float(...) no valor de retorno.
                 d.inicial._tipo_inferido = tipo_inicial
             else:
-                tipo_inicial, _ = self._tipo_expr(d.inicial, escopo)
-                if not self._compativel(d.tipo, tipo_inicial):
+                dims_n_inicial = 0 if d.dims is None else len(d.dims)
+                # 'permitir_vetor=True': mesma ideia do ramo 'Chamada' logo
+                # acima e do equivalente em atribuição -- um vetor "nu"
+                # (variável) é uma posição legítima para inicializar outro
+                # vetor, tal como 'estrutura' já é aqui.
+                tipo_inicial, dims_inicial = self._tipo_expr(
+                    d.inicial, escopo, permitir_vetor=True)
+                if (dims_inicial != dims_n_inicial
+                        and not self._nulo_aceitavel_vetor(tipo_inicial, dims_n_inicial)):
+                    raise ErroSemantico(
+                        f"não é possível inicializar '{d.nome}' "
+                        f"({self._descricao_dims(dims_n_inicial)}) com "
+                        f"{self._descricao_dims(dims_inicial)}", d.linha)
+                if dims_n_inicial > 0:
+                    if tipo_inicial != d.tipo and tipo_inicial != "nulo":
+                        raise ErroSemantico(
+                            f"'{d.nome}' é um vetor de '{d.tipo}' mas está a ser "
+                            f"inicializado com um vetor de '{tipo_inicial}' -- vetores "
+                            f"não são alargados/estreitados automaticamente, o tipo "
+                            f"do elemento tem de ser exatamente igual", d.linha)
+                elif not self._compativel(d.tipo, tipo_inicial):
                     raise ErroSemantico(
                         f"não é possível inicializar '{d.nome}' (tipo '{d.tipo}') com um "
                         f"valor do tipo '{tipo_inicial}'", d.linha)
@@ -816,7 +824,7 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"a estrutura '{tipo_esperado}' não tem nenhum campo '{nome_campo}'. "
                     f"Campos disponíveis: {disponiveis}", lit.linha)
-            tipo_campo, dims_campo, dims_campo_exprs, _por_referencia = campos_da_estrutura[nome_campo]
+            tipo_campo, dims_campo, dims_campo_exprs = campos_da_estrutura[nome_campo]
             if isinstance(expr, A.VetorLiteral):
                 if dims_campo == 0:
                     raise ErroSemantico(
@@ -841,6 +849,8 @@ class VerificadorTipos:
                 raise ErroSemantico(
                     f"o campo '{nome_campo}' de '{tipo_esperado}' espera '{tipo_campo}' "
                     f"mas recebeu '{tipo_valor}'", lit.linha)
+        # Campos não dados no literal ficam com o valor por omissão do seu
+        # tipo (ver codegen.py:_expr_estrutura_literal) -- não é erro.
 
     def _tamanho_estatico(self, dim_expr, escopo):
         """Devolve o tamanho declarado de uma dimensão se for um literal
@@ -860,8 +870,13 @@ class VerificadorTipos:
         # (lista de expressões de dimensão, não só a contagem) permite
         # validar o TAMANHO de cada nível quando é um literal estático,
         # não só a profundidade de aninhamento.
+        # Menos elementos do que o tamanho declarado é aceite -- as
+        # posições em falta ficam com o valor por omissão do elemento (ver
+        # codegen.py:_expr_vetor_literal), preenchimento posicional pelo
+        # início. Mais elementos do que cabem é sempre erro (não há onde
+        # os pôr).
         tam_esperado = self._tamanho_estatico(dims[0], escopo)
-        if tam_esperado is not None and len(lit.elementos) != tam_esperado:
+        if tam_esperado is not None and len(lit.elementos) > tam_esperado:
             raise ErroSemantico(
                 f"o vetor tem tamanho declarado {tam_esperado} mas o literal "
                 f"'{{...}}' tem {len(lit.elementos)} elemento(s)", lit.linha)
@@ -934,38 +949,45 @@ class VerificadorTipos:
         elif isinstance(s, A.Atribuicao):
             self._verificar_nao_constante(s.alvo, escopo, "atribuir a")
             tipo_alvo, dims_alvo = self._tipo_lvalue(s.alvo, escopo)
-            if dims_alvo > 0:
-                raise ErroSemantico(
-                    f"'{s.alvo.nome}' é um vetor; não pode ser atribuído "
-                    f"diretamente (falta indexá-lo, ex: {s.alvo.nome}[i] = ...)",
-                    s.linha)
+            # codegen.py (gerador_base.py:_gerar_atribuicao) reaproveita isto
+            # para saber se o alvo é um vetor inteiro (dims > 0), e nesse
+            # caso embrulhar o lado direito em
+            # _algo_verificar_tamanho_vetor_resultado -- 'tipos' aí só
+            # guarda o NOME do tipo, não as dimensões.
+            s.alvo._dims_inferido = dims_alvo
             if isinstance(s.expr, A.Chamada) and self._tem_ref(s.expr):
                 tipo_retorno = self._verificar_chamada(s.expr, escopo)
                 if tipo_retorno is None:
                     raise ErroSemantico(
                         f"'{s.expr.nome}' é um procedimento e não devolve valor",
                         s.linha)
-                # dims_alvo já é garantidamente 0 aqui (o vetor acima
-                # rejeita reatribuição direta a um vetor inteiro) -- falta
-                # só garantir que o LADO DIREITO também não é um vetor
-                # (partilharia o mesmo 'tipo' que um escalar, ignorando
-                # dims, se não fosse este gate).
                 dims_retorno = self._dims_retorno_de_chamada(s.expr)
                 tipo_retorno, dims_retorno, caminho = self._percorrer_acessos(
                     tipo_retorno, dims_retorno, s.expr.acessos, f"{s.expr.nome}(...)",
                     s.linha, escopo)
-                if dims_retorno > 0:
+                if dims_retorno != dims_alvo:
                     raise ErroSemantico(
                         f"'{caminho}' devolve {self._descricao_dims(dims_retorno)} "
                         f"mas '{s.alvo.nome}' é {self._descricao_dims(dims_alvo)}",
                         s.linha)
-                if not self._compativel(tipo_alvo, tipo_retorno):
+                if dims_alvo > 0:
+                    if tipo_retorno != tipo_alvo:
+                        raise ErroSemantico(
+                            f"'{s.alvo.nome}' é um vetor de '{tipo_alvo}' mas está a "
+                            f"ser atribuído com um vetor de '{tipo_retorno}' -- "
+                            f"vetores não são alargados/estreitados automaticamente, "
+                            f"o tipo do elemento tem de ser exatamente igual", s.linha)
+                elif not self._compativel(tipo_alvo, tipo_retorno):
                     raise ErroSemantico(
                         f"não é possível atribuir um valor do tipo '{tipo_retorno}' à "
                         f"variável '{s.alvo.nome}' (tipo '{tipo_alvo}')", s.linha)
                 # Mesma lógica que a declaração, acima.
                 s.expr._tipo_inferido = tipo_retorno
             elif isinstance(s.expr, A.EstruturaLiteral):
+                if dims_alvo > 0:
+                    raise ErroSemantico(
+                        f"'{s.alvo.nome}' é um vetor; usa '{{valor, valor, ...}}' "
+                        f"para o atribuir, não '{{campo: valor}}'", s.linha)
                 # Mesma ideia que a declaração/argumento de chamada: um
                 # literal de estrutura não tem tipo próprio, mas o tipo
                 # esperado já é conhecido pelo contexto (o tipo já
@@ -973,9 +995,34 @@ class VerificadorTipos:
                 # com "não há informação suficiente" mesmo sabendo-se
                 # exatamente que forma esperar.
                 self._verificar_estrutura_literal(s.expr, tipo_alvo, escopo)
+            elif isinstance(s.expr, A.VetorLiteral):
+                # Mesma ideia que o ramo acima, lado vetor: 'v = {1, 2, 3}'
+                # com 'v' já declarado -- sem este ramo caía no genérico
+                # abaixo, que não sabe tratar um literal sem tipo próprio.
+                if dims_alvo == 0:
+                    raise ErroSemantico(
+                        f"'{s.alvo.nome}' não é um vetor; não pode ser atribuído "
+                        f"com '{{...}}'", s.linha)
+                self._verificar_vetor_literal(s.expr, tipo_alvo, [None] * dims_alvo, escopo)
             else:
-                tipo_expr, _ = self._tipo_expr(s.expr, escopo)
-                if not self._compativel(tipo_alvo, tipo_expr):
+                # 'permitir_vetor=True': um vetor "nu" (variável ou chamada
+                # sem 'ref') é uma posição legítima aqui, tal como um
+                # argumento de chamada ou 'retornar' -- tal como 'estrutura'
+                # já é em toda a parte.
+                tipo_expr, dims_expr = self._tipo_expr(s.expr, escopo, permitir_vetor=True)
+                if (dims_expr != dims_alvo
+                        and not self._nulo_aceitavel_vetor(tipo_expr, dims_alvo)):
+                    raise ErroSemantico(
+                        f"'{s.alvo.nome}' é {self._descricao_dims(dims_alvo)} mas o "
+                        f"lado direito é {self._descricao_dims(dims_expr)}", s.linha)
+                if dims_alvo > 0:
+                    if tipo_expr != tipo_alvo and tipo_expr != "nulo":
+                        raise ErroSemantico(
+                            f"'{s.alvo.nome}' é um vetor de '{tipo_alvo}' mas está a "
+                            f"ser atribuído com um vetor de '{tipo_expr}' -- vetores "
+                            f"não são alargados/estreitados automaticamente, o tipo "
+                            f"do elemento tem de ser exatamente igual", s.linha)
+                elif not self._compativel(tipo_alvo, tipo_expr):
                     raise ErroSemantico(
                         f"não é possível atribuir um valor do tipo '{tipo_expr}' à "
                         f"variável '{s.alvo.nome}' (tipo '{tipo_alvo}')", s.linha)
@@ -1130,7 +1177,8 @@ class VerificadorTipos:
                 tipo, dims = ctx_funcao.tipo_retorno, 0
             else:
                 tipo, dims = self._tipo_expr(s.expr, escopo, permitir_vetor=True)
-            if dims != ctx_funcao.dims_retorno:
+            if dims != ctx_funcao.dims_retorno and not self._nulo_aceitavel_vetor(
+                    tipo, ctx_funcao.dims_retorno):
                 # Mesmo gate "dimensões antes de tipo" de _verificar_chamada --
                 # sem ele um vetor podia ser devolvido em silêncio onde se
                 # espera um escalar, ou vice-versa.
@@ -1139,7 +1187,7 @@ class VerificadorTipos:
                     f"{self._descricao_dims(ctx_funcao.dims_retorno)} mas está a "
                     f"retornar {self._descricao_dims(dims)}", s.linha)
             if ctx_funcao.dims_retorno > 0:
-                if tipo != ctx_funcao.tipo_retorno:
+                if tipo != ctx_funcao.tipo_retorno and tipo != "nulo":
                     raise ErroSemantico(
                         f"a função '{ctx_funcao.nome}' devolve um vetor de "
                         f"'{ctx_funcao.tipo_retorno}' mas está a retornar um vetor de "
@@ -1232,7 +1280,7 @@ class VerificadorTipos:
                     raise ErroSemantico(
                         f"a estrutura '{tipo}' não tem nenhum campo '{valor}'. "
                         f"Campos disponíveis: {disponiveis}", linha)
-                tipo, dims, _, _ = campos[valor]
+                tipo, dims, _ = campos[valor]
                 caminho = f"{caminho}.{valor}"
         return tipo, dims, caminho
 
@@ -1252,10 +1300,16 @@ class VerificadorTipos:
         toda a lógica de inferência de tipos.
 
         'permitir_vetor' (por omissão False) controla se um vetor "nu" (não
-        indexado) é aceite como valor -- só os dois sítios legítimos disso
-        (argumento de chamada, expressão de 'retornar') passam True; todos
-        os outros contextos (aritmética, condições, escrever(), etc.)
-        continuam a rejeitar um vetor nu com o erro de sempre."""
+        indexado) é aceite como valor -- só os sítios legítimos disso
+        (argumento de chamada, expressão de 'retornar', lado direito de uma
+        atribuição/declaração a um vetor, operando de '=='/'<>') passam
+        True; todos os outros contextos (aritmética, condições,
+        escrever(), etc.) continuam a rejeitar um vetor nu com o erro de
+        sempre.
+
+        Também anota expr._dims_inferido (além de _tipo_inferido) sempre
+        que dims pode ser > 0 (LValue/Chamada) -- codegen.py usa-o para
+        decidir '=='/'is' num A.BinOp (ver GeradorCodigo._expr)."""
         if isinstance(expr, A.Literal):
             expr._tipo_inferido = expr.tipo
             return expr.tipo, 0
@@ -1266,6 +1320,7 @@ class VerificadorTipos:
                     f"'{expr.nome}' é um vetor; falta indexá-lo (ex: {expr.nome}[i])",
                     expr.linha)
             expr._tipo_inferido = tipo
+            expr._dims_inferido = dims
             return tipo, dims
         if isinstance(expr, A.BinOp):
             tipo, dims = self._tipo_binop(expr, escopo)
@@ -1305,6 +1360,7 @@ class VerificadorTipos:
                     f"'{caminho}' devolve um vetor; falta indexá-lo (ex: "
                     f"{caminho}[i])", expr.linha)
             expr._tipo_inferido = tipo_retorno
+            expr._dims_inferido = dims_retorno
             return tipo_retorno, dims_retorno
         if isinstance(expr, (A.VetorLiteral, A.EstruturaLiteral)):
             # Um literal '{...}' não tem um tipo próprio -- só faz sentido
@@ -1332,9 +1388,14 @@ class VerificadorTipos:
         return valor is not None and valor >= 0
 
     def _tipo_binop(self, expr: A.BinOp, escopo):
-        t_e, _ = self._tipo_expr(expr.esq, escopo)
-        t_d, _ = self._tipo_expr(expr.dire, escopo)
         op = expr.op
+        # 'permitir_vetor=True' só para '=='/'<>': um vetor "nu" (variável)
+        # é um operando legítimo aí (comparação referencial, ver
+        # codegen.py:_expr) -- os outros operadores continuam a rejeitar um
+        # vetor nu como sempre (não fazem sentido em cima dele).
+        permitir_vetor = op in ("==", "<>")
+        t_e, dims_e = self._tipo_expr(expr.esq, escopo, permitir_vetor=permitir_vetor)
+        t_d, dims_d = self._tipo_expr(expr.dire, escopo, permitir_vetor=permitir_vetor)
 
         if op == "+":
             if t_e in NUMERICOS and t_d in NUMERICOS:
@@ -1375,7 +1436,18 @@ class VerificadorTipos:
             return "inteiro", 0
 
         if op in ("==", "<>"):
-            if not self._tipos_comparaveis(t_e, t_d):
+            if dims_e > 0 or dims_d > 0:
+                # Comparação de vetor -- 'nulo' compara-se com um vetor de
+                # qualquer tipo/dims (tal como já compara com 'estrutura',
+                # ver _nulo_aceitavel_vetor); fora isso, exatamente o mesmo
+                # tipo E as mesmas dims (sem promoção/achatamento), tal como
+                # a atribuição entre vetores.
+                if t_e != "nulo" and t_d != "nulo" and (dims_e != dims_d or t_e != t_d):
+                    raise ErroSemantico(
+                        f"não é possível comparar {self._descricao_dims(dims_e)} "
+                        f"(tipo '{t_e}') com {self._descricao_dims(dims_d)} "
+                        f"(tipo '{t_d}')", expr.linha)
+            elif not self._tipos_comparaveis(t_e, t_d):
                 raise ErroSemantico(
                     f"não é possível comparar '{t_e}' com '{t_d}'", expr.linha)
             return "booleano", 0
@@ -1405,14 +1477,21 @@ class VerificadorTipos:
             return True
         # 'nulo' compara-se com qualquer tipo de estrutura (ex.: 'enquanto
         # no <> nulo fazer ...', o idioma de PERCORRER uma lista ligada já
-        # construída). Não confundir com "apontador mutável": 'estrutura'
-        # copia sempre por valor, mesmo ao atribuir a um campo (ver
-        # docs/manual/07-Estruturas.md, secção 7.5) -- este 'nulo' só
-        # sustenta o percurso, não permite duas variáveis partilharem o
-        # mesmo nó nem construir uma lista ligando/mutando nós já criados.
+        # construída) -- 'estrutura' é um tipo por REFERÊNCIA (ver
+        # gerador_base.py), por isso este 'nulo' é exatamente o "esta
+        # variável ainda não aponta para nenhuma instância" de qualquer
+        # linguagem com referências/apontadores.
         if (a == "nulo" and b in self.estruturas) or (b == "nulo" and a in self.estruturas):
             return True
         return a == b
+
+    def _nulo_aceitavel_vetor(self, tipo_valor, dims_esperado):
+        """'nulo' (sempre dims=0) é aceite num sítio que espera um vetor
+        (dims_esperado > 0) -- tal como já é aceite para 'estrutura' (ver
+        _compativel). Usado nos sítios que comparam (tipo, dims) exatos
+        entre um vetor e o que se espera, e por isso não passam por
+        _compativel (que só olha para o nome do tipo, não para dims)."""
+        return tipo_valor == "nulo" and dims_esperado > 0
 
     def _compativel(self, tipo_alvo, tipo_valor):
         if tipo_alvo == tipo_valor:
@@ -1591,7 +1670,7 @@ class VerificadorTipos:
                 tipo, dims = p.tipo, p.dims
             else:
                 tipo, dims = self._tipo_expr(arg, escopo, permitir_vetor=True)
-            if dims != p.dims:
+            if dims != p.dims and not self._nulo_aceitavel_vetor(tipo, p.dims):
                 # Tem de ser verificado ANTES de qualquer compatibilidade de
                 # tipo: um vetor e um escalar podem partilhar o mesmo 'tipo'
                 # (ex.: ambos "inteiro") ignorando dims -- sem este gate um
@@ -1607,7 +1686,7 @@ class VerificadorTipos:
                 # justificação do caso 'ref' logo abaixo; por valor segue a
                 # mesma regra por simplicidade, para não haver coerção
                 # elemento-a-elemento de um vetor inteiro).
-                if tipo != p.tipo:
+                if tipo != p.tipo and tipo != "nulo":
                     raise ErroSemantico(
                         f"o parâmetro '{p.nome}' de '{chamada.nome}' é um vetor de "
                         f"'{p.tipo}' mas '{A.texto_expr(arg)}' é um vetor de '{tipo}' "

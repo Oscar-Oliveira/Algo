@@ -17,6 +17,7 @@ inicio
     filmes:Filme[3]
     i:inteiro
     para i de 0 ate 2 fazer
+        filmes[i] = {}
         escrever("Título: ")
         ler(filmes[i].titulo)
         escrever("Ano: ")

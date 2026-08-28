@@ -8,6 +8,7 @@ inicio
     contactos:Contacto[3]
     i:inteiro
     para i de 0 ate 2 fazer
+        contactos[i] = {}
         escrever("Nome: ")
         ler(contactos[i].nome)
         escrever("Telefone: ")

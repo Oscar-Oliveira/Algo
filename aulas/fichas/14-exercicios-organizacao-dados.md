@@ -22,7 +22,7 @@ Define uma `estrutura Aluno` (`nome`, `media`). Pede os dados de vários alunos 
 
 ### Exercício 5 — Catálogo com empréstimos
 
-Define uma `estrutura Livro` (`titulo`, `emprestado`). Escreve `procedimento emprestar(ref livro:Livro)` e `procedimento devolver(ref livro:Livro)`, cada um com um `afirmar` a garantir que a operação faz sentido (não emprestar o que já está emprestado, não devolver o que não estava). Testa com um catálogo de vários livros.
+Define uma `estrutura Livro` (`titulo`, `emprestado`). Escreve `procedimento emprestar(livro:Livro)` e `procedimento devolver(livro:Livro)`, cada um com um `afirmar` a garantir que a operação faz sentido (não emprestar o que já está emprestado, não devolver o que não estava). Testa com um catálogo de vários livros.
 
 ### Exercício 6 — Conflitos de horário
 

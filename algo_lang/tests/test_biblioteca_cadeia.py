@@ -127,7 +127,7 @@ inicio
     assert resultado.returncode == 1
     assert "Traceback" not in resultado.stdout
     assert "4 elemento" in resultado.stdout
-    assert "espera 2" in resultado.stdout
+    assert "tamanho 2" in resultado.stdout
 
 
 def test_dividir_com_menos_partes_do_que_o_tamanho_declarado_da_erro_amigavel():
@@ -141,7 +141,7 @@ inicio
     assert resultado.returncode == 1
     assert "Traceback" not in resultado.stdout
     assert "4 elemento" in resultado.stdout
-    assert "espera 5" in resultado.stdout
+    assert "tamanho 5" in resultado.stdout
 
 
 def test_indexar_cadeia_diretamente_da_erro_com_sugestao_de_cadeia_caracter():

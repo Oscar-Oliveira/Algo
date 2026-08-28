@@ -15,6 +15,7 @@ inicio
     contactos:Contacto[n]
     i:inteiro
     para i de 0 ate n - 1 fazer
+        contactos[i] = {}
         escrever("Nome: ")
         ler(contactos[i].nome)
 

@@ -42,17 +42,13 @@ class Incluir(No):
 
 
 class Declaracao(No):
-    def __init__(self, tipo, nome, dims, linha, inicial=None, eh_constante=False,
-                 por_referencia=False):
+    def __init__(self, tipo, nome, dims, linha, inicial=None, eh_constante=False):
         self.tipo = tipo
         self.nome = nome
         self.dims = dims          # lista de expressões (0, 1 ou N dimensões) ou None
         self.linha = linha
         self.inicial = inicial    # expressão de inicialização, ou None
         self.eh_constante = eh_constante
-        # Só relevante para um campo de 'estrutura' (ver _parse_estrutura_def) --
-        # aliasing em vez de cópia por valor, tal como um parâmetro 'ref'.
-        self.por_referencia = por_referencia
 
 
 class Parametro(No):

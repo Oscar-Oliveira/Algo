@@ -23,9 +23,23 @@ inicio
     escrever(primos[0], primos[4])
 ```
 
-O literal tem de ter exatamente o número de elementos do tamanho
-declarado — nem a mais, nem a menos (erro de compilação, não
-preenchimento/corte silencioso).
+O literal pode ter **menos** elementos do que o tamanho declarado — os
+valores dados ocupam as primeiras posições (`0`, `1`, ...) e as que
+faltam, no fim, ficam com o valor por omissão do tipo:
+
+```algo
+inicio
+    v:inteiro[5] = {1, 2, 3}
+    escrever(v[0], " ", v[3], " ", v[4])    // 1 0 0
+```
+
+Ter **mais** elementos do que o tamanho declarado continua a ser erro
+de compilação — não há onde os pôr:
+
+```algo
+inicio
+    // v:inteiro[3] = {1, 2, 3, 4}    // ERRO! 4 valores para 3 posições
+```
 
 ### Percorrer um vetor
 
@@ -125,39 +139,85 @@ Um tamanho negativo, ou maior do que **10 milhões de elementos no
 total** (produto de todas as dimensões, para uma matriz), é erro em
 runtime com mensagem amigável, não um `MemoryError`/travamento cru.
 
-## 5.4 Um vetor não se copia com `=`
+## 5.4 Um vetor é um tipo por referência: `=` não copia
 
-Ao contrário de `estrutura` (capítulo 7), que copia por valor tanto com
-`=` como ao declarar `p2:Ponto = p1`, um vetor **não pode ser o valor
-de uma atribuição nem de uma declaração** — nenhuma das duas formas
-abaixo compila:
+Tal como `estrutura` (capítulo 7), um vetor é um tipo **por
+referência**: `=`, uma declaração a partir de outra variável,
+`retornar`, um argumento passado sem `ref` a uma função/procedimento
+(capítulo 6), e um elemento/campo populado a partir de uma variável
+existente num literal — todos fazem as duas variáveis apontarem para o
+**mesmo** vetor por baixo, não para duas cópias independentes. Mudar
+uma é mudar a outra:
 
 ```algo
 inicio
     v1:inteiro[3] = {1, 2, 3}
-    v2:inteiro[3]
-    // v2 = v1                    // ERRO: 'v2' é um vetor; não pode ser atribuído diretamente
-    // v3:inteiro[3] = v1         // ERRO: 'v1' é um vetor; falta indexá-lo
+    v2:inteiro[3] = v1
+    v2[0] = 99
+    escrever(v1[0], " ", v2[0])    // 99 99 -- é o MESMO vetor
 ```
 
-As únicas formas de obter uma cópia independente de um vetor são: uma
-**função que o devolve** (`retornar`), um **literal** `{...}`, ou
-passá-lo como argumento normal (sem `ref`) a uma função/procedimento —
-os três copiam por valor (capítulo 6). Sem nenhuma dessas, a única
-alternativa é copiar elemento a elemento:
+O tamanho declarado (`inteiro[3]`) não faz parte do *tipo* de um
+vetor — só é validado contra o valor real quando esse valor vem de
+outra variável ou de uma chamada (nunca de um literal `{...}`, cujo
+tamanho já é validado em compilação). Se não coincidir, é um erro
+amigável em **runtime**, não em compilação:
+
+```algo
+inicio
+    v1:inteiro[5] = {1, 2, 3, 4, 5}
+    v2:inteiro[3]
+    v2 = v1
+    // erro em runtime: "este valor tem 5 elemento(s), mas o vetor de
+    // destino tem tamanho 3"
+```
+
+Para obter uma cópia **independente** de um vetor (ou só de parte
+dele), copia elemento a elemento com um ciclo — é a única forma:
 
 ```algo
 algoritmo "CopiaDeVetor"
 
 inicio
-    v1:inteiro[3] = {1, 2, 3}
-    v2:inteiro[3]
+    v1:inteiro[5] = {1, 2, 3, 4, 5}
+    copia:inteiro[5]
     i:inteiro
-    para i de 0 ate 2 fazer
-        v2[i] = v1[i]
+    para i de 0 ate 4 fazer
+        copia[i] = v1[i]
 
-    v2[0] = 99
-    escrever(v1[0], " ", v2[0])    // 1 99 -- independentes
+    copia[0] = 99
+    escrever(v1[0], " ", copia[0])    // 1 99 -- agora sim, independentes
+```
+
+## 5.5 Igualdade compara por referência, não por conteúdo
+
+`==`/`<>` entre dois vetores comparam se são **o mesmo vetor**, não se
+têm os mesmos elementos — mesmo com conteúdo idêntico, dois vetores
+construídos separadamente são considerados diferentes:
+
+```algo
+inicio
+    a:inteiro[3] = {1, 2, 3}
+    b:inteiro[3] = {1, 2, 3}
+    escrever(a == b)      // falso -- mesmo conteúdo, mas vetores diferentes
+    c:inteiro[3] = a
+    escrever(a == c)      // verdadeiro -- 'c' é o MESMO vetor que 'a'
+```
+
+`x == nulo`/`x <> nulo` continuam a funcionar normalmente para testar
+se uma variável de vetor ainda não foi construída. Para comparar o
+**conteúdo** de dois vetores, escreve a tua própria comparação
+elemento a elemento:
+
+```algo
+funcao mesmoConteudo(a:inteiro[], tamA:inteiro, b:inteiro[], tamB:inteiro):booleano
+    i:inteiro
+    se tamA <> tamB entao
+        retornar falso
+    para i de 0 ate tamA - 1 fazer
+        se a[i] <> b[i] entao
+            retornar falso
+    retornar verdadeiro
 ```
 
 ## Exemplo completo

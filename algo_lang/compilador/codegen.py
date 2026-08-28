@@ -4,7 +4,7 @@
 from . import ast_nodes as A
 from .. import bibliotecas
 from .ast_nodes import texto_expr
-from .gerador_base import GeradorCodigoBase, DEFAULT_POR_TIPO, ErroInternoCompilador
+from .gerador_base import GeradorCodigoBase, ErroInternoCompilador
 
 
 CABECALHO_RUNTIME = '''\
@@ -14,7 +14,6 @@ CABECALHO_RUNTIME = '''\
 # ============================================================
 
 import sys
-import copy
 
 sys.setrecursionlimit(10000)
 
@@ -199,6 +198,16 @@ def _algo_traduzir_attributeerror(msg):
     return "tentaste aceder a um campo de um valor nulo."  # pragma: no cover -- defensivo
 
 
+def _algo_traduzir_typeerror():
+    """Num programa ALGO válido, o único TypeError possível é indexar
+    (ex.: 'v[0]') um valor 'vetor' que é 'nulo' -- semantics.py já
+    garante em compilação que todos os outros acessos indexados são a um
+    vetor de facto. Ao contrário de _algo_traduzir_attributeerror, a
+    mensagem nativa do Python ("'NoneType' object is not subscriptable")
+    não inclui o índice usado, por isso não há nada a extrair dela."""
+    return "tentaste aceder a uma posição de um vetor nulo."
+
+
 def _algo_traduzir_nameerror(msg):
     """Rede de segurança -- a correção principal é em semantics.py
     (_globais_lidas_transitivamente), apanhada em compilação; isto cobre
@@ -317,40 +326,23 @@ def _algo_verificar_tamanho_vetor_agregado(*dims):
 
 
 def _algo_verificar_tamanho_vetor_resultado(lista, tamanho_esperado):
-    """Uma função (biblioteca, ex. cadeia.dividir, ou do próprio programa)
-    que devolve um vetor para inicializar uma declaração de tamanho fixo
-    (ex.: 'partes:cadeia[3] = cadeia.dividir(...)') só tem o tamanho REAL
-    conhecido em runtime -- ao contrário de um literal '{...}', cujo
-    tamanho semantics.py já valida em compilação. Sem isto, um resultado
-    maior do que o declarado ficava silenciosamente legível além do
-    tamanho declarado, e um resultado menor só falhava (com a mensagem
-    genérica de índice fora dos limites) quando de facto se tentasse ler
-    além dele, nunca já na própria inicialização."""
-    if len(lista) != tamanho_esperado:
+    """Uma chamada (biblioteca, ex. cadeia.dividir, ou do próprio programa)
+    que devolve um vetor, ou outra variável vetor, usada para inicializar
+    ou reatribuir um vetor de tamanho fixo (ex.: 'partes:cadeia[3] =
+    cadeia.dividir(...)', ou 'v2 = v1' com 'v2' de tamanho fixo) só tem o
+    tamanho REAL conhecido em runtime -- ao contrário de um literal
+    '{...}', cujo tamanho semantics.py já valida em compilação. Sem isto,
+    um resultado maior do que o declarado ficava silenciosamente legível
+    além do tamanho declarado, e um resultado menor só falhava (com a
+    mensagem genérica de índice fora dos limites) quando de facto se
+    tentasse ler além dele, nunca já na própria atribuição. 'nulo' é um
+    vetor legitimamente sem tamanho nenhum (ponto 7) -- passa direto,
+    sem chamar len() sobre None."""
+    if lista is not None and len(lista) != tamanho_esperado:
         raise _AlgoErroAmigavel(
-            f"esta chamada devolveu um vetor com {len(lista)} elemento(s), "
-            f"mas a declaração espera {tamanho_esperado}")
+            f"este valor tem {len(lista)} elemento(s), mas o vetor de destino "
+            f"tem tamanho {tamanho_esperado}")
     return lista
-
-
-def _algo_eq_estrutura(a, b, visitados):
-    """Comparação de valor usada pelo '__eq__' gerado para 'estrutura',
-    campo a campo -- com deteção de ciclo. Um campo 'ref' permite duas
-    instâncias apontarem uma para a outra (ou um ciclo maior), o que faria
-    '==' recursar para sempre sem isto. 'visitados' regista pares
-    (id(a), id(b)) já em comparação: reencontrar o mesmo par fecha o
-    ciclo e conta como igual, sem descer mais fundo -- mesma técnica que o
-    'memo' de '__deepcopy__' usa para o problema irmão (copiar, em vez de
-    comparar, um grafo cíclico). Recursa também em listas (campos-vetor,
-    de qualquer dimensão), para um vetor de 'estrutura' com um campo 'ref'
-    ficar igualmente protegido."""
-    if isinstance(a, list):
-        if not isinstance(b, list) or len(a) != len(b):
-            return False
-        return all(_algo_eq_estrutura(x, y, visitados) for x, y in zip(a, b))
-    if hasattr(a, "_algo_eq"):
-        return a._algo_eq(b, visitados)
-    return a == b
 
 '''
 
@@ -383,7 +375,7 @@ class GeradorCodigo(GeradorCodigoBase):
             campos = {}
             for c in e.campos:
                 dims_n = 0 if c.dims is None else len(c.dims)
-                campos[c.nome] = (c.tipo, dims_n, c.por_referencia)
+                campos[c.nome] = (c.tipo, dims_n, c.dims)
             self.estruturas[e.nome] = campos
 
         for imp in self.programa.importares:
@@ -517,6 +509,14 @@ class GeradorCodigo(GeradorCodigoBase):
         self.emit("print(_algo_msg)", 2)
         self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
         self.emit("sys.exit(1)", 2)
+        # Irmão do AttributeError acima -- ver _algo_traduzir_typeerror.
+        self.emit("except TypeError as _algo_erro:", 1)
+        self.emit(
+            '_algo_msg = f"Erro em tempo de execução: '
+            '{_algo_traduzir_typeerror()}{_algo_sufixo_linha(_algo_erro)}"', 2)
+        self.emit("print(_algo_msg)", 2)
+        self.emit("_algo_registar_erro_runtime(_algo_msg, _algo_linha_do_erro(_algo_erro))", 2)
+        self.emit("sys.exit(1)", 2)
         self.emit("except NameError as _algo_erro:", 1)
         self.emit(
             '_algo_msg = f"Erro em tempo de execução: '
@@ -536,23 +536,34 @@ class GeradorCodigo(GeradorCodigoBase):
 
     def _gerar_estrutura(self, e: A.EstruturaDef):
         # Propositadamente NÃO associado a 'e.linha' -- o corpo de
-        # '__init__'/'__eq__' só corre em RUNTIME, sempre que uma
-        # instância é criada ou comparada, nunca na linha da própria
-        # definição. Mapeá-lo para 'e.linha' faria o tracer (--debug/--json)
-        # injetar passos espúrios sempre que uma estrutura fosse
-        # construída/comparada. Deixando '_linha_algo_atual' em None aqui,
-        # 'emit()' não regista entrada em mapa_linhas para estas linhas.
-        recursivas = self._estruturas_recursivas()
+        # '__init__' só corre em RUNTIME, sempre que uma instância é
+        # criada, nunca na linha da própria definição. Mapeá-lo para
+        # 'e.linha' faria o tracer (--debug/--json) injetar passos
+        # espúrios sempre que uma estrutura fosse construída. Deixando
+        # '_linha_algo_atual' em None aqui, 'emit()' não regista entrada
+        # em mapa_linhas para estas linhas.
+        #
+        # Sem '__eq__' nenhum, '==' do Python cai no comportamento por
+        # omissão (identidade, 'is') -- exatamente a comparação
+        # referencial que 'estrutura' agora tem (ver GeradorCodigo._expr,
+        # ramo A.BinOp). Sem '__deepcopy__' nenhum -- nada no código
+        # gerado chama copy.deepcopy num valor 'estrutura' (aliasing é
+        # sempre o comportamento, ver _expr_estrutura_literal/
+        # _gerar_lista_args/_gerar_declaracao).
         params_kwargs = []
         for c in e.campos:
-            if c.dims is not None or c.tipo not in DEFAULT_POR_TIPO:
-                # vetor OU campo de tipo estrutura: o valor por omissão tem
-                # de ser construído dentro do __init__, nunca como valor
-                # por omissão direto do parâmetro -- um valor por omissão
-                # de parâmetro só é avaliado UMA VEZ (quando a classe é
-                # definida), por isso todas as instâncias partilhariam o
-                # mesmo objeto ("mutable default argument", um erro
-                # clássico do Python) em vez de cada uma ter o seu próprio
+            if c.dims is not None:
+                # Vetor: o valor por omissão (uma lista nova) tem de ser
+                # construído dentro do __init__, nunca como valor por
+                # omissão direto do parâmetro -- um valor por omissão de
+                # parâmetro só é avaliado UMA VEZ (quando a classe é
+                # definida), por isso todas as instâncias partilhariam a
+                # MESMA lista ("mutable default argument", um erro
+                # clássico do Python) em vez de cada uma ter a sua
+                # própria. Um campo de tipo 'estrutura' não tem este
+                # problema -- o seu valor por omissão é sempre 'None'
+                # (nulo, ver _valor_default), seguro como valor por
+                # omissão literal do próprio parâmetro.
                 params_kwargs.append(f"{c.nome}=None")
             else:
                 params_kwargs.append(f"{c.nome}={self._valor_default(c.tipo)}")
@@ -564,75 +575,11 @@ class GeradorCodigo(GeradorCodigoBase):
         for c in e.campos:
             if c.dims is not None:
                 self.emit(f"if {c.nome} is None:", 2)
-                # Se 'c.tipo' é (direta ou mutuamente) recursivo, construir
-                # os N elementos por omissão nunca terminaria (cada
-                # elemento tentaria construir o seu próprio campo do
-                # mesmo tipo, ad infinitum) -- fica vazio, tal como um
-                # campo escalar recursivo fica 'None' (ver 'recursivas'
-                # acima/_estruturas_recursivas).
-                if c.tipo in recursivas:
-                    valor_default = "[]"
-                else:
-                    valor_default = self._construir_vetor_aninhado(c.tipo, c.dims, {}, 3)
+                valor_default = self._construir_vetor_aninhado(c.tipo, c.dims, {}, 3)
                 self.emit(f"{c.nome} = {valor_default}", 3)
                 self.emit(f"self.{c.nome} = {c.nome}", 2)
-            elif c.tipo not in DEFAULT_POR_TIPO:
-                # Se 'c.tipo' é (direta ou mutuamente) recursivo, construir
-                # a instância por omissão nunca terminaria -- fica 'None'
-                # (nulo), tal como o estudante teria de escrever
-                # explicitamente para terminar uma lista ligada. Um campo
-                # 'ref' fica 'None' sempre, mesmo sem recursão -- nunca
-                # possui/constrói eagerly a instância que aponta para ela.
-                valor_default = "None" if (c.tipo in recursivas or c.por_referencia) else self._valor_default(c.tipo)
-                self.emit(f"self.{c.nome} = {c.nome} if {c.nome} is not None else {valor_default}", 2)
             else:
                 self.emit(f"self.{c.nome} = {c.nome}", 2)
-        self.emit("def __eq__(self, outro):", 1)
-        self.emit(f"if not isinstance(outro, {e.nome}):", 2)
-        self.emit("return NotImplemented", 3)
-        self.emit("return self._algo_eq(outro, set())", 2)
-        # '_algo_eq' (não '__eq__' diretamente) é o que recursa em campos
-        # de tipo 'estrutura': 'visitados' só sobrevive à recursão porque é
-        # passado explicitamente de instância em instância -- usar '=='
-        # nos campos, como '__eq__' faz para si próprio, chamaria de novo
-        # '__eq__' com um 'set()' NOVO a cada campo, perdendo o registo de
-        # ciclo mal desce um nível. Ver '_algo_eq_estrutura' no cabeçalho
-        # gerado, que decide entre recursar numa lista, chamar '_algo_eq'
-        # (campo de tipo 'estrutura') ou cair para '==' (escalar).
-        self.emit("def _algo_eq(self, outro, visitados):", 1)
-        self.emit(f"if not isinstance(outro, {e.nome}):", 2)
-        self.emit("return False", 3)
-        self.emit("par = (id(self), id(outro))", 2)
-        self.emit("if par in visitados:", 2)
-        self.emit("return True", 3)
-        self.emit("visitados.add(par)", 2)
-        if e.campos:
-            condicoes = " and ".join(
-                f"_algo_eq_estrutura(self.{c.nome}, outro.{c.nome}, visitados)" for c in e.campos)
-        else:  # pragma: no cover -- o parser exige >=1 campo em 'estrutura'
-            condicoes = "True"
-        self.emit(f"return {condicoes}", 2)
-        campos_ref = [c for c in e.campos if c.por_referencia]
-        if campos_ref:
-            # Sem isto, copiar esta estrutura POR VALOR (ex.: 'c:T = a',
-            # devolver, passar por valor) usaria o copy.deepcopy() por
-            # omissão do Python, que não distingue um campo 'ref' de um
-            # campo normal -- copiaria recursivamente através dele também,
-            # quebrando o aliasing em qualquer cópia por valor a jusante da
-            # construção inicial. 'memo' regista a nova instância ANTES de
-            # descer nos campos normais, para o caso de dois nós formarem
-            # um ciclo real através de campos 'ref' (só possível agora que
-            # 'ref' existe -- cópia por valor sozinha cortava sempre
-            # qualquer ciclo).
-            self.emit("def __deepcopy__(self, memo):", 1)
-            self.emit(f"novo = {e.nome}.__new__({e.nome})", 2)
-            self.emit("memo[id(self)] = novo", 2)
-            for c in e.campos:
-                if c.por_referencia:
-                    self.emit(f"novo.{c.nome} = self.{c.nome}", 2)
-                else:
-                    self.emit(f"novo.{c.nome} = copy.deepcopy(self.{c.nome}, memo)", 2)
-            self.emit("return novo", 2)
         self._linha_algo_atual = None
         self.linhas.append("")
 
@@ -653,19 +600,12 @@ class GeradorCodigo(GeradorCodigoBase):
                 # Mesma ideia que A.EstruturaLiteral acima: um literal de
                 # vetor ({...}) passado diretamente como argumento não tem
                 # tipo próprio, semantics.py já validou a forma contra
-                # 'param.dims' -- é sempre uma instância nova, não precisa
-                # de cópia.
-                args_py.append(self._expr_vetor_literal(a, param.tipo, tipos))
+                # 'param.dims' -- um parâmetro vetor aceita qualquer
+                # tamanho, por isso não há tamanho-alvo para preencher em
+                # falta (dims_exprs=None, ver _expr_vetor_literal).
+                args_py.append(self._expr_vetor_literal(a, param.tipo, None, tipos))
             elif param is not None:
                 expr_py = self._coagir_decimal(self._expr(a, tipos), param.tipo, a)
-                if not param.por_referencia and (param.dims > 0 or param.tipo in self.estruturas):
-                    # Um parâmetro de tipo 'estrutura' (ou vetor) sem 'ref'
-                    # é por VALOR -- sem esta cópia, o Python gerado
-                    # passava a MESMA referência, e uma mutação dentro da
-                    # função vazava silenciosamente para quem chamou. Um
-                    # literal ({...}, tratado nos 'if' acima) já é uma
-                    # instância nova -- não precisa de cópia.
-                    expr_py = f"copy.deepcopy({expr_py})"
                 args_py.append(expr_py)
             else:
                 args_py.append(self._expr(a, tipos))
@@ -756,15 +696,41 @@ class GeradorCodigo(GeradorCodigoBase):
                 self.emit(f"if {condicao_py}:", nivel)
                 self.emit(f"raise _AlgoErroAmigavel({msg_literal})", nivel + 1)
 
+    def _valor_default_vetor_estatico(self, tipo, dims_exprs, tipos):
+        """Como _construir_vetor_aninhado, mas sem hoisting de temporárias
+        para as dimensões -- seguro quando 'dims_exprs' vem de um campo de
+        'estrutura' (semantics.py valida os seus tamanhos contra um
+        escopo VAZIO, ver _validar_dims(contexto_campo=True); por isso são
+        sempre expressões estáticas/puras, nunca podem ter efeito lateral
+        nem ler uma variável, e reavaliá-las não muda nada). Usada para o
+        valor por omissão de um campo-vetor OMITIDO num literal de
+        estrutura (ver _expr_estrutura_literal, ponto 6)."""
+        expr = self._valor_default(tipo)
+        for dim_expr in reversed(dims_exprs):
+            tamanho_py = self._expr(dim_expr, tipos)
+            expr = f"[{expr} for _ in range(_algo_verificar_tamanho_vetor({tamanho_py}))]"
+        return expr
+
     def _expr_estrutura_literal(self, lit: A.EstruturaLiteral, tipo_nome: str, tipos) -> str:
         """Um A.EstruturaLiteral não sabe o seu próprio tipo (só os
         campos) -- quem chama tem sempre de indicar 'tipo_nome' a partir
         do contexto (o tipo declarado, ou o tipo do parâmetro que recebe
-        o literal numa chamada)."""
+        o literal numa chamada). Campos omitidos no literal (ponto 6)
+        ficam com o valor por omissão do seu próprio tipo -- 'nulo' para
+        um campo 'estrutura' (ver _valor_default), eagerly preenchido
+        para um campo vetor (ver _valor_default_vetor_estatico)."""
         campos_decl = self.estruturas.get(tipo_nome, {})
+        dados = dict(lit.campos)
         partes = []
-        for nome, valor in lit.campos:
-            tipo_campo, _dims_n, campo_e_ref = campos_decl.get(nome, ("", 0, False))
+        for nome, (tipo_campo, dims_campo, dims_campo_exprs) in campos_decl.items():
+            if nome not in dados:
+                if dims_campo > 0:
+                    expr_py = self._valor_default_vetor_estatico(tipo_campo, dims_campo_exprs, tipos)
+                else:
+                    expr_py = self._valor_default(tipo_campo)
+                partes.append(f"{nome}={expr_py}")
+                continue
+            valor = dados[nome]
             if isinstance(valor, A.EstruturaLiteral):
                 # Literal de estrutura aninhado dentro doutro -- 'valor'
                 # não tem 'self._expr()' próprio, por isso recursão direta
@@ -773,48 +739,81 @@ class GeradorCodigo(GeradorCodigoBase):
             elif isinstance(valor, A.VetorLiteral):
                 # Campo-vetor inicializado diretamente num literal de
                 # estrutura (ex.: '{notas: {10, 8, 9}}') -- mesma ideia
-                # que o ramo EstruturaLiteral acima.
-                expr_py = self._expr_vetor_literal(valor, tipo_campo, tipos)
+                # que o ramo EstruturaLiteral acima. 'dims_campo_exprs'
+                # vem sempre de um escopo estático (ver
+                # _valor_default_vetor_estatico), por isso não precisa de
+                # 'nivel' para preencher os elementos em falta.
+                expr_py = self._expr_vetor_literal(valor, tipo_campo, dims_campo_exprs, tipos)
             else:
-                expr_py = self._coagir_decimal(self._expr(valor, tipos), tipo_campo, valor)
                 # Campo de literal de struct a partir de uma variável
-                # existente (ex.: '{canto: p1}') -- exceto se o campo for
-                # 'ref': aí é aliasing intencional, tal como um parâmetro
-                # 'ref' (ver _copiar_se_necessario).
-                if not campo_e_ref:
-                    expr_py = self._copiar_se_necessario(expr_py, tipo_campo, 0)
+                # existente (ex.: '{canto: p1}') -- aliasing, tal como
+                # qualquer outra leitura de variável (ver ponto 1).
+                expr_py = self._coagir_decimal(self._expr(valor, tipos), tipo_campo, valor)
             partes.append(f"{nome}={expr_py}")
         return f"{tipo_nome}({', '.join(partes)})"
 
-    def _expr_vetor_literal(self, lit: A.VetorLiteral, tipo_elemento: str, tipos) -> str:
+    def _expr_vetor_literal(self, lit: A.VetorLiteral, tipo_elemento: str, dims_exprs, tipos,
+                             nivel=None) -> str:
         """Coage cada elemento individualmente para o tipo alvo (ex.:
         inteiro -> decimal), tal como _expr_estrutura_literal já faz para
         campos de estrutura. Recursivo para suportar vetores aninhados
-        (multidimensionais)."""
+        (multidimensionais).
+
+        'dims_exprs' (lista de expressões de dimensão, paralela ao
+        aninhamento) é o tamanho DECLARADO do alvo, quando conhecido --
+        usado para preencher com o valor por omissão do elemento as
+        posições que o literal não deu (ponto 6). None quando não há
+        tamanho-alvo conhecido em compilação (argumento de chamada,
+        'retornar', atribuição a um vetor já existente): nesse caso o
+        comportamento é só os elementos dados, como sempre. 'nivel' só é
+        necessário para hoistear temporárias de dimensões dinâmicas (ver
+        _construir_vetor_aninhado) -- None quando 'dims_exprs' vem de um
+        campo de 'estrutura' (sempre estático, ver
+        _valor_default_vetor_estatico)."""
+        sub_dims = dims_exprs[1:] if dims_exprs else None
         partes = []
         for elem in lit.elementos:
             if isinstance(elem, A.VetorLiteral):
-                partes.append(self._expr_vetor_literal(elem, tipo_elemento, tipos))
+                partes.append(self._expr_vetor_literal(elem, tipo_elemento, sub_dims, tipos, nivel))
             elif isinstance(elem, A.EstruturaLiteral):
                 # Elemento de vetor que é ele próprio um literal de
                 # estrutura (ex.: vetor de estruturas).
                 partes.append(self._expr_estrutura_literal(elem, tipo_elemento, tipos))
             else:
-                expr_py = self._coagir_decimal(self._expr(elem, tipos), tipo_elemento, elem)
                 # Elemento de literal de vetor a partir de uma variável
-                # existente (ex.: '{p1, p2}').
-                partes.append(self._copiar_se_necessario(expr_py, tipo_elemento, 0))
-        return f"[{', '.join(partes)}]"
+                # existente (ex.: '{p1, p2}') -- aliasing (ver ponto 1).
+                partes.append(self._coagir_decimal(self._expr(elem, tipos), tipo_elemento, elem))
+        dados_py = f"[{', '.join(partes)}]"
+        if not dims_exprs:
+            return dados_py
+        tamanho_py = self._expr(dims_exprs[0], tipos)
+        if nivel is not None:
+            default_py = self._construir_vetor_aninhado(tipo_elemento, sub_dims, tipos, nivel)
+        else:
+            default_py = self._valor_default_vetor_estatico(tipo_elemento, sub_dims, tipos)
+        # Preenchimento posicional: os elementos DADOS ocupam sempre o
+        # início (0..len(dados)-1); as posições em falta (se o literal deu
+        # menos do que o tamanho declarado) ficam com o valor por omissão
+        # do elemento -- uma NOVA instância por posição (a compreensão de
+        # lista reavalia 'default_py' a cada volta), nunca a mesma
+        # partilhada (evita o bug clássico '[[0]*n]*n' de linhas
+        # "aliased").
+        return f"({dados_py} + [{default_py} for _ in range(({tamanho_py}) - {len(lit.elementos)})])"
 
     def _gerar_declaracao(self, d: A.Declaracao, nivel, tipos):
         if d.inicial is not None and isinstance(d.inicial, A.VetorLiteral):
-            self.emit(f"{d.nome} = {self._expr_vetor_literal(d.inicial, d.tipo, tipos)}", nivel)
+            self.emit(f"{d.nome} = {self._expr_vetor_literal(d.inicial, d.tipo, d.dims, tipos, nivel)}", nivel)
             return
         if d.inicial is not None and isinstance(d.inicial, A.EstruturaLiteral):
             if d.dims is not None:
-                # '{}' vazio inicializando um vetor -- semantics.py já
-                # garantiu que só chega aqui com campos vazios.
-                self.emit(f"{d.nome} = []", nivel)
+                # '{}' vazio inicializando um vetor -- sintaticamente
+                # indistinguível de um literal de estrutura vazio (ver
+                # parser.py:_proximo_parece_campo_literal), mas
+                # semanticamente é um A.VetorLiteral sem elementos dados;
+                # cada posição fica com o valor por omissão do elemento
+                # (ponto 6), não um vetor vazio.
+                vetor_vazio = A.VetorLiteral([], d.inicial.linha)
+                self.emit(f"{d.nome} = {self._expr_vetor_literal(vetor_vazio, d.tipo, d.dims, tipos, nivel)}", nivel)
                 return
             self.emit(f"{d.nome} = {self._expr_estrutura_literal(d.inicial, d.tipo, tipos)}", nivel)
             return
@@ -853,11 +852,12 @@ class GeradorCodigo(GeradorCodigoBase):
         if d.inicial is not None:
             expr_py = self._coagir_decimal(self._expr(d.inicial, tipos), d.tipo, d.inicial)
             dims_n = 0 if d.dims is None else len(d.dims)
-            expr_py = self._copiar_se_necessario(expr_py, d.tipo, dims_n)
-            if dims_n == 1 and isinstance(d.inicial, A.Chamada):
-                # O tamanho devolvido por uma chamada (biblioteca ou do
-                # próprio programa) só é conhecido em runtime -- ao
-                # contrário de um literal '{...}', que semantics.py já
+            if dims_n == 1:
+                # Chegado aqui, 'd.inicial' é sempre uma chamada (biblioteca
+                # ou do próprio programa) ou outra variável -- nunca um
+                # literal '{...}' (tratado num ramo anterior, com 'return').
+                # Em ambos os casos o tamanho REAL só é conhecido em
+                # runtime -- ao contrário de um literal, que semantics.py já
                 # validou em compilação (ver _algo_verificar_tamanho_
                 # vetor_resultado, no cabeçalho gerado).
                 tamanho_py = self._expr(d.dims[0], tipos)
@@ -872,9 +872,9 @@ class GeradorCodigo(GeradorCodigoBase):
     def _gerar_atribuicao(self, stmt: A.Atribuicao, nivel, tipos):
         """Sobrepõe gerador_base.py para o caminho de chamada com
         parâmetros 'ref' -- precisa de _gerar_lista_args (coerção
-        inteiro->decimal nos argumentos, cópia de estruturas por valor) e
-        de coagir o valor de retorno principal (ver a mesma duplicação já
-        existente em _gerar_chamada_stmt)."""
+        inteiro->decimal nos argumentos) e de coagir o valor de retorno
+        principal (ver a mesma duplicação já existente em
+        _gerar_chamada_stmt)."""
         if isinstance(stmt.expr, A.Chamada):
             f_def = self._encontrar_funcao(stmt.expr.nome)
             if f_def and any(p.por_referencia for p in f_def.parametros):
@@ -931,14 +931,21 @@ class GeradorCodigo(GeradorCodigoBase):
         emitida antes da expressão -- a compreensão de listas aninhada do
         Python reavalia o 'range()' interior a cada volta da exterior,
         duplicando o efeito de uma expressão de dimensão com efeitos
-        laterais. Mesmo princípio que _gerar_para aplica a 'passo'.
-        'nivel' tem de ser o mesmo nível de indentação de quem usa a
-        expressão devolvida logo a seguir."""
+        laterais. Mesmo princípio que _gerar_para aplica a 'passo'. Os
+        nomes das temporárias vêm de um contador PERSISTENTE
+        (self._contador_dim_vetor, gerador_base.py), não de um índice
+        reiniciado a cada chamada -- uma única instrução pode chamar este
+        método mais do que uma vez antes de ser emitida (ex.: preencher
+        várias linhas em falta dum literal de vetor multidimensional
+        parcial, ver _expr_vetor_literal), e nomes fixos colidiriam entre
+        essas chamadas irmãs. 'nivel' tem de ser o mesmo nível de
+        indentação de quem usa a expressão devolvida logo a seguir."""
         if not dims_exprs:
             return self._valor_default(tipo)
         temps = []
-        for i, dim_expr in enumerate(dims_exprs):
-            nome_temp = f"_algo_dim{i}"
+        for dim_expr in dims_exprs:
+            nome_temp = f"_algo_dim{self._contador_dim_vetor}"
+            self._contador_dim_vetor += 1
             self.emit(f"{nome_temp} = {self._expr(dim_expr, tipos)}", nivel)
             temps.append(nome_temp)
         self.emit(f"_algo_verificar_tamanho_vetor_agregado({', '.join(temps)})", nivel)
@@ -1011,11 +1018,13 @@ class GeradorCodigo(GeradorCodigoBase):
                     # Mesma ideia para um literal de vetor -- _expr_vetor_literal
                     # coage cada elemento (ex.: inteiro -> decimal), ao contrário
                     # do ramo genérico de A.VetorLiteral em _expr(), que apenas
-                    # monta a lista sem coagir nada.
-                    valor = self._expr_vetor_literal(stmt.expr, self.tipo_retorno_atual, tipos)
+                    # monta a lista sem coagir nada. Uma função devolve o nº de
+                    # dimensões (dims_retorno), não um tamanho por dimensão, por
+                    # isso não há tamanho-alvo para preencher em falta
+                    # (dims_exprs=None, ver _expr_vetor_literal).
+                    valor = self._expr_vetor_literal(stmt.expr, self.tipo_retorno_atual, None, tipos)
                 else:
                     valor = self._coagir_decimal(self._expr(stmt.expr, tipos), self.tipo_retorno_atual, stmt.expr)
-                    valor = self._copiar_se_necessario(valor, self.tipo_retorno_atual, self.dims_retorno_atual)
                 if self.refs_atuais:
                     self.emit(f"return {valor}, {', '.join(self.refs_atuais)}", nivel)
                 else:
@@ -1082,6 +1091,21 @@ class GeradorCodigo(GeradorCodigoBase):
             "argumentos passados por referência têm de ser uma variável, um "
             "elemento de vetor ou um campo")
 
+    def _comparacao_e_referencial(self, expr: A.BinOp):
+        """True se algum dos operandos de '=='/'<>' for vetor (dims > 0)
+        ou 'estrutura' -- semantics.py anota cada operando com
+        _tipo_inferido/_dims_inferido (ver VerificadorTipos._tipo_expr);
+        'nulo' (dims sempre 0, tipo 'nulo', nunca em self.estruturas) não
+        ativa isto sozinho, mas um dos LADOS sendo vetor/estrutura já
+        chega -- 'x == nulo' com 'x' vetor/estrutura fica corretamente
+        referencial."""
+        for operando in (expr.esq, expr.dire):
+            if getattr(operando, "_dims_inferido", 0) > 0:
+                return True
+            if getattr(operando, "_tipo_inferido", None) in self.estruturas:
+                return True
+        return False
+
     # -------- lvalue / expressões --------
     def _expr(self, expr, tipos):
         if expr is None:  # pragma: no cover -- nenhum chamador passa None (todos são guardados)
@@ -1122,6 +1146,18 @@ class GeradorCodigo(GeradorCodigoBase):
                         and expr.dire._tipo_inferido == "inteiro"):
                     return f"float({chamada})"
                 return chamada
+            if expr.op in ("==", "<>") and self._comparacao_e_referencial(expr):
+                # 'vetor' (list do Python) e 'estrutura' são tipos por
+                # REFERÊNCIA -- '==' nativo do Python é estrutural para
+                # ambos (list compara elemento a elemento; uma
+                # 'estrutura' sem '__eq__' próprio, ver _gerar_estrutura,
+                # já cai na identidade por omissão, mas 'is'/'is not'
+                # torna isso explícito em vez de depender do
+                # comportamento por omissão do Python). 'x == nulo' cai
+                # aqui tal e qual (identidade contra None é exatamente o
+                # que um teste de nulo deve ser).
+                op = "is" if expr.op == "==" else "is not"
+                return f"({self._expr(expr.esq, tipos)} {op} {self._expr(expr.dire, tipos)})"
             op = OPS_BIN[expr.op]
             return f"({self._expr(expr.esq, tipos)} {op} {self._expr(expr.dire, tipos)})"
         if isinstance(expr, A.UnOp):

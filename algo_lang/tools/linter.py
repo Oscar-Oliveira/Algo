@@ -36,7 +36,6 @@ class Linter:
         self._verificar_casos_duplicados_em_escolha()
         self._verificar_escolha_sem_casos()
         self._verificar_resultado_de_funcao_descartado()
-        self._verificar_campos_em_falta_em_literal_de_estrutura()
         self._verificar_recursao_sem_condicao()
 
         nomes_globais = {d.nome for d in self.programa.declaracoes}
@@ -842,73 +841,6 @@ class Linter:
                 and expr.operando.tipo == "inteiro":
             return -expr.operando.valor
         return None
-
-    def _verificar_literal_de_estrutura_campos_em_falta(self, tipo_nome, lit, campos_por_estrutura):
-        campos_da_estrutura = campos_por_estrutura.get(tipo_nome)
-        if campos_da_estrutura is None:
-            return
-        campos_dados = {nome for nome, _expr in lit.campos}
-        em_falta = sorted(campos_da_estrutura - campos_dados)
-        if em_falta:
-            lista = ", ".join(f"'{c}'" for c in em_falta)
-            self.avisos.append(Aviso(
-                f"o literal de '{tipo_nome}' não define o(s) campo(s) {lista} -- ficam "
-                f"com o valor por omissão", lit.linha))
-
-    def _verificar_literais_de_estrutura_em_valor(self, tipo_nome, valor, campos_por_estrutura):
-        """Percorre 'valor' recursivamente -- cobre EstruturaLiteral direto,
-        e EstruturaLiteral dentro de VetorLiteral a qualquer profundidade
-        (vetores 2D+ de estruturas), usando SEMPRE o mesmo 'tipo_nome'
-        (o tipo do ELEMENTO do vetor, não muda com a profundidade)."""
-        if isinstance(valor, A.EstruturaLiteral):
-            self._verificar_literal_de_estrutura_campos_em_falta(
-                tipo_nome, valor, campos_por_estrutura)
-        elif isinstance(valor, A.VetorLiteral):
-            for elemento in valor.elementos:
-                self._verificar_literais_de_estrutura_em_valor(
-                    tipo_nome, elemento, campos_por_estrutura)
-
-    def _verificar_campos_em_falta_em_chamada(self, expr, funcoes_por_nome, campos_por_estrutura):
-        """Também verifica literais de estrutura passados como argumento
-        de uma chamada (ex.: 'soma({x: 3})'), percorrendo recursivamente
-        para apanhar chamadas aninhadas."""
-        if isinstance(expr, A.Chamada):
-            f_def = funcoes_por_nome.get(expr.nome)
-            if f_def is not None:
-                for arg, p in zip(expr.args, f_def.parametros):
-                    self._verificar_literais_de_estrutura_em_valor(
-                        p.tipo, arg, campos_por_estrutura)
-            for a in expr.args:
-                self._verificar_campos_em_falta_em_chamada(a, funcoes_por_nome, campos_por_estrutura)
-        elif isinstance(expr, A.BinOp):
-            self._verificar_campos_em_falta_em_chamada(expr.esq, funcoes_por_nome, campos_por_estrutura)
-            self._verificar_campos_em_falta_em_chamada(expr.dire, funcoes_por_nome, campos_por_estrutura)
-        elif isinstance(expr, A.UnOp):
-            self._verificar_campos_em_falta_em_chamada(
-                expr.operando, funcoes_por_nome, campos_por_estrutura)
-        elif isinstance(expr, A.VetorLiteral):
-            for e in expr.elementos:
-                self._verificar_campos_em_falta_em_chamada(e, funcoes_por_nome, campos_por_estrutura)
-        elif isinstance(expr, A.EstruturaLiteral):
-            for _nome, valor in expr.campos:
-                self._verificar_campos_em_falta_em_chamada(valor, funcoes_por_nome, campos_por_estrutura)
-
-    def _verificar_campos_em_falta_em_literal_de_estrutura(self):
-        campos_por_estrutura = {e.nome: {c.nome for c in e.campos} for e in self.programa.estruturas}
-        declaracoes = list(self.programa.declaracoes)
-        for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
-            declaracoes.extend(s for s in self._todas_as_stmts(stmts) if isinstance(s, A.Declaracao))
-        for d in declaracoes:
-            if d.inicial is not None:
-                self._verificar_literais_de_estrutura_em_valor(
-                    d.tipo, d.inicial, campos_por_estrutura)
-
-        funcoes_por_nome = {f.nome: f for f in self.programa.funcoes}
-        for stmts in [self.programa.corpo] + [f.corpo for f in self.programa.funcoes]:
-            for s in self._todas_as_stmts(stmts):
-                for e in self._expressoes_lidas(s):
-                    self._verificar_campos_em_falta_em_chamada(e, funcoes_por_nome, campos_por_estrutura)
-
 
 def analisar(programa: A.Programa, codigo_fonte: str = None):
     return Linter(programa, codigo_fonte).analisar()

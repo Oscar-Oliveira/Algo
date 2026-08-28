@@ -4,7 +4,7 @@ estrutura Pessoa
     nome:cadeia
     idade:inteiro
 
-procedimento renomear(ref pessoa:Pessoa, novoNome:cadeia)
+procedimento renomear(pessoa:Pessoa, novoNome:cadeia)
     pessoa.nome = novoNome
 
 inicio

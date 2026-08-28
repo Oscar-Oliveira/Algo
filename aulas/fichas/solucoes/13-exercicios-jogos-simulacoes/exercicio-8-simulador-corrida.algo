@@ -16,6 +16,7 @@ inicio
     corredores:Corredor[n]
     i:inteiro
     para i de 0 ate n - 1 fazer
+        corredores[i] = {}
         escrever("Nome do corredor: ")
         ler(corredores[i].nome)
         corredores[i].posicao = 0

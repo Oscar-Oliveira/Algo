@@ -42,6 +42,7 @@ inicio
         escolher opcao
             caso 1
                 afirmar numLivros < MAX_LIVROS, "biblioteca cheia"
+                livros[numLivros] = {}
                 escrever("Título: ")
                 ler(livros[numLivros].titulo)
                 escrever("Autor: ")

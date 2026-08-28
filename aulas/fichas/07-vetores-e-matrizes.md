@@ -3,9 +3,9 @@
 ## Antes de começares
 
 - `nome:tipo[tamanho]` — índices vão de `0` a `tamanho - 1`.
-- Literal `{...}` tem de ter exatamente o número certo de elementos.
+- Literal `{...}` pode ter menos elementos do que o tamanho declarado (o resto fica por omissão); mais elementos do que cabem é sempre erro de compilação.
 - Um índice inválido (incluindo negativo) é erro em **runtime**; índices negativos não contam a partir do fim.
-- Um vetor **não** se copia com `=` — copia elemento a elemento, com um `para`.
+- `=`/declaração **não** copia um vetor — as duas variáveis passam a apontar para o mesmo vetor; `==` compara se é o mesmo vetor, não o conteúdo. O tamanho declarado só é validado em **runtime** quando o valor vem doutra variável/chamada.
 - Matriz: `tipo[linhas][colunas]`, acede-se com `m[i][j]`, percorre-se com `para` aninhados.
 - Testa sempre o teu programa a correr, não só a lê-lo.
 

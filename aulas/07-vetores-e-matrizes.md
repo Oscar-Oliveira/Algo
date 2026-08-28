@@ -102,18 +102,20 @@ primos:inteiro[5] = {2, 3, 5, 7, 11}
 escrever(primos[0], primos[4])       // 2 11
 ```
 
-O literal tem de ter **exatamente** o número de elementos do tamanho declarado.
+O literal pode ter **menos** elementos do que o tamanho declarado — as
+posições que faltam, no fim, ficam com o valor por omissão do tipo.
 
 ---
 
-## Armadilha: o literal tem de bater certo
+## Armadilha: mais elementos do que cabem é sempre erro
 
 ```algo
-// primos:inteiro[5] = {2, 3, 5}         // ERRO! só 3 valores para 5 posições
-// primos:inteiro[5] = {2, 3, 5, 7, 11, 13}  // ERRO! 6 valores a mais
+v:inteiro[3] = {1, 2}                     // OK -- v[2] fica 0
+// v3:inteiro[3] = {1, 2, 3, 4}            // ERRO! 4 valores para 3 posições
 ```
 
-Nem preenchimento automático, nem corte silencioso — é sempre erro de compilação.
+Faltar elementos é aceite (preenchimento com o valor por omissão); ter
+elementos a mais nunca é — não há onde os pôr.
 
 ---
 
@@ -185,30 +187,51 @@ O tamanho não precisa de ser um número fixo escrito no código — pode ser ca
 
 ---
 
-## Armadilha: um vetor não se copia com `=`
+## `=` não copia um vetor -- as duas variáveis ficam ligadas
 
 ```algo
 v1:inteiro[3] = {1, 2, 3}
-v2:inteiro[3]
-// v2 = v1                // ERRO! um vetor não pode ser atribuído assim
+v2:inteiro[3] = v1
+v2[0] = 99
+escrever(v1[0], " ", v2[0])     // 99 99 -- é o MESMO vetor!
 ```
 
-Ao contrário de uma variável normal, `=` **não** funciona entre dois vetores inteiros.
+`v2` não é uma cópia de `v1` -- é o mesmo vetor com dois nomes. Mudar
+`v2` também muda `v1`. Isto acontece tanto numa declaração
+(`v2:inteiro[3] = v1`) como numa atribuição a um vetor já existente
+(`v2 = v1`).
 
 ---
 
-## Como copiar um vetor de verdade
+## Para uma cópia de verdade, elemento a elemento com um ciclo
+
+Se precisares mesmo de uma cópia **independente** (mudar uma sem afetar a outra), copia com um `para`:
 
 ```algo
-v1:inteiro[3] = {1, 2, 3}
-v2:inteiro[3]
+v1:inteiro[5] = {1, 2, 3, 4, 5}
+copia:inteiro[5]
 i:inteiro
-para i de 0 ate 2 fazer
-    v2[i] = v1[i]              // copiar elemento a elemento
+para i de 0 ate 4 fazer
+    copia[i] = v1[i]
 
-v2[0] = 99
-escrever(v1[0], " ", v2[0])     // 1 99 -- são independentes
+copia[0] = 99
+escrever(v1[0], " ", copia[0])     // 1 99 -- agora sim, independentes
 ```
+
+---
+
+## Armadilha: `==` compara SE é o mesmo vetor, não o conteúdo
+
+```algo
+a:inteiro[3] = {1, 2, 3}
+b:inteiro[3] = {1, 2, 3}
+escrever(a == b)      // falso! mesmo conteúdo, mas são vetores diferentes
+c:inteiro[3] = a
+escrever(a == c)      // verdadeiro -- 'c' é o MESMO vetor que 'a'
+```
+
+Para comparar o **conteúdo**, escreve a tua própria comparação
+elemento a elemento (como no Exercício 8 da ficha).
 
 ---
 
@@ -320,9 +343,9 @@ inicio
 ## Resumo
 
 - `nome:tipo[tamanho]` — índices de `0` a `tamanho - 1`
-- Literal `{...}` tem de ter exatamente o tamanho certo
+- Literal `{...}` pode ter menos elementos (preenche o resto por omissão); mais é sempre erro
 - Índice inválido (incluindo negativo) é erro em **runtime**, nunca conta a partir do fim
-- Um vetor **não** se copia com `=` — copia elemento a elemento
+- `=`/declaração **não** copia um vetor — as duas variáveis ficam ligadas ao mesmo vetor; `==` compara se é o mesmo vetor, não o conteúdo; usa um ciclo para copiar/comparar de verdade
 - Matriz: `tipo[linhas][colunas]`, `m[i][j]`, cada linha independente
 - `para` aninhados para percorrer matrizes
 

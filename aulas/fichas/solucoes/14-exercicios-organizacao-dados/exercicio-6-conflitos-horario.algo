@@ -16,6 +16,7 @@ inicio
     reservas:Reserva[n]
     i:inteiro
     para i de 0 ate n - 1 fazer
+        reservas[i] = {}
         escrever("Nome: ")
         ler(reservas[i].nome)
         escrever("Hora de início: ")

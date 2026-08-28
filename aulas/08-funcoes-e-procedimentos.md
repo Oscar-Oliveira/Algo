@@ -275,7 +275,25 @@ Um parâmetro `v:tipo[]` (sem tamanho) aceita um vetor de **qualquer** tamanho �
 
 ## Nota: sem promoção de tipo nos elementos
 
-O tipo dos elementos tem de ser **exatamente igual** ao declarado no parâmetro — tal como em `ref`, não há promoção `inteiro`→`decimal` aqui. Um vetor passado sem `ref` continua a ser copiado inteiro para dentro da função.
+O tipo dos elementos tem de ser **exatamente igual** ao declarado no parâmetro — tal como em `ref`, não há promoção `inteiro`→`decimal` aqui.
+
+---
+
+## Um vetor passado sem `ref` NÃO é copiado
+
+```algo
+procedimento dobrarElementos(v:inteiro[], tamanho:inteiro)
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        v[i] = v[i] * 2
+
+inicio
+    numeros:inteiro[3] = {1, 2, 3}
+    dobrarElementos(numeros, 3)
+    escrever(numeros[0], " ", numeros[1], " ", numeros[2])   // 2 4 6 -- mutado!
+```
+
+Tal como `v2 = v1` liga as duas variáveis na Aula 7, `v` dentro da função é o MESMO vetor que `numeros`. Mutar um elemento é visto pelo chamador; só reatribuir o parâmetro inteiro (`v = {...}`) é que fica preso à função.
 
 ---
 
@@ -311,8 +329,9 @@ inicio
 ## Resumo
 
 - `funcao` devolve valor (sempre `retornar <expr>` em todos os caminhos); `procedimento` não
-- Por valor (padrão): cópia, o chamador nunca é afetado
-- `ref`: aponta para a mesma variável; regras estritas (variável, tipo exato, não repetir, só instrução isolada)
+- Por valor (padrão), parâmetro **escalar**: cópia, o chamador nunca é afetado
+- Por valor, parâmetro **vetor/estrutura**: NÃO é cópia — mutar um elemento/campo afeta o chamador; só reatribuir o parâmetro inteiro é que não propaga
+- `ref`: aponta para a mesma variável (mesmo uma reatribuição completa propaga); regras estritas (variável, tipo exato, não repetir, só instrução isolada)
 - Variável global: lida/escrita direta, sem `ref`
 - Recursão: caso base + aproximação do caso base
 - Vetor como parâmetro: `v:tipo[]`, sem promoção de tipo
