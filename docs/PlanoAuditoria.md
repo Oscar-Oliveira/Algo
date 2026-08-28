@@ -26,15 +26,14 @@ existir). Nada de achados espalhados por mais nenhum sítio.
 
 - **Compilador**: os 10 capítulos do manual já foram auditados (6 achados
   já corrigidos e removidos deste documento — ver nota no início da
-  secção "Achados"). Não cobre a camada de ferramentas (`cli.py`,
-  `linter.py`, `flowchart.py`, `tracer.py`) nem a estrutura interna do
-  código. `pytest algo_lang/tests/ -m "not slow"`: 908 passam, 44 falham
-  — confirmadas como falhas de **ambiente** (testes que invocam o
-  comando `algo` diretamente via subprocesso, fora do PATH neste
-  ambiente), não bugs — ver achado 2. Há também um diff não commitado em
-  `algo_lang/compilador/` (mudança de semântica `estrutura`/`vetor` de
-  tipo por valor para tipo por referência, identificado nos comentários
-  como `AUDITORIA_2026-08-19 Fase 1.1`) — ver achado 1.
+  secção "Achados"). A mudança de semântica `estrutura`/`vetor` de tipo
+  por valor para tipo por referência (`AUDITORIA_2026-08-19 Fase 1.1`)
+  já foi confirmada e commitada (commit `b75190e`). Não cobre a camada
+  de ferramentas (`cli.py`, `linter.py`, `flowchart.py`, `tracer.py`) nem
+  a estrutura interna do código. `pytest algo_lang/tests/ -m "not slow"`:
+  908 passam, 44 falham — confirmadas como falhas de **ambiente** (testes
+  que invocam o comando `algo` diretamente via subprocesso, fora do PATH
+  neste ambiente), não bugs — ver achado 1.
 - **Documentos**: `docs/bin/` (citado em `context/project-overview.md`
   como existente) foi apagado deliberadamente no commit `ca1f1a4`
   (2026-08-24) junto com o manual antigo em `.docx`, substituído por
@@ -53,20 +52,34 @@ existir). Nada de achados espalhados por mais nenhum sítio.
 registar passa/falha de cada uma como baseline para comparar depois de
 cada fase seguinte.
 
-### Fase 1 — Compilador: fechar a Fase 1.1 já em curso
-O diff não commitado (`estrutura`/`vetor` por referência) está
-implementado, testado, e o manual (`05-Vetores-e-Matrizes.md`,
-`07-Estruturas.md`) já o descreve como atual — só falta confirmar com o
-utilizador que é o design final (achado 1) e, nesse caso, commitar.
+### Fase 1 — ~~Compilador: fechar a Fase 1.1 já em curso~~ ✅ feito
+`estrutura`/`vetor` por referência confirmado como design final e
+commitado (`b75190e`).
 
-### Fase 2 — Compilador: camada de ferramentas
+### Fase 2 — Compilador: camada de ferramentas — 🔶 em curso
 Auditar por execução `cli.py`, `linter.py`, `flowchart.py`, `tracer.py`
 — nunca cobertos pela auditoria do manual. Exercitar caminhos principais
 e de erro contra o compilador real (avisos do linter, fluxogramas com
 estruturas de controlo aninhadas, trace de erro em runtime, `cli.py` com
 flags inválidas/combinações raras). Também o sítio certo para marcar as
 44 falhas de ambiente com um marker pytest dedicado, se houver tempo —
-ver achado 2.
+ver achado 1.
+
+Já cobertos e corrigidos (confirmados por execução, suite completa
+verde antes/depois): `tracer.py` — `_valor_serializavel` rebentava com
+"recursão infinita" num programa válido com um ciclo real entre
+`estrutura`s (consequência da Fase 1.1, ciclos passaram a ser
+possíveis); corrigido com deteção de ciclo por caminho (`<ciclo>` em
+vez de recursar), teste de regressão em `test_tracer.py`.
+`linter.py` — `_verificar_atribuicao_a_parametro_por_valor` avisava
+(errado) que mutar um campo/elemento de um parâmetro `estrutura`/vetor
+sem `ref` não era visto por quem chamou; corrigido para só avisar
+quando o PRÓPRIO parâmetro é reatribuído (continua correto), testes
+atualizados em `test_linter.py`. `flowchart.py` — testado com ciclos
+aninhados + `sair`/`continuar`, sem problemas encontrados (a
+duplicação de aresta a seguir a `sair`/`retornar` é intencional, já
+documentada no código). Por cobrir ainda: `cli.py` com flags
+inválidas/combinações raras, mais casos de `flowchart.py`.
 
 ### Fase 3 — Documentos: consistência e referências
 Verificar que `docs/`, `context/project-overview.md` e `CLAUDE.md`
@@ -103,48 +116,7 @@ deles corrigidos) fica em `git log`/`git show HEAD:docs/manual/ACHADOS.md`
 se algum dia for preciso consultá-lo, mas deixa de viver neste
 documento vivo.
 
-#### 1. [Compilador] `estrutura`/`vetor` mudaram de tipo por valor para tipo por referência — 🟡 confirmado a correr o compilador, ⚪ por decidir
-
-Diff não commitado em `algo_lang/compilador/` (`git status`:
-`ast_nodes.py`, `codegen.py`, `gerador_base.py`, `parser.py`,
-`semantics.py` modificados). Os comentários do próprio diff
-identificam-no como `AUDITORIA_2026-08-19 Fase 1.1`.
-
-Confirmado a correr o compilador (estado atual da working tree):
-
-```algo
-v1:inteiro[3] = {1, 2, 3}
-v2:inteiro[3] = v1
-v2[0] = 99
-escrever(v1[0], ",", v2[0])   // "99,99" -- v1 também mudou (aliasing)
-```
-
-```algo
-b:No = {valor: 2, seguinte: nulo}
-a:No = {valor: 1, seguinte: b}
-b.valor = 99
-escrever(a.seguinte.valor)   // "99" -- b e a.seguinte são a mesma instância
-```
-
-Uma `estrutura` declarada sem `{...}` também mudou: fica `nulo` (antes,
-construía eagerly uma instância com os campos a valor por omissão) —
-confirmado `c:Conta` seguido de `escrever(c == nulo)` → `verdadeiro`.
-
-`docs/manual/05-Vetores-e-Matrizes.md` (secção 5.4, "Um vetor é um tipo
-por referência: `=` não copia") e `docs/manual/07-Estruturas.md` (linha
-86, "as duas variáveis passam a apontar para a mesma instância")
-**já foram reescritos** para descrever este comportamento como atual —
-o manual está à frente deste registo de achados, não atrás. A suite de
-testes já o cobre e passa (`pytest algo_lang/tests/ -m "not slow"`:
-mesmas 44 falhas de ambiente do achado 2, nenhuma nova) — o trabalho
-está feito e testado, só não commitado.
-
-**Por decidir (do maintainer)**: confirmar que é o design final
-pretendido (indícios fortes que sim — manual já reescrito, suite
-dedicada `AUDITORIA_2026-08-19 Fase 1.1` cobre vários caminhos de
-aliasing) e, nesse caso, commitar o diff (Fase 1).
-
-#### 2. [Compilador] 44 falhas de teste são de ambiente, não bugs — 🟡 confirmado a correr
+#### 1. [Compilador] 44 falhas de teste são de ambiente, não bugs — 🟡 confirmado a correr
 
 `pytest algo_lang/tests/ -m "not slow"`: 44 falham, todas por
 `FileNotFoundError` — testes que invocam `subprocess.run(["algo", ...])`

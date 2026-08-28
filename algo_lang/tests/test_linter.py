@@ -513,12 +513,12 @@ def test_atribuicao_a_parametro_por_referencia_nao_da_aviso():
     assert not any("não é 'por referência'" in a.mensagem for a in avisos)
 
 
-def test_atribuicao_a_campo_de_parametro_estrutura_por_valor_da_aviso():
-    """Ronda 15: o aviso só disparava para reatribuir o parâmetro
-    INTEIRO ('p = ...'), não para mutar um CAMPO seu ('p.x = ...') --
-    exatamente a forma idiomática de tentar "modificar" uma estrutura
-    passada por valor, com o mesmo problema (a cópia local, não o
-    original do chamador, é que muda)."""
+def test_atribuicao_a_campo_de_parametro_estrutura_por_valor_nao_da_aviso():
+    """AUDITORIA_2026-08-19 Fase 1.1: 'estrutura' passou a tipo por
+    referência -- mutar um CAMPO ('p.x = ...') de um parâmetro sem 'ref'
+    já é visto por quem chamou, não é a confusão valor/referência que
+    este aviso existe para apanhar. Antes desta mudança (ronda 15) o
+    aviso disparava aqui; hoje seria um falso positivo."""
     avisos = _avisos("""
         algoritmo "T"
         estrutura Ponto
@@ -526,21 +526,40 @@ def test_atribuicao_a_campo_de_parametro_estrutura_por_valor_da_aviso():
         procedimento mexe(p:Ponto)
             p.x = 99
         inicio
-            pt:Ponto
+            pt:Ponto = {x: 0}
             mexe(pt)
             escrever(pt.x)
     """)
-    assert any("não é 'por referência'" in a.mensagem for a in avisos)
+    assert not any("não é 'por referência'" in a.mensagem for a in avisos)
 
 
-def test_atribuicao_a_elemento_de_parametro_vetor_por_valor_da_aviso():
+def test_atribuicao_a_elemento_de_parametro_vetor_por_valor_nao_da_aviso():
+    """Mesma razão que o teste acima, lado vetor."""
     avisos = _avisos("""
         algoritmo "T"
         procedimento mexe(v:inteiro[])
             v[0] = 99
         inicio
-            vv:inteiro[3]
+            vv:inteiro[3] = {0, 0, 0}
             mexe(vv)
+    """)
+    assert not any("não é 'por referência'" in a.mensagem for a in avisos)
+
+
+def test_reatribuicao_do_proprio_parametro_estrutura_por_valor_da_aviso():
+    """Ao contrário do teste acima: reatribuir o NOME do parâmetro
+    ('p = ...', não um campo seu) continua a só mudar a variável local
+    -- este caso do aviso continua correto."""
+    avisos = _avisos("""
+        algoritmo "T"
+        estrutura Ponto
+            x:inteiro
+        procedimento mexe(p:Ponto)
+            p = {x: 99}
+        inicio
+            pt:Ponto = {x: 0}
+            mexe(pt)
+            escrever(pt.x)
     """)
     assert any("não é 'por referência'" in a.mensagem for a in avisos)
 

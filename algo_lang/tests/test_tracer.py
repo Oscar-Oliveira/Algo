@@ -107,6 +107,33 @@ def test_trace_estrutura_serializa_como_objeto(tmp_path):
     assert ultimo["pilha"][0]["variaveis"]["p"] == {"x": 3, "y": 4}
 
 
+def test_trace_estrutura_com_ciclo_de_referencias_nao_rebenta(tmp_path):
+    """AUDITORIA_2026-08-19 Fase 1.1: 'estrutura' passou a tipo por
+    referência, por isso um ciclo real (a.seguinte=b, b.seguinte=a) é
+    hoje um programa válido -- antes era impossível de construir (toda
+    atribuição copiava). Sem deteção de ciclo, o serializador de
+    variáveis do trace recursava até RecursionError, apanhado pelo
+    tratamento de erro do programa gerado e mostrado como "recursão
+    infinita" (enganador -- o programa não tem nenhuma função
+    recursiva). Confirma que passa a mostrar '<ciclo>' em vez de
+    rebentar."""
+    resultado = _trace("""
+        algoritmo "T"
+        estrutura No
+            valor:inteiro
+            seguinte:No
+        inicio
+            a:No = {valor: 1, seguinte: nulo}
+            b:No = {valor: 2, seguinte: a}
+            a.seguinte = b
+            escrever(a.seguinte.seguinte.valor)
+    """, tmp_path=tmp_path)
+    assert resultado["erro"] is None
+    assert resultado["consolaFinal"].strip() == "1"
+    ultimo = resultado["passos"][-1]
+    assert ultimo["pilha"][0]["variaveis"]["a"]["seguinte"]["seguinte"] == "<ciclo>"
+
+
 def test_trace_vetor_serializa_como_lista(tmp_path):
     resultado = _trace("""
         algoritmo "T"

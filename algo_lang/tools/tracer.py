@@ -63,18 +63,36 @@ def _arredondar_decimal(v):
     return 0.0 if v == 0.0 else v
 
 
-def _valor_serializavel(v):
+def _valor_serializavel(v, _antepassados=frozenset()):
     """Converte um valor Python num valor pronto para JSON, mantendo os
     tipos nativos quando possível (para a página web poder formatar como
-    quiser) em vez de os transformar já em texto."""
+    quiser) em vez de os transformar já em texto.
+
+    '_antepassados' (ids dos objetos já em recursão no CAMINHO atual, não
+    todos os já vistos) deteta um ciclo real -- 'estrutura'/vetor são
+    tipos por referência desde a Fase 1.1 (ver AUDITORIA_2026-08-19),
+    por isso um ciclo genuíno (ex.: 'a.seguinte = b' e 'b.seguinte = a')
+    é hoje um programa ALGO válido, não só um erro de construção; sem
+    isto, um RecursionError real aqui era apanhado pelo tratamento de
+    erro do programa gerado (o sys.settrace corre na mesma pilha) e
+    mostrado como "recursão infinita" -- enganador, o programa em si não
+    tem nenhuma função recursiva. Usa o CAMINHO (não todos os ids já
+    vistos) para não confundir aliasing não-cíclico (ex.: o mesmo Ponto
+    aparecendo em duas posições de um vetor) com um ciclo real."""
     if isinstance(v, float):
         return _arredondar_decimal(v)
     if isinstance(v, (int, bool, str)) or v is None:
         return v
     if isinstance(v, list):
-        return [_valor_serializavel(e) for e in v]
+        if id(v) in _antepassados:
+            return "<ciclo>"
+        antepassados = _antepassados | {id(v)}
+        return [_valor_serializavel(e, antepassados) for e in v]
     if hasattr(v, "__dict__"):  # instância de uma 'estrutura'
-        return {k: _valor_serializavel(val) for k, val in vars(v).items()}
+        if id(v) in _antepassados:
+            return "<ciclo>"
+        antepassados = _antepassados | {id(v)}
+        return {k: _valor_serializavel(val, antepassados) for k, val in vars(v).items()}
     return repr(v)
 
 
