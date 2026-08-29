@@ -11,6 +11,19 @@ import pytest
 
 RAIZ_PROJETO = pathlib.Path(__file__).resolve().parent.parent.parent
 
+# Achado 1 revisto (docs/PlanoAuditoria.md): não é um bug, é a própria
+# natureza destes testes -- correm 'algo.sh' como processo real
+# (Windows não sabe interpretar o shebang de um script bash, dá
+# "%1 is not a valid Win32 application") e dois deles criam symlinks
+# para simular um PATH mínimo (privilégio que o Windows exige e que
+# esta conta não tem, ao contrário de Linux/macOS). Confirma o que o
+# docstring do módulo já dizia: só faz sentido correr em POSIX.
+_SO_NAO_SUPORTADO = pytest.mark.skipif(
+    os.name != "posix",
+    reason="algo.sh é um script bash, testado como processo real -- só corre em POSIX "
+    "(Windows usa algo.bat, sem testes automáticos, ver docstring do módulo)",
+)
+
 
 def _preparar_copia_do_projeto(tmp_path):
     """Copia só o necessário para o algo.sh conseguir instalar-se: o
@@ -25,6 +38,7 @@ def _preparar_copia_do_projeto(tmp_path):
     return destino
 
 
+@_SO_NAO_SUPORTADO
 @pytest.mark.slow
 def test_algo_sh_primeira_execucao_cria_venv_e_funciona(tmp_path):
     projeto = _preparar_copia_do_projeto(tmp_path)
@@ -42,6 +56,7 @@ def test_algo_sh_primeira_execucao_cria_venv_e_funciona(tmp_path):
     assert (projeto / ".venv" / "bin" / "algo").exists()
 
 
+@_SO_NAO_SUPORTADO
 @pytest.mark.slow
 def test_algo_sh_segunda_execucao_nao_reinstala(tmp_path):
     projeto = _preparar_copia_do_projeto(tmp_path)
@@ -57,6 +72,7 @@ def test_algo_sh_segunda_execucao_nao_reinstala(tmp_path):
     assert "Primeira utilização" not in resultado.stdout
 
 
+@_SO_NAO_SUPORTADO
 @pytest.mark.slow
 def test_algo_sh_funciona_com_espacos_no_caminho(tmp_path):
     pasta_com_espacos = tmp_path / "pasta com espaços"
@@ -76,6 +92,7 @@ def test_algo_sh_funciona_com_espacos_no_caminho(tmp_path):
     assert "5" in resultado.stdout
 
 
+@_SO_NAO_SUPORTADO
 def test_algo_sh_sem_python_da_erro_amigavel(tmp_path):
     projeto = _preparar_copia_do_projeto(tmp_path)
     bin_minimo = tmp_path / "bin_minimo"
@@ -103,6 +120,7 @@ def test_algo_command_e_identico_ao_algo_sh():
     assert conteudo_sh == conteudo_command
 
 
+@_SO_NAO_SUPORTADO
 def test_algo_sh_venv_sem_pip_da_erro_amigavel(tmp_path):
     """Cenário real em Debian/Ubuntu sem o pacote 'python3-venv': o venv
     chega a ser criado, mas fica sem 'pip' lá dentro. Para simular isto

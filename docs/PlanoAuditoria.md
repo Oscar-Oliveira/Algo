@@ -280,15 +280,25 @@ razão diferente — ver achado 1 revisto abaixo) em
 `test_consola.py`/`test_correcoes_auditoria.py`/`test_estruturas.py`/
 `test_fluxogramas.py`/`test_linter.py`/`test_tracer.py`.
 
-Corrida final: `algo_lang/tests/` completo (incluindo `slow`) — **5
-falham** (só `test_algo_sh.py`, achado 1 revisto — razão diferente,
-não "algo fora do PATH"), 911 passam, 43 skipped. `cd online && pytest
--v` completo — 298 passam, 7 skipped, 0 falham. Critério de sucesso
-cumprido na prática: as falhas de ambiente que mascaravam regressões
-(achado 1 original) deixaram de aparecer como falhas; as 5 restantes
-são uma limitação de plataforma diferente e mais restrita (só Windows,
-só `test_algo_sh.py`), documentada como achado 1 revisto, não um
-critério de sucesso desta fase.
+Segunda corrida (com o marker): `algo_lang/tests/` completo — **5
+falham** (só `test_algo_sh.py`, razão diferente de "algo fora do
+PATH" — ver achado 1 revisto), 911 passam, 43 skipped.
+
+Achado 1 revisto também fechado: as 5 falhas de `test_algo_sh.py`
+confirmaram-se **não ser bugs** — o próprio docstring do módulo já
+dizia que só faz sentido correr em POSIX (`algo.bat`, o equivalente
+para Windows, é só revisto manualmente); 3 delas invocam `algo.sh`
+como processo, o que o Windows não sabe interpretar sem um shebang
+(`OSError: [WinError 193]`), as outras 2 criam symlinks num PATH
+falso, privilégio que esta conta Windows não tem (`OSError: [WinError
+1314]`). Adicionado `@pytest.mark.skipif(os.name != "posix", ...)` só
+a essas 5 (não ao módulo inteiro — `test_algo_command_e_identico_ao_
+algo_sh` não usa subprocesso nenhum e já passava em Windows, ficou
+de fora do skip). `algo_lang/tests/`: **911 passam, 0 falham, 48
+skipped** — critério de sucesso desta fase agora cumprido por
+completo, não só na prática.
+
+`cd online && pytest -v` completo — 298 passam, 7 skipped, 0 falham.
 
 ## Achados
 
@@ -298,25 +308,6 @@ confirmados fechados — o histórico completo (11 achados do manual, 6
 deles corrigidos) fica em `git log`/`git show HEAD:docs/manual/ACHADOS.md`
 se algum dia for preciso consultá-lo, mas deixa de viver neste
 documento vivo.
-
-#### 1. [Compilador] `test_algo_sh.py` — 5 falhas por limitação do Windows, não bugs — 🟡 confirmado a correr, ⚪ por decidir
-
-Distinto do achado 1 original (já corrigido, ver Fase 5): estes 5
-testes falham por DUAS razões que não são "algo não está no PATH" —
-`test_algo_sh_sem_python_da_erro_amigavel`/`test_algo_sh_venv_sem_pip_
-da_erro_amigavel` com `OSError: [WinError 1314] A required privilege
-is not held by the client` (criar um symlink no `setup` do teste exige
-Modo de Programador/privilégio de administrador no Windows); os outros
-3 com `OSError: [WinError 193] %1 is not a valid Win32 application`
-(tentam correr `algo.sh` diretamente como executável nativo, sem
-`bash` — só funciona em Linux/macOS ou WSL). Nenhum destes tem a ver
-com `algo` estar no PATH, por isso ficam fora do marker
-`requer_algo_no_path` (Fase 5) — marcá-los como tal seria enganador,
-já que continuariam a falhar mesmo com `algo` no PATH. Por decidir do
-maintainer: são só testes POSIX-only por natureza (o `Dockerfile`/CI de
-produção já são Linux) e não vale a pena adaptá-los ao Windows, ou
-merecem o mesmo tratamento (`skipif` num Windows sem privilégio de
-symlink)?
 
 #### 2. [Online] `_validar_host_ollama` (ON-14) é contornável por DNS rebinding — 🟡 mitigado (parcial), correção completa fora de âmbito
 
