@@ -44,6 +44,10 @@ omissão de `caracter`, tipagem de `^` encadeado, `conversao.paraBooleano("0")`;
 os outros 3 eram só documentação/comentários desatualizados). 1 achado
 original (indentação por tabs em `docs/bin/ReferenciaCompletaCLI.md`)
 deixou de se aplicar — esse ficheiro foi apagado (ver commit
-`ca1f1a4`). Por rever antes de considerar o manual "pronto": uma
-passagem de revisão humana ao texto (tom, terminologia consistente
-entre capítulos).
+`ca1f1a4`). Uma primeira passagem de revisão (tom, terminologia,
+referências cruzadas) já foi feita — capítulo a capítulo, ver
+`PlanoAuditoria.md` — e encontrou só um deslize de grafia
+("exactamente" num único sítio, já corrigido). Continua a valer a pena
+uma leitura humana antes do manual ser considerado "pronto" — a
+revisão feita não substitui o julgamento de alguém a ler como
+estudante, só verificou consistência mecânica.

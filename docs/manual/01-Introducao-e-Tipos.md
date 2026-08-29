@@ -182,7 +182,7 @@ escrever("Olá, ", nome, "!")
   letras onde se espera `inteiro`), pede o valor outra vez em vez de
   rebentar o programa. `booleano` aceita `verdadeiro`/`v`/`true` ou
   `falso`/`f`/`false` (outra coisa qualquer é pedida de novo);
-  `caracter` só aceita exactamente 1 símbolo.
+  `caracter` só aceita exatamente 1 símbolo.
 
 ## 1.7 `+` não converte números para texto
 

@@ -141,9 +141,16 @@ as suites crescem. `CLAUDE.md` em si verificado link a link (grep+leitura, não 
 `apoio.py:compilar/executar`, `modo_codemirror.py`, `grupos.py`,
 `autenticacao.tornar_admin`/`remover_admin`, `atividade.py:log_atividade`,
 `credenciais.py`/`cifragem.py:gerar_chave_nova` — todos existem como
-descrito. Por cobrir ainda: os 10 capítulos do manual um a um por
-conteúdo (só a consistência pós-Fase-1.1 e os links foram verificados
-até agora, não o texto todo).
+descrito. Os 10 capítulos do manual lidos por inteiro, um a um (tom,
+terminologia, referências cruzadas entre capítulos, estrutura):
+consistentes entre si, sem inglês a escapar para o meio do texto em
+português, todas as referências cruzadas (`capítulo N`/`N.M`) apontam
+para secções que existem mesmo. Um achado: `01-Introducao-e-Tipos.md`
+tinha "exactamente" (grafia pré-acordo ortográfico) numa frase, único
+sítio em todo o manual — o resto usa sempre "exatamente" — corrigido.
+Dois exemplos "completo" (capítulo 7, `CatalogoDeLivros`; capítulo 2,
+`div`/`mod` com negativos e `2^3^2`) recorridos contra o compilador
+real para confirmar que a saída documentada ainda bate certo — bate.
 
 ### Fase 4 — Online: auditoria por execução — ✅ feito
 Primeira auditoria desta frente. Prioridade a `executor.py` (isolamento
