@@ -2,8 +2,7 @@
 
 Manual de referência e aprendizagem da linguagem ALGO — só a linguagem em
 si (conceitos, sintaxe, exemplos). Não cobre instalação nem o CLI; para
-isso ver [`ManualCLI.md`](../ManualCLI.md) e
-[`bin/ReferenciaCompletaCLI.md`](../bin/ReferenciaCompletaCLI.md).
+isso ver [`ManualCLI.md`](../ManualCLI.md).
 
 Cada capítulo é um ficheiro próprio, para se poder rever e corrigir por
 partes. Os exemplos de código são escritos de raiz para este manual
@@ -42,8 +41,9 @@ cabeça) para confirmar que compilam e produzem a saída mostrada.
 7 achados registados em [`PlanoAuditoria.md`](../PlanoAuditoria.md) — 6 já corrigidos
 (3 deles com mudança real de comportamento do compilador: valor por
 omissão de `caracter`, tipagem de `^` encadeado, `conversao.paraBooleano("0")`;
-os outros 3 eram só documentação/comentários desatualizados). 1 fica
-deliberadamente adiado (achado 2, indentação por tabs em
-`bin/ReferenciaCompletaCLI.md` — fora do âmbito deste manual). Por
-rever antes de considerar o manual "pronto": uma passagem de revisão
-humana ao texto (tom, terminologia consistente entre capítulos).
+os outros 3 eram só documentação/comentários desatualizados). 1 achado
+original (indentação por tabs em `docs/bin/ReferenciaCompletaCLI.md`)
+deixou de se aplicar — esse ficheiro foi apagado (ver commit
+`ca1f1a4`). Por rever antes de considerar o manual "pronto": uma
+passagem de revisão humana ao texto (tom, terminologia consistente
+entre capítulos).

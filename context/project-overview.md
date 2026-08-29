@@ -23,10 +23,10 @@ python3 -m pytest algo_lang/tests/ -v
 python3 -m pytest algo_lang/tests/test_estruturas.py -v      # single file
 python3 -m pytest algo_lang/tests/test_estruturas.py -k nome_do_teste  # single test
 
-# Alguem (tutor) test suite (173 tests) — from repo root
+# Alguem (tutor) test suite (215 tests) — from repo root
 python3 -m pytest alguem/tests/ -v
 
-# Online (web service) test suite (83 tests)
+# Online (web service) test suite (302 tests)
 cd online && python3 -m pytest -v
 
 # Run the CLI/console locally (creates a venv on first run, no manual activation needed)

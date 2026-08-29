@@ -290,6 +290,23 @@ def test_admin_configurado_depois_da_conta_ja_existir(monkeypatch):
     assert autenticacao.eh_admin(id_est) is True
 
 
+def test_bootstrap_tardio_ainda_e_bloqueado_por_grupo_desativado(monkeypatch):
+    """Achado 3 (PlanoAuditoria.md): a promoção tardia a admin
+    (ONLINE_EMAIL_ADMIN configurada DEPOIS de a conta já existir e já
+    pertencer a um grupo entretanto desativado) continua bloqueada pelo
+    grupo desativado, tal como o docstring de autenticar() promete --
+    'sem exceção (incluindo contas admin)'."""
+    import grupos
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    grupo = grupos.criar_grupo("Grupo A")
+    id_est = autenticacao.registar("professor@escola.pt", "password123", codigo_grupo=grupo["codigo"])
+    grupos.desativar_grupo(grupo["id"])
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    with pytest.raises(autenticacao.ErroAutenticacao, match="grupo foi desativado"):
+        autenticacao.autenticar("professor@escola.pt", "password123")
+
+
 # ---------- registo com código de grupo ----------
 
 def test_registar_sem_codigo_de_grupo_fica_sem_grupo():

@@ -70,9 +70,9 @@ Cada parte tem documentação própria, mais detalhada do que cabe aqui:
 
 ## Estado dos testes
 
-- `algo_lang` (compilador): 792 testes — corre com `python3 -m pytest algo_lang/tests/`
-- `alguem` (tutor): 173 testes — corre com `python3 -m pytest alguem/tests/`
-- `online` (serviço web): 83 testes — corre com `cd online && python3 -m pytest`
+- `algo_lang` (compilador): 959 testes — corre com `python3 -m pytest algo_lang/tests/`
+- `alguem` (tutor): 215 testes — corre com `python3 -m pytest alguem/tests/`
+- `online` (serviço web): 302 testes — corre com `cd online && python3 -m pytest`
 
 ## O que ainda não está confirmado (honestidade)
 

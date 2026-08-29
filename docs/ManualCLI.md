@@ -149,6 +149,9 @@ Compila e corre o programa.
 | `--debug` | mostra na consola o valor das variáveis a cada passo da execução |
 | `--json` | gera um `..._trace.json` com o trace completo, para abrir no [visualizador web](#4-onde-ficam-os-ficheiros-gerados) |
 | `--entradas FICHEIRO` | com `--debug`/`--json`: lê os valores de `ler()` de um ficheiro de texto (um por linha), em vez de perguntar interativamente |
+| `--limite-cpu SEGUNDOS` | sem `--debug`/`--json`: substitui o limite de 10s de tempo de CPU (ver [secção 6](#6-detalhes-técnicos-códigos-de-saída-limites)) |
+| `--max-passos N` | com `--debug`/`--json`: substitui o limite de 4000 passos do trace |
+| `--limite-tempo SEGUNDOS` | com `--debug`/`--json`: substitui o limite de 10s de CPU do trace |
 
 ```
 algo> e soma.algo

@@ -18,7 +18,7 @@ from alguem.fornecedores import criar_fornecedor, ErroFornecedorLLM
 from alguem.nucleo import Alguem, PoliticaPedagogica, Registador
 from alguem.nucleo.ficheiros_visiveis import LIMITE_FICHEIROS, LIMITE_BYTES_TOTAL
 
-from credenciais import obter_credencial, CredencialLLM
+from credenciais import obter_credencial, CredencialLLM, ErroCredencial, _validar_host_ollama
 from autenticacao import obter_id_pseudonimo
 
 # Política por omissão para todas as sessões web -- mesmos valores por
@@ -74,6 +74,22 @@ def construir_alguem(
 
     extras = {}
     if credencial.host:
+        # Achado 2 (PlanoAuditoria.md): _validar_host_ollama já corre em
+        # credenciais.guardar_credencial, mas só uma vez, ao guardar --
+        # um domínio com TTL baixo pode resolver para um IP público
+        # nesse momento e para um IP interno mais tarde (DNS rebinding),
+        # contornando essa validação por completo. Repeti-la aqui, mesmo
+        # sem a poder fixar (pinning) no pedido HTTP em si -- isso vive
+        # em alguem/fornecedores/, fora do âmbito desta auditoria --,
+        # encurta bastante a janela: passa a validar-se de novo em cada
+        # conversa nova, não só uma vez ao guardar a credencial.
+        try:
+            _validar_host_ollama(credencial.host)
+        except ErroCredencial as e:
+            raise ErroAlguemIndisponivel(
+                f"O host configurado para o Ollama deixou de ser válido: {e} "
+                f"Reconfigura o fornecedor em Definições."
+            ) from e
         extras["host"] = credencial.host
 
     try:

@@ -212,8 +212,15 @@ def autenticar(email: str, password: str, dsn: str | None = None) -> int:
 
     # bootstrap tardio: se o email só se tornou admin DEPOIS de a conta
     # já existir (ONLINE_EMAIL_ADMIN configurada mais tarde), atualiza-a
-    # aqui em vez de deixar o estudante bloqueado para sempre.
+    # aqui em vez de deixar o estudante bloqueado para sempre. O grupo
+    # desativado continua a bloquear -- verificado ANTES de promover/
+    # devolver, para não abrir uma exceção ao "sem exceção (incluindo
+    # contas admin)" do docstring acima só por causa desta promoção.
     if email in _emails_admin() and not (linha["admin"] and linha["aprovado"]):
+        if linha["grupo_id"] is not None and not linha["grupo_ativo"]:
+            raise ErroAutenticacao(
+                "O teu grupo foi desativado. Contacta o administrador responsável por este grupo."
+            )
         with sessao_bd(dsn) as bd:
             bd.execute(
                 "UPDATE estudante SET admin = TRUE, aprovado = TRUE WHERE id = %s", (linha["id"],)
