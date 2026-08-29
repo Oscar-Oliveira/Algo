@@ -3,27 +3,19 @@ algoritmo "ListaLigadaFixa"
 // Uma lista ligada de tamanho fixo, construída de trás para a frente.
 // Foco: campo de uma estrutura do PRÓPRIO tipo ('seguinte:No'),
 // comparação com 'nulo', e o idioma clássico de percurso
-// 'enquanto no <> nulo fazer'. ALGO não tem alocação dinâmica -- cada
-// atribuição de estrutura é uma CÓPIA, por isso esta lista tem de ser
-// montada de trás para a frente: cada nó "seguinte" já leva consigo uma
-// cópia completa do resto da cadeia.
+// 'enquanto no <> nulo fazer'. 'estrutura' é um tipo por referência
+// (7.3 do manual): uma declaração sem literal '={...}' fica 'nulo',
+// por isso cada nó é construído já com um literal, com 'seguinte' a
+// apontar para o nó seguinte (já construído antes dele).
 
 estrutura No
     valor:inteiro
     seguinte:No
 
 inicio
-    terceiro:No
-    terceiro.valor = 30
-    terceiro.seguinte = nulo
-
-    segundo:No
-    segundo.valor = 20
-    segundo.seguinte = terceiro
-
-    primeiro:No
-    primeiro.valor = 10
-    primeiro.seguinte = segundo
+    terceiro:No = {valor: 30, seguinte: nulo}
+    segundo:No = {valor: 20, seguinte: terceiro}
+    primeiro:No = {valor: 10, seguinte: segundo}
 
     atual:No = primeiro
     soma:inteiro = 0

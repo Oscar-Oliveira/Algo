@@ -31,16 +31,9 @@ Converte entre os 5 tipos primitivos e cifra uma letra por código ASCII
 Demonstra: toda a `Conversao` — `paraTexto`, `paraInteiro`,
 `paraDecimal`, `paraBooleano`, `paraCaracter`, `paraAscii`, `deAscii`.
 `conversao.paraTexto` finalmente resolve a lacuna documentada no
-assunto 01 (`+` não converte número para texto).
-
-### Achado ao testar `conversao.paraBooleano`
-
-`conversao.paraBooleano("não")` devolve **`verdadeiro`**, não `falso`.
-A função só reconhece `"falso"`/`"f"`/`"false"` (sem distinguir
-maiúsculas) como negativo — qualquer outro texto não vazio segue a
-truthiness nativa do Python, incluindo a própria palavra portuguesa
-"não". Numa linguagem cujo código-fonte inteiro é em português, isto é
-mais armadilha do que pareceria numa biblioteca em inglês (onde "no" ou
-"not" também não seriam reconhecidos, mas não têm o mesmo peso
-enganador). Confirmado em runtime; ver conversa para decisão sobre se
-isto deve ser corrigido ou só documentado como limitação conhecida.
+assunto 01 (`+` não converte número para texto). `paraBooleano`
+reconhece `"falso"`/`"f"`/`"false"`/`"não"`/`"nao"`/`"n"`/`"0"` (sem
+distinguir maiúsculas) como negativo — a própria palavra portuguesa
+"não" tem tratamento explícito, para não cair na truthiness nativa do
+Python (texto não vazio → verdadeiro), que seria uma armadilha numa
+linguagem cujo código-fonte é todo em português.

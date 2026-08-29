@@ -82,6 +82,7 @@ dado:inteiro = matematica.aleatorio(1, 6)   // 1 a 6
 | `maiusculas(s)` / `minusculas(s)` | muda a capitalização |
 | `inverter(s)` | inverte o texto |
 | `subcadeia(s, inicio, fim)` | recorta parte do texto (`fim` exclusivo) |
+| `caracter(s, i)` | devolve o `caracter` na posição `i` |
 | `procurar(s, alvo)` | posição da 1ª ocorrência, ou `-1` |
 | `dividir(s, separador)` | separa por texto — devolve um **vetor** |
 
@@ -94,6 +95,7 @@ s:cadeia = "Ola Mundo"
 escrever(cadeia.comprimento(s))            // 9
 escrever(cadeia.maiusculas(s))             // OLA MUNDO
 escrever(cadeia.subcadeia(s, 0, 3))        // Ola
+escrever(cadeia.caracter(s, 4))            // M
 escrever(cadeia.procurar(s, "Mundo"))      // 4
 escrever(cadeia.procurar(s, "xyz"))        // -1  -- não encontrado
 ```

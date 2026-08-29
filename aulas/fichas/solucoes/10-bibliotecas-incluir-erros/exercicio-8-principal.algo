@@ -9,18 +9,18 @@ estrutura Forma
 inicio
     formas:Forma[2]
 
-    raio:decimal
+    raioCirculo:decimal
     escrever("Raio do círculo: ")
-    ler(raio)
-    formas[0] = {tipo: "Círculo", area: calc.areaCirculo(raio)}
+    ler(raioCirculo)
+    formas[0] = {tipo: "Círculo", area: calc.areaCirculo(raioCirculo)}
 
-    base:decimal
-    altura:decimal
+    baseRetangulo:decimal
+    alturaRetangulo:decimal
     escrever("Base do retângulo: ")
-    ler(base)
+    ler(baseRetangulo)
     escrever("Altura do retângulo: ")
-    ler(altura)
-    formas[1] = {tipo: "Retângulo", area: calc.areaRetangulo(base, altura)}
+    ler(alturaRetangulo)
+    formas[1] = {tipo: "Retângulo", area: calc.areaRetangulo(baseRetangulo, alturaRetangulo)}
 
     i:inteiro
     para i de 0 ate 1 fazer

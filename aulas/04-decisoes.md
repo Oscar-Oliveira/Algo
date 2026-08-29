@@ -351,7 +351,7 @@ inicio
 
 ## Próxima aula
 
-Vamos ver os **ciclos**: como repetir passos sem escrever o mesmo código muitas vezes — `para` (repetição contada) e `enquanto`/`repetir` (repetição condicionada).
+Vamos ver os **ciclos**: como repetir passos sem escrever o mesmo código muitas vezes — `para` (repetição contada) e `enquanto`/`fazer ... enquanto` (repetição condicionada).
 
 ---
 

@@ -50,9 +50,8 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 │   └── editors/vscode-algo/ # extensão de realce de sintaxe para VS Code
 ├── alguem/              # o tutor LLM -- reaproveitado tal e qual pelos dois modos
 ├── online/                # o serviço web (FastAPI) -- ver online/README.md
-├── visualizador/              # visualizador autónomo do rasto (algo-trace-viewer.html)
 ├── exemplos/                    # programas Algo de exemplo, organizados por assunto (01_variaveis_tipos/, 02_operadores/, ...)
-└── docs/                            # manual da CLI, decisões de design (bin/: material arquivado)
+└── docs/                            # manuais e decisões de design
 ```
 
 ## `docs/` — manuais e material de apoio
@@ -60,7 +59,9 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 | Ficheiro | Para quem |
 |---|---|
 | `ManualCLI.md` | Manual do estudante: consola interativa, extensão do VS Code, e (por fim) instalar Python e usar a linha de comandos |
-| `bin/` | Material arquivado — versões supersedidas ou não atualizadas (manual de instalação anterior, roteiro de testes manuais, sebenta de exercícios, guia do docente, referência completa da linguagem em Word e em Markdown) |
+| `manual/` | Manual de referência da linguagem ALGO, capítulo a capítulo |
+| `PlanoAuditoria.md` | Achados e decisões de auditoria do projeto |
+| `DecisoesDeArquitetura.md` | Catálogo dos comentários do código que documentam decisões de arquitetura/segurança/design |
 
 ## Sub-projetos com o seu próprio README
 
@@ -72,7 +73,7 @@ Cada parte tem documentação própria, mais detalhada do que cabe aqui:
 
 - `algo_lang` (compilador): 959 testes — corre com `python3 -m pytest algo_lang/tests/`
 - `alguem` (tutor): 215 testes — corre com `python3 -m pytest alguem/tests/`
-- `online` (serviço web): 302 testes — corre com `cd online && python3 -m pytest`
+- `online` (serviço web): 305 testes — corre com `cd online && python3 -m pytest`
 
 ## O que ainda não está confirmado (honestidade)
 
