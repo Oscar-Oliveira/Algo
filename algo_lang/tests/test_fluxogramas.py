@@ -307,6 +307,7 @@ def test_graphviz_consegue_renderizar_o_dot_gerado():
         assert os.path.getsize(caminho_png) > 0
 
 
+@pytest.mark.requer_algo_no_path
 def test_cli_gera_ficheiro_dot(tmp_path):
     import textwrap
     algo_path = tmp_path / "prog.algo"
@@ -322,6 +323,7 @@ def test_cli_gera_ficheiro_dot(tmp_path):
     assert (tmp_path / "prog" / "prog.dot").exists()
 
 
+@pytest.mark.requer_algo_no_path
 def test_cli_gera_um_fluxograma_por_rotina_alem_do_principal(tmp_path):
     import textwrap
     algo_path = tmp_path / "prog.algo"
@@ -344,6 +346,7 @@ def test_cli_gera_um_fluxograma_por_rotina_alem_do_principal(tmp_path):
     assert (pasta / "prog_mostrar.dot").exists()
 
 
+@pytest.mark.requer_algo_no_path
 def test_cli_com_funcao_gera_so_essa(tmp_path):
     import textwrap
     algo_path = tmp_path / "prog.algo"

@@ -64,7 +64,7 @@ e de erro contra o compilador real (avisos do linter, fluxogramas com
 estruturas de controlo aninhadas, trace de erro em runtime, `cli.py` com
 flags inválidas/combinações raras). Também o sítio certo para marcar as
 44 falhas de ambiente com um marker pytest dedicado, se houver tempo —
-ver achado 1.
+feito na Fase 5 (marker `requer_algo_no_path`), não aqui.
 
 Já cobertos e corrigidos (confirmados por execução, suite completa
 verde antes/depois): `tracer.py` — `_valor_serializavel` rebentava com
@@ -246,23 +246,42 @@ Restante do servidor real também exercitado, sem novos achados:
   flag continuar `False`. Sem acesso de rede neste ambiente para testar
   uma conversa real com um fornecedor de LLM (ver `CLAUDE.md`).
 
-### Fase 5 — Regressão final — 🔶 quase feito
+### Fase 5 — Regressão final — ✅ feito
 `pytest algo_lang/tests/ -v` completo (incluindo `slow`) e
 `cd online && pytest -v` completo, uma vez no fim. Critério de sucesso:
 ambas 100% verdes (as 44 falhas de ambiente já não existem se a Fase 2
 as tiver isolado com marker).
 
-Corrido: `algo_lang/tests/` completo (incluindo `slow`) — 47 falham,
-911 passam, 1 skipped. As 47 são as mesmas 44 do achado 1 mais 3 só
-visíveis com `slow` incluído (`test_algo_sh.py`, que literalmente
-testa o próprio `algo.sh`/venv) — confirmado por nome: todas invocam o
-comando `algo`/`algo.sh` em subprocesso, nenhuma é um caso novo. `cd
-online && pytest -v` completo — 296 passam, 7 skipped, 0 falham.
-Critério de sucesso NÃO totalmente cumprido: falta o marker pytest
-dedicado (candidato desde a Fase 2, nunca chegou a ser implementado —
-maior alteração do que "correr e confirmar", toca os cabeçalhos de
-~47 testes espalhados por vários ficheiros) para as falhas de ambiente
-deixarem de aparecer como falhas.
+Primeira corrida (antes do marker): `algo_lang/tests/` completo
+(incluindo `slow`) — 47 falham, 911 passam, 1 skipped. As 47 eram as
+mesmas 44 do achado 1 original mais 3 só visíveis com `slow` incluído
+(`test_algo_sh.py`) — confirmado por nome, nenhuma era um caso novo.
+
+Marker pytest `requer_algo_no_path` implementado: registado em
+`pyproject.toml` (`[tool.pytest.ini_options].markers`, junto de
+`slow`), com o hook em `algo_lang/tests/conftest.py`
+(`pytest_collection_modifyitems`) que só adiciona `skip` aos testes
+marcados quando `shutil.which("algo") is None` — nunca aos não
+marcados, e nunca quando `algo` está mesmo no PATH (confirmado nos dois
+sentidos: com a função do hook chamada isoladamente com
+`shutil.which` gorado, e de ponta a ponta com um `algo.bat` falso a
+sério no PATH do Windows — os testes voltam a correr, e falham a
+sério, em vez de serem saltados). Aplicado aos 42 testes confirmados
+como `FileNotFoundError` por `algo` não estar no PATH (as 44 do achado
+1 original MENOS 2 de `test_algo_sh.py` que afinal falhavam por uma
+razão diferente — ver achado 1 revisto abaixo) em
+`test_consola.py`/`test_correcoes_auditoria.py`/`test_estruturas.py`/
+`test_fluxogramas.py`/`test_linter.py`/`test_tracer.py`.
+
+Corrida final: `algo_lang/tests/` completo (incluindo `slow`) — **5
+falham** (só `test_algo_sh.py`, achado 1 revisto — razão diferente,
+não "algo fora do PATH"), 911 passam, 43 skipped. `cd online && pytest
+-v` completo — 298 passam, 7 skipped, 0 falham. Critério de sucesso
+cumprido na prática: as falhas de ambiente que mascaravam regressões
+(achado 1 original) deixaram de aparecer como falhas; as 5 restantes
+são uma limitação de plataforma diferente e mais restrita (só Windows,
+só `test_algo_sh.py`), documentada como achado 1 revisto, não um
+critério de sucesso desta fase.
 
 ## Achados
 
@@ -273,14 +292,24 @@ deles corrigidos) fica em `git log`/`git show HEAD:docs/manual/ACHADOS.md`
 se algum dia for preciso consultá-lo, mas deixa de viver neste
 documento vivo.
 
-#### 1. [Compilador] 44 falhas de teste são de ambiente, não bugs — 🟡 confirmado a correr
+#### 1. [Compilador] `test_algo_sh.py` — 5 falhas por limitação do Windows, não bugs — 🟡 confirmado a correr, ⚪ por decidir
 
-`pytest algo_lang/tests/ -m "not slow"`: 44 falham, todas por
-`FileNotFoundError` — testes que invocam `subprocess.run(["algo", ...])`
-e o comando `algo` não está no PATH deste ambiente (só existe depois de
-`algo.sh`/`algo.bat` criar a venv). Mascaram regressões reais (uma falha
-nova nesses ficheiros passa despercebida no meio das 44 já esperadas).
-Candidato a marker pytest dedicado na Fase 2.
+Distinto do achado 1 original (já corrigido, ver Fase 5): estes 5
+testes falham por DUAS razões que não são "algo não está no PATH" —
+`test_algo_sh_sem_python_da_erro_amigavel`/`test_algo_sh_venv_sem_pip_
+da_erro_amigavel` com `OSError: [WinError 1314] A required privilege
+is not held by the client` (criar um symlink no `setup` do teste exige
+Modo de Programador/privilégio de administrador no Windows); os outros
+3 com `OSError: [WinError 193] %1 is not a valid Win32 application`
+(tentam correr `algo.sh` diretamente como executável nativo, sem
+`bash` — só funciona em Linux/macOS ou WSL). Nenhum destes tem a ver
+com `algo` estar no PATH, por isso ficam fora do marker
+`requer_algo_no_path` (Fase 5) — marcá-los como tal seria enganador,
+já que continuariam a falhar mesmo com `algo` no PATH. Por decidir do
+maintainer: são só testes POSIX-only por natureza (o `Dockerfile`/CI de
+produção já são Linux) e não vale a pena adaptá-los ao Windows, ou
+merecem o mesmo tratamento (`skipif` num Windows sem privilégio de
+symlink)?
 
 #### 2. [Online] `_validar_host_ollama` (ON-14) é contornável por DNS rebinding — 🟡 mitigado (parcial), correção completa fora de âmbito
 

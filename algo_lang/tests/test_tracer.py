@@ -271,6 +271,7 @@ def test_trace_escolha_mapeia_cada_caso_para_a_sua_linha(tmp_path):
 
 # ---------- integração via CLI ----------
 
+@pytest.mark.requer_algo_no_path
 def test_cli_json_sozinho_ja_nao_exige_debug(tmp_path):
     """--json deixou de depender de --debug: cada flag agora é independente
     (--debug mostra na consola, --json escreve o ficheiro; usam-se juntas
@@ -283,6 +284,7 @@ def test_cli_json_sozinho_ja_nao_exige_debug(tmp_path):
     assert (tmp_path / "prog" / "prog_trace.json").exists()
 
 
+@pytest.mark.requer_algo_no_path
 def test_cli_gera_ficheiro_trace_json(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(textwrap.dedent("""
@@ -304,6 +306,7 @@ def test_cli_gera_ficheiro_trace_json(tmp_path):
     assert len(dados["passos"]) > 0
 
 
+@pytest.mark.requer_algo_no_path
 def test_cli_entradas_por_ficheiro(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(textwrap.dedent("""
@@ -371,6 +374,7 @@ def test_debug_mostra_globais_e_locais_dentro_de_funcao(tmp_path):
     assert "total=" in texto      # global visível dentro da função
 
 
+@pytest.mark.requer_algo_no_path
 def test_cli_debug_mostra_trace_na_consola(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(textwrap.dedent("""

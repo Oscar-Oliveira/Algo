@@ -279,6 +279,7 @@ def test_comparacao_de_elementos_diferentes_de_vetor_nao_e_assinalada():
     assert not any("sempre verdadeira" in a.mensagem for a in avisos)
 
 
+@pytest.mark.requer_algo_no_path
 def test_cli_verifica_sem_avisos(tmp_path):
     import subprocess
     algo_path = tmp_path / "prog.algo"
@@ -288,6 +289,7 @@ def test_cli_verifica_sem_avisos(tmp_path):
     assert "Nenhum aviso" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_cli_verifica_com_avisos(tmp_path):
     import subprocess
     algo_path = tmp_path / "prog.algo"

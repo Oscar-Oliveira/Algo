@@ -243,6 +243,7 @@ def test_lista_ligada_construida_e_percorrida_com_nulo():
     assert saida.split() == ["1", "2"]
 
 
+@pytest.mark.requer_algo_no_path
 def test_aceder_a_campo_de_nulo_da_erro_amigavel_nao_traceback(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
@@ -329,6 +330,7 @@ def test_campo_vetor_mutuamente_recursivo_tambem_nao_recursa_infinitamente():
     assert saida.strip() == "ok"
 
 
+@pytest.mark.requer_algo_no_path
 def test_aceder_a_campo_vetor_recursivo_vazio_da_erro_amigavel_nao_traceback(tmp_path):
     """'filhos' fica preenchido (2 elementos), mas cada elemento é 'nulo'
     -- '.valor' sobre o elemento é que dá o erro amigável (ver
@@ -351,6 +353,7 @@ def test_aceder_a_campo_vetor_recursivo_vazio_da_erro_amigavel_nao_traceback(tmp
     assert "campo 'valor' de um valor nulo" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_aceder_a_posicao_de_vetor_nulo_da_erro_amigavel_nao_traceback(tmp_path):
     """Um 'vetor' pode ficar 'nulo' tal como uma 'estrutura' (declaração
     sem literal, ou 'nulo' explícito) -- indexá-lo dá um erro amigável

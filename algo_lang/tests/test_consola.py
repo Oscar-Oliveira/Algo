@@ -213,6 +213,7 @@ def test_consola_ordem_do_output_nao_fica_baralhada_pelo_buffering(tmp_path):
         "mas a ordem ficou trocada")
 
 
+@pytest.mark.requer_algo_no_path
 def test_executa_mostrar_python(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
@@ -225,6 +226,7 @@ def test_executa_mostrar_python(tmp_path):
     assert "def _algo_programa" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_executa_json_com_entradas_nao_encontrado(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
@@ -236,6 +238,7 @@ def test_executa_json_com_entradas_nao_encontrado(tmp_path):
     assert "não encontrado" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_executa_json_com_erro_em_tempo_de_execucao(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
@@ -248,6 +251,7 @@ def test_executa_json_com_erro_em_tempo_de_execucao(tmp_path):
     assert (tmp_path / "prog" / "prog_trace.json").exists()
 
 
+@pytest.mark.requer_algo_no_path
 def test_executa_json_limite_de_passos_excedido(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
@@ -259,6 +263,7 @@ def test_executa_json_limite_de_passos_excedido(tmp_path):
     assert "Limite de passos" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_fluxograma_funcao_inexistente(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
@@ -270,6 +275,7 @@ def test_fluxograma_funcao_inexistente(tmp_path):
     assert "não existe nenhuma função" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_fluxograma_sem_graphviz_disponivel(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text('algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
@@ -299,6 +305,7 @@ def test_consola_aspas_por_fechar():
     assert "closing quotation" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_consola_ctrl_c_durante_um_comando_nao_fecha_a_consola(tmp_path):
     """Bug real a confirmar: um SIGINT (Ctrl+C) a meio de um 'executa'
     (ex: um ciclo infinito) tem de voltar ao prompt, não deve fechar a

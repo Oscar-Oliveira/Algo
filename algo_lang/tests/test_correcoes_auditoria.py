@@ -172,6 +172,7 @@ def test_para_com_passo_de_efeito_lateral_so_avalia_uma_vez():
     assert saida.split() == ["1", "2", "3", "4", "5"]
 
 
+@pytest.mark.requer_algo_no_path
 def test_raiz_de_negativo_da_erro_amigavel_nao_traceback(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
@@ -184,6 +185,7 @@ def test_raiz_de_negativo_da_erro_amigavel_nao_traceback(tmp_path):
     assert "Erro em tempo de execução" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_aleatorio_com_limites_invertidos_da_erro_amigavel(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
@@ -212,6 +214,7 @@ def test_recursao_legitima_profunda_nao_falha():
     assert saida.strip() == "5000"
 
 
+@pytest.mark.requer_algo_no_path
 def test_recursao_infinita_da_mensagem_amigavel_via_cli(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
@@ -1272,6 +1275,7 @@ def test_cadeia_caracter_aceita_caracter_como_primeiro_argumento():
     assert saida.strip() == "x"
 
 
+@pytest.mark.requer_algo_no_path
 def test_cadeia_caracter_indice_fora_dos_limites_da_erro_amigavel(tmp_path):
     algo_path = tmp_path / "prog.algo"
     algo_path.write_text(
@@ -1723,6 +1727,7 @@ def test_parser_mensagem_de_erro_nao_mostra_jargao_ingles_para_le_ge():
 
 # ---------- lacuna grave encontrada: 'incluir' nunca era testado ----------
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_funciona_de_ponta_a_ponta(tmp_path):
     (tmp_path / "geometria.algo").write_text(
         "funcao areaCirculo(raio:decimal):decimal\n"
@@ -1742,6 +1747,7 @@ def test_incluir_funciona_de_ponta_a_ponta(tmp_path):
     assert "12.56636" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_ficheiro_inexistente_da_erro(tmp_path):
     (tmp_path / "principal.algo").write_text(
         'algoritmo "Principal"\n'
@@ -1757,6 +1763,7 @@ def test_incluir_ficheiro_inexistente_da_erro(tmp_path):
     assert "não encontrado" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_estrutura_duplicada_da_erro(tmp_path):
     (tmp_path / "lib.algo").write_text(
         "estrutura Ponto\n    x:inteiro\n", encoding="utf-8")
@@ -1775,6 +1782,7 @@ def test_incluir_estrutura_duplicada_da_erro(tmp_path):
     assert "colide" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_funcao_duplicada_da_erro(tmp_path):
     """Com alias obrigatório, o nome de uma função incluída é sempre
     mangled para '{alias}_{nome}' -- só colide se esse nome mangled já
@@ -1797,6 +1805,7 @@ def test_incluir_funcao_duplicada_da_erro(tmp_path):
     assert "colide" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_variavel_global_duplicada_da_erro(tmp_path):
     (tmp_path / "lib.algo").write_text(
         "total:inteiro = 0\n", encoding="utf-8")
@@ -1815,6 +1824,7 @@ def test_incluir_variavel_global_duplicada_da_erro(tmp_path):
     assert "colide" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_constante(tmp_path):
     (tmp_path / "lib.algo").write_text(
         "constante PI:decimal = 3.14\n", encoding="utf-8")
@@ -1833,6 +1843,7 @@ def test_incluir_constante(tmp_path):
 
 # ---------- 'incluir ... como <alias>' -- namespace ----------
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_com_alias_chama_funcao_qualificada(tmp_path):
     (tmp_path / "geometria.algo").write_text(
         "funcao areaCirculo(raio:decimal):decimal\n"
@@ -1852,6 +1863,7 @@ def test_incluir_com_alias_chama_funcao_qualificada(tmp_path):
     assert "12.56636" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_com_alias_funcao_sem_alias_deixa_de_existir(tmp_path):
     """Com alias, a função só fica disponível como 'alias.funcao(...)' --
     chamá-la sem qualificação (o nome original) já não existe."""
@@ -1873,6 +1885,7 @@ def test_incluir_com_alias_funcao_sem_alias_deixa_de_existir(tmp_path):
     assert "areaCirculo" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_com_alias_parametro_ref_funciona(tmp_path):
     (tmp_path / "lib.algo").write_text(
         "procedimento dobra(ref v:inteiro)\n"
@@ -1893,6 +1906,7 @@ def test_incluir_com_alias_parametro_ref_funciona(tmp_path):
     assert "10" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_alias_reutilizado_para_ficheiro_diferente_da_erro(tmp_path):
     (tmp_path / "a.algo").write_text(
         "funcao fA():inteiro\n    retornar 1\n", encoding="utf-8")
@@ -1913,6 +1927,7 @@ def test_incluir_alias_reutilizado_para_ficheiro_diferente_da_erro(tmp_path):
     assert "alias" in resultado.stdout.lower()
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_alias_colide_com_biblioteca_importada_da_erro(tmp_path):
     (tmp_path / "lib.algo").write_text(
         "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
@@ -1931,6 +1946,7 @@ def test_incluir_alias_colide_com_biblioteca_importada_da_erro(tmp_path):
     assert "biblioteca" in resultado.stdout.lower()
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_alias_metodo_inexistente_da_erro(tmp_path):
     (tmp_path / "lib.algo").write_text(
         "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
@@ -1951,6 +1967,7 @@ def test_incluir_alias_metodo_inexistente_da_erro(tmp_path):
 # ---------- ronda 15: buracos deixados pela funcionalidade de alias ('incluir
 # ... como <alias>') na ronda anterior ----------
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_mesmo_ficheiro_duas_vezes_com_aliases_diferentes_da_erro(tmp_path):
     """Antes, o deduplicar por caminho absoluto ignorava o 'incluir'
     inteiro (incluindo o alias) na segunda ocorrência -- 'como b' ficava
@@ -1974,6 +1991,7 @@ def test_incluir_mesmo_ficheiro_duas_vezes_com_aliases_diferentes_da_erro(tmp_pa
     assert "já foi" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_mesmo_ficheiro_duas_vezes_com_mesmo_alias_continua_a_funcionar(tmp_path):
     (tmp_path / "lib.algo").write_text(
         "funcao f():inteiro\n    retornar 1\n", encoding="utf-8")
@@ -1992,6 +2010,7 @@ def test_incluir_mesmo_ficheiro_duas_vezes_com_mesmo_alias_continua_a_funcionar(
     assert "1" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_alias_de_incluir_colide_com_nome_de_variavel_da_erro(tmp_path):
     """Um alias ('incluir ... como c') nunca era validado contra nomes
     de variável/parâmetro -- uma variável local com o mesmo nome do
@@ -2017,6 +2036,7 @@ def test_alias_de_incluir_colide_com_nome_de_variavel_da_erro(tmp_path):
     assert "alias" in resultado.stdout.lower()
 
 
+@pytest.mark.requer_algo_no_path
 def test_funcao_incluida_com_alias_e_parametro_ref_nao_pode_ser_usada_em_expressao(tmp_path):
     """'_tem_ref' tratava toda chamada com '.' como biblioteca (nunca tem
     'ref'), mas uma função incluída com alias É uma função ALGO normal e
@@ -2044,6 +2064,7 @@ def test_funcao_incluida_com_alias_e_parametro_ref_nao_pode_ser_usada_em_express
     assert "dentro de uma expressão" in resultado.stdout
 
 
+@pytest.mark.requer_algo_no_path
 def test_funcao_incluida_com_alias_que_le_global_antecipada_e_detetada(tmp_path):
     """'_registar_decl' só seguia chamadas SEM '.' para verificar
     referência antecipada a uma global -- uma função incluída com alias
@@ -2241,6 +2262,7 @@ def test_linter_sem_falsos_positivos_com_para_passo_enquanto_escolha():
     assert avisos == []
 
 
+@pytest.mark.requer_algo_no_path
 def test_linter_variavel_de_ciclo_global_dentro_de_funcao_nao_e_assinalada(tmp_path):
     """'para <nomeGlobal> de ... fazer' dentro de uma função trata a
     variável de ciclo como local (sombra a global), não deve dar aviso de
@@ -2746,6 +2768,7 @@ def test_flowchart_escolha_sem_contrario():
     assert 'label="contrario"' in dot
 
 
+@pytest.mark.requer_algo_no_path
 def test_incluir_o_mesmo_ficheiro_duas_vezes_nao_da_erro(tmp_path):
     """cli.py deduplica inclusões pelo caminho absoluto -- incluir o
     mesmo ficheiro duas vezes (ex: dependência em diamante) não deve

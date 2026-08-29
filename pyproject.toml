@@ -21,6 +21,7 @@ packages = ["algo_lang", "algo_lang.compilador", "algo_lang.tools", "algo_lang.b
 testpaths = ["algo_lang/tests"]
 markers = [
     "slow: testes que criam um venv a sério (algo.sh) -- mais lentos, mas corretos",
+    "requer_algo_no_path: invoca o comando 'algo' via subprocesso -- salta quando não está no PATH",
 ]
 
 [tool.mutmut]
