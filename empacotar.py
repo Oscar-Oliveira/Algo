@@ -14,7 +14,7 @@ import zipfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
-PASTA_EXTENSAO = RAIZ / "editors" / "vscode-algo"
+PASTA_EXTENSAO = RAIZ / "editores" / "vscode-algo"
 
 # (origem relativa à raiz, destino relativo à raiz do pacote) -- os
 # scripts de arranque vivem em instaladores/ no repositório, mas saem

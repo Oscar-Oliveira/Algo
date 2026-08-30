@@ -8,7 +8,7 @@ compilador, comparando interpretações; (2) se o linter sofre da mesma
 ambiguidade textual campo-de-estrutura-vs-chamada-de-biblioteca que
 afeta a gramática TextMate da extensão VS Code (que não tem árvore de
 sintaxe, só regex, por isso precisa de um lookahead por '(' -- ver
-editors/vscode-algo/syntaxes/algo.tmLanguage.json).
+editores/vscode-algo/syntaxes/algo.tmLanguage.json).
 
 Achado ao investigar (2): a ambiguidade é estrutural da extensão VS
 Code (texto puro, sem parser) -- NÃO existe para linter.py nem

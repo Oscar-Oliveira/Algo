@@ -47,7 +47,7 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 ├── instaladores/        # scripts de arranque da consola local (algo.sh / algo.bat / algo.command)
 ├── algo_lang/          # o compilador -- nunca alterado entre CLI e online
 │   └── tests/            # suite de testes do compilador (CLI)
-├── editors/vscode-algo/ # extensão de realce de sintaxe para VS Code
+├── editores/vscode-algo/ # extensão de realce de sintaxe para VS Code
 ├── alguem/              # o tutor LLM -- reaproveitado tal e qual pelos dois modos
 ├── online/                # o serviço web (FastAPI) -- ver online/README.md
 └── docs/                            # manuais, decisões de design, aulas, exemplos e logo

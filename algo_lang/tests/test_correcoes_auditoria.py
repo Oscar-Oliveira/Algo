@@ -4830,7 +4830,7 @@ def test_linter_nao_assinala_indice_valido_em_campo_vetor_de_estrutura():
     assert not any("fora dos limites" in a.mensagem for a in avisos)
 
 
-# ---------- B27 (AL-99): editors/vscode-algo -- palavra-chave 'nulo' sem highlighting nenhum ----------
+# ---------- B27 (AL-99): editores/vscode-algo -- palavra-chave 'nulo' sem highlighting nenhum ----------
 
 def test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer():
     """A gramática TextMate da extensão VS Code é mantida à mão (ao
@@ -4845,7 +4845,7 @@ def test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer():
     import re
     from algo_lang.compilador.lexer import PALAVRAS_CHAVE
     caminho_grammar = os.path.join(
-        os.path.dirname(__file__), "..", "..", "editors", "vscode-algo",
+        os.path.dirname(__file__), "..", "..", "editores", "vscode-algo",
         "syntaxes", "algo.tmLanguage.json")
     with open(caminho_grammar, "r", encoding="utf-8") as f:
         grammar = json.load(f)
@@ -4862,7 +4862,7 @@ def test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer():
 # ---------- Auditoria (4ª ronda), Etapa 10 -- extensão VS Code. A
 # suite ad-hoc Node/JS referida pela 3ª auditoria NÃO está neste
 # repositório (confirmado: só package.json, language-configuration.json,
-# syntaxes/algo.tmLanguage.json, README.md em editors/vscode-algo/,
+# syntaxes/algo.tmLanguage.json, README.md em editores/vscode-algo/,
 # nenhum ficheiro de teste). O teste de paridade lexer↔gramática
 # (acima, test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer)
 # já satisfaz o pedido do plano de um "teste de paridade lexer↔gramática
@@ -4880,7 +4880,7 @@ def test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer():
 def _padrao_grammar(nome_regra):
     import json
     caminho_grammar = os.path.join(
-        os.path.dirname(__file__), "..", "..", "editors", "vscode-algo",
+        os.path.dirname(__file__), "..", "..", "editores", "vscode-algo",
         "syntaxes", "algo.tmLanguage.json")
     with open(caminho_grammar, "r", encoding="utf-8") as f:
         grammar = json.load(f)
