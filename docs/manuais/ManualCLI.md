@@ -147,11 +147,11 @@ Compila e corre o programa.
 |---|---|
 | `--mostrar-python` | mostra o código Python gerado antes de o executar |
 | `--debug` | mostra na consola o valor das variáveis a cada passo da execução |
-| `--json` | gera um `..._trace.json` com o trace completo, para abrir no [visualizador web](#4-onde-ficam-os-ficheiros-gerados) |
+| `--json` | gera um `..._trace.json` com o rasto completo, para abrir no [visualizador web](#4-onde-ficam-os-ficheiros-gerados) |
 | `--entradas FICHEIRO` | com `--debug`/`--json`: lê os valores de `ler()` de um ficheiro de texto (um por linha), em vez de perguntar interativamente |
 | `--limite-cpu SEGUNDOS` | sem `--debug`/`--json`: substitui o limite de 10s de tempo de CPU (ver [secção 6](#6-detalhes-técnicos-códigos-de-saída-limites)) |
-| `--max-passos N` | com `--debug`/`--json`: substitui o limite de 4000 passos do trace |
-| `--limite-tempo SEGUNDOS` | com `--debug`/`--json`: substitui o limite de 10s de CPU do trace |
+| `--max-passos N` | com `--debug`/`--json`: substitui o limite de 4000 passos do rasto |
+| `--limite-tempo SEGUNDOS` | com `--debug`/`--json`: substitui o limite de 10s de CPU do rasto |
 
 ```
 algo> e soma.algo
@@ -214,7 +214,7 @@ soma/
 └── soma_trace.json
 ```
 
-O `..._trace.json` gerado por `--json` abre-se no **visualizador
+O `..._trace.json` (rasto) gerado por `--json` abre-se no **visualizador
 web**, disponível apenas na versão online do Algo (`/estatico/visualizador/`):
 arrasta o `.json` para dentro da janela e usa as setas ← → para andares
 passo a passo pela execução, com o valor de cada variável à vista.

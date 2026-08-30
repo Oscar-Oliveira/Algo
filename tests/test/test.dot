@@ -1,0 +1,20 @@
+digraph Fluxograma {
+    label="MeuPrograma";
+    labelloc=t;
+    node [fontname="Helvetica", fontsize=11];
+    edge [fontname="Helvetica", fontsize=10];
+    rankdir=TB;
+    n1 [label="Início", shape=oval];
+    n2 [label="Fim", shape=oval];
+    n3 [label="escrever(\"ola\")", shape=parallelogram];
+    n4 [label="a = {x: 1, y: 2}", shape=box];
+    n5 [label="b = a", shape=box];
+    n6 [label="b.x = 99", shape=box];
+    n7 [label="escrever(a.x, \" \", b.x)", shape=parallelogram];
+    n1 -> n3;
+    n3 -> n4;
+    n4 -> n5;
+    n5 -> n6;
+    n6 -> n7;
+    n7 -> n2;
+}

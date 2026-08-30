@@ -307,7 +307,7 @@ def cmd_executa_com_trace(args):
     # se não houver ficheiro de entradas, gerar_trace() usa o stdin real
     # do processo -- podes escrever os valores interativamente
 
-    print("----- A gerar o trace -----")
+    print("----- A gerar o rasto -----")
     resultado = gerar_trace(
         dados["codigo"],
         caminho_py,
@@ -330,13 +330,13 @@ def cmd_executa_com_trace(args):
     if resultado["limiteExcedido"]:
         if resultado.get("limiteTipo") == "tempo":
             print(
-                "⚠ Limite de tempo do trace atingido (execução demasiado longa) — "
-                "o programa foi interrompido só para efeitos do trace."
+                "⚠ Limite de tempo do rasto atingido (execução demasiado longa) — "
+                "o programa foi interrompido só para efeitos do rasto."
             )
         else:
             print(
-                "⚠ Limite de passos do trace atingido (possível ciclo infinito) — "
-                "o programa foi interrompido só para efeitos do trace."
+                "⚠ Limite de passos do rasto atingido (possível ciclo infinito) — "
+                "o programa foi interrompido só para efeitos do rasto."
             )
 
     if args.json:
@@ -355,7 +355,7 @@ def cmd_executa_com_trace(args):
         caminho_json = os.path.join(pasta, nome_base + "_trace.json")
         with open(caminho_json, "w", encoding="utf-8") as f:
             json.dump(trace_final, f, ensure_ascii=False, indent=1)
-        print(f"\n✔ Trace gerado: {caminho_json} ({len(resultado['passos'])} passo(s))")
+        print(f"\n✔ Rasto gerado: {caminho_json} ({len(resultado['passos'])} passo(s))")
         print(
             "  Carrega este ficheiro no visualizador web (disponível apenas na "
             "versão online do Algo) para navegar passo a passo."
@@ -566,7 +566,7 @@ def _mostrar_ajuda(ultimo_ficheiro):
     print()
     print("    --mostrar-python        mostra o código Python gerado antes de correr")
     print("    --debug                 mostra o valor das variáveis a cada passo")
-    print("    --json                  gera um .json com o trace completo, para o")
+    print("    --json                  gera um .json com o rasto completo, para o")
     print("                            visualizador web")
     print("    --entradas <ficheiro>   lê os valores de ler() de um ficheiro de")
     print("                            texto, em vez de perguntares um a um")
@@ -774,7 +774,7 @@ def main():
     p_executa.add_argument(
         "--json",
         action="store_true",
-        help="gera um ficheiro .json com o trace completo (linha a linha, pilha de "
+        help="gera um ficheiro .json com o rasto completo (linha a linha, pilha de "
         "chamadas, consola), para abrir no visualizador web",
     )
     p_executa.add_argument(
@@ -798,7 +798,7 @@ def main():
         default=None,
         dest="max_passos",
         metavar="N",
-        help=f"usado com --debug/--json: substitui o limite de linhas do trace "
+        help=f"usado com --debug/--json: substitui o limite de linhas do rasto "
         f"(omitido usa {MAX_PASSOS})",
     )
     p_executa.add_argument(
@@ -808,7 +808,7 @@ def main():
         dest="limite_tempo",
         metavar="SEGUNDOS",
         help=f"usado com --debug/--json: substitui o limite de tempo de CPU do "
-        f"trace (omitido usa {LIMITE_TEMPO_SEGUNDOS}s)",
+        f"rasto (omitido usa {LIMITE_TEMPO_SEGUNDOS}s)",
     )
     p_executa.set_defaults(func=cmd_executa)
 

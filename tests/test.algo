@@ -1,26 +1,12 @@
 algoritmo "MeuPrograma"
 
-funcao adcionais(primos:inteiro[], n:inteiro) : inteiro[]
-    primos2:inteiro[n + 1]
-
-    i:inteiro
-    para i de 0 ate n - 1 fazer
-        primos2[i] = primos[i]
-
-    retornar primos2
+estrutura Ponto
+    x:inteiro
+    y:inteiro
 
 inicio
-    primos:inteiro[5][5] = { {1,2,3,4,5}, {6,7,8,9,10}, {11,12,13,14,15}, {16,17,18,19,20}, {21,22,23,24,25} }
-
-    i:inteiro
-    para i de 0 ate 4 fazer
-        escrever(primos[0][i])
-
-
-    primos2:inteiro[6] = adcionais(primos[0], 5)
-    primos2[5] = 6
-
-    para i de 0 ate 5 fazer
-        escrever(primos2[1])
-
     escrever("ola")
+    a:Ponto = {x: 1, y: 2}
+    b:Ponto = a
+    b.x = 99
+    escrever(a.x, " ", b.x) 

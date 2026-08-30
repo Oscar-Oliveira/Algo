@@ -1,0 +1,96 @@
+{
+ "titulo": "MeuPrograma",
+ "ficheiro": "test.algo",
+ "codigoFonte": [
+  "algoritmo \"MeuPrograma\"",
+  "",
+  "estrutura Ponto",
+  "    x:inteiro",
+  "    y:inteiro",
+  "",
+  "inicio",
+  "    escrever(\"ola\")",
+  "    a:Ponto = {x: 1, y: 2}",
+  "    b:Ponto = a",
+  "    b.x = 99",
+  "    escrever(a.x, \" \", b.x) "
+ ],
+ "passos": [
+  {
+   "linha": 8,
+   "consola": "",
+   "pilha": [
+    {
+     "nome": "(Principal)",
+     "variaveis": {}
+    }
+   ]
+  },
+  {
+   "linha": 9,
+   "consola": "ola\n",
+   "pilha": [
+    {
+     "nome": "(Principal)",
+     "variaveis": {}
+    }
+   ]
+  },
+  {
+   "linha": 10,
+   "consola": "ola\n",
+   "pilha": [
+    {
+     "nome": "(Principal)",
+     "variaveis": {
+      "a": {
+       "x": 1,
+       "y": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "linha": 11,
+   "consola": "ola\n",
+   "pilha": [
+    {
+     "nome": "(Principal)",
+     "variaveis": {
+      "a": {
+       "x": 1,
+       "y": 2
+      },
+      "b": {
+       "x": 1,
+       "y": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "linha": 12,
+   "consola": "ola\n99 99\n",
+   "pilha": [
+    {
+     "nome": "(Principal)",
+     "variaveis": {
+      "a": {
+       "x": 99,
+       "y": 2
+      },
+      "b": {
+       "x": 99,
+       "y": 2
+      }
+     }
+    }
+   ]
+  }
+ ],
+ "erro": null,
+ "limiteExcedido": false,
+ "limiteTipo": null
+}
