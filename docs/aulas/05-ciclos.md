@@ -25,6 +25,7 @@ Repetir passos sem repetir código: `para`, `enquanto` e `fazer ... enquanto`
 - Repetir enquanto uma condição for verdadeira, com `enquanto`
 - Repetir pelo menos uma vez, com `fazer ... enquanto`
 - Parar ou saltar uma repetição com `sair` / `continuar`
+- Aprender a **traçagem**: seguir um programa no papel, passo a passo
 - Ver, passo a passo, o que acontece **na memória** durante um ciclo
 
 ---
@@ -61,6 +62,91 @@ Funciona para 5 números... e para 1000? Um ciclo faz o mesmo com poucas linhas,
 |---|---|---|
 | **Contado** | já sei quantas vezes | `para` |
 | **Condicionado** | repito até algo acontecer, não sei quantas vezes à partida | `enquanto` / `fazer ... enquanto` |
+
+---
+
+# Traçagem
+
+## Seguir o programa no papel, passo a passo
+
+---
+
+## Porque precisamos disto
+
+- Um programa com ciclos ou decisões não se lê de cima a baixo, de uma vez só
+- "Fazer de conta" que se sabe o resultado leva a erros
+- **Traçagem**: simular o computador à mão, executando o programa linha a linha e apontando o valor de cada variável
+
+---
+
+## Como se faz
+
+1. Desenha uma tabela: **uma coluna por variável**
+2. **Uma linha por instrução executada** (ou por volta, nos ciclos)
+3. Percorre o código a sério, linha a linha — nunca saltes nem adivinhes
+4. Quando uma instrução muda uma variável, o valor novo fica na linha seguinte — o antigo não desaparece da tabela, só deixa de ser o atual
+
+---
+
+## Exemplo, sem ciclos nem decisões
+
+```algo
+a:inteiro = 3
+b:inteiro = 5
+a = a + b
+b = a - b
+a = a - b
+escrever(a, " ", b)
+```
+
+Antes de continuar: o que achas que isto escreve?
+
+---
+
+## A tabela de traçagem
+
+![Tabela de traçagem do exemplo de troca de valores, com uma linha por instrução: a recebe 3, b recebe 5, depois a passa a receber a mais b (8), b passa a receber a menos b (3), a passa a receber a menos b (5); a linha final mostra que escrever escreve 5 e 3 -- os valores de a e b trocaram entre si](diagramas/05-ciclos/tracagem-exemplo-troca.svg)
+
+Sem traçar, era fácil responder "3 5". A tabela mostra a verdade: **5 3** — os valores trocaram entre si.
+
+---
+
+## Traçagem com uma decisão
+
+```algo
+n:inteiro = 7
+resultado:cadeia
+se n mod 2 == 0 entao
+    resultado = "par"
+senao
+    resultado = "ímpar"
+escrever(resultado)
+```
+
+Com um `se`, a traçagem só segue **um** dos ramos — o que a condição escolher.
+
+---
+
+## A tabela de traçagem
+
+![Tabela de traçagem do exemplo com decisão: n recebe 7, resultado ainda não tem valor, a condição n mod 2 igual a 0 é testada (7 mod 2 é 1, 1 igual a 0 é falso), por isso segue o ramo senão e resultado recebe "ímpar", a linha final mostra que escrever escreve "ímpar"](diagramas/05-ciclos/tracagem-exemplo-decisao.svg)
+
+Só uma das duas atribuições a `resultado` acontece — nunca as duas.
+
+---
+
+## Dicas para traçar bem
+
+- Regista **todas** as variáveis desde que existem, mesmo as que não mudam nessa linha
+- Em `soma = soma + i`, calcula primeiro com o valor **antigo** de `soma`, só depois escreves o novo
+- Não saltes passos "óbvios" — é aí que os erros se escondem
+- Numa condição, decide primeiro se é verdadeira ou falsa, só depois segues o ramo certo
+
+---
+
+## Porque isto importa hoje
+
+Um ciclo executa as mesmas linhas várias vezes. Ao longo desta aula vais ver tabelas de traçagem com **uma linha por volta** — a mesma ideia de hoje, repetida.
 
 ---
 
@@ -376,6 +462,7 @@ inicio
 
 ## Resumo
 
+- **Traçagem**: tabela com uma coluna por variável e uma linha por instrução (ou volta), para saber com confiança o que o programa faz
 - `para i de A ate B [passo P] fazer` — repetição contada; `i` declarada antes; `ate` inclusivo
 - `enquanto condicao fazer` — testa antes; pode nunca correr
 - `fazer ... enquanto condicao` — testa depois; corre sempre pelo menos 1 vez

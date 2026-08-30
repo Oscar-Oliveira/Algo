@@ -1,0 +1,23 @@
+digraph TracagemExemploTroca {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="8">
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>instrução</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>a</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>b</b></font></td>
+            </tr>
+            <tr><td>a:inteiro = 3</td><td>3</td><td>ainda não existe</td></tr>
+            <tr><td>b:inteiro = 5</td><td>3</td><td>5</td></tr>
+            <tr><td>a = a + b</td><td>3+5 → 8</td><td>5</td></tr>
+            <tr><td>b = a - b</td><td>8</td><td>8-5 → 3</td></tr>
+            <tr><td>a = a - b</td><td>8-3 → 5</td><td>3</td></tr>
+            <tr>
+                <td bgcolor="#ffebee"><b>escrever(a, " ", b)</b></td>
+                <td bgcolor="#ffebee" colspan="2">mostra <b>5 3</b> -- a e b trocaram entre si</td>
+            </tr>
+        </table>
+    >];
+}

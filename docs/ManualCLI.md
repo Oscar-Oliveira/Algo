@@ -226,16 +226,14 @@ digitação.
 
 ### 5.1 Instalar a extensão
 
-1. Dentro da pasta do ALGO, entra em
-   `algo_lang/editors/vscode-algo/` — é **esta pasta** que vais copiar,
-   não o que está lá dentro.
-2. Copia a pasta inteira (`vscode-algo`) para a pasta de extensões do
-   VS Code:
-   - **Windows**: `%USERPROFILE%\.vscode\extensions\`
-   - **macOS/Linux**: `~/.vscode/extensions/`
-   - Se a pasta `extensions` não existir, cria-a.
-3. Fecha o VS Code por completo e abre-o outra vez.
-4. Abre (ou cria) um ficheiro `.algo` — o código deve aparecer
+1. Dentro da pasta do ALGO, na raiz, encontras um ficheiro
+   `algo-language-*.vsix`.
+2. No VS Code, abre a vista de Extensões, clica no menu `...` no
+   canto superior e escolhe **Install from VSIX...**. Seleciona o
+   ficheiro `.vsix`.
+   - Alternativa por linha de comandos: `code --install-extension
+     algo-language-*.vsix`.
+3. Abre (ou cria) um ficheiro `.algo` — o código deve aparecer
    colorido automaticamente.
 
 ### 5.2 Verificar se a extensão está atualizada

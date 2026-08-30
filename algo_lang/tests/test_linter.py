@@ -152,6 +152,25 @@ def test_variavel_local_sombreia_global_da_aviso():
     assert any("total" in a.mensagem and "mesmo nome" in a.mensagem for a in avisos)
 
 
+def test_parametro_ou_local_com_mesmo_nome_de_variavel_do_corpo_principal_nao_da_aviso():
+    """Uma variável só declarada dentro de 'inicio' NÃO é global --
+    semantics.py garante que nenhuma função consegue vê-la, por isso não
+    há nada para um parâmetro/local de função "sombrear". Regressão:
+    'nomes_globais' incluía por engano os nomes declarados em 'inicio',
+    dando aqui um aviso de sombra sobre uma global inexistente."""
+    avisos = _avisos("""
+        algoritmo "T"
+        procedimento f(total:inteiro)
+            total2:inteiro = total
+            escrever(total2)
+        inicio
+            total:inteiro = 0
+            total2:inteiro = 1
+            f(total)
+    """)
+    assert not any("mesmo nome" in a.mensagem for a in avisos)
+
+
 def test_escrita_em_global_mutavel_da_aviso():
     avisos = _avisos("""
         algoritmo "T"
@@ -816,6 +835,35 @@ def test_ciclo_procedimento_chamado_que_nao_altera_bandeira_continua_a_dar_aviso
     """)
     relevantes = [a for a in avisos if "nunca termina" in a.mensagem]
     assert len(relevantes) == 1
+
+
+def test_ciclo_bandeira_local_nao_e_confundida_com_local_homonima_de_outra_funcao():
+    """Regressão: a bandeira do ciclo aqui é uma variável LOCAL de 'f'
+    (não uma global) -- nenhuma chamada consegue alterá-la, mesmo que o
+    procedimento chamado tenha (por coincidência) a sua PRÓPRIA variável
+    local com o mesmo nome e a reatribua. Antes da correção,
+    '_chamada_altera_global_diretamente' comparava só pelo NOME, sem
+    confirmar que era mesmo uma global -- silenciava este aviso mesmo
+    sendo as duas variáveis completamente distintas e sem relação
+    nenhuma (só o nome coincide), escondendo um ciclo genuinamente
+    infinito."""
+    avisos = _avisos("""
+        algoritmo "T"
+        procedimento outraFuncao()
+            ativo:booleano
+            ativo = falso
+            escrever(ativo)
+
+        funcao f():inteiro
+            ativo:booleano = verdadeiro
+            enquanto ativo fazer
+                outraFuncao()
+            retornar 0
+
+        inicio
+            escrever(f())
+    """)
+    assert any("nunca termina" in a.mensagem for a in avisos)
 
 
 # ---------- AUDITORIA_2026-08-22 ronda 14: 'sair' alcançável também é

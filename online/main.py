@@ -52,12 +52,11 @@ PASTA_ESTATICO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estat
 # pedido (/editor), não da localização física do ficheiro.
 PASTA_PAGINAS_PRIVADAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paginas_privadas")
 
-# exemplos/ vive na raiz do repositório (irmã de algo_lang/, alguem/,
-# online/), não dentro de online/ -- por isso não pode ser montada como
-# PASTA_ESTATICO. A rota /api/exemplos lê-a diretamente do disco a cada
-# pedido (tal como /modo-algo.js lê o lexer a cada pedido), para nunca
-# divergir do conteúdo real da pasta.
-PASTA_EXEMPLOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "exemplos")
+# docs/exemplos/ vive em docs/, não dentro de online/ -- por isso não
+# pode ser montada como PASTA_ESTATICO. A rota /api/exemplos lê-a
+# diretamente do disco a cada pedido (tal como /modo-algo.js lê o
+# lexer a cada pedido), para nunca divergir do conteúdo real da pasta.
+PASTA_EXEMPLOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "exemplos")
 
 _logger = logging.getLogger("online")
 

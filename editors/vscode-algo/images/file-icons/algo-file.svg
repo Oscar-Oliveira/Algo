@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 220" role="img">
+  <title>Algo — símbolo</title>
+  <desc>Um triângulo construído a partir de quatro degraus ascendentes, representando um algoritmo como sequência ordenada de passos, na forma da letra grega delta.</desc>
+  <defs>
+    <linearGradient id="algoDegraus" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0bd5e"/>
+      <stop offset="100%" stop-color="#c98d24"/>
+    </linearGradient>
+  </defs>
+  <rect x="96"  y="35"  width="48"  height="35" rx="5" fill="url(#algoDegraus)"/>
+  <rect x="74"  y="75"  width="92"  height="35" rx="5" fill="url(#algoDegraus)"/>
+  <rect x="52"  y="115" width="136" height="35" rx="5" fill="url(#algoDegraus)"/>
+  <rect x="30"  y="155" width="180" height="35" rx="5" fill="url(#algoDegraus)"/>
+</svg>

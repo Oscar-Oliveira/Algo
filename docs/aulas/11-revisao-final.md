@@ -130,6 +130,14 @@ procedimento saudar(nome:cadeia)
 
 ---
 
+## Cuidado: vetor/estrutura por valor não é uma cópia "a sério"
+
+![Diagrama de vetor por valor: o parâmetro recebe uma cópia do apontador para o mesmo vetor; mutar um elemento afeta o chamador, mas reatribuir o parâmetro inteiro não](diagramas/08-funcoes-e-procedimentos/por-valor-vetor.svg)
+
+Mutar um elemento/campo propaga; reatribuir o parâmetro inteiro não. Sem `ref`, mas com o mesmo perigo de aliasing da Aula 7/9.
+
+---
+
 ## Recursão
 
 ![Tabela de traçagem da recursão do fatorial: desce até ao caso base, depois sobe multiplicando os resultados](diagramas/08-funcoes-e-procedimentos/recursao-fatorial.svg)

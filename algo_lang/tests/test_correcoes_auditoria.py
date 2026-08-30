@@ -2768,6 +2768,37 @@ def test_flowchart_escolha_sem_contrario():
     assert 'label="contrario"' in dot
 
 
+def test_flowchart_chamada_a_funcao_incluida_com_alias_tem_contorno_duplo(tmp_path):
+    """Regressão: '_eh_chamada_a_rotina' rejeitava QUALQUER nome com '.'
+    como se fosse sempre uma chamada a biblioteca embutida (sem
+    FuncaoDef, por isso sem contorno duplo) -- mas 'alias.metodo(...)'
+    de uma função trazida por 'incluir ... como alias' TEM um FuncaoDef
+    real, só que com o nome mangled (ex.: 'm_dobro', ver
+    inclusoes.py:mesclar_biblioteca_no_programa). Sem resolver o alias
+    antes de comparar contra 'nomes_rotinas' (que só contém o nome
+    mangled), toda chamada a uma rotina incluída ficava indistinguível
+    de uma atribuição normal no fluxograma -- mesmo bug de fundo do
+    'nomes_globais' do linter: o modelo mental da ferramenta não batia
+    com o esquema real de resolução do compilador."""
+    from algo_lang.cli import _carregar_e_verificar
+    from algo_lang.tools.flowchart import gerar_dot
+    (tmp_path / "lib.algo").write_text(
+        'funcao dobro(x:inteiro):inteiro\n    retornar x * 2\n', encoding="utf-8")
+    principal = tmp_path / "principal.algo"
+    principal.write_text(textwrap.dedent("""\
+        algoritmo "T"
+        incluir "lib.algo" como m
+        inicio
+            x:inteiro = m.dobro(5)
+            escrever(x)
+    """), encoding="utf-8")
+    programa = _carregar_e_verificar(str(principal))
+    nomes_rotinas = {f.nome for f in programa.funcoes}
+    dot = gerar_dot(programa.corpo, programa.nome, nomes_rotinas, programa.aliases_inclusao)
+    linha = next(l for l in dot.splitlines() if "m.dobro(5)" in l)
+    assert "peripheries=2" in linha
+
+
 @pytest.mark.requer_algo_no_path
 def test_incluir_o_mesmo_ficheiro_duas_vezes_nao_da_erro(tmp_path):
     """cli.py deduplica inclusões pelo caminho absoluto -- incluir o
@@ -4814,7 +4845,7 @@ def test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer():
     import re
     from algo_lang.compilador.lexer import PALAVRAS_CHAVE
     caminho_grammar = os.path.join(
-        os.path.dirname(__file__), "..", "editors", "vscode-algo",
+        os.path.dirname(__file__), "..", "..", "editors", "vscode-algo",
         "syntaxes", "algo.tmLanguage.json")
     with open(caminho_grammar, "r", encoding="utf-8") as f:
         grammar = json.load(f)
@@ -4849,7 +4880,7 @@ def test_vscode_grammar_nao_esquece_nenhuma_palavra_chave_do_lexer():
 def _padrao_grammar(nome_regra):
     import json
     caminho_grammar = os.path.join(
-        os.path.dirname(__file__), "..", "editors", "vscode-algo",
+        os.path.dirname(__file__), "..", "..", "editors", "vscode-algo",
         "syntaxes", "algo.tmLanguage.json")
     with open(caminho_grammar, "r", encoding="utf-8") as f:
         grammar = json.load(f)
@@ -7627,3 +7658,92 @@ def test_segundo_inicio_continua_com_mensagem_dedicada():
             inicio
                 escrever(2)
         """))
+
+
+# ---------- 'algo verifica --json': diagnósticos estruturados para ferramentas
+# de editor (extensão VS Code). Ao contrário de _carregar_e_verificar (usado
+# por 'algo verifica' sem --json), este caminho nunca sys.exit(1) num erro do
+# programa do estudante -- imprime sempre uma lista JSON em stdout. ----------
+
+def test_verifica_json_com_erro_lexico_devolve_diagnostico_json(tmp_path, capsys):
+    import argparse
+    import json as json_modulo
+    from algo_lang.cli import cmd_verifica
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    x:inteiro = @\n', encoding="utf-8")
+    args = argparse.Namespace(ficheiro=str(algo_path), json=True)
+    cmd_verifica(args)  # não deve levantar SystemExit
+    diagnosticos = json_modulo.loads(capsys.readouterr().out)
+    assert len(diagnosticos) == 1
+    assert diagnosticos[0]["linha"] == 3
+    assert diagnosticos[0]["severidade"] == "erro"
+
+
+def test_verifica_json_com_erro_sintatico_devolve_diagnostico_json(tmp_path, capsys):
+    import argparse
+    import json as json_modulo
+    from algo_lang.cli import cmd_verifica
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    escrever(\n', encoding="utf-8")
+    args = argparse.Namespace(ficheiro=str(algo_path), json=True)
+    cmd_verifica(args)
+    diagnosticos = json_modulo.loads(capsys.readouterr().out)
+    assert len(diagnosticos) == 1
+    assert diagnosticos[0]["severidade"] == "erro"
+
+
+def test_verifica_json_com_erro_semantico_devolve_diagnostico_json(tmp_path, capsys):
+    import argparse
+    import json as json_modulo
+    from algo_lang.cli import cmd_verifica
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    escrever(x)\n', encoding="utf-8")
+    args = argparse.Namespace(ficheiro=str(algo_path), json=True)
+    cmd_verifica(args)
+    diagnosticos = json_modulo.loads(capsys.readouterr().out)
+    assert len(diagnosticos) == 1
+    assert diagnosticos[0]["linha"] == 3
+    assert diagnosticos[0]["severidade"] == "erro"
+    assert diagnosticos[0]["coluna"] is None
+
+
+def test_verifica_json_com_programa_correto_devolve_lista_vazia_ou_so_avisos(tmp_path, capsys):
+    import argparse
+    import json as json_modulo
+    from algo_lang.cli import cmd_verifica
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    escrever("ok")\n', encoding="utf-8")
+    args = argparse.Namespace(ficheiro=str(algo_path), json=True)
+    cmd_verifica(args)
+    diagnosticos = json_modulo.loads(capsys.readouterr().out)
+    assert all(d["severidade"] == "aviso" for d in diagnosticos)
+
+
+def test_verifica_json_ficheiro_inexistente_devolve_diagnostico_em_vez_de_sair(tmp_path, capsys):
+    import argparse
+    import json as json_modulo
+    from algo_lang.cli import cmd_verifica
+    args = argparse.Namespace(ficheiro=str(tmp_path / "nao_existe.algo"), json=True)
+    cmd_verifica(args)  # não deve levantar SystemExit
+    diagnosticos = json_modulo.loads(capsys.readouterr().out)
+    assert len(diagnosticos) == 1
+    assert diagnosticos[0]["severidade"] == "erro"
+
+
+def test_verifica_sem_json_continua_com_o_comportamento_antigo(tmp_path, capsys):
+    """Não regressão: omitir --json continua a usar _carregar_e_verificar
+    (texto amigável + sys.exit(1) num erro), não o caminho novo."""
+    import argparse
+    from algo_lang.cli import cmd_verifica
+    algo_path = tmp_path / "prog.algo"
+    algo_path.write_text(
+        'algoritmo "T"\ninicio\n    escrever(x)\n', encoding="utf-8")
+    args = argparse.Namespace(ficheiro=str(algo_path), json=False)
+    with pytest.raises(SystemExit) as exc:
+        cmd_verifica(args)
+    assert exc.value.code == 1
+    assert "❌" in capsys.readouterr().out

@@ -26,9 +26,10 @@ def _escapar(texto: str) -> str:
 
 
 class GeradorFluxograma:
-    def __init__(self, titulo: str, nomes_rotinas=None):
+    def __init__(self, titulo: str, nomes_rotinas=None, aliases_inclusao=None):
         self.titulo = titulo
         self.nomes_rotinas = nomes_rotinas or set()
+        self.aliases_inclusao = aliases_inclusao or {}
         self.contador = 0
         self.declaracoes_nos = []
         self.declaracoes_arestas = []
@@ -86,8 +87,22 @@ class GeradorFluxograma:
         return atual
 
     def _eh_chamada_a_rotina(self, chamada):
-        return isinstance(chamada, A.Chamada) and "." not in chamada.nome and \
-            chamada.nome in self.nomes_rotinas
+        if not isinstance(chamada, A.Chamada):
+            return False
+        nome = chamada.nome
+        if "." in nome:
+            # 'alias.metodo(...)' -- só uma função incluída com 'incluir
+            # ... como alias' corresponde a uma rotina do PRÓPRIO
+            # programa (o seu FuncaoDef.nome real é o mangled, ex.:
+            # 'm_dobro', ver inclusoes.py); 'biblioteca.metodo' (embutida)
+            # não tem FuncaoDef nenhum, por isso fica de fora como antes.
+            # Mesma resolução que linter.py:_extrair_lvalues_e_chamadas.
+            alias, _, metodo = nome.partition(".")
+            mapa_metodos = self.aliases_inclusao.get(alias)
+            if mapa_metodos is None or metodo not in mapa_metodos:
+                return False
+            nome = mapa_metodos[metodo]
+        return nome in self.nomes_rotinas
 
     def gerar_stmt(self, stmt, anterior, rotulo=None):
         if isinstance(stmt, A.Declaracao):
@@ -310,5 +325,5 @@ class GeradorFluxograma:
         return fim_id
 
 
-def gerar_dot(corpo, titulo: str, nomes_rotinas=None) -> str:
-    return GeradorFluxograma(titulo, nomes_rotinas).gerar(corpo)
+def gerar_dot(corpo, titulo: str, nomes_rotinas=None, aliases_inclusao=None) -> str:
+    return GeradorFluxograma(titulo, nomes_rotinas, aliases_inclusao).gerar(corpo)

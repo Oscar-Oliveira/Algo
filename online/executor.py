@@ -617,7 +617,8 @@ def gerar_rasto(ficheiros: list[dict], nome_principal: str, entradas: list[str],
     try:
         resultado = gerar_trace(
             dados["codigo"], caminho_py, dados["mapa_linhas"],
-            dados["nomes_globais"], dados["nomes_funcoes"], entradas=entradas)
+            dados["nomes_globais"], dados["nomes_funcoes"], entradas=entradas,
+            nomes_locais_por_funcao=dados["nomes_locais_por_funcao"])
     except Exception as e:
         raise ErroRasto(f"Não foi possível gerar o rasto: {e}") from e
 

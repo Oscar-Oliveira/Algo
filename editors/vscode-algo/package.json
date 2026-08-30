@@ -1,0 +1,56 @@
+{
+  "name": "algo-language",
+  "displayName": "ALGO Language",
+  "description": "Realce de sintaxe para a linguagem algorítmica ALGO (ensino de programação em português)",
+  "version": "0.3.1",
+  "publisher": "algo-lang",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "author": {
+    "name": "Óscar Oliveira",
+    "email": "oao@estg.ipp.pt"
+  },
+  "bugs": {
+    "email": "oao@estg.ipp.pt"
+  },
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": ["Programming Languages"],
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:algo"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "algo",
+        "aliases": ["ALGO", "algo"],
+        "extensions": [".algo"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "algo",
+        "scopeName": "source.algo",
+        "path": "./syntaxes/algo.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "algo-minimal",
+        "label": "Algo Minimal",
+        "path": "./fileicons/algo-icon-theme.json"
+      }
+    ],
+    "configuration": {
+      "title": "ALGO",
+      "properties": {
+        "algo.caminhoExecutavel": {
+          "type": "string",
+          "default": "",
+          "description": "Caminho para o executável 'algo' (ex.: o algo.exe dentro do .venv do projeto). Deixa em branco para procurar automaticamente um .venv local ou o 'algo' no PATH."
+        }
+      }
+    }
+  }
+}

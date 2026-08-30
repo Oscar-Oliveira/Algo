@@ -297,6 +297,38 @@ Tal como `v2 = v1` liga as duas variáveis na Aula 7, `v` dentro da função é 
 
 ---
 
+## Na pilha e no heap
+
+![Diagrama da pilha e do heap com endereços de memória: na pilha, idade guarda o valor 25 diretamente na caixa; numeros e copia guardam, cada uma, o endereço 0x2000; no heap, o bloco no endereço 0x2000 contém os valores reais do vetor, 1 2 3; as duas variáveis apontam, com setas laranja, para esse mesmo endereço](diagramas/08-funcoes-e-procedimentos/pilha-heap-enderecos.svg)
+
+Um `inteiro` guarda o valor **diretamente** na sua caixa (`idade`). Um vetor guarda um **endereço** — a caixa `numeros` não tem `1 2 3` lá dentro, tem `0x2000`, o sítio no heap onde o vetor realmente vive.
+
+---
+
+## Duas variáveis, o mesmo endereço
+
+Se `copia` for outra variável a apontar para o mesmo `0x2000` (por exemplo depois de `copia = numeros`, ou de `v` receber `numeros` como argumento), as duas veem o **mesmo** vetor. Mudar um elemento a partir de uma é visto pela outra — não porque haja magia, mas porque as duas caixas guardam o **mesmo número de endereço**.
+
+---
+
+## Em diagrama: dois destinos diferentes
+
+![Diagrama de vetor por valor: o chamador tem numeros igual a 1,2,3, o parâmetro v recebe uma cópia do apontador que aponta para o mesmo vetor; um ramo muta um elemento (v[0] = v[0] vezes 2) e o vetor do chamador também muda para 2,2,3 -- mudou; o outro ramo reatribui o parâmetro inteiro (v = 9,9,9), a cópia do apontador passa a apontar para um vetor novo, e o vetor do chamador continua 1,2,3 -- não mudou](diagramas/08-funcoes-e-procedimentos/por-valor-vetor.svg)
+
+Mesma cópia do apontador nos dois ramos — o que muda é **o que fazes com ela**: mutar um elemento afeta o original; substituir o vetor todo só troca para onde a cópia aponta.
+
+---
+
+## As três situações, lado a lado
+
+| Situação | O parâmetro recebe | Mudar um elemento/campo | Reatribuir o parâmetro inteiro |
+|---|---|---|---|
+| escalar, por valor (padrão) | uma cópia do valor | *(não aplicável)* | não é visto pelo chamador |
+| escalar, `ref` | a mesma caixa do chamador | *(não aplicável)* | é visto pelo chamador |
+| vetor/estrutura, por valor (sem `ref`) | uma cópia do apontador, para o MESMO vetor/estrutura | é visto pelo chamador | não é visto pelo chamador |
+
+---
+
 ## Exemplo completo
 
 ```algo

@@ -6,12 +6,15 @@ nem testes.
 Uso: python3 empacotar.py
 Produz: dist/algo-<versao>.zip
 """
+import os
 import re
 import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
+PASTA_EXTENSAO = RAIZ / "editors" / "vscode-algo"
 
 # (origem relativa à raiz, destino relativo à raiz do pacote)
 FICHEIROS = [
@@ -24,7 +27,7 @@ FICHEIROS = [
 PASTAS = [
     ("algo_lang", {"tests", "__pycache__"}),
     ("docs/manual", {"__pycache__"}),
-    ("exemplos", {"__pycache__"}),
+    ("docs/exemplos", {"__pycache__"}),
 ]
 
 README_PACOTE = """\
@@ -50,11 +53,11 @@ diretamente a consola interativa.
 - `docs/ManualCLI.md` -- manual do estudante: a consola interativa,
   todos os comandos (`algo executa`, `algo fluxograma`, `algo
   verifica`, ...), a extensão de realce de sintaxe para VS Code
-  (`algo_lang/editors/vscode-algo/`), e instalação do Python à mão se
-  o script de arranque não funcionar.
+  (`algo-language-*.vsix`, na raiz deste pacote), e instalação do
+  Python à mão se o script de arranque não funcionar.
 - `docs/manual/` -- manual da linguagem em si (tipos, condicionais,
   ciclos, vetores, funções, estruturas, bibliotecas, ...).
-- `exemplos/` -- programas ALGO de exemplo, organizados por assunto.
+- `docs/exemplos/` -- programas ALGO de exemplo, organizados por assunto.
 """
 
 
@@ -71,6 +74,20 @@ def copiar_pasta(origem: Path, destino: Path, excluir: set[str]) -> None:
         return {n for n in nomes if n in excluir or n.endswith(".pyc")}
 
     shutil.copytree(origem, destino, ignore=ignorar)
+
+
+def gerar_vsix(destino: Path) -> None:
+    vsce = shutil.which("vsce")
+    if not vsce:
+        raise SystemExit(
+            "'vsce' não encontrado no PATH -- instala com 'npm install -g "
+            "@vscode/vsce' para poder empacotar a extensão VS Code."
+        )
+    subprocess.run(
+        [vsce, "package", "--out", f"{destino}{os.sep}"],
+        cwd=PASTA_EXTENSAO,
+        check=True,
+    )
 
 
 def main() -> None:
@@ -96,6 +113,8 @@ def main() -> None:
         if not origem.exists():
             raise SystemExit(f"Falta a pasta esperada: {rel}")
         copiar_pasta(origem, pasta_pacote / rel, excluir)
+
+    gerar_vsix(pasta_pacote)
 
     (pasta_pacote / "README.md").write_text(README_PACOTE, encoding="utf-8")
 

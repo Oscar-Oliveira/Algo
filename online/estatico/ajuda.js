@@ -14,7 +14,7 @@ abasAjuda.forEach((aba) => {
 
 // ---------- aba "Exemplos" ----------
 //
-// Um tema (pasta de exemplos/) de cada vez no painel direito: a barra
+// Um tema (pasta de docs/exemplos/) de cada vez no painel direito: a barra
 // lateral só lista os 10 temas -- os ficheiros e as suas descrições
 // aparecem juntos, tema a tema, no painel direito (ver /api/exemplos,
 // que já vem com o enunciado.md cortado em intro + blocos por

@@ -1,0 +1,23 @@
+digraph TracagemExemploDecisao {
+    bgcolor="transparent";
+    node [shape=plain, fontname="Segoe UI,Arial"];
+
+    tabela [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="8">
+            <tr>
+                <td bgcolor="#1a5fb4"><font color="white"><b>instrução</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>n</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>n mod 2 == 0 ?</b></font></td>
+                <td bgcolor="#1a5fb4"><font color="white"><b>resultado</b></font></td>
+            </tr>
+            <tr><td>n:inteiro = 7</td><td>7</td><td>ainda não testada</td><td>ainda não existe</td></tr>
+            <tr><td>resultado:cadeia</td><td>7</td><td>ainda não testada</td><td>ainda não tem valor</td></tr>
+            <tr><td>se n mod 2 == 0 entao</td><td>7</td><td>7 mod 2 → 1, 1==0 → falso</td><td>ainda não tem valor</td></tr>
+            <tr><td>resultado = "ímpar"  <i>(ramo senao)</i></td><td>7</td><td>falso</td><td>"ímpar"</td></tr>
+            <tr>
+                <td bgcolor="#ffebee"><b>escrever(resultado)</b></td>
+                <td bgcolor="#ffebee" colspan="3">mostra <b>ímpar</b></td>
+            </tr>
+        </table>
+    >];
+}

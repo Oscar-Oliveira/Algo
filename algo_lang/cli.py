@@ -317,6 +317,7 @@ def cmd_executa_com_trace(args):
         entradas=entradas,
         max_passos=getattr(args, "max_passos", None),
         limite_tempo_segundos=getattr(args, "limite_tempo", None),
+        nomes_locais_por_funcao=dados["nomes_locais_por_funcao"],
     )
 
     print("\n----- Execução -----")
@@ -394,7 +395,7 @@ def cmd_fluxograma(args):
 
     graphviz_disponivel = shutil.which("dot") is not None
     for corpo, titulo, nome_ficheiro in alvos:
-        dot = gerar_dot(corpo, titulo, nomes_rotinas)
+        dot = gerar_dot(corpo, titulo, nomes_rotinas, programa.aliases_inclusao)
         caminho_dot = os.path.join(pasta, nome_ficheiro + ".dot")
         with open(caminho_dot, "w", encoding="utf-8") as f:
             f.write(dot)
@@ -417,6 +418,9 @@ def cmd_fluxograma(args):
 
 
 def cmd_verifica(args):
+    if getattr(args, "json", False):
+        _cmd_verifica_json(args)
+        return
     programa = _carregar_e_verificar(args.ficheiro)
     codigo_fonte = _ler_ficheiro_algo(args.ficheiro)
     avisos = linter_modulo.analisar(programa, codigo_fonte)
@@ -426,6 +430,51 @@ def cmd_verifica(args):
     print(f"{len(avisos)} aviso(s):\n")
     for aviso in avisos:
         print(f"  ⚠ {aviso}")
+
+
+def _diagnostico_de_erro(e):
+    return {
+        "linha": e.linha,
+        "coluna": getattr(e, "coluna", None),
+        "mensagem": str(e),
+        "severidade": "erro",
+    }
+
+
+def _cmd_verifica_json(args):
+    """Como cmd_verifica, mas para consumo por ferramentas de editor (ex.:
+    a extensão VS Code), que precisam dos erros como dados estruturados em
+    stdout, não como texto formatado + sys.exit(1). Por isso não reaproveita
+    _carregar_e_verificar/_resolver_inclusoes tal como estão -- chama parse/
+    verificar diretamente, tal como online/executor.py, pela mesma razão
+    documentada aí: essas funções fazem sys.exit(1) no primeiro erro, o que
+    aqui impediria de sequer imprimir o diagnóstico em JSON."""
+    if not os.path.isfile(args.ficheiro):
+        print(json.dumps([{
+            "linha": 1, "coluna": None,
+            "mensagem": f"ficheiro '{args.ficheiro}' não encontrado",
+            "severidade": "erro",
+        }], ensure_ascii=False))
+        return
+    codigo = _ler_ficheiro_algo(args.ficheiro)
+    pasta_base = os.path.dirname(os.path.abspath(args.ficheiro))
+    try:
+        programa = parse(codigo)
+        _resolver_inclusoes(programa, pasta_base)
+    except (ErroLexico, ErroSintatico) as e:
+        print(json.dumps([_diagnostico_de_erro(e)], ensure_ascii=False))
+        return
+    try:
+        verificar(programa)
+    except ErroSemantico as e:
+        print(json.dumps([_diagnostico_de_erro(e)], ensure_ascii=False))
+        return
+    avisos = linter_modulo.analisar(programa, codigo)
+    diagnosticos = [
+        {"linha": a.linha, "coluna": None, "mensagem": a.mensagem, "severidade": "aviso"}
+        for a in avisos
+    ]
+    print(json.dumps(diagnosticos, ensure_ascii=False))
 
 
 # Para cada comando que tem um 'ficheiro' posicional, as flags que consomem
@@ -786,6 +835,12 @@ def main():
         help="analisa o programa em busca de possíveis enganos (avisos de estilo)",
     )
     p_verifica.add_argument("ficheiro", help="caminho para o ficheiro .algo")
+    p_verifica.add_argument(
+        "--json", action="store_true",
+        help="imprime os diagnósticos (erros/avisos) como JSON em stdout, "
+             "para ferramentas de editor -- nunca sai com código 1 por "
+             "causa de um erro no programa do estudante",
+    )
     p_verifica.set_defaults(func=cmd_verifica)
 
     if len(sys.argv) == 1:

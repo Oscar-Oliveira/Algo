@@ -24,7 +24,8 @@ def _trace(codigo_algo, entradas=None, tmp_path=None):
     with open(caminho_py, "w", encoding="utf-8") as f:
         f.write(dados["codigo"])
     return gerar_trace(dados["codigo"], caminho_py, dados["mapa_linhas"],
-                        dados["nomes_globais"], dados["nomes_funcoes"], entradas=entradas)
+                        dados["nomes_globais"], dados["nomes_funcoes"], entradas=entradas,
+                        nomes_locais_por_funcao=dados["nomes_locais_por_funcao"])
 
 
 def test_trace_basico_tem_um_passo_por_linha_executada(tmp_path):
@@ -372,6 +373,29 @@ def test_debug_mostra_globais_e_locais_dentro_de_funcao(tmp_path):
     assert "a=1, b=3" in texto     # parâmetros
     assert "resultado=" in texto  # local
     assert "total=" in texto      # global visível dentro da função
+
+
+def test_variavel_local_com_prefixo_de_temporario_interno_nao_desaparece_do_trace(tmp_path):
+    """Regressão: o lexer aceita identificadores ALGO começados por '_'
+    (não é uma convenção reservada ao compilador), mas o codegen também
+    injeta temporários Python com o prefixo '_algo_' na mesma frame (ex.:
+    '_algo_tmp_idx_0'). O filtro antigo escondia QUALQUER variável cujo
+    nome começasse por '_algo_' -- se um estudante desse esse nome à sua
+    própria variável, ela desaparecia de '--debug'/'--json' mesmo depois
+    de ser atribuída. 'nomes_locais_por_funcao' (construído a partir da
+    AST, não de uma convenção de nomes) corrige isto."""
+    resultado = _trace("""
+        algoritmo "T"
+        funcao dobro(x:inteiro):inteiro
+            _algo_resultado:inteiro = x * 2
+            retornar _algo_resultado
+        inicio
+            escrever(dobro(21))
+    """, tmp_path=tmp_path)
+    passo_final = next(p for p in resultado["passos"]
+                        if p["pilha"] and p["pilha"][-1]["nome"] == "dobro"
+                        and "_algo_resultado" in p["pilha"][-1]["variaveis"])
+    assert passo_final["pilha"][-1]["variaveis"]["_algo_resultado"] == 42
 
 
 @pytest.mark.requer_algo_no_path

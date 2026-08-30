@@ -48,7 +48,7 @@ As aulas são construídas uma de cada vez; cada uma só é dada como fechada de
 | 2 | [Variáveis e tipos](02-variaveis-e-tipos.md) — os 5 tipos primitivos, `constante`, valores por omissão | ✅ pronta para revisão |
 | 3 | [Operadores](03-operadores.md) — aritméticos, relacionais, lógicos | ✅ pronta para revisão |
 | 4 | [Decisões](04-decisoes.md) — `se` / `senao` / `senao se` / `escolher` | ✅ pronta para revisão |
-| 5 | [Ciclos](05-ciclos.md) — `para` (contado) e `enquanto`/`fazer ... enquanto` (condicionado), com diagramas de memória | ✅ pronta para revisão |
+| 5 | [Ciclos](05-ciclos.md) — `para` (contado) e `enquanto`/`fazer ... enquanto` (condicionado), com diagramas de memória; inclui bloco dedicado a **traçagem** (o que é, como se faz, exemplos sem ciclos) | ✅ pronta para revisão |
 | 6 | [Revisão](06-revisao.md) — consolidação a meio do curso (aulas 1 a 5) | ✅ pronta para revisão |
 | 7 | [Vetores e matrizes](07-vetores-e-matrizes.md) — listas de valores e tabelas | ✅ pronta para revisão |
 | 8 | [Funções e procedimentos](08-funcoes-e-procedimentos.md) | ✅ pronta para revisão |

@@ -2,7 +2,7 @@ services:
   algo-online:
     build:
       # o contexto tem de ser a pasta-mãe (onde algo_lang/, alguem/,
-      # online/ e exemplos/ são irmãs) -- o Dockerfile precisa de
+      # online/ e docs/ são irmãs) -- o Dockerfile precisa de
       # copiar as quatro, não só o online/ onde este ficheiro vive
       context: ..
       dockerfile: online/Dockerfile

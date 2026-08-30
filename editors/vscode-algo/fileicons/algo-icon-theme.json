@@ -1,0 +1,14 @@
+{
+  "iconDefinitions": {
+    "_file": { "iconPath": "../images/file-icons/file.svg" },
+    "_folder": { "iconPath": "../images/file-icons/folder.svg" },
+    "_folder_open": { "iconPath": "../images/file-icons/folder-open.svg" },
+    "_algo_file": { "iconPath": "../images/file-icons/algo-file.svg" }
+  },
+  "file": "_file",
+  "folder": "_folder",
+  "folderExpanded": "_folder_open",
+  "fileExtensions": {
+    "algo": "_algo_file"
+  }
+}

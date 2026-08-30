@@ -261,7 +261,7 @@ Muitos destes comentários já usam tags (`ARCH-##`, `ON-##`, `AG-##`,
 ### main.py
 - L2-6 — racional de ser framework-light (arquitetura)
 - L44-52 (tag ON-21) — páginas privadas deliberadamente fora do mount `StaticFiles`, para preservar verificações de sessão (segurança)
-- L55-59 — `exemplos/` vive fora de `online/`, lido de novo a cada pedido para evitar divergência (arquitetura)
+- L55-59 — `docs/exemplos/` vive fora de `online/`, lido de novo a cada pedido para evitar divergência (arquitetura)
 - L81-84 (tag ON-25), L85-88 (tag ON-35) — max-age de sessão explícito; cookie HTTPS-only por omissão (segurança)
 - L94-97, L100-106 (limitador de tamanho do corpo) — ressalva de cobertura só por Content-Length (limitação)
 - L121-126, L129-136 (verificação CSRF Origin/Referer) — segunda camada além do SameSite; alcance do que bloqueia e não bloqueia (segurança)

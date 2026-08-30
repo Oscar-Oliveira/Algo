@@ -46,12 +46,14 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 .
 ├── algo.sh / algo.bat / algo.command   # arranque da consola local
 ├── algo_lang/          # o compilador -- nunca alterado entre CLI e online
-│   ├── tests/            # suite de testes do compilador (CLI)
-│   └── editors/vscode-algo/ # extensão de realce de sintaxe para VS Code
+│   └── tests/            # suite de testes do compilador (CLI)
+├── editors/vscode-algo/ # extensão de realce de sintaxe para VS Code
 ├── alguem/              # o tutor LLM -- reaproveitado tal e qual pelos dois modos
 ├── online/                # o serviço web (FastAPI) -- ver online/README.md
-├── exemplos/                    # programas Algo de exemplo, organizados por assunto (01_variaveis_tipos/, 02_operadores/, ...)
-└── docs/                            # manuais e decisões de design
+└── docs/                            # manuais, decisões de design, aulas, exemplos e logo
+    ├── aulas/                       # curso de 14 aulas (slides reveal.js + fichas de trabalho)
+    ├── exemplos/                    # programas Algo de exemplo, organizados por assunto (01_variaveis_tipos/, 02_operadores/, ...)
+    └── logo/                        # logótipo do projeto (SVG/PNG)
 ```
 
 ## `docs/` — manuais e material de apoio
@@ -62,6 +64,9 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 | `manual/` | Manual de referência da linguagem ALGO, capítulo a capítulo |
 | `PlanoAuditoria.md` | Achados e decisões de auditoria do projeto |
 | `DecisoesDeArquitetura.md` | Catálogo dos comentários do código que documentam decisões de arquitetura/segurança/design |
+| `aulas/` | Curso de 14 aulas para quem nunca programou (slides + fichas de trabalho) -- ver `docs/aulas/README.md` |
+| `exemplos/` | Programas ALGO de exemplo, organizados por assunto |
+| `logo/` | Logótipo do projeto |
 
 ## Sub-projetos com o seu próprio README
 

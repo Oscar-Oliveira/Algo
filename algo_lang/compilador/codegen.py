@@ -1197,11 +1197,28 @@ def gerar_python_com_mapa(programa: A.Programa):
     corresponde e quais são as variáveis globais visíveis. O compilador
     em si não sabe nada de debug/trace -- só devolve esta informação de
     correspondência de linhas, que é sempre gerada (é meta-informação
-    inofensiva, não código extra dentro do programa)."""
+    inofensiva, não código extra dentro do programa).
+
+    'nomes_locais_por_funcao' (nome da função -> nomes de parâmetros e
+    variáveis locais REALMENTE declaradas pelo estudante, em qualquer
+    nível de aninhamento) permite ao tracer distinguir essas variáveis
+    dos temporários internos que o codegen também injeta na mesma frame
+    Python (ex.: '_algo_tmp_idx_0', '_algo_passo') -- o lexer aceita
+    identificadores ALGO começados por '_', por isso um filtro por
+    PREFIXO ('começa com _algo_') pode esconder uma variável real do
+    estudante que calhe a ter esse nome; esta lista, construída a partir
+    da AST (não de uma convenção de nomes), não tem esse problema."""
     gerador = GeradorCodigo(programa)
     codigo = gerador.gerar()
+    nomes_locais_por_funcao = {}
+    for f in programa.funcoes:
+        tipos_locais = {}
+        A.coletar_declaracoes_tipadas(f.corpo, tipos_locais)
+        nomes_locais_por_funcao[f.nome] = sorted(
+            {p.nome for p in f.parametros} | set(tipos_locais.keys()))
     return {
         "codigo": codigo,
+        "nomes_locais_por_funcao": nomes_locais_por_funcao,
         "mapa_linhas": dict(gerador.mapa_linhas),
         "nomes_globais": list(gerador.tabela_tipos_globais.keys()),
         "nomes_funcoes": [f.nome for f in programa.funcoes],

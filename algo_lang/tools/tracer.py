@@ -139,7 +139,8 @@ def formatar_consola_com_debug(resultado):
 
 def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                  nomes_globais: list, nomes_funcoes: list, entradas=None,
-                 max_passos=None, limite_tempo_segundos=None):
+                 max_passos=None, limite_tempo_segundos=None,
+                 nomes_locais_por_funcao: dict = None):
     """Executa 'codigo_py' (o Python gerado a partir de um .algo) sob
     sys.settrace(), devolvendo um dicionário pronto a converter em JSON:
     {
@@ -161,12 +162,36 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
     bater no limite sem precisar editar este ficheiro. online/executor.py
     nunca passa estes argumentos de propósito (vários estudantes partilham
     a mesma VM; deixar cada um alargar o seu próprio limite enfraquecia a
-    proteção contra um programa a monopolizar CPU partilhada)."""
+    proteção contra um programa a monopolizar CPU partilhada).
+
+    'nomes_locais_por_funcao' (opcional, ver
+    codegen.py:gerar_python_com_mapa): nome da função -> nomes de
+    parâmetros/variáveis locais REALMENTE declaradas na AST. Quando
+    fornecida, é usada como lista exata de variáveis a mostrar em cada
+    frame de função. Omitida (chamador antigo), cai para a aproximação
+    por prefixo -- sabe-se que essa aproximação pode esconder uma
+    variável do estudante chamada '_algo_algo' ou '_' (o lexer aceita
+    identificadores ALGO começados por '_'), por isso todo chamador novo
+    deve passá-la."""
     max_passos = MAX_PASSOS if max_passos is None else max_passos
     limite_tempo_segundos = (
         LIMITE_TEMPO_SEGUNDOS if limite_tempo_segundos is None else limite_tempo_segundos
     )
     nomes_funcoes_conhecidas = set(nomes_funcoes) | {NOME_FUNCAO_PRINCIPAL}
+    nomes_locais_por_funcao = (
+        {k: set(v) for k, v in nomes_locais_por_funcao.items()}
+        if nomes_locais_por_funcao is not None else None
+    )
+
+    def _variaveis_locais_visiveis(nome_funcao, f_locals):
+        if nomes_locais_por_funcao is not None:
+            permitidos = nomes_locais_por_funcao.get(nome_funcao, set())
+            return {k: _valor_serializavel(v) for k, v in f_locals.items() if k in permitidos}
+        # Sem a lista exata (chamador antigo) -- aproximação por prefixo,
+        # que pode esconder uma variável real do estudante com o mesmo
+        # nome de um temporário interno (ver docstring acima).
+        return {k: _valor_serializavel(v) for k, v in f_locals.items()
+                if not k.startswith("_algo_") and k != "_"}
     passos = []
     limite_excedido = {"valor": False, "tipo": None}
     resultado_erro = {"valor": None}
@@ -194,15 +219,7 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                              if k in nomes_globais}
                 pilha.append({"nome": NOME_VISIVEL_PRINCIPAL, "variaveis": variaveis})
             elif nome in nomes_funcoes_conhecidas:
-                # O lexer permite identificadores ALGO começados por '_' --
-                # filtrar variáveis por "começa com '_'" esconderia essas
-                # variáveis reais do estudante. Só '_algo_'-prefixados e o
-                # nome '_' sozinho (destino descartado de um 'ref' usado
-                # como instrução solta -- ver _gerar_chamada_stmt) são
-                # internos do compilador.
-                variaveis = {k: _valor_serializavel(v) for k, v in f.f_locals.items()
-                             if not k.startswith("_algo_") and k != "_"}
-                pilha.append({"nome": nome, "variaveis": variaveis})
+                pilha.append({"nome": nome, "variaveis": _variaveis_locais_visiveis(nome, f.f_locals)})
             # frames de funções auxiliares internas (_algo_...) não entram na pilha visível
             f = f.f_back
         pilha.reverse()
@@ -303,8 +320,7 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
             variaveis_atuais = {k: _valor_serializavel(v) for k, v in frame.f_globals.items()
                                  if k in nomes_globais}
         else:
-            variaveis_atuais = {k: _valor_serializavel(v) for k, v in frame.f_locals.items()
-                                 if not k.startswith("_algo_") and k != "_"}
+            variaveis_atuais = _variaveis_locais_visiveis(nome_atual, frame.f_locals)
         pilha_incremental[-1] = {"nome": nome_atual, "variaveis": variaveis_atuais}
         # Ao contrário de locais (só existem dentro da própria frame),
         # globais são um único namespace partilhado por TODAS as frames

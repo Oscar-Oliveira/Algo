@@ -38,11 +38,16 @@ class Linter:
         self._verificar_resultado_de_funcao_descartado()
         self._verificar_recursao_sem_condicao()
 
+        # Só as declarações de TOPO (antes de 'inicio') são globais de
+        # verdade -- semantics.py garante que nada declarado dentro de
+        # 'inicio' é visível a uma função, por isso um nome só declarado
+        # aí nunca pode ser confundido com/sombrear nada dentro de uma
+        # função (ver achado de auditoria: 'nomes_globais' incluía esses
+        # nomes por engano, dando avisos de "sombra de global" falsos
+        # para qualquer parâmetro/local de função que calhasse a ter o
+        # mesmo nome de uma variável puramente local ao corpo principal).
         nomes_globais = {d.nome for d in self.programa.declaracoes}
-        nomes_globais |= self._nomes_declarados(self.programa.corpo)
-
         nomes_constantes = {d.nome for d in self.programa.declaracoes if d.eh_constante}
-        nomes_constantes |= self._nomes_constantes_declaradas(self.programa.corpo)
         nomes_globais_mutaveis = nomes_globais - nomes_constantes
 
         # nome de 'constante' -> valor inteiro resolvido, calculado uma
@@ -62,7 +67,7 @@ class Linter:
         self._verificar_globais_nao_usadas()
         self._verificar_divisoes_e_comparacoes(self.programa.corpo)
         self._verificar_codigo_depois_de_retornar(self.programa.corpo)
-        self._verificar_ciclo_verdadeiro_sem_saida(self.programa.corpo)
+        self._verificar_ciclo_verdadeiro_sem_saida(self.programa.corpo, nomes_globais)
         self._verificar_indices_fora_dos_limites(
             self.programa.corpo, vetores_globais, campos_vetor, valores_constantes)
 
@@ -77,7 +82,7 @@ class Linter:
             self._verificar_divisoes_e_comparacoes(f.corpo)
             self._verificar_atribuicao_a_parametro_por_valor(f)
             self._verificar_codigo_depois_de_retornar(f.corpo)
-            self._verificar_ciclo_verdadeiro_sem_saida(f.corpo)
+            self._verificar_ciclo_verdadeiro_sem_saida(f.corpo, nomes_globais)
             self._verificar_indices_fora_dos_limites(
                 f.corpo, vetores_globais, campos_vetor, valores_constantes)
 
@@ -86,9 +91,8 @@ class Linter:
 
     # ---------- utilidades de percurso ----------
     # ARCH-15: um único percorredor recursivo genérico (_todas_as_stmts,
-    # sobre A.subblocos), com _nomes_declarados/_nomes_constantes_declaradas
-    # como filtros derivados dele, em vez de três recursões ad hoc
-    # separadas que percorriam a mesma árvore de instruções.
+    # sobre A.subblocos), em vez de várias recursões ad hoc separadas que
+    # percorriam a mesma árvore de instruções.
     def _todas_as_stmts(self, stmts):
         """Devolve a lista achatada de todas as instruções, incluindo as
         que estão dentro de blocos aninhados (se/para/enquanto/escolher)."""
@@ -98,13 +102,6 @@ class Linter:
             for bloco in A.subblocos(s):
                 todas.extend(self._todas_as_stmts(bloco))
         return todas
-
-    def _nomes_declarados(self, stmts):
-        return {s.nome for s in self._todas_as_stmts(stmts) if isinstance(s, A.Declaracao)}
-
-    def _nomes_constantes_declaradas(self, stmts):
-        return {s.nome for s in self._todas_as_stmts(stmts)
-                if isinstance(s, A.Declaracao) and s.eh_constante}
 
     def _extrair_lvalues(self, expr, destino):
         """Atalho: extrai só os nomes de variáveis (ignora chamadas)."""
@@ -553,7 +550,7 @@ class Linter:
                         f"se só interessa o efeito, considera torná-la um procedimento; "
                         f"caso contrário falta usar o valor devolvido", s.linha))
 
-    def _verificar_ciclo_verdadeiro_sem_saida(self, corpo):
+    def _verificar_ciclo_verdadeiro_sem_saida(self, corpo, nomes_globais):
         """Um 'enquanto verdadeiro'/'faz...enquanto verdadeiro' só pode
         terminar através de um 'retornar' ou 'sair' algures no corpo. O
         mesmo problema aparece, de forma menos óbvia, quando a condição
@@ -578,7 +575,20 @@ class Linter:
             elif isinstance(s.condicao, A.LValue) and not s.condicao.acessos \
                     and getattr(s.condicao, "_tipo_inferido", None) == "booleano" \
                     and not self._variavel_e_alterada_no_corpo(
-                        s.condicao.nome, s.corpo, funcoes_por_nome):
+                        s.condicao.nome, s.corpo,
+                        # só uma variável GLOBAL de verdade pode ser mutada
+                        # por uma chamada a outra função (ver
+                        # _chamada_altera_global_diretamente) -- passar
+                        # 'funcoes_por_nome' sem este filtro fazia o aviso
+                        # desaparecer sempre que a bandeira local calhava a
+                        # ter o mesmo nome de UMA VARIÁVEL LOCAL SEM
+                        # RELAÇÃO NENHUMA dentro da função chamada (ex.:
+                        # bandeira local 'ativo' silenciada por um
+                        # procedimento chamado que também tem o seu
+                        # próprio 'ativo' local e o reatribui -- duas
+                        # variáveis completamente distintas, só com o
+                        # mesmo nome)
+                        funcoes_por_nome if s.condicao.nome in nomes_globais else None):
                 self.avisos.append(Aviso(
                     f"o ciclo depende da variável '{s.condicao.nome}' para terminar, "
                     f"mas ela nunca é alterada dentro do corpo -- isto nunca termina",

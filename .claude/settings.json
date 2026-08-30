@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py -3 -m pytest algo_lang/tests/ -q)",
+      "Bash(py -3 -m pytest algo_lang/tests/test_correcoes_auditoria.py::test_incluir_funciona_de_ponta_a_ponta algo_lang/tests/test_estruturas.py::test_aceder_a_campo_de_nulo_da_erro_amigavel_nao_traceback algo_lang/tests/test_correcoes_auditoria.py::test_linter_variavel_de_ciclo_global_dentro_de_funcao_nao_e_assinalada -q)",
+      "Bash(py -3 -m pytest algo_lang/tests/test_estruturas.py::test_aceder_a_campo_de_nulo_da_erro_amigavel_nao_traceback algo_lang/tests/test_correcoes_auditoria.py::test_linter_variavel_de_ciclo_global_dentro_de_funcao_nao_e_assinalada -q)",
+      "Bash(python -c ' *)",
+      "Bash(git stash *)",
+      "Bash(python -m pytest algo_lang/tests/test_correcoes_auditoria.py::test_incluir_estrutura_duplicada_da_erro algo_lang/tests/test_linter.py::test_cli_verifica_sem_avisos -q)",
+      "Bash(python -m pytest algo_lang/tests/test_estruturas.py -q -m \"not slow\")",
+      "Bash(git log *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(python -m algo_lang.cli)",
+      "Bash(python -m pytest algo_lang/tests/test_consola.py -q -k \"h_de_subcomando\")",
+      "Bash(python3 -)",
+      "Bash(python -)",
+      "Bash(dot -Tsvg diagramas/08-funcoes-e-procedimentos/pilha-prototipo-lado-a-lado.dot -o diagramas/08-funcoes-e-procedimentos/pilha-prototipo-lado-a-lado.svg)",
+      "Bash(dot -Tsvg diagramas/08-funcoes-e-procedimentos/pilha-prototipo-vertical.dot -o diagramas/08-funcoes-e-procedimentos/pilha-prototipo-vertical.svg)",
+      "Bash(dot -Tpng -Gdpi=150 diagramas/08-funcoes-e-procedimentos/pilha-prototipo-lado-a-lado.dot -o diagramas/08-funcoes-e-procedimentos/pilha-prototipo-lado-a-lado.png)",
+      "Bash(dot -Tpng -Gdpi=150 diagramas/08-funcoes-e-procedimentos/pilha-prototipo-vertical.dot -o diagramas/08-funcoes-e-procedimentos/pilha-prototipo-vertical.png)",
+      "Bash(cd \"c:\\\\Users\\\\oscar\\\\Documents\\\\Repos\\\\algo\\\\aulas\\\\diagramas\\\\08-funcoes-e-procedimentos\" && rm -f pilha-prototipo-lado-a-lado.dot pilha-prototipo-lado-a-lado.svg pilha-prototipo-lado-a-lado.png pilha-prototipo-vertical.dot pilha-prototipo-vertical.svg pilha-prototipo-vertical.png *.png && ls)",
+      "Bash(dot -Tsvg pilha-heap-enderecos.dot -o pilha-heap-enderecos.svg)",
+      "Bash(dot -Tpng -Gdpi=150 pilha-heap-enderecos.dot -o pilha-heap-enderecos.png)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\oscar\\Documents\\Repos\\algo\\aulas\\diagramas\\08-funcoes-e-procedimentos"
+    ]
+  }
+}

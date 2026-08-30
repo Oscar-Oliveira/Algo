@@ -1,0 +1,21 @@
+digraph PorValorVetor {
+    rankdir=TB;
+    bgcolor="transparent";
+    node [fontname="Segoe UI,Arial", fontsize=15, style=filled, shape=box];
+    edge [fontname="Segoe UI,Arial", fontsize=12, color="#555555"];
+
+    a [label="chamador: numeros = {1, 2, 3}", fillcolor="#e8f5e9", color="#66bb6a"];
+    b [label="parâmetro v recebe uma CÓPIA do apontador\n(aponta para o MESMO vetor {1, 2, 3})", fillcolor="#e3f2fd", color="#42a5f5"];
+
+    c1 [label="dentro da função:\nv[0] = v[0] * 2\n(muta o vetor apontado)", fillcolor="#fff8e1", color="#f9a825"];
+    d1 [label="depois da chamada:\nnumeros também mudou -> {2, 2, 3}\nMUDOU!", fillcolor="#ffebee", color="#ef5350"];
+
+    c2 [label="dentro da função:\nv = {9, 9, 9}\n(a cópia do apontador passa a apontar\npara um vetor NOVO)", fillcolor="#fff8e1", color="#f9a825"];
+    d2 [label="depois da chamada:\nnumeros continua {1, 2, 3}\nnão mudou", fillcolor="#e8f5e9", color="#66bb6a"];
+
+    a -> b;
+    b -> c1 [label="  mutar um elemento  "];
+    b -> c2 [label="  reatribuir o parâmetro inteiro  "];
+    c1 -> d1;
+    c2 -> d2;
+}

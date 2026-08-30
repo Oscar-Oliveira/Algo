@@ -1,0 +1,52 @@
+digraph PilhaHeapEnderecos {
+    rankdir=LR;
+    bgcolor="transparent";
+    fontname="Segoe UI,Arial";
+    ranksep=1.4;
+    nodesep=0.6;
+    splines=line;
+    node [fontname="Segoe UI,Arial", fontsize=14];
+
+    pilha [shape=plain, label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="8">
+            <tr><td bgcolor="#1a5fb4" colspan="3"><font color="white"><b>PILHA</b></font></td></tr>
+            <tr>
+                <td bgcolor="#37474f"><font color="white"><b>variável</b></font></td>
+                <td bgcolor="#37474f"><font color="white"><b>endereço</b></font></td>
+                <td bgcolor="#37474f"><font color="white"><b>conteúdo</b></font></td>
+            </tr>
+            <tr>
+                <td>idade : inteiro</td>
+                <td><font face="Consolas">0x1000</font></td>
+                <td><b>25</b></td>
+            </tr>
+            <tr>
+                <td>numeros : inteiro[]</td>
+                <td><font face="Consolas">0x1004</font></td>
+                <td port="pnum" bgcolor="#fff3e0"><font face="Consolas"><b>0x2000</b></font></td>
+            </tr>
+            <tr>
+                <td>copia : inteiro[]</td>
+                <td><font face="Consolas">0x1008</font></td>
+                <td port="pcopia" bgcolor="#fff3e0"><font face="Consolas"><b>0x2000</b></font></td>
+            </tr>
+        </table>
+    >];
+
+    heap [shape=plain, label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="8">
+            <tr><td bgcolor="#e65100" colspan="2"><font color="white"><b>HEAP</b></font></td></tr>
+            <tr>
+                <td bgcolor="#37474f"><font color="white"><b>endereço</b></font></td>
+                <td bgcolor="#37474f"><font color="white"><b>conteúdo</b></font></td>
+            </tr>
+            <tr>
+                <td port="alvo"><font face="Consolas"><b>0x2000</b></font></td>
+                <td>{ 1, 2, 3 }</td>
+            </tr>
+        </table>
+    >];
+
+    pilha:pnum -> heap:alvo [label="guarda o endereço", color="#e65100", fontcolor="#e65100", fontsize=12, penwidth=1.4];
+    pilha:pcopia -> heap:alvo [label="guarda o endereço", color="#e65100", fontcolor="#e65100", fontsize=12, penwidth=1.4];
+}
