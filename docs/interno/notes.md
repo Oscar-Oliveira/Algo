@@ -10,7 +10,6 @@ docker compose up -d --build
 compilador v2
 
 online
- - manual
 
 - admin atica deeactiva alguem
 - definiç~eos de llm
@@ -21,5 +20,3 @@ online
  - guardian (se nenhum ativo) usa o o estudante.
 
 - activities apenas qd se chama alguem
-
-- logs das duvidas  para analise do progresso do estudante e aconselhamento sobre conteudo a reforcar
