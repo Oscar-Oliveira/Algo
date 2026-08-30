@@ -20,7 +20,7 @@ A última aula com matéria nova!
 
 ## Objetivos de hoje
 
-- Usar as bibliotecas embutidas de ALGO (`Matematica`, `Cadeia`, `Conversao`)
+- Usar as bibliotecas embutidas da Linguagem Algorítmica (`Matematica`, `Cadeia`, `Conversao`)
 - Juntar código de outro ficheiro teu com `incluir`
 - Verificar suposições com `afirmar`
 - Perceber os 3 momentos em que um erro pode aparecer
@@ -223,7 +223,7 @@ Saída (e o programa para):
 
 `afirmar <condição>[, <mensagem>]` — se a condição for falsa, o programa para logo com uma mensagem clara. Serve para verificares as tuas próprias suposições ("isto nunca deveria acontecer aqui").
 
-Ao contrário de outras linguagens, um `afirmar` em ALGO **nunca** é desativado — fica sempre ativo.
+Ao contrário de outras linguagens, um `afirmar` em Linguagem Algorítmica **nunca** é desativado — fica sempre ativo.
 
 ---
 

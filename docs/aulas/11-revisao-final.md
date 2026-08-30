@@ -13,7 +13,7 @@ Aulas 1 a 10 — sem matéria nova, todo o curso junto
 
 ## Porque esta revisão
 
-Já viste tudo o que ALGO tem para ensinar sobre algoritmia: tipos, decisões, ciclos, vetores, funções, estruturas, bibliotecas. As próximas 3 aulas são só prática — antes disso, vale a pena ligar todos os pontos.
+Já viste tudo o que a Linguagem Algorítmica tem para ensinar sobre algoritmia: tipos, decisões, ciclos, vetores, funções, estruturas, bibliotecas. As próximas 3 aulas são só prática — antes disso, vale a pena ligar todos os pontos.
 
 ---
 

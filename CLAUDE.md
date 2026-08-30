@@ -4,6 +4,8 @@
 
 Be concise with all of your responses.
 
+Whenever you make changes to the code, bump `version` in `pyproject.toml` (it stays stuck at `0.1.0` otherwise, and `empacotar.py` reads it to name the distributed package).
+
 ## Behavioral guidelines
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.

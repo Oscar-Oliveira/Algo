@@ -261,7 +261,7 @@ Ao contrário da "escada" do `senao se`, aqui todos os ramos saem do **mesmo** p
 
 ## Sem "queda" para o caso seguinte
 
-Ao contrário de outras linguagens, um `caso` em ALGO **nunca** cai para o seguinte. Só um ramo corre: o primeiro cujo valor bate certo. Não precisas de nada tipo `sair`/`break` no fim.
+Ao contrário de outras linguagens, um `caso` em Linguagem Algorítmica **nunca** cai para o seguinte. Só um ramo corre: o primeiro cujo valor bate certo. Não precisas de nada tipo `sair`/`break` no fim.
 
 `contrario` é opcional, tal como `senao` em `se`.
 

@@ -1,9 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 rem Arranque do ALGO -- nao precisas de ativar nenhum ambiente virtual a
-rem mao. Este script encontra (ou cria, na primeira vez) um venv ao lado
-rem dele proprio, instala o pacote la dentro se for preciso, e depois
-rem chama o 'algo' de dentro desse venv diretamente.
+rem mao. Este script encontra (ou cria, na primeira vez) um venv na raiz
+rem do projeto (onde esta o pyproject.toml), instala o pacote la dentro
+rem se for preciso, e depois chama o 'algo' de dentro desse venv
+rem diretamente.
 
 rem AL-35: as mensagens do compilador usam emojis (ex: ❌) -- sem isto, a
 rem code page por omissao da consola do Windows (normalmente 850/1252,
@@ -23,7 +24,15 @@ rem fechar a string, e o argumento a seguir fica todo trocado. Por isso
 rem tiramos essa barra final aqui, uma vez por todas.
 if "%DIR:~-1%"=="\" set "DIR=%DIR:~0,-1%"
 
-set "VENV=%DIR%\.venv"
+rem Corre tanto daqui (instaladores\, dentro do repositorio -- pyproject.toml
+rem um nivel acima) como da raiz de um pacote distribuido a estudantes
+rem (empacotar.py copia este script para la, ao lado do pyproject.toml).
+if exist "%DIR%\pyproject.toml" (
+    set "RAIZ=%DIR%"
+) else (
+    for %%I in ("%DIR%\..") do set "RAIZ=%%~fI"
+)
+set "VENV=%RAIZ%\.venv"
 
 if not exist "%VENV%\Scripts\algo.exe" (
     echo Primeira utilizacao: a preparar o ambiente ^(so demora uns segundos^)...
@@ -81,10 +90,10 @@ if not exist "%VENV%\Scripts\algo.exe" (
         exit /b 1
     )
 
-    "%VENV%\Scripts\python.exe" -m pip install --quiet -e "%DIR%"
+    "%VENV%\Scripts\python.exe" -m pip install --quiet -e "%RAIZ%"
     if errorlevel 1 (
         echo.
-        echo Nao foi possivel instalar o ALGO ^(pip install -e "%DIR%"^).
+        echo Nao foi possivel instalar o ALGO ^(pip install -e "%RAIZ%"^).
         echo Confirma que esta pasta tem mesmo o ficheiro pyproject.toml.
         rmdir /s /q "%VENV%" 2>nul
         pause

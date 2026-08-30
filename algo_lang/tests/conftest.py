@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Achado 1 (docs/PlanoAuditoria.md): dezenas de testes invocam o
+"""Achado 1 (docs/interno/PlanoAuditoria.md): dezenas de testes invocam o
 comando 'algo' diretamente via subprocesso (não python -m algo_lang.cli),
 que só existe no PATH depois de algo.sh/algo.bat criar a venv -- fora
 desse fluxo (ex: `pytest algo_lang/tests/` correndo direto do

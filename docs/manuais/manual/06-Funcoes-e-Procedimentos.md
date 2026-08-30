@@ -80,7 +80,14 @@ Regras específicas de `ref`, mais estritas do que um parâmetro normal:
   próprio tipo declarado.
 - A mesma variável não pode ser passada por `ref` duas vezes na mesma
   chamada (ex.: `trocar(x, x)`) — ficaria ambíguo qual das duas
-  escritas "ganha".
+  escritas "ganha". Isto é normalmente detetado em compilação, mas nem
+  sempre dá para saber olhando só para o código: `trocar(v[i], v[j])`
+  só colide se `i` e `j` acabarem por ter o **mesmo valor** em runtime,
+  o que o compilador não pode adivinhar. Nesse caso a verificação
+  acontece a correr o programa — se `i` e `j` derem o mesmo índice
+  nessa chamada, o programa para com um erro em runtime (capítulo 10)
+  em vez de compilar sempre e produzir um resultado ambíguo em
+  silêncio.
 - Uma chamada a uma função/procedimento com **algum** parâmetro `ref`
   só pode ser usada como instrução isolada (`inc(x)`) ou do lado
   direito de uma atribuição/declaração (`y = inc(x)`) — nunca dentro de

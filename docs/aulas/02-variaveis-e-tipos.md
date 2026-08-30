@@ -7,14 +7,14 @@ customTheme: "estilo-aulas"
 
 ## Variáveis e Tipos
 
-Os 5 tipos primitivos, `constante`, e as regras de tipo do ALGO
+Os 5 tipos primitivos, `constante`, e as regras de tipo da Linguagem Algorítmica
 
 ---
 
 ## Recapitulando a Aula 1
 
 - Um **algoritmo** é uma sequência de passos para resolver um problema
-- Um programa ALGO tem `algoritmo "Nome"` e um bloco `inicio`
+- Um programa em Linguagem Algorítmica tem `algoritmo "Nome"` e um bloco `inicio`
 - `escrever` mostra coisas, `ler` guarda o que o utilizador escreve
 - Já usámos `cadeia` e `inteiro` — hoje vemos **todos** os tipos
 
@@ -22,7 +22,7 @@ Os 5 tipos primitivos, `constante`, e as regras de tipo do ALGO
 
 ## Objetivos de hoje
 
-- Conhecer os 5 tipos primitivos de ALGO
+- Conhecer os 5 tipos primitivos da Linguagem Algorítmica
 - Declarar variáveis, com e sem valor inicial
 - Perceber o que é uma `constante`
 - Saber o que acontece quando misturamos tipos
@@ -33,7 +33,7 @@ Os 5 tipos primitivos, `constante`, e as regras de tipo do ALGO
 
 Uma variável é uma **caixa com nome** onde guardamos um valor.
 
-Mas nem todas as caixas servem para tudo: uma caixa de sapatos não é boa para guardar água. Da mesma forma, cada variável em ALGO **tem um tipo**, que diz que género de valor pode guardar.
+Mas nem todas as caixas servem para tudo: uma caixa de sapatos não é boa para guardar água. Da mesma forma, cada variável em Linguagem Algorítmica **tem um tipo**, que diz que género de valor pode guardar.
 
 ---
 

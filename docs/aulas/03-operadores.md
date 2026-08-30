@@ -185,7 +185,7 @@ c:inteiro = 10
 // a < b < c        // ERRO de compilação!
 ```
 
-O que parece "a é menor que b, que é menor que c" **não existe** em ALGO. Escreve as duas comparações por extenso, ligadas por `e` (já a seguir):
+O que parece "a é menor que b, que é menor que c" **não existe** em Linguagem Algorítmica. Escreve as duas comparações por extenso, ligadas por `e` (já a seguir):
 
 ```algo
 a < b e b < c        // certo

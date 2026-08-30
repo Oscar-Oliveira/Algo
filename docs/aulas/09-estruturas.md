@@ -315,7 +315,7 @@ inicio
 
 ## Próxima aula
 
-Vamos ver **bibliotecas**: as ferramentas prontas a usar que já vêm com ALGO (`matematica`, `cadeia`, `conversao`, ...), através de `importar`.
+Vamos ver **bibliotecas**: as ferramentas prontas a usar que já vêm com a Linguagem Algorítmica (`matematica`, `cadeia`, `conversao`, ...), através de `importar`.
 
 ---
 

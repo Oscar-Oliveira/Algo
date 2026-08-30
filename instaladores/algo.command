@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 # Arranque do ALGO -- não precisas de ativar nenhum ambiente virtual à mão.
-# Este script encontra (ou cria, na primeira vez) um venv ao lado dele
-# próprio, instala o pacote lá dentro se for preciso, e depois chama o
-# 'algo' de dentro desse venv diretamente -- o mesmo resultado prático
-# de "ativar" o ambiente, sem precisar de o ativar na tua shell.
+# Este script encontra (ou cria, na primeira vez) um venv na raiz do
+# projeto (onde está o pyproject.toml), instala o pacote lá dentro se for
+# preciso, e depois chama o 'algo' de dentro desse venv diretamente -- o
+# mesmo resultado prático de "ativar" o ambiente, sem precisar de o
+# ativar na tua shell.
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV="$DIR/.venv"
+# Corre tanto daqui (instaladores/, dentro do repositório -- pyproject.toml
+# um nível acima) como da raiz de um pacote distribuído a estudantes
+# (empacotar.py copia este script para lá, ao lado do pyproject.toml).
+if [ -f "$DIR/pyproject.toml" ]; then
+    RAIZ="$DIR"
+else
+    RAIZ="$(cd "$DIR/.." && pwd)"
+fi
+VENV="$RAIZ/.venv"
 
 if [ ! -x "$VENV/bin/algo" ]; then
     echo "Primeira utilização: a preparar o ambiente (só demora uns segundos)..."
@@ -45,8 +54,8 @@ if [ ! -x "$VENV/bin/algo" ]; then
         exit 1
     fi
 
-    if ! "$VENV/bin/pip" install --quiet -e "$DIR"; then
-        echo "❌ Não foi possível instalar o ALGO (pip install -e \"$DIR\")." >&2
+    if ! "$VENV/bin/pip" install --quiet -e "$RAIZ"; then
+        echo "❌ Não foi possível instalar o ALGO (pip install -e \"$RAIZ\")." >&2
         echo "   Confirma que esta pasta tem mesmo o ficheiro pyproject.toml." >&2
         rm -rf "$VENV"
         exit 1

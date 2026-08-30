@@ -2,7 +2,7 @@
 
 ## Antes de começares
 
-- Cada exercício pede um programa ALGO completo: começa com `algoritmo "Nome"` e tem um bloco `inicio`.
+- Cada exercício pede um programa completo em Linguagem Algorítmica: começa com `algoritmo "Nome"` e tem um bloco `inicio`.
 - Só usámos, até agora: `escrever`, `ler`, variáveis `cadeia`/`inteiro`, e comentários (`//`, `/* */`). Não precisas de mais nada.
 - Testa sempre o teu programa a correr, não só a lê-lo.
 

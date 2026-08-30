@@ -184,10 +184,15 @@ colar o conteúdo do ficheiro).
 ### `verifica <ficheiro.algo>`
 
 Avisos de possíveis enganos (variáveis nunca usadas, comparações
-sempre verdadeiras, etc.) sem impedir a compilação. Sem opções.
+sempre verdadeiras, etc.) sem impedir a compilação.
+
+| Opção | Efeito |
+|---|---|
+| `--json` | imprime os diagnósticos (erros/avisos) como JSON em stdout, para ferramentas de editor — nunca termina com código de saída 1 por causa de um erro no programa do estudante |
 
 ```
 algo> v soma.algo
+algo> v soma.algo --json
 ```
 
 ---
@@ -324,6 +329,15 @@ quiseres perceber porque é que um programa foi interrompido.
   limites podem ser ajustados por invocação com `--limite-cpu SEGUNDOS`
   (sem `--debug`/`--json`) ou `--max-passos N`/`--limite-tempo SEGUNDOS`
   (com `--debug`/`--json`), sem editar o compilador.
+
+  **No Windows, o limite de 10s sem `--debug`/`--json` não existe** — só
+  é aplicado em POSIX (Linux/macOS), via `resource.setrlimit`, que o
+  Windows não suporta. Um ciclo infinito corrido com `algo executa`
+  simples no Windows fica mesmo a correr até interromperes à mão
+  (Ctrl+C). Com `--debug`/`--json`, o limite de passos/tempo funciona
+  em qualquer sistema operativo (é feito em Python puro, não depende de
+  `resource.setrlimit`) — usa esta forma se precisares mesmo de um
+  limite automático no Windows.
 
 ---
 

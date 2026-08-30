@@ -14,6 +14,8 @@ compilador v2
 aulas diagrama mem ref
 
 online
+ - manual
+
 - admin atica deeactiva alguem
 - definiç~eos de llm
 

@@ -7,7 +7,7 @@ customTheme: "estilo-aulas"
 
 ## O que é um Algoritmo?
 
-Introdução à algoritmia + o primeiro programa em ALGO
+Introdução à algoritmia + o primeiro programa em Linguagem Algorítmica
 
 ---
 
@@ -15,7 +15,7 @@ Introdução à algoritmia + o primeiro programa em ALGO
 
 - Perceber o que é um algoritmo (sem computadores!)
 - Ver que já usas algoritmos todos os dias
-- Escrever o teu primeiro programa em ALGO
+- Escrever o teu primeiro programa em Linguagem Algorítmica
 - Pedir dados ao utilizador e mostrar resultados no ecrã
 
 ---
@@ -88,9 +88,9 @@ O computador não "pensa" — só segue os passos, exatamente como estão escrit
 
 ---
 
-## A linguagem ALGO
+## A Linguagem Algorítmica
 
-Vamos escrever os nossos algoritmos na linguagem **ALGO**:
+Vamos escrever os nossos algoritmos na **Linguagem Algorítmica**:
 
 - Parecida com português
 - Feita para aprender a programar
@@ -98,7 +98,7 @@ Vamos escrever os nossos algoritmos na linguagem **ALGO**:
 
 ---
 
-## A forma de um programa ALGO
+## A forma de um programa em Linguagem Algorítmica
 
 ```algo
 algoritmo "OlaMundo"
@@ -191,7 +191,7 @@ inicio
 
 - Algoritmo = sequência de passos para resolver um problema
 - Já usas algoritmos todos os dias (receitas, direções, instruções)
-- Um programa ALGO começa com `algoritmo "Nome"` e `inicio`
+- Um programa em Linguagem Algorítmica começa com `algoritmo "Nome"` e `inicio`
 - `escrever` mostra coisas, `ler` guarda o que o utilizador escreve numa variável
 - Os blocos formam-se por indentação, não por chavetas
 
@@ -199,7 +199,7 @@ inicio
 
 ## Próxima aula
 
-Vamos conhecer **todos os tipos de dados** de ALGO (`inteiro`, `decimal`, `booleano`, `cadeia`, `caracter`), como declarar variáveis com e sem valor inicial, e o que é uma `constante`.
+Vamos conhecer **todos os tipos de dados** da Linguagem Algorítmica (`inteiro`, `decimal`, `booleano`, `cadeia`, `caracter`), como declarar variáveis com e sem valor inicial, e o que é uma `constante`.
 
 ---
 

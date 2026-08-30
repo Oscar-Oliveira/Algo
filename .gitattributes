@@ -4,7 +4,7 @@
 # meio (linhas seguintes ficam ilegíveis, ex.: "setlocal" vira "tlocal"),
 # e a criação do venv falha logo na primeira utilização. Confirmado em
 # cmd.exe real -- não é um problema só de teste.
-algo.bat text eol=crlf
+instaladores/algo.bat text eol=crlf
 *.png binary
 *.jpg binary
 *.jpeg binary

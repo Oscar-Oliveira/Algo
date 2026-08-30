@@ -58,7 +58,7 @@ Funciona para 5 números... e para 1000? Um ciclo faz o mesmo com poucas linhas,
 
 ## Dois tipos de ciclo
 
-| Tipo | Uso | Em ALGO |
+| Tipo | Uso | Em Linguagem Algorítmica |
 |---|---|---|
 | **Contado** | já sei quantas vezes | `para` |
 | **Condicionado** | repito até algo acontecer, não sei quantas vezes à partida | `enquanto` / `fazer ... enquanto` |

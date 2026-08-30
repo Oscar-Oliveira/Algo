@@ -12,7 +12,7 @@ fonte da verdade continua a ser o comentário junto ao código
 
 Muitos destes comentários já usam tags (`ARCH-##`, `ON-##`, `AG-##`,
 `AL-##`, `UX-##`, `GOAL-##`) de auditorias anteriores — ver
-`docs/PlanoAuditoria.md` para o histórico dessas auditorias.
+`docs/interno/PlanoAuditoria.md` para o histórico dessas auditorias.
 
 ---
 

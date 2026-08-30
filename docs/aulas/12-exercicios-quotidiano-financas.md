@@ -26,7 +26,7 @@ Contas do dia a dia: trocos, descontos, contas de restaurante, orçamentos, poup
 ## Como abordar qualquer exercício
 
 1. **Que dados preciso de ler?** E de que tipo (`inteiro`, `decimal`, ...)?
-2. **O que tenho de calcular?** Escreve a fórmula em português antes de a traduzir para ALGO
+2. **O que tenho de calcular?** Escreve a fórmula em português antes de a traduzir para Linguagem Algorítmica
 3. **Preciso de decidir alguma coisa?** (`se`/`senao`) — ou de repetir? (`para`/`enquanto`)
 4. **O que escrevo no fim?** — testa sempre com valores que sabes de cabeça
 

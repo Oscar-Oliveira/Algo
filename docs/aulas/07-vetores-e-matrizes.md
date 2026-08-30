@@ -166,7 +166,7 @@ v:inteiro[5] = {1, 2, 3, 4, 5}
 // escrever(v[-1])      // erro em runtime -- NÃO devolve o último elemento!
 ```
 
-Se conheces Python, isto é diferente: `v[-1]` **não** é um atalho para o último elemento em ALGO. É só um índice inválido.
+Se conheces Python, isto é diferente: `v[-1]` **não** é um atalho para o último elemento em Linguagem Algorítmica. É só um índice inválido.
 
 ---
 

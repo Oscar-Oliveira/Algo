@@ -54,6 +54,8 @@ com código de saída `1`.
 | índice de **texto** fora dos limites (`cadeia.caracter`, etc.) | "tentaste aceder a uma posição de texto que não existe (índice fora dos limites)." |
 | divisão (`/`, `div`, `mod`) por zero | "divisão por zero." |
 | aceder a um campo de um valor `nulo` | "tentaste aceder ao campo '\<nome\>' de um valor nulo." |
+| indexar (`v[i]`) um **vetor** `nulo` | "tentaste aceder a uma posição de um vetor nulo." |
+| dois argumentos `ref` que só colidem para certos índices (ex. `trocar(v[i], v[j])` com `i == j` em runtime — capítulo 6) | "'\<expr1\>' e '\<expr2\>' referem-se à mesma posição em runtime -- não podem ser ambos passados por referência na mesma chamada a '\<função\>'." |
 | `ler()` depois de esgotar o ficheiro/entrada disponível | "o programa tentou ler mais valores do que os que o ficheiro de entradas tinha." |
 | resultado grande demais para representar | "o resultado é grande demais para ser representado (overflow numérico)." |
 | recursão sem caso base (nunca para) | "recursão infinita (a função nunca chega ao caso base)." |

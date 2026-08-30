@@ -18,13 +18,13 @@ se precisares).
 ### 1. Linha de comandos (uso individual, numa máquina)
 
 ```bash
-./algo.sh        # Linux/macOS -- ./algo.command também funciona no macOS
-algo.bat         # Windows
+./instaladores/algo.sh        # Linux/macOS -- algo.command também funciona no macOS
+instaladores\algo.bat         # Windows
 ```
 
 Instala tudo o que for preciso na primeira vez (ambiente virtual
 Python) e abre a consola interativa. `algo executa`, `algo fluxograma`,
-`algo verifica`. Referência completa em `docs/ManualCLI.md`.
+`algo verifica`. Referência completa em `docs/manuais/ManualCLI.md`.
 
 ### 2. Serviço web (várias pessoas, cada uma com a sua conta)
 
@@ -44,13 +44,15 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 
 ```
 .
-├── algo.sh / algo.bat / algo.command   # arranque da consola local
+├── instaladores/        # scripts de arranque da consola local (algo.sh / algo.bat / algo.command)
 ├── algo_lang/          # o compilador -- nunca alterado entre CLI e online
 │   └── tests/            # suite de testes do compilador (CLI)
 ├── editors/vscode-algo/ # extensão de realce de sintaxe para VS Code
 ├── alguem/              # o tutor LLM -- reaproveitado tal e qual pelos dois modos
 ├── online/                # o serviço web (FastAPI) -- ver online/README.md
 └── docs/                            # manuais, decisões de design, aulas, exemplos e logo
+    ├── manuais/                     # ManualCLI.md e o manual/ da linguagem, capítulo a capítulo
+    ├── interno/                     # documentação interna: decisões de arquitetura, plano de auditoria
     ├── aulas/                       # curso de 14 aulas (slides reveal.js + fichas de trabalho)
     ├── exemplos/                    # programas Algo de exemplo, organizados por assunto (01_variaveis_tipos/, 02_operadores/, ...)
     └── logo/                        # logótipo do projeto (SVG/PNG)
@@ -60,10 +62,10 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 
 | Ficheiro | Para quem |
 |---|---|
-| `ManualCLI.md` | Manual do estudante: consola interativa, extensão do VS Code, e (por fim) instalar Python e usar a linha de comandos |
-| `manual/` | Manual de referência da linguagem ALGO, capítulo a capítulo |
-| `PlanoAuditoria.md` | Achados e decisões de auditoria do projeto |
-| `DecisoesDeArquitetura.md` | Catálogo dos comentários do código que documentam decisões de arquitetura/segurança/design |
+| `manuais/ManualCLI.md` | Manual do estudante: consola interativa, extensão do VS Code, e (por fim) instalar Python e usar a linha de comandos |
+| `manuais/manual/` | Manual de referência da linguagem algorítmica ALGO, capítulo a capítulo |
+| `interno/PlanoAuditoria.md` | Achados e decisões de auditoria do projeto |
+| `interno/DecisoesDeArquitetura.md` | Catálogo dos comentários do código que documentam decisões de arquitetura/segurança/design |
 | `aulas/` | Curso de 14 aulas para quem nunca programou (slides + fichas de trabalho) -- ver `docs/aulas/README.md` |
 | `exemplos/` | Programas ALGO de exemplo, organizados por assunto |
 | `logo/` | Logótipo do projeto |

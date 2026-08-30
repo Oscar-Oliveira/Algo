@@ -1,4 +1,4 @@
-# Aulas de Algoritmia com ALGO
+# Aulas de Algoritmia com Linguagem Algorítmica
 
 Curso de 14 aulas para quem nunca programou.
 
@@ -17,7 +17,7 @@ aulas/
     ├── 02-nome-da-aula.md
     ├── ...
     └── solucoes/
-        ├── 01-nome-da-aula/          soluções em ALGO da aula 1
+        ├── 01-nome-da-aula/          soluções em Linguagem Algorítmica da aula 1
         │   ├── exercicio-1-....algo
         │   └── ...
         └── 02-nome-da-aula/
