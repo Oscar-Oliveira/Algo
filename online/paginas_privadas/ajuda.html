@@ -1042,7 +1042,10 @@ inicio
               promoção nenhuma (passar um <code>inteiro</code> a um <code>ref x:decimal</code> é erro, ao
               contrário de um parâmetro por valor).</li>
             <li>A mesma variável não pode ser passada por <code>ref</code> duas vezes na mesma chamada (ex.:
-              <code>trocar(x, x)</code>) — ficaria ambíguo qual das duas escritas "ganha".
+              <code>trocar(x, x)</code>) — ficaria ambíguo qual das duas escritas "ganha". Isto é normalmente
+              detetado em compilação, mas <code>trocar(v[i], v[j])</code> só colide se <code>i</code> e
+              <code>j</code> derem o mesmo valor em runtime, o que o compilador não pode adivinhar — nesse
+              caso a verificação acontece a correr o programa (capítulo 10).
             </li>
             <li>Uma chamada a uma função/procedimento com <strong>algum</strong> parâmetro <code>ref</code>
               só pode ser usada como instrução isolada (<code>inc(x)</code>) ou do lado direito de uma
@@ -1719,6 +1722,14 @@ afirmar idade >= 18</code></pre>
               <tr>
                 <td>aceder a um campo de um valor <code>nulo</code></td>
                 <td>"tentaste aceder ao campo '&lt;nome&gt;' de um valor nulo."</td>
+              </tr>
+              <tr>
+                <td>indexar (<code>v[i]</code>) um <strong>vetor</strong> <code>nulo</code></td>
+                <td>"tentaste aceder a uma posição de um vetor nulo."</td>
+              </tr>
+              <tr>
+                <td>dois argumentos <code>ref</code> que só colidem para certos índices (ex. <code>trocar(v[i], v[j])</code> com <code>i == j</code> em runtime — capítulo 6)</td>
+                <td>"'&lt;expr1&gt;' e '&lt;expr2&gt;' referem-se à mesma posição em runtime -- não podem ser ambos passados por referência na mesma chamada a '&lt;função&gt;'."</td>
               </tr>
               <tr>
                 <td><code>ler()</code> depois de esgotar o ficheiro/entrada disponível</td>

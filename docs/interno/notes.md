@@ -7,11 +7,7 @@ docker compose up -d --build
 
 ---
 
-aulas
-
 compilador v2
-
-aulas diagrama mem ref
 
 online
  - manual
