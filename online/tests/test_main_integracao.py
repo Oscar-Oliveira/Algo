@@ -966,6 +966,72 @@ def test_ws_executar_isola_estudantes_diferentes(cliente):
     assert saida_dois == "estudante dois"
 
 
+# ---------- WebSocket: rasto ao vivo (--debug interativo) ----------
+# Peça isolada de propósito -- ver a nota no topo de
+# online/executor.py:ExecucaoComDebugAoVivo. Espelha os testes de
+# /ws/executar acima, adaptados ao protocolo de /ws/debug (que também
+# manda "saida" para cada linha real do programa, mais uma linha extra
+# "    [debug linha N] ..." a cada passo).
+
+def test_ws_debug_sem_autenticacao(cliente):
+    with cliente.websocket_connect("/ws/debug") as ws:
+        m = ws.receive_json()
+        assert m["tipo"] == "erro"
+
+
+def test_ws_debug_programa_simples(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    with cliente.websocket_connect("/ws/debug") as ws:
+        ws.send_json(_msg('algoritmo "T"\ninicio\n    x:inteiro = 1\n    escrever(x)\n'))
+        mensagens = []
+        while True:
+            m = ws.receive_json()
+            mensagens.append(m)
+            if m["tipo"] in ("fim", "erro", "erro_compilacao"):
+                break
+    tipos = [m["tipo"] for m in mensagens]
+    assert tipos[0] == "compilado"
+    assert tipos[-1] == "fim"
+    textos = [m["texto"] for m in mensagens if m["tipo"] == "saida"]
+    assert "1" in textos
+    assert any("[debug linha" in t and "x=1" in t for t in textos)
+
+
+def test_ws_debug_erro_de_compilacao(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    with cliente.websocket_connect("/ws/debug") as ws:
+        ws.send_json(_msg("algoritmo sem aspas\ninicio\n    escrever(1)\n"))
+        m = ws.receive_json()
+        assert m["tipo"] == "erro_compilacao"
+        assert "sintaxe" in m["mensagem"]
+
+
+def test_ws_debug_com_entrada_interativa(cliente):
+    """Confirma que _FluxoEntradaFilaEspera desbloqueia corretamente cada
+    ler() com a entrada certa, uma de cada vez -- a parte mais frágil de
+    ExecucaoComDebugAoVivo (thread + fila, em vez do stdin real de um
+    subprocesso)."""
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    codigo = (
+        'algoritmo "Soma"\ninicio\n'
+        '    a:inteiro\n    b:inteiro\n    ler(a)\n    ler(b)\n'
+        '    escrever("Soma: ", a + b)\n'
+    )
+    with cliente.websocket_connect("/ws/debug") as ws:
+        ws.send_json(_msg(codigo))
+        assert ws.receive_json()["tipo"] == "compilado"
+        ws.send_json({"tipo": "entrada", "valor": "3"})
+        ws.send_json({"tipo": "entrada", "valor": "4"})
+        mensagens = []
+        while True:
+            m = ws.receive_json()
+            mensagens.append(m)
+            if m["tipo"] == "fim":
+                break
+    textos = [m["texto"] for m in mensagens if m["tipo"] == "saida"]
+    assert "Soma: 7" in textos
+
+
 # ---------- WebSocket: Alguem ----------
 
 def test_ws_alguem_sem_autenticacao(cliente):

@@ -347,7 +347,7 @@ const entradaTerminal = document.getElementById("entrada-terminal");
 
 function escreverNoTerminal(texto, classe) {
   const linha = document.createElement("div");
-  if (classe) linha.className = classe;
+  linha.className = !classe && /^\s*\[debug linha \d+\]/.test(texto) ? "linha-debug" : classe || "";
   linha.textContent = texto;
   terminal.appendChild(linha);
   terminal.scrollTop = terminal.scrollHeight;
@@ -372,6 +372,7 @@ let wsExecucao = null;
 // em modo batch. Ver botaoDescarregarRastoExecucao mais abaixo.
 let entradasExecucaoAtual = null;
 let execucaoTerminadaComSucesso = false; // só true depois de "fim" -- ver atualizarBotaoDescarregarRastoExecucao
+let modoExecucaoAtual = "Execução"; // "Execução" ou "Debug" -- título da vista-execucao, ver mostrarVistaPainelTerminal
 let rastoExecucaoCache = null; // { chave, url } -- evita gerar de novo o mesmo rasto
 const botaoDescarregarRastoExecucao = document.getElementById("botao-descarregar-rasto-execucao");
 
@@ -382,7 +383,10 @@ function invalidarRastoExecucaoCache() {
 
 function atualizarBotaoDescarregarRastoExecucao() {
   const naVistaExecucao = !vistaExecucao.classList.contains("escondido");
-  botaoDescarregarRastoExecucao.classList.toggle("escondido", !naVistaExecucao || !execucaoTerminadaComSucesso);
+  botaoDescarregarRastoExecucao.classList.toggle("escondido", !naVistaExecucao);
+  botaoDescarregarRastoExecucao.disabled = !execucaoTerminadaComSucesso;
+  botaoAbrirRasto.classList.toggle("escondido", !naVistaExecucao);
+  ligacaoAbrirVisualizador.classList.toggle("escondido", !naVistaExecucao);
 }
 
 function descarregarUrl(url, nomeFicheiro) {
@@ -442,6 +446,7 @@ botaoDescarregarRastoExecucao.addEventListener("click", async () => {
 });
 
 document.getElementById("botao-executar").addEventListener("click", () => {
+  modoExecucaoAtual = "Execução";
   mostrarVistaPainelTerminal("execucao");
   document.querySelector(".painel-terminal").scrollIntoView({ behavior: "smooth", block: "start" });
   terminal.innerHTML = "";
@@ -486,6 +491,65 @@ document.getElementById("botao-executar").addEventListener("click", () => {
     formEntradaTerminal.classList.add("escondido");
   });
 });
+
+// ---------- Debug ao vivo (--debug interativo) ----------
+// Peça isolada de propósito -- ver a nota no topo de
+// online/executor.py:ExecucaoComDebugAoVivo. Reaproveita o mesmo painel/
+// terminal e o mesmo formEntradaTerminal/wsExecucao que "Executar" já usa
+// (o submit handler abaixo já manda a entrada para wsExecucao seja qual
+// for a ligação aberta), só liga a um WebSocket diferente. "Rasto desta
+// execução" (no painel de execução) descarrega o rasto desta execução ao
+// vivo; o botão "Rasto" ali ao lado abre o formulário clássico (vista-rasto,
+// mais abaixo) para gerar um rasto indicando as entradas à mão.
+
+function iniciarDebug() {
+  modoExecucaoAtual = "Debug";
+  mostrarVistaPainelTerminal("execucao");
+  document.querySelector(".painel-terminal").scrollIntoView({ behavior: "smooth", block: "start" });
+  terminal.innerHTML = "";
+  limparMarcadorDeErro();
+  formEntradaTerminal.classList.add("escondido");
+  entradasExecucaoAtual = []; // debug ao vivo também alimenta o "descarregar rasto", tal como a execução normal
+  execucaoTerminadaComSucesso = false;
+  invalidarRastoExecucaoCache();
+  atualizarBotaoDescarregarRastoExecucao();
+  if (wsExecucao) wsExecucao.close();
+
+  const protocolo = window.location.protocol === "https:" ? "wss:" : "ws:";
+  wsExecucao = new WebSocket(`${protocolo}//${window.location.host}/ws/debug`);
+
+  wsExecucao.addEventListener("open", () => {
+    wsExecucao.send(JSON.stringify(obterTodosOsFicheiros()));
+  });
+
+  wsExecucao.addEventListener("message", (evento) => {
+    const dados = JSON.parse(evento.data);
+    if (dados.tipo === "erro_compilacao") {
+      escreverErroCompilacaoNoTerminal(dados.mensagem);
+      marcarErroNoEditor(dados.mensagem);
+    } else if (dados.tipo === "compilado") {
+      escreverNoTerminal("-- a executar em modo debug --", "linha-sistema");
+      formEntradaTerminal.classList.remove("escondido");
+      entradaTerminal.focus();
+    } else if (dados.tipo === "saida") {
+      escreverNoTerminal(dados.texto);
+    } else if (dados.tipo === "fim") {
+      escreverNoTerminal("-- terminou --", "linha-sistema");
+      formEntradaTerminal.classList.add("escondido");
+      execucaoTerminadaComSucesso = true;
+      atualizarBotaoDescarregarRastoExecucao();
+    } else if (dados.tipo === "erro") {
+      escreverNoTerminal(dados.mensagem, "linha-erro");
+      formEntradaTerminal.classList.add("escondido");
+    }
+  });
+
+  wsExecucao.addEventListener("close", () => {
+    formEntradaTerminal.classList.add("escondido");
+  });
+}
+
+document.getElementById("botao-debug").addEventListener("click", iniciarDebug);
 
 formEntradaTerminal.addEventListener("submit", (evento) => {
   evento.preventDefault();
@@ -693,6 +757,7 @@ const vistaLinter = document.getElementById("vista-linter");
 const tituloPainelExecucao = document.getElementById("titulo-painel-execucao");
 const seletorRotinaFluxograma = document.getElementById("seletor-rotina-fluxograma");
 const botaoVoltarExecucao = document.getElementById("botao-voltar-execucao");
+const botaoAbrirRasto = document.getElementById("botao-rasto");
 const ligacaoAbrirVisualizador = document.getElementById("ligacao-abrir-visualizador");
 
 const TITULOS_VISTA_PAINEL_TERMINAL = { execucao: "Execução", rasto: "Rasto", fluxograma: "Fluxograma", linter: "Verificador" };
@@ -702,10 +767,9 @@ function mostrarVistaPainelTerminal(nome) {
   vistaRasto.classList.toggle("escondido", nome !== "rasto");
   vistaFluxograma.classList.toggle("escondido", nome !== "fluxograma");
   vistaLinter.classList.toggle("escondido", nome !== "linter");
-  tituloPainelExecucao.textContent = TITULOS_VISTA_PAINEL_TERMINAL[nome];
+  tituloPainelExecucao.textContent = nome === "execucao" ? modoExecucaoAtual : TITULOS_VISTA_PAINEL_TERMINAL[nome];
   seletorRotinaFluxograma.classList.toggle("escondido", nome !== "fluxograma");
   botaoVoltarExecucao.classList.toggle("escondido", nome === "execucao");
-  ligacaoAbrirVisualizador.classList.toggle("escondido", nome !== "rasto");
   atualizarBotaoDescarregarRastoExecucao();
   if (nome === "rasto") {
     document.getElementById("conteudo-rasto").classList.add("escondido");
@@ -714,8 +778,8 @@ function mostrarVistaPainelTerminal(nome) {
   if (nome !== "rasto" && ultimoUrlRasto) { URL.revokeObjectURL(ultimoUrlRasto); ultimoUrlRasto = null; }
 }
 
-document.getElementById("botao-rasto").addEventListener("click", () => mostrarVistaPainelTerminal("rasto"));
 botaoVoltarExecucao.addEventListener("click", () => mostrarVistaPainelTerminal("execucao"));
+botaoAbrirRasto.addEventListener("click", () => mostrarVistaPainelTerminal("rasto"));
 
 // ---------- modal de ajuda: busca /ajuda e injeta só o <main> no modal
 // (sem iframe -- corre no documento principal). Só na primeira abertura

@@ -108,28 +108,47 @@ def _fmt_debug(v):
     return str(v)
 
 
+def formatar_passo_debug(passo, consola_vista):
+    """Formata um único passo no mesmo estilo do antigo --debug: a saída
+    real do programa produzida desde o último passo, seguida (se houver
+    variáveis visíveis) de uma anotação '[debug linha N]' com o seu valor
+    nesse momento (todas as frames da pilha fundidas, da mais externa
+    para a mais interna, tal como a resolução de nomes normal). Devolve
+    (linhas, nova_consola_vista) -- partilhado por formatar_consola_com_debug
+    (em lote), ImpressorDebugAoVivo (streaming da CLI) e
+    online/executor.py:ExecucaoComDebugAoVivo (streaming do online, via
+    WebSocket), para as três formas não divergirem. Público (sem "_") de
+    propósito, por ser reaproveitado fora deste módulo."""
+    linhas = []
+    novo_texto = passo["consola"][len(consola_vista):]
+    if novo_texto:
+        linhas.append(novo_texto.rstrip("\n"))
+    consola_vista = passo["consola"]
+
+    variaveis = {}
+    for frame in passo["pilha"]:
+        variaveis.update(frame["variaveis"])
+    if variaveis:
+        partes = ", ".join(f"{k}={_fmt_debug(v)}" for k, v in variaveis.items())
+        linhas.append(f"    [debug linha {passo['linha']}] {partes}")
+    return linhas, consola_vista
+
+
 def formatar_consola_com_debug(resultado):
     """Reconstrói a consola tal como apareceria com o antigo --debug: a
     saída real do programa intercalada com uma anotação '[debug linha N]'
-    a cada passo, mostrando as variáveis visíveis nesse momento (todas as
-    frames da pilha fundidas, da mais externa para a mais interna, tal
-    como a resolução de nomes normal). Isto é construído inteiramente
-    aqui a partir do trace já recolhido -- o compilador não sabe nada
-    disto, não gerou nenhum código extra para o tornar possível."""
+    a cada passo. Isto é construído inteiramente aqui a partir do trace já
+    recolhido -- o compilador não sabe nada disto, não gerou nenhum código
+    extra para o tornar possível.
+
+    Usado quando não há streaming ao vivo (ver ImpressorDebugAoVivo para
+    esse caso -- ex.: --json sem --debug, onde só o ficheiro json importa
+    e este texto nem chega a ser usado)."""
     linhas_saida = []
     consola_vista = ""
     for passo in resultado["passos"]:
-        novo_texto = passo["consola"][len(consola_vista):]
-        if novo_texto:
-            linhas_saida.append(novo_texto.rstrip("\n"))
-        consola_vista = passo["consola"]
-
-        variaveis = {}
-        for frame in passo["pilha"]:
-            variaveis.update(frame["variaveis"])
-        if variaveis:
-            partes = ", ".join(f"{k}={_fmt_debug(v)}" for k, v in variaveis.items())
-            linhas_saida.append(f"    [debug linha {passo['linha']}] {partes}")
+        linhas, consola_vista = formatar_passo_debug(passo, consola_vista)
+        linhas_saida.extend(linhas)
 
     resto = resultado["consolaFinal"][len(consola_vista):]
     if resto:
@@ -137,10 +156,54 @@ def formatar_consola_com_debug(resultado):
     return "\n".join(linhas_saida) + ("\n" if linhas_saida else "")
 
 
+class ImpressorDebugAoVivo:
+    """Callback para gerar_trace(on_passo=...): imprime cada passo assim
+    que fica disponível (sem atraso -- ver a docstring de 'on_passo' em
+    gerar_trace para o porquê), em vez de esperar o programa todo
+    terminar para só depois mostrar o trace completo (o que
+    formatar_consola_com_debug faz). A PRÓPRIA última instrução da
+    função principal (quando não chama nenhuma função do utilizador) é
+    entregue duas vezes -- uma com o estado ANTES de correr (no momento
+    em que a linha é alcançada), outra já corrigida (no 'evento ==
+    "return"' mais abaixo, quando o seu efeito real -- consola e/ou
+    variáveis -- só aí fica definitivo). finalizar() só continua a
+    existir como rede de segurança para o raríssimo caso de sobrar
+    consola escrita fora de qualquer passo (ex.: ao nível do módulo).
+
+    Escreve sempre em sys.__stdout__ (o stdout ORIGINAL do processo), nunca
+    em sys.stdout -- isto é chamado de dentro do próprio 'tracer()',
+    enquanto gerar_trace ainda tem sys.stdout redirecionado para o buffer
+    que captura a consola do programa (para conseguir gravar
+    'passo["consola"]'). Escrever em sys.stdout aqui cairia dentro desse
+    buffer em vez do terminal (nunca mais se via) e ainda contaminava as
+    capturas seguintes da consola com o próprio texto de debug.
+    flush=True porque a consola pode ter buffering por blocos (não por
+    linha) quando o processo não corre num terminal (ex.: 'algo executa
+    --debug < entradas.txt') -- sem isto, o texto podia ficar preso no
+    buffer do SO e só aparecer depois de um 'ler()' bloqueante mais à
+    frente já ter sido respondido."""
+    def __init__(self):
+        self._consola_vista = ""
+
+    def __call__(self, passo):
+        linhas, self._consola_vista = formatar_passo_debug(passo, self._consola_vista)
+        for linha in linhas:
+            print(linha, file=sys.__stdout__, flush=True)
+
+    def finalizar(self, resultado):
+        """Chamado depois de gerar_trace devolver, para mostrar qualquer
+        resto da consola final não coberto por nenhum passo (mesmo caso
+        do 'resto' em formatar_consola_com_debug)."""
+        resto = resultado["consolaFinal"][len(self._consola_vista):]
+        if resto:
+            print(resto.rstrip("\n"), file=sys.__stdout__, flush=True)
+
+
 def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                  nomes_globais: list, nomes_funcoes: list, entradas=None,
                  max_passos=None, limite_tempo_segundos=None,
-                 nomes_locais_por_funcao: dict = None):
+                 nomes_locais_por_funcao: dict = None, on_passo=None,
+                 fluxo_entrada=None):
     """Executa 'codigo_py' (o Python gerado a partir de um .algo) sob
     sys.settrace(), devolvendo um dicionário pronto a converter em JSON:
     {
@@ -154,6 +217,37 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
 
     'entradas': lista de strings para alimentar ler(), ou None para usar
     o stdin real do processo (permite entrada interativa).
+
+    'fluxo_entrada' (opcional): um objeto com .readline() para alimentar
+    ler(), em alternativa a 'entradas' -- usado pelo debug ao vivo do
+    online/ (ver online/executor.py:ExecucaoComDebugAoVivo), que corre
+    isto numa thread própria (não é o processo real, por isso 'entradas
+    is None' não serviria) e precisa de bloquear à espera de cada
+    resposta que o estudante ainda vai escrever no browser, uma de cada
+    vez -- não pode pré-fornecer todas as entradas à partida como
+    'entradas' faz. Tem prioridade sobre 'entradas' se ambos forem dados
+    (não deviam ser, na prática cada chamador usa só um dos dois).
+
+    'on_passo' (opcional): chamado com cada passo assim que fica pronto,
+    para o --debug da CLI (e o debug ao vivo do online/, ver
+    online/executor.py:ExecucaoComDebugAoVivo) poderem mostrar as
+    variáveis ao vivo em vez de esperar o programa todo terminar. Entregue
+    IMEDIATAMENTE ao ser criado (sem atraso) -- uma versão anterior atrasava
+    a entrega em exatamente um passo para nunca mostrar o passo da ÚLTIMA
+    instrução da principal antes de ele ser corrigido retroativamente (ver
+    'evento == "return"' mais abaixo), mas isso escondia o passo imediatamente
+    anterior a um 'ler()' até ELE desbloquear -- exatamente o oposto do que
+    --debug ao vivo deve mostrar (o estudante fica sem contexto nenhum
+    enquanto espera para escrever a resposta). A correção retroativa só
+    acontece UMA VEZ, no fim do programa inteiro; QUANDO acontece, on_passo
+    é chamado outra vez para esse MESMO passo (agora já corrigido) -- sem
+    isto, uma última instrução que só altera variáveis sem escrever nada
+    (ex.: 'b.x = 1') nunca mostrava o valor final no --debug ao vivo,
+    porque a única correção já feita antes disto (o 'resto' em
+    ImpressorDebugAoVivo.finalizar()) só olha para a consola, nunca para
+    as variáveis. Não passar nada (omitido) não corre este código --
+    --json sem --debug continua a só ler 'passos' no dicionário
+    devolvido, tal como antes.
 
     'max_passos'/'limite_tempo_segundos': None (omitido) usa os valores
     por omissão do módulo (MAX_PASSOS/LIMITE_TEMPO_SEGUNDOS) -- só a CLI
@@ -289,6 +383,22 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                         # último da lista, por isso atualizá-lo mantém "um
                         # passo por linha executada".
                         passos[indice] = passo_final
+                        # on_passo já viu este ÍNDICE antes (com o estado
+                        # DE ANTES desta linha correr, entregue no evento
+                        # 'line' mais abaixo) -- sem chamá-lo outra vez
+                        # aqui, uma alteração desta última linha que não
+                        # mexe na consola (ex.: só 'b.x = 1', sem
+                        # escrever nenhuma) nunca chegava a aparecer no
+                        # --debug ao vivo: a única pista dessa correção
+                        # (o 'resto' em ImpressorDebugAoVivo.finalizar())
+                        # só olha para a consola, não para as variáveis.
+                        # Entregar de novo, já corrigido, resolve os dois
+                        # casos com o mesmo mecanismo -- se não houver
+                        # consola nova, formatar_passo_debug simplesmente
+                        # não gera nenhuma linha de saída extra, só a
+                        # anotação de debug com o valor final.
+                        if on_passo is not None:
+                            on_passo(passos[indice])
                     else:
                         # A última instrução ENTROU numa função do
                         # utilizador (ex.: 'escrever(f(10))'), que já
@@ -297,6 +407,8 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
                         # cronológica; acrescentar um passo novo no fim
                         # preserva-a.
                         passos.append(passo_final)
+                        if on_passo is not None:
+                            on_passo(passos[-1])
             return tracer
         if evento != "line":
             return tracer
@@ -350,10 +462,17 @@ def gerar_trace(codigo_py: str, caminho_py: str, mapa_linhas: dict,
             "consola": buffer_saida.getvalue(),
             "pilha": list(pilha_incremental),
         })
+        if on_passo is not None:
+            on_passo(passos[-1])
         return tracer
 
     buffer_saida = io.StringIO()
-    entrada_stream = io.StringIO("\n".join(entradas)) if entradas is not None else None
+    if fluxo_entrada is not None:
+        entrada_stream = fluxo_entrada
+    elif entradas is not None:
+        entrada_stream = io.StringIO("\n".join(entradas))
+    else:
+        entrada_stream = None
 
     namespace = {"__name__": "__main__", "__file__": caminho_py}
     try:

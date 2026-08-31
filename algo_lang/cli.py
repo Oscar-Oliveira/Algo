@@ -275,7 +275,7 @@ def cmd_executa_com_trace(args):
     compilador. Usa --debug para veres o trace na consola, --json para
     gerares o ficheiro para o visualizador web (podes usar os dois)."""
     from .compilador.codegen import gerar_python_com_mapa
-    from .tools.tracer import gerar_trace, formatar_consola_com_debug
+    from .tools.tracer import gerar_trace, ImpressorDebugAoVivo
 
     programa = _carregar_e_verificar(args.ficheiro)
     try:
@@ -307,7 +307,15 @@ def cmd_executa_com_trace(args):
     # se não houver ficheiro de entradas, gerar_trace() usa o stdin real
     # do processo -- podes escrever os valores interativamente
 
-    print("----- A gerar o rasto -----")
+    # --debug mostra cada passo assim que fica pronto (ImpressorDebugAoVivo),
+    # em vez de esperar o programa todo terminar para só depois mostrar o
+    # trace completo -- por isso o cabeçalho "Execução" sai já aqui, antes
+    # de gerar_trace correr, e não depois.
+    impressor_ao_vivo = ImpressorDebugAoVivo() if args.debug else None
+    if args.debug:
+        print("\n----- Execução -----")
+    else:
+        print("----- A gerar o rasto -----")
     resultado = gerar_trace(
         dados["codigo"],
         caminho_py,
@@ -318,12 +326,13 @@ def cmd_executa_com_trace(args):
         max_passos=getattr(args, "max_passos", None),
         limite_tempo_segundos=getattr(args, "limite_tempo", None),
         nomes_locais_por_funcao=dados["nomes_locais_por_funcao"],
+        on_passo=impressor_ao_vivo,
     )
 
-    print("\n----- Execução -----")
     if args.debug:
-        print(formatar_consola_com_debug(resultado), end="")
+        impressor_ao_vivo.finalizar(resultado)
     else:
+        print("\n----- Execução -----")
         print(resultado["consolaFinal"], end="")
     if resultado["erro"]:
         print(f"❌ {resultado['erro']['mensagem']}")

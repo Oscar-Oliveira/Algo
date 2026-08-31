@@ -335,22 +335,10 @@ def _algo_verificar_tamanho_vetor_resultado(lista, tamanho_esperado):
     return lista
 
 
-class Ponto:
-    def __init__(self, x=0, y=0):
-        self.x = x
-        self.y = y
-
 def _algo_programa():
-    global a, b
     _algo_escrever('ola')
-    a = Ponto(x=1, y=2)
-    b = a
-    b.x = 99
-    _algo_escrever('ola111')
-    b.y = _algo_ler_inteiro()
-    _algo_escrever(a.x, ' ', b.x)
 
-_ALGO_MAPA_LINHAS = {345: 8, 346: 9, 347: 10, 348: 11, 349: 12, 350: 14, 351: 16}
+_ALGO_MAPA_LINHAS = {339: 3}
 
 if __name__ == "__main__":
     try:

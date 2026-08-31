@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import asyncio
 import os
+import queue
 import shutil
 import sys
 import tempfile
+import threading
 import time
 import uuid
 import xml.etree.ElementTree as ET
@@ -36,7 +38,7 @@ from algo_lang.compilador.parser import ErroSintatico
 from algo_lang.compilador.codegen import gerar_python, gerar_python_com_mapa, ErroInternoCompilador
 from algo_lang.compilador.inclusoes import mesclar_biblioteca_no_programa, ColisaoDeInclusao
 from algo_lang.tools.flowchart import gerar_dot
-from algo_lang.tools.tracer import gerar_trace
+from algo_lang.tools.tracer import gerar_trace, formatar_passo_debug
 from algo_lang.tools import linter as linter_modulo
 
 PASTA_EXECUCOES_POR_OMISSAO = os.path.join(tempfile.gettempdir(), "algo_online_execucoes")
@@ -629,5 +631,182 @@ def gerar_rasto(ficheiros: list[dict], nome_principal: str, entradas: list[str],
         "ficheiro": nome_principal,
         "codigoFonte": codigo_principal.splitlines(),
     }
+
+
+# ---------- rasto AO VIVO (--debug interativo, via WebSocket) ----------
+#
+# Peça isolada de propósito -- ver online/main.py (rota /ws/debug) e o
+# botão "Debug" no editor. Só esta secção, essas duas pontas em main.py/
+# app.js/editor.html, e o parâmetro 'fluxo_entrada' em
+# algo_lang/tools/tracer.py existem por causa disto -- retirar a
+# funcionalidade é apagar essas peças, sem tocar em mais nada (gerar_rasto
+# e ExecucaoInterativa acima não são usados nem alterados por isto).
+#
+# Ao contrário de ExecucaoInterativa (subprocesso isolado, com
+# resource.setrlimit), isto corre o programa do estudante DENTRO do
+# processo do servidor, numa thread própria -- sys.settrace só funciona
+# no próprio processo, e gerar_trace() é síncrono. Por isso não há
+# isolamento por processo aqui: a única rede de segurança contra um
+# programa preso é MAX_PASSOS/LIMITE_TEMPO_SEGUNDOS do próprio tracer
+# (tools/tracer.py), os mesmos já usados por gerar_rasto acima. Aceite
+# de propósito para esta primeira versão, precisamente para ser fácil de
+# avaliar e, se não compensar, de retirar.
+
+class ErroDebugAoVivo(Exception):
+    pass
+
+
+def preparar_debug_ao_vivo(ficheiros: list[dict], nome_principal: str, pasta_estudante: str) -> dict:
+    """Equivalente a compilar_codigo, mas devolve o que gerar_trace()
+    precisa (código Python + mapa de linhas, tal como gerar_rasto usa)
+    em vez de só o caminho do .py -- ExecucaoComDebugAoVivo (mais abaixo)
+    usa isto para arrancar a thread de execução. Levanta ErroCompilacao,
+    tal como compilar_codigo (mesmo tratamento de erro, repetido aqui em
+    vez de partilhado, para esta secção poder ser removida sem mexer em
+    compilar_codigo)."""
+    programa, _ = _escrever_ficheiros_e_analisar(ficheiros, nome_principal, pasta_estudante)
+    try:
+        verificar(programa)
+        dados = gerar_python_com_mapa(programa)
+    except ErroSemantico as e:
+        raise ErroCompilacao(str(e)) from e
+    except ErroInternoCompilador as e:  # pragma: no cover -- verificar() já garantiu que o programa é válido antes disto
+        raise ErroCompilacao(
+            f"{e} -- isto é um bug do próprio ALGO, não do teu programa."
+        ) from e
+    except RecursionError as e:  # pragma: no cover -- ver o mesmo catch em compilar_codigo
+        raise ErroCompilacao(
+            "o teu programa tem uma expressão demasiado complexa (operadores/"
+            "aninhamento a mais) para o compilador conseguir processar -- "
+            "tenta simplificá-la, ex. dividindo em variáveis intermédias."
+        ) from e
+
+    nome_base = f"debug_{uuid.uuid4().hex[:8]}"
+    caminho_py = os.path.join(pasta_estudante, nome_base + ".py")
+    with open(caminho_py, "w", encoding="utf-8") as f:
+        f.write(dados["codigo"])
+    dados["caminho_py"] = caminho_py
+    return dados
+
+
+class _FluxoEntradaFilaEspera:
+    """Um objeto tipo-stdin (só precisa de .readline()) que bloqueia até
+    receber uma linha -- para o ler()/input() do programa do estudante
+    (a correr na thread de ExecucaoComDebugAoVivo) esperar por uma
+    resposta que o estudante ainda vai escrever no browser. Alimentado
+    por enviar()/fechar(), chamados a partir do event loop -- queue.Queue
+    já é thread-safe, por isso não precisa de nenhum lock à parte. None
+    sinaliza fim de entrada (EOF, ver fechar())."""
+
+    def __init__(self):
+        self._fila = queue.Queue()
+
+    def readline(self) -> str:
+        linha = self._fila.get()
+        return "" if linha is None else linha + "\n"
+
+    def enviar(self, texto: str) -> None:
+        self._fila.put(texto)
+
+    def fechar(self) -> None:
+        self._fila.put(None)
+
+
+class ExecucaoComDebugAoVivo:
+    """O equivalente, para o rasto AO VIVO, do que ExecucaoInterativa é
+    para a execução normal -- mas em vez de um subprocesso lido linha a
+    linha, corre gerar_trace() numa thread própria (ver o aviso de
+    isolamento no topo desta secção) e traduz cada passo, já formatado
+    por formatar_passo_debug (a mesma função que o --debug ao vivo da
+    CLI usa -- ver tools/tracer.py:ImpressorDebugAoVivo, para as duas
+    formas nunca divergirem), em eventos que main.py reencaminha para o
+    WebSocket."""
+
+    def __init__(self, dados_compilados: dict, pasta_estudante: str):
+        self.dados = dados_compilados
+        self.pasta_estudante = pasta_estudante
+        self.entrada = _FluxoEntradaFilaEspera()
+        self.eventos: asyncio.Queue = asyncio.Queue()
+        self.terminou = False
+        self._thread: threading.Thread | None = None
+
+    def iniciar(self) -> None:
+        loop = asyncio.get_running_loop()
+
+        def publicar(evento: dict) -> None:
+            # call_soon_threadsafe: 'correr' (mais abaixo) corre numa
+            # thread à parte, mas self.eventos é um asyncio.Queue, só
+            # seguro de mexer a partir do próprio event loop.
+            loop.call_soon_threadsafe(self.eventos.put_nowait, evento)
+
+        def correr() -> None:
+            try:
+                consola_vista = ""
+
+                def on_passo(passo):
+                    nonlocal consola_vista
+                    linhas, consola_vista = formatar_passo_debug(passo, consola_vista)
+                    # cada 'linha' pode conter '\n' embutidos (uma única
+                    # diferença de consola a cobrir várias linhas reais de
+                    # saída) -- divide sempre, para bater com o contrato
+                    # de "saida" que o frontend já espera de /ws/executar
+                    # (uma linha real do programa por mensagem).
+                    for linha in linhas:
+                        for sub_linha in linha.split("\n"):
+                            publicar({"tipo": "saida", "texto": sub_linha})
+
+                resultado = gerar_trace(
+                    self.dados["codigo"], self.dados["caminho_py"], self.dados["mapa_linhas"],
+                    self.dados["nomes_globais"], self.dados["nomes_funcoes"],
+                    fluxo_entrada=self.entrada,
+                    nomes_locais_por_funcao=self.dados["nomes_locais_por_funcao"],
+                    on_passo=on_passo)
+
+                # mesmo 'resto' que ImpressorDebugAoVivo.finalizar() trata na CLI
+                resto = resultado["consolaFinal"][len(consola_vista):]
+                if resto:
+                    for sub_linha in resto.rstrip("\n").split("\n"):
+                        publicar({"tipo": "saida", "texto": sub_linha})
+
+                # "erro" é sempre um evento TERMINAL (tal como em /ws/executar) --
+                # nunca seguido de "fim", para o frontend não mostrar as duas
+                # mensagens (erro + "-- terminou --") uma a seguir à outra.
+                if resultado["erro"]:
+                    publicar({"tipo": "erro", "mensagem": resultado["erro"]["mensagem"]})
+                elif resultado["limiteExcedido"]:
+                    # UX-18: mesma mensagem que /ws/executar já usa para o limite do subprocesso
+                    mensagem = (
+                        "Execução interrompida: excedeu o tempo limite (possível ciclo infinito)."
+                        if resultado.get("limiteTipo") == "tempo" else
+                        "Execução interrompida: excedeu o limite de passos do rasto (possível ciclo infinito)."
+                    )
+                    publicar({"tipo": "erro", "mensagem": mensagem})
+                else:
+                    publicar({"tipo": "fim"})
+            except Exception as e:  # pragma: no cover -- rede de segurança, não deve ocorrer
+                publicar({"tipo": "erro", "mensagem": f"Erro interno a gerar o rasto: {e}"})
+            finally:
+                self.terminou = True
+
+        self._thread = threading.Thread(target=correr, daemon=True)
+        self._thread.start()
+
+    async def proximo_evento(self) -> dict:
+        return await self.eventos.get()
+
+    def enviar_entrada(self, texto: str) -> None:
+        self.entrada.enviar(texto)
+
+    def terminar_a_forcar(self) -> None:
+        """Não há processo para matar (ver o aviso de isolamento no topo
+        desta secção) -- só desbloqueia um ler() pendente com EOF, para a
+        thread não ficar presa para sempre à espera de uma entrada que já
+        não vai chegar (ex.: o estudante fechou a aba a meio de um
+        ler()). A partir daí a thread (daemon=True, nunca impede o
+        processo do servidor de terminar) acaba por conta própria -- ou
+        pelo EOFError que a entrada vazia provoca, ou pelos limites do
+        próprio tracer se estiver presa por outro motivo."""
+        self.entrada.fechar()
+        self.terminou = True
 
 

@@ -58,6 +58,11 @@
               fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <polygon points="6 3 20 12 6 21 6 3" />
             </svg><span class="rotulo-botao">Executar</span></button>
+          <button id="botao-debug" class="botao-icone" title="Debug (mostra as variáveis a cada passo)"><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 20h4v-4h4v-4h4v-4h4V4" />
+            </svg><span class="rotulo-botao">Debug</span></button>
           <button id="botao-fluxograma" class="botao-icone" title="Fluxograma"><svg class="icone-botao"
               viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
               stroke-linejoin="round">
@@ -67,15 +72,29 @@
               <path d="M6 8.3V15.7" />
               <path d="M8.2 6.6C11 6 13.7 7.6 15.4 10" />
             </svg><span class="rotulo-botao">Fluxograma</span></button>
-          <button id="botao-rasto" class="botao-icone" title="Rasto"><svg class="icone-botao" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="2 12 7 12 9.5 18 14 6 16.5 12 22 12" />
-            </svg><span class="rotulo-botao">Rasto</span></button>
           <button id="botao-linter" class="botao-icone" title="Verificador"><svg class="icone-botao" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="10.5" cy="10.5" r="6.5" />
               <line x1="20" y1="20" x2="15.3" y2="15.3" />
             </svg><span class="rotulo-botao">Verificador</span></button>
+          <div class="grupo-separado">
+            <button id="botao-abrir-projeto" class="botao-icone"
+              title="Abrir projeto (.zip) — substitui os ficheiros atuais"><svg class="icone-botao"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 8 12 3 17 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg></button>
+            <input type="file" id="campo-projeto-zip" accept=".zip" class="escondido">
+            <button id="botao-descarregar-projeto" class="botao-icone" title="Descarregar projeto (.zip)"><svg
+                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg></button>
+          </div>
         </div>
       </div>
       <div class="barra-ficheiros">
@@ -91,21 +110,6 @@
             stroke-linejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
-          </svg></button>
-        <button id="botao-abrir-projeto" class="botao-icone botao-icone-pequeno"
-          title="Abrir projeto (.zip) — substitui os ficheiros atuais"><svg class="icone-botao" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 8 12 3 17 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg></button>
-        <input type="file" id="campo-projeto-zip" accept=".zip" class="escondido">
-        <button id="botao-descarregar-projeto" class="botao-icone botao-icone-pequeno"
-          title="Descarregar projeto (.zip)"><svg class="icone-botao" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
           </svg></button>
         <button id="botao-tema" type="button" class="botao-icone botao-icone-pequeno" title="Alternar tema"><svg
             class="icone-botao icone-tema-escuro" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -138,14 +142,18 @@
           </label>
         </div>
         <div class="acoes-codigo">
-          <button id="botao-descarregar-rasto-execucao" class="botao-icone escondido"
-            title="Gerar e descarregar o rasto desta execução"><svg class="icone-botao" viewBox="0 0 24 24" fill="none"
+          <button id="botao-descarregar-rasto-execucao" class="botao-icone" disabled
+            title="Descarregar o rasto desta execução"><svg class="icone-botao" viewBox="0 0 24 24" fill="none"
               stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg><span class="rotulo-botao">Rasto desta execução</span></button>
-          <a id="ligacao-abrir-visualizador" class="botao-icone escondido" title="Visualizador"
+          <button id="botao-rasto" class="botao-icone" title="Rasto"><svg class="icone-botao" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="2 12 7 12 9.5 18 14 6 16.5 12 22 12" />
+            </svg><span class="rotulo-botao">Rasto</span></button>
+          <a id="ligacao-abrir-visualizador" class="botao-icone" title="Visualizador"
             href="/estatico/visualizador/algo-trace-viewer.html" target="algo-visualizador"><svg class="icone-botao"
               viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
               stroke-linejoin="round">

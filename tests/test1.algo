@@ -1,0 +1,3 @@
+algoritmo "MeuPrograma"
+inicio
+    escrever("ola")

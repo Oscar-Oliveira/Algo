@@ -829,9 +829,34 @@ async def ws_executar(websocket: WebSocket):
 
         tarefa_leitura = asyncio.create_task(ler_e_reencaminhar())
 
+        # Um programa sem nenhum ler() nunca manda o browser escrever nada
+        # neste WebSocket -- 'await websocket.receive_json()' sozinho ficaria
+        # bloqueado para sempre depois do "fim"/"erro". Isso prendia esta
+        # ligação -- e a vaga que ocupa em _semaforo_execucoes -- até o
+        # browser a fechar por conta própria no PRÓXIMO clique em
+        # Executar/Debug, esgotando aos poucos o semáforo partilhado.
+        # Corrida entre receber e a tarefa de leitura acabar, para sair
+        # assim que a execução terminar mesmo sem entrada.
+        #
+        # A condição do while é 'not tarefa_leitura.done()', NÃO
+        # 'not execucao.terminou' -- um programa muito rápido (ex.: um
+        # único 'escrever()') pode marcar execucao.terminou=True antes
+        # mesmo desta função chegar a correr o corpo do while uma única
+        # vez. Com 'execucao.terminou' como condição, esse caso saltava o
+        # while por completo e cancelava tarefa_leitura no finally ANTES
+        # dela ter sequer arrancado -- perdendo o "saida"/"fim" que ainda
+        # estava para ser reencaminhado (o browser via "compilado" e
+        # nada mais, para sempre). tarefa_leitura.done() só fica True
+        # depois de ela já ter mandado esse último evento ao websocket.
         try:
-            while not execucao.terminou:
-                mensagem = await websocket.receive_json()
+            while not tarefa_leitura.done():
+                tarefa_receber = asyncio.create_task(websocket.receive_json())
+                concluidas, _ = await asyncio.wait(
+                    {tarefa_receber, tarefa_leitura}, return_when=asyncio.FIRST_COMPLETED)
+                if tarefa_receber not in concluidas:
+                    tarefa_receber.cancel()
+                    break
+                mensagem = tarefa_receber.result()
                 if mensagem.get("tipo") == "entrada":
                     await execucao.enviar_entrada(mensagem.get("valor", ""))
         except WebSocketDisconnect:
@@ -840,6 +865,84 @@ async def ws_executar(websocket: WebSocket):
             if not tarefa_leitura.done():
                 tarefa_leitura.cancel()
             await execucao.terminar_a_forcar()
+    finally:
+        _semaforo_execucoes.release()
+
+
+# ---------- WebSocket: rasto ao vivo (--debug interativo) ----------
+#
+# Peça isolada de propósito -- ver a nota no topo de
+# online/executor.py:ExecucaoComDebugAoVivo. Reaproveita o mesmo
+# _semaforo_execucoes que /ws/executar (mesmo orçamento de execuções
+# concorrentes, não um limite paralelo à parte), mas não toca em mais
+# nada de /ws/executar.
+
+@app.websocket("/ws/debug")
+async def ws_debug(websocket: WebSocket):
+    await websocket.accept()
+    id_estudante = _id_estudante_do_websocket(websocket)
+    if id_estudante is None:
+        await websocket.send_json({"tipo": "erro", "mensagem": "Não autenticado."})
+        await websocket.close()
+        return
+
+    pseudonimo = await run_in_threadpool(autenticacao.obter_id_pseudonimo, id_estudante)
+    pasta_estudante = executor.preparar_pasta_execucao(pseudonimo)
+
+    try:
+        mensagem_inicial = await websocket.receive_json()
+    except WebSocketDisconnect:
+        return
+
+    ficheiros = mensagem_inicial.get("ficheiros", [])
+    nome_principal = mensagem_inicial.get("principal", "")
+    try:
+        dados_compilados = executor.preparar_debug_ao_vivo(ficheiros, nome_principal, pasta_estudante)
+    except executor.ErroCompilacao as e:
+        await websocket.send_json({"tipo": "erro_compilacao", "mensagem": str(e)})
+        await websocket.close()
+        return
+
+    await _adquirir_vaga_de_execucao(websocket)
+    try:
+        await websocket.send_json({"tipo": "compilado"})
+        execucao = executor.ExecucaoComDebugAoVivo(dados_compilados, pasta_estudante)
+        execucao.iniciar()
+
+        async def ler_e_reencaminhar():
+            while True:
+                evento = await execucao.proximo_evento()
+                await websocket.send_json(evento)
+                if evento.get("tipo") in ("fim", "erro"):
+                    break
+
+        tarefa_leitura = asyncio.create_task(ler_e_reencaminhar())
+
+        # Ver o mesmo comentário em ws_executar acima -- idêntico aqui: sem
+        # a corrida entre receber e a tarefa de leitura, um programa sem
+        # ler() prendia esta ligação (e a vaga que ocupa) para sempre depois
+        # do "fim"/"erro". E a condição tem de ser 'not tarefa_leitura.done()',
+        # não 'not execucao.terminou' -- um programa muito rápido marca
+        # execucao.terminou=True antes desta função sequer chegar a correr,
+        # o que cancelava tarefa_leitura no finally SEM ela ter mandado
+        # "saida"/"fim" nenhum (o browser ficava preso em "compilado").
+        try:
+            while not tarefa_leitura.done():
+                tarefa_receber = asyncio.create_task(websocket.receive_json())
+                concluidas, _ = await asyncio.wait(
+                    {tarefa_receber, tarefa_leitura}, return_when=asyncio.FIRST_COMPLETED)
+                if tarefa_receber not in concluidas:
+                    tarefa_receber.cancel()
+                    break
+                mensagem = tarefa_receber.result()
+                if mensagem.get("tipo") == "entrada":
+                    execucao.enviar_entrada(mensagem.get("valor", ""))
+        except WebSocketDisconnect:
+            execucao.terminar_a_forcar()
+        finally:
+            if not tarefa_leitura.done():
+                tarefa_leitura.cancel()
+            execucao.terminar_a_forcar()
     finally:
         _semaforo_execucoes.release()
 

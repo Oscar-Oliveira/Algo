@@ -13,7 +13,11 @@
   "    a:Ponto = {x: 1, y: 2}",
   "    b:Ponto = a",
   "    b.x = 99",
-  "    escrever(a.x, \" \", b.x) "
+  "    escrever(\"ola111\")",
+  "",
+  "    ler(b.y)",
+  "",
+  "    escrever(a.x, \" \", b.x)"
  ],
  "passos": [
   {
@@ -72,7 +76,7 @@
   },
   {
    "linha": 12,
-   "consola": "ola\n99 99\n",
+   "consola": "ola\n",
    "pilha": [
     {
      "nome": "(Principal)",
@@ -84,6 +88,44 @@
       "b": {
        "x": 99,
        "y": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "linha": 14,
+   "consola": "ola\nola111\n",
+   "pilha": [
+    {
+     "nome": "(Principal)",
+     "variaveis": {
+      "a": {
+       "x": 99,
+       "y": 2
+      },
+      "b": {
+       "x": 99,
+       "y": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "linha": 16,
+   "consola": "ola\nola111\n99 99\n",
+   "pilha": [
+    {
+     "nome": "(Principal)",
+     "variaveis": {
+      "a": {
+       "x": 99,
+       "y": 11
+      },
+      "b": {
+       "x": 99,
+       "y": 11
       }
      }
     }
