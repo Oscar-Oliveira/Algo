@@ -7,10 +7,12 @@ docker compose up -d --build
 
 ---
 
-compilador v2
-
 online
 
+os problemas reportaddos deveriam ter um notificação dos vistos e nao vistos
+
+
+Alguem
 - admin atica deeactiva alguem
 - definiç~eos de llm
 

@@ -123,7 +123,7 @@ async function carregarUtilizadores() {
         botaoRejeitar.className = "botao-perigo";
         botaoRejeitar.textContent = "Rejeitar";
         botaoRejeitar.addEventListener("click", () => {
-          if (confirm(`Rejeitar e eliminar definitivamente a conta de ${conta.email}?`)) agirSobreUtilizador(conta.id, "rejeitar");
+          if (confirm(`Rejeitar e apagar definitivamente a conta de ${conta.email}?`)) agirSobreUtilizador(conta.id, "rejeitar");
         });
 
         celulaAcoes.appendChild(botaoAprovar);
@@ -411,13 +411,16 @@ async function carregarGrupos() {
 
       const botaoExportar = document.createElement("a");
       botaoExportar.className = "botao-secundario";
-      botaoExportar.textContent = "Exportar membros";
+      botaoExportar.textContent = "Exportar membros (CSV)";
       botaoExportar.href = `/api/admin/grupos/${grupo.id}/membros.csv`;
       botaoExportar.target = "_blank";
 
       const botaoApagar = document.createElement("button");
-      botaoApagar.className = "botao-perigo";
-      botaoApagar.textContent = "Eliminar";
+      botaoApagar.className = "botao-perigo botao-com-icone";
+      botaoApagar.innerHTML = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        + 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+        + '<polyline points="4 7 20 7" /><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />'
+        + '<path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" /></svg><span>Apagar</span>';
       botaoApagar.addEventListener("click", () => apagarGrupo(grupo.id));
 
       celulaAcoes.appendChild(botaoAtivarDesativar);
@@ -511,7 +514,7 @@ async function agirSobreGrupo(grupoId, acao) {
 }
 
 async function apagarGrupo(grupoId) {
-  if (!confirm("Eliminar este grupo definitivamente? Só é possível se não tiver membros.")) return;
+  if (!confirm("Apagar este grupo definitivamente? Só é possível se não tiver membros.")) return;
   await agirSobreGrupo(grupoId, "apagar");
 }
 
@@ -726,7 +729,7 @@ checkboxLogSelecionarTudo.addEventListener("change", () => {
 
 botaoLogApagarSelecionados.addEventListener("click", async () => {
   if (idsSelecionadosLog.size === 0) return;
-  if (!confirm(`Eliminar definitivamente ${idsSelecionadosLog.size} registo(s)? Esta ação não pode ser desfeita.`)) return;
+  if (!confirm(`Apagar definitivamente ${idsSelecionadosLog.size} registo(s)? Esta ação não pode ser desfeita.`)) return;
   mensagemErroLog.textContent = "";
   try {
     const resposta = await fetch("/api/admin/log/apagar", {
@@ -736,7 +739,7 @@ botaoLogApagarSelecionados.addEventListener("click", async () => {
     });
     if (!resposta.ok) {
       const corpo = await resposta.json();
-      mensagemErroLog.textContent = corpo.detail || "Não foi possível eliminar os registos selecionados.";
+      mensagemErroLog.textContent = corpo.detail || "Não foi possível apagar os registos selecionados.";
       return;
     }
     atualizarTabelaLog();

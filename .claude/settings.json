@@ -24,7 +24,9 @@
       "Bash(dot -Tsvg pilha-heap-enderecos.dot -o pilha-heap-enderecos.svg)",
       "Bash(dot -Tpng -Gdpi=150 pilha-heap-enderecos.dot -o pilha-heap-enderecos.png)",
       "Bash(node --check online/estatico/admin.js)",
-      "Bash(node --check online/estatico/app.js)"
+      "Bash(node --check online/estatico/app.js)",
+      "Bash(python3 -m pytest tests/test_main_integracao.py -k tema -v)",
+      "Bash(py -3 -m pytest tests/test_main_integracao.py -k tema -v)"
     ],
     "additionalDirectories": [
       "C:\\Users\\oscar\\Documents\\Repos\\algo\\aulas\\diagramas\\08-funcoes-e-procedimentos"

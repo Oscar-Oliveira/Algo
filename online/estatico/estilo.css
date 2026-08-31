@@ -1,16 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --tinta: #1a1f2e;
-  --tinta-clara: #242b3d;
-  --tinta-borda: #313a52;
+  --tinta: #18181b;
+  --tinta-clara: #27272a;
+  --tinta-borda: #3f3f46;
   --creme: #f6f3ec;
   --creme-forte: #ece7db;
   --texto-escuro: #24241f;
   --texto-claro: #e9e7e1;
-  --texto-esmaecido: #9aa0b4;
-  --ambar: #e0a63d;
-  --ambar-forte: #c98d24;
+  --texto-esmaecido: #a1a1aa;
+  --ambar: #d4d4d8;
+  --ambar-forte: #52525b;
   --erro: #d9695a;
   --sucesso: #7fb88a;
   font-size: 16px;
@@ -26,8 +26,8 @@
   --tinta-borda: #d8d2c2;
   --texto-claro: var(--texto-escuro);
   --texto-esmaecido: #7a7566;
-  --ambar: #b8791f;
-  --ambar-forte: #a9721c;
+  --ambar: #52525b;
+  --ambar-forte: #3f3f46;
   --erro: #b23b2c;
   --sucesso: #3f7a4f;
 }
@@ -213,7 +213,7 @@ button {
 
 .formulario button[type="submit"]:hover,
 .botao-primario:hover {
-  background: #b17d1f;
+  background: #27272a;
 }
 
 .botao-secundario {
@@ -278,8 +278,8 @@ button {
 }
 
 #botao-executar:hover {
-  background: #b17d1f;
-  border-color: #b17d1f;
+  background: #27272a;
+  border-color: #27272a;
 }
 
 .mensagem-erro {
