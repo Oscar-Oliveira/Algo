@@ -38,7 +38,7 @@ _DSN_TESTE = os.environ.setdefault(
 # das dependências de chave estrangeira sozinho).
 _TABELAS = (
     "log_atividade", "tentativa_registo", "relatorio_problema",
-    "credencial_llm", "estudante", "grupo",
+    "credencial_llm", "estudante", "grupo", "definicao",
 )
 
 

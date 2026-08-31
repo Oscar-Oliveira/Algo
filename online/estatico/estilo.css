@@ -17,10 +17,10 @@
 }
 
 /* FEAT-02: tema claro -- as páginas da aplicação (editor/admin/ajuda)
-   usam sempre as variáveis --tinta*/
---texto-claro,
-nunca cores fixas,
-por isso um segundo bloco de variáveis chega para trocar de tema sem tocar em cada regra individual. */:root[data-theme="light"] {
+   usam sempre as variáveis --tinta*, --texto-claro, nunca cores fixas,
+   por isso um segundo bloco de variáveis chega para trocar de tema sem
+   tocar em cada regra individual. */
+:root[data-theme="light"] {
   --tinta: var(--creme);
   --tinta-clara: var(--creme-forte);
   --tinta-borda: #d8d2c2;
@@ -289,21 +289,37 @@ button {
   min-height: 1.2em;
 }
 
+.mensagem-sucesso {
+  color: var(--sucesso);
+  font-size: 0.85rem;
+  margin: 0.6rem 0 0;
+}
+
 /* ---------- painel de admin (página própria, não um modal) ---------- */
 
+/* Mesmo padrão do editor (.pagina-editor): altura fixa ao viewport,
+   scroll de cada painel por si -- aqui a barra lateral ocupa sempre a
+   altura toda, mesmo que o conteúdo à direita seja mais alto ou mais
+   baixo do que ela. */
 .pagina-admin {
   background: var(--tinta);
   color: var(--texto-claro);
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
+.corpo-admin {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
 .conteudo-admin {
   flex: 1;
-  width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
+  min-width: 0;
+  overflow-y: auto;
   padding: 2rem clamp(1rem, 4vw, 2.5rem) 3rem;
 }
 
@@ -472,31 +488,78 @@ button {
   margin-right: 0.4rem;
 }
 
-.abas-admin {
+/* Menu de admin: barra lateral com a altura toda (ver .corpo-admin),
+   ícone + rótulo em cada item -- mesmo "kit" visual dos botões com
+   ícone do editor (ver .botao-com-icone), só em coluna. */
+.barra-lateral-admin {
+  flex: 0 0 220px;
   display: flex;
-  gap: 0.4rem;
-  border-bottom: 1px solid var(--tinta-borda);
-  margin-bottom: 1.4rem;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1.5rem 1rem;
+  border-right: 1px solid var(--tinta-borda);
+  background: var(--tinta-clara);
+  overflow-y: auto;
 }
 
-.aba-admin {
+.item-lateral-admin {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
   background: transparent;
   border: none;
+  border-left: 2px solid transparent;
+  border-radius: 8px;
   color: var(--texto-esmaecido);
   font-weight: 500;
-  font-size: 0.95rem;
-  padding: 0.6rem 0.2rem;
-  margin-bottom: -1px;
-  border-bottom: 2px solid transparent;
+  font-size: 0.9rem;
+  padding: 0.6rem 0.7rem;
+  text-align: left;
 }
 
-.aba-admin.ativa {
+.item-lateral-admin .icone-botao {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.item-lateral-admin:hover {
+  background: var(--tinta-clara);
   color: var(--texto-claro);
-  border-bottom-color: var(--ambar);
+}
+
+.item-lateral-admin.ativa {
+  background: var(--tinta-clara);
+  color: var(--texto-claro);
+  border-left-color: var(--ambar);
 }
 
 .conteudo-aba-admin.escondido {
   display: none;
+}
+
+@media (max-width: 900px) {
+  .pagina-admin {
+    height: auto;
+    overflow: visible;
+  }
+
+  .corpo-admin {
+    flex-direction: column;
+  }
+
+  .barra-lateral-admin {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--tinta-borda);
+    overflow-y: visible;
+  }
+
+  .conteudo-admin {
+    overflow-y: visible;
+  }
 }
 
 .cartoes-metricas {
@@ -1270,6 +1333,13 @@ button {
 
 .modal-caixa-media {
   width: min(560px, 92vw);
+}
+
+.conteudo-detalhes-log {
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .modal-cabecalho {

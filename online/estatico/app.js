@@ -385,8 +385,11 @@ function atualizarBotaoDescarregarRastoExecucao() {
   const naVistaExecucao = !vistaExecucao.classList.contains("escondido");
   botaoDescarregarRastoExecucao.classList.toggle("escondido", !naVistaExecucao);
   botaoDescarregarRastoExecucao.disabled = !execucaoTerminadaComSucesso;
-  botaoAbrirRasto.classList.toggle("escondido", !naVistaExecucao);
-  ligacaoAbrirVisualizador.classList.toggle("escondido", !naVistaExecucao);
+  // botões "Rasto" (formulário clássico) e "Visualizador" só fazem
+  // sentido em modo Debug -- na Execução normal só o download acima chega.
+  const emDebug = naVistaExecucao && modoExecucaoAtual === "Debug";
+  botaoAbrirRasto.classList.toggle("escondido", !emDebug);
+  ligacaoAbrirVisualizador.classList.toggle("escondido", !emDebug);
 }
 
 function descarregarUrl(url, nomeFicheiro) {
@@ -564,10 +567,11 @@ formEntradaTerminal.addEventListener("submit", (evento) => {
 
 // ---------- Alguem ----------
 
-// TEMP: alguem desativado enquanto se corrige o editor -- reativar
-// trocando para true (o backend também tem de reativar ALGUEM_ATIVO
-// em online/main.py).
-const ALGUEM_ATIVO = false;
+// Ligado/desligado pelo admin (aba Definições do painel de admin) --
+// valor real só se conhece depois do fetch a /api/eu mais abaixo;
+// começa false para nunca tentar ligar antes disso (e como falha
+// segura se esse fetch falhar).
+let ALGUEM_ATIVO = false;
 
 const conversaAlguem = document.getElementById("conversa-alguem");
 const entradaAlguem = document.getElementById("entrada-alguem");
@@ -661,8 +665,6 @@ document.getElementById("botao-mostrar-ficheiro").addEventListener("click", () =
   adicionarMensagem(`(mostrei-te o meu código atual: ${nomes})`, "mensagem-estudante");
 });
 
-if (ALGUEM_ATIVO) ligarAlguem();
-
 // ---------- definições do LLM (vivem dentro do painel do Alguem) ----------
 
 const vistaConversaAlguem = document.getElementById("vista-conversa-alguem");
@@ -742,7 +744,13 @@ const botaoAdmin = document.getElementById("botao-admin");
     const resposta = await fetch("/api/eu");
     const dados = await resposta.json();
     if (dados.admin) botaoAdmin.classList.remove("escondido");
+    ALGUEM_ATIVO = !!dados.alguem_ativo;
   } catch (erro) { /* silencioso -- só uma ligação a mais */ }
+  if (ALGUEM_ATIVO) {
+    ligarAlguem();
+    botaoAlternarAlguem.classList.remove("escondido");
+    botaoAlternarAlguem.addEventListener("click", alternarPainelAlguem);
+  }
 })();
 
 // ---------- painel do meio: execução / rasto / fluxograma ----------
@@ -1053,12 +1061,6 @@ function alternarPainelAlguem() {
   if (editor.refresh) editor.refresh();
 }
 
-if (ALGUEM_ATIVO) {
-  botaoAlternarAlguem.addEventListener("click", alternarPainelAlguem);
-} else {
-  // TEMP: sem botão para abrir um painel que não liga a lado nenhum.
-  botaoAlternarAlguem.classList.add("escondido");
-}
 // painel do Alguem escondido por omissão: editor e terminal a 50/50;
 // ao mostrar o Alguem, os três painéis passam a dividir o espaço
 // em partes iguais (ver alternarPainelAlguem).

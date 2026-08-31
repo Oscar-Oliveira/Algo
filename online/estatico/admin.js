@@ -18,7 +18,7 @@ function criarBadge(texto, variante) {
 
 // ---------- abas ----------
 
-const abas = document.querySelectorAll(".aba-admin");
+const abas = document.querySelectorAll(".item-lateral-admin");
 const conteudosCarregados = {};
 
 function carregarConteudoDaAba(nomeAba) {
@@ -36,6 +36,7 @@ function carregarConteudoDaAba(nomeAba) {
   if (nomeAba === "atividade") carregarAtividade();
   if (nomeAba === "grupos") carregarGrupos();
   if (nomeAba === "registoatividade") carregarLog();
+  if (nomeAba === "definicoes") carregarDefinicoes();
 }
 
 abas.forEach((aba) => {
@@ -533,6 +534,23 @@ const botaoLogPaginaAnterior = document.getElementById("log-pagina-anterior");
 const botaoLogPaginaSeguinte = document.getElementById("log-pagina-seguinte");
 const textoLogPagina = document.getElementById("log-texto-pagina");
 
+const modalDetalhesLog = document.getElementById("modal-detalhes-log");
+const conteudoDetalhesLog = document.getElementById("conteudo-detalhes-log");
+
+function abrirDetalhesLog(detalhes) {
+  conteudoDetalhesLog.textContent = JSON.stringify(detalhes, null, 2);
+  modalDetalhesLog.classList.remove("escondido");
+}
+
+function fecharDetalhesLog() {
+  modalDetalhesLog.classList.add("escondido");
+}
+
+document.getElementById("botao-fechar-detalhes-log").addEventListener("click", fecharDetalhesLog);
+modalDetalhesLog.addEventListener("click", (evento) => {
+  if (evento.target === modalDetalhesLog) fecharDetalhesLog();
+});
+
 const TIPOS_LOG_CONHECIDOS = [
   "login", "login_falhado", "registo", "conta_aprovada", "conta_rejeitada", "conta_revogada",
   "admin_concedido", "admin_revogado", "grupo_criado", "grupo_editado", "grupo_ativado",
@@ -664,8 +682,16 @@ async function atualizarTabelaLog() {
       celulaGrupoLog.textContent = evento.grupo_nome || "-";
 
       const celulaDetalhes = document.createElement("td");
-      celulaDetalhes.className = "texto-mono";
-      celulaDetalhes.textContent = evento.detalhes ? JSON.stringify(evento.detalhes) : "";
+      if (evento.detalhes) {
+        const botaoDetalhes = document.createElement("button");
+        botaoDetalhes.type = "button";
+        botaoDetalhes.className = "botao-secundario";
+        botaoDetalhes.textContent = "Ver detalhes";
+        botaoDetalhes.addEventListener("click", () => abrirDetalhesLog(evento.detalhes));
+        celulaDetalhes.appendChild(botaoDetalhes);
+      } else {
+        celulaDetalhes.textContent = "-";
+      }
 
       linha.appendChild(celulaCheckbox);
       linha.appendChild(celulaData);
@@ -828,6 +854,47 @@ botaoRelatoriosPaginaAnterior.addEventListener("click", () => {
 botaoRelatoriosPaginaSeguinte.addEventListener("click", () => {
   paginaRelatorios += 1;
   atualizarTabelaRelatorios();
+});
+
+// ---------- definições ----------
+
+const checkboxAlguemAtivo = document.getElementById("definicao-alguem-ativo");
+const botaoGuardarDefinicoes = document.getElementById("botao-guardar-definicoes");
+const mensagemErroDefinicoes = document.getElementById("mensagem-erro-definicoes");
+const mensagemSucessoDefinicoes = document.getElementById("mensagem-sucesso-definicoes");
+let timeoutSucessoDefinicoes = null;
+
+async function carregarDefinicoes() {
+  mensagemErroDefinicoes.textContent = "";
+  try {
+    const resposta = await fetch("/api/admin/definicoes");
+    const dados = await resposta.json();
+    checkboxAlguemAtivo.checked = !!dados.alguem_ativo;
+  } catch (erro) {
+    mensagemErroDefinicoes.textContent = "Não foi possível carregar as definições.";
+  }
+}
+
+botaoGuardarDefinicoes.addEventListener("click", async () => {
+  mensagemErroDefinicoes.textContent = "";
+  mensagemSucessoDefinicoes.classList.add("escondido");
+  clearTimeout(timeoutSucessoDefinicoes);
+  botaoGuardarDefinicoes.disabled = true;
+  const ativo = checkboxAlguemAtivo.checked;
+  try {
+    const resposta = await fetch("/api/admin/definicoes/alguem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ativo }),
+    });
+    if (!resposta.ok) throw new Error();
+    mensagemSucessoDefinicoes.classList.remove("escondido");
+    timeoutSucessoDefinicoes = setTimeout(() => mensagemSucessoDefinicoes.classList.add("escondido"), 2000);
+  } catch (erro) {
+    mensagemErroDefinicoes.textContent = "Não foi possível guardar. Tenta novamente.";
+  } finally {
+    botaoGuardarDefinicoes.disabled = false;
+  }
 });
 
 carregarConteudoDaAba("grupos");

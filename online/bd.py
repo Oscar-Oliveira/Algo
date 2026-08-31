@@ -81,6 +81,11 @@ CREATE TABLE IF NOT EXISTS tentativa_registo (
     atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS definicao (
+    chave TEXT PRIMARY KEY,
+    valor TEXT NOT NULL
+);
+
 ALTER TABLE estudante ADD COLUMN IF NOT EXISTS grupo_id INTEGER REFERENCES grupo(id) ON DELETE SET NULL;
 """
 

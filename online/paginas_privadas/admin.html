@@ -13,20 +13,21 @@
     <span class="marca marca-pequena"><img src="/estatico/algo-logo.svg" alt="" class="marca-simbolo"> Algo — admin</span>
   </header>
 
-  <main class="conteudo-admin">
-    <nav class="abas-admin">
-      <button type="button" class="aba-admin ativa" data-aba="grupos">Grupos</button>
-      <button type="button" class="aba-admin" data-aba="utilizadores">Utilizadores</button>
-      <button type="button" class="aba-admin" data-aba="registoatividade">Registo de Atividade</button>
+  <div class="corpo-admin">
+    <nav class="barra-lateral-admin">
+      <button type="button" class="item-lateral-admin ativa" data-aba="grupos"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg><span>Grupos</span></button>
+      <button type="button" class="item-lateral-admin" data-aba="utilizadores"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg><span>Utilizadores</span></button>
+      <button type="button" class="item-lateral-admin" data-aba="registoatividade"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg><span>Registo de Atividade</span></button>
       <!-- Separador "Atividade" (métricas do Alguem) fica temporariamente
            oculto -- funcionalidade ainda não usada, mas os dados/rota/lógica
            continuam intactos (ver online/main.py rota_admin_atividade). Reverter
            removendo a classe "escondido" do botão e da secção abaixo. -->
-      <button type="button" class="aba-admin escondido" data-aba="atividade">Atividade</button>
-      <button type="button" class="aba-admin" data-aba="relatorios">Problemas Reportados</button>
-      <button type="button" class="aba-admin" data-aba="backup">Backup</button>
+      <button type="button" class="item-lateral-admin escondido" data-aba="atividade"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg><span>Atividade</span></button>
+      <button type="button" class="item-lateral-admin" data-aba="relatorios"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg><span>Problemas Reportados</span></button>
+      <button type="button" class="item-lateral-admin" data-aba="definicoes"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg><span>Definições</span></button>
     </nav>
 
+    <main class="conteudo-admin">
     <section id="aba-conteudo-grupos" class="conteudo-aba-admin">
       <p class="subtitulo">Cria um grupo para gerares um código de junção para os teus estudantes. Só podes eliminar definitivamente um grupo sem membros -- se já tiver estudantes, desativa-o em vez disso (os membros existentes continuam a poder entrar, mas o grupo deixa de aceitar novos registos com o código antigo).</p>
       <form id="form-criar-grupo" class="formulario formulario-inline">
@@ -173,7 +174,19 @@
       <p class="mensagem-erro" id="mensagem-erro-relatorios"></p>
     </section>
 
-    <section id="aba-conteudo-backup" class="conteudo-aba-admin escondido">
+    <section id="aba-conteudo-definicoes" class="conteudo-aba-admin escondido">
+      <p class="subtitulo">Definições globais da aplicação.</p>
+      <p>
+        <label>
+          <input type="checkbox" id="definicao-alguem-ativo">
+          Ativar o Alguem (tutor LLM) para os estudantes
+        </label>
+      </p>
+      <button type="button" id="botao-guardar-definicoes" class="botao-primario">Guardar</button>
+      <p class="mensagem-erro" id="mensagem-erro-definicoes"></p>
+      <p class="mensagem-sucesso escondido" id="mensagem-sucesso-definicoes">Guardado.</p>
+
+      <h3>Backup da base de dados</h3>
       <p class="subtitulo">Descarrega uma cópia completa da base de dados (contas e credenciais cifradas) para guardar como backup ou analisar offline.</p>
       <a href="/api/admin/bd" download class="botao-primario botao-com-icone"><svg class="icone-botao"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -183,7 +196,24 @@
           <path d="M4 19h16" />
         </svg><span>Descarregar base de dados</span></a>
     </section>
-  </main>
+    </main>
+  </div>
+
+  <div id="modal-detalhes-log" class="modal escondido">
+    <div class="modal-caixa modal-caixa-media">
+      <div class="modal-cabecalho">
+        <h2>Detalhes do registo</h2>
+        <button id="botao-fechar-detalhes-log" type="button" class="botao-icone" title="Fechar"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg></button>
+      </div>
+      <pre id="conteudo-detalhes-log" class="texto-mono conteudo-detalhes-log"></pre>
+    </div>
+  </div>
+
   <script src="/estatico/admin.js"></script>
 </body>
 </html>

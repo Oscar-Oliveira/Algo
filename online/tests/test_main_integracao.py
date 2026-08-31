@@ -1040,7 +1040,7 @@ def test_ws_alguem_sem_autenticacao(cliente):
         assert m["tipo"] == "erro"
 
 
-@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
+@pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
 def test_ws_alguem_sem_credencial_configurada(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     with cliente.websocket_connect("/ws/alguem") as ws:
@@ -1049,7 +1049,7 @@ def test_ws_alguem_sem_credencial_configurada(cliente):
         assert "configuraste" in m["mensagem"]
 
 
-@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
+@pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
 def test_ws_alguem_conversa_completa(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
@@ -1091,7 +1091,7 @@ class _TutorFalsoQueRebenta:
         self.fechado = True
 
 
-@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
+@pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
 def test_ws_alguem_fecha_sessao_mesmo_com_excecao_inesperada(cliente, monkeypatch):
     """ARCH-09: antes, fechar_sessao() só corria dentro do 'except
     WebSocketDisconnect' -- qualquer outra exceção no loop deixava o
@@ -1111,7 +1111,7 @@ def test_ws_alguem_fecha_sessao_mesmo_com_excecao_inesperada(cliente, monkeypatc
     assert tutor_falso.fechado is True
 
 
-@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
+@pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
 def test_ws_alguem_logs_usam_pseudonimo_nao_email(cliente, tmp_path):
     cliente.post("/api/registar", json={"email": "privacidade@b.com", "password": "password123"})
     cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
@@ -1304,7 +1304,7 @@ def test_ws_executar_incluir_ficheiro_em_falta(cliente):
         assert "não encontrado" in m["mensagem"]
 
 
-@pytest.mark.skip(reason="alguem temporariamente desativado (main.ALGUEM_ATIVO=False)")
+@pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
 def test_ws_alguem_recebe_varios_ficheiros(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})

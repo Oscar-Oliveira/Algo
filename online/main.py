@@ -26,6 +26,7 @@ from contextlib import asynccontextmanager
 import bd
 import autenticacao
 import atividade
+import definicoes
 import grupos
 import limitador_registo
 import modo_codemirror
@@ -292,6 +293,7 @@ async def rota_eu(id_estudante: int = Depends(estudante_atual)):
     return {
         "id": id_estudante,
         "admin": await run_in_threadpool(autenticacao.eh_admin, id_estudante),
+        "alguem_ativo": await run_in_threadpool(definicoes.alguem_ativo),
     }
 
 
@@ -534,6 +536,24 @@ async def rota_admin_apagar_relatorio(id_relatorio: int, id_estudante: int = Dep
     return {"ok": True}
 
 
+# ---------- administração: definições globais ----------
+
+@app.get("/api/admin/definicoes")
+async def rota_admin_obter_definicoes(id_estudante: int = Depends(admin_atual)):
+    return {"alguem_ativo": await run_in_threadpool(definicoes.alguem_ativo)}
+
+
+@app.post("/api/admin/definicoes/alguem")
+async def rota_admin_definir_alguem_ativo(request: Request, id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    ativo = bool(dados.get("ativo"))
+    await run_in_threadpool(definicoes.definir_alguem_ativo, ativo)
+    await run_in_threadpool(
+        atividade.registar_evento, "definicao_alterada", id_estudante, None, None,
+        {"chave": "alguem_ativo", "valor": ativo})
+    return {"ok": True}
+
+
 # ---------- administração: descarregar a base de dados para backup ----------
 
 @app.get("/api/admin/bd")
@@ -737,11 +757,6 @@ async def rota_modo_algo():
 
 
 app.mount("/estatico", StaticFiles(directory=PASTA_ESTATICO), name="estatico")
-
-# TEMP: alguem desativado enquanto se corrige o editor -- reativar
-# trocando para True (o frontend também tem de reativar ALGUEM_ATIVO
-# em online/estatico/app.js).
-ALGUEM_ATIVO = False
 
 
 # ---------- WebSocket: execução interativa ----------
@@ -952,7 +967,7 @@ async def ws_debug(websocket: WebSocket):
 @app.websocket("/ws/alguem")
 async def ws_alguem(websocket: WebSocket):
     await websocket.accept()
-    if not ALGUEM_ATIVO:
+    if not await run_in_threadpool(definicoes.alguem_ativo):
         await websocket.send_json({"tipo": "erro", "mensagem": "O Alguem está temporariamente desativado."})
         await websocket.close()
         return
