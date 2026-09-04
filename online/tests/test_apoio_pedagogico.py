@@ -235,3 +235,99 @@ def test_gerar_analise_fora_do_ambito_de_admin_de_grupo_levanta_erro():
     grupos.definir_grupos_geridos(admin_id, [turma_a["id"]])
     with pytest.raises(inv.ErroAcessoNegado):
         ap.gerar_analise(admin_id, False, id_est, "resumo qualquer")
+
+
+# ---------- Apoio por Grupo -- mesmo fluxo, para um grupo inteiro ----------
+
+def test_montar_blocos_historico_grupo_prefixa_com_email_de_cada_membro(tmp_path):
+    id_a = autenticacao.registar("a@b.com", "password123")
+    id_c = autenticacao.registar("c@d.com", "password123")
+    _sessao_com_turno(tmp_path, "a@b.com")
+    _sessao_com_turno(tmp_path, "c@d.com")
+    membros = [{"id": id_a, "email": "a@b.com"}, {"id": id_c, "email": "c@d.com"}]
+
+    blocos = ap.montar_blocos_historico_grupo(membros, tipos={"alguem"}, pasta_logs=str(tmp_path))
+    assert len(blocos) == 2
+    assert {b["texto"].startswith("[a@b.com]") for b in blocos if "a@b.com" in b["texto"]} == {True}
+    assert any(b["texto"].startswith("[c@d.com]") for b in blocos)
+
+
+def test_contar_historico_grupo_inclui_num_estudantes(tmp_path):
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    id_a = autenticacao.registar("a@b.com", "password123")
+    id_c = autenticacao.registar("c@d.com", "password123")
+    turma = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.reatribuir_grupo(id_a, turma["id"])
+    grupos.reatribuir_grupo(id_c, turma["id"])
+    _sessao_com_turno(tmp_path, "a@b.com")
+    historico_codigo.registar_execucao(id_c, "executa", "p.algo", [], "Sucesso")
+
+    contagem = ap.contar_historico_grupo(
+        admin_id, True, turma["id"], tipos={"alguem", "codigo"}, pasta_logs=str(tmp_path))
+    assert contagem == {"total": 2, "alguem": 1, "codigo": 1, "num_estudantes": 2}
+
+
+def test_contar_historico_grupo_fora_do_ambito_de_admin_de_grupo_levanta_erro():
+    admin_id = autenticacao.registar("prof@escola.pt", "password123")
+    outra_turma = grupos.criar_grupo("Turma B", criado_por=admin_id)
+    turma_geridas = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.definir_grupos_geridos(admin_id, [turma_geridas["id"]])
+    with pytest.raises(inv.ErroAcessoNegado):
+        ap.contar_historico_grupo(admin_id, False, outra_turma["id"], tipos={"alguem"})
+
+
+def test_preparar_resumo_grupo_nao_precisa_de_llm_configurado(tmp_path):
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    id_a = autenticacao.registar("a@b.com", "password123")
+    turma = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.reatribuir_grupo(id_a, turma["id"])
+    _sessao_com_turno(tmp_path, "a@b.com")
+
+    resumo = ap.preparar_resumo_grupo(admin_id, True, turma["id"], tipos={"alguem"}, pasta_logs=str(tmp_path))
+    assert "[a@b.com]" in resumo
+
+
+def test_preparar_resumo_grupo_sem_estudantes():
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    turma = grupos.criar_grupo("Turma vazia", criado_por=admin_id)
+    resumo = ap.preparar_resumo_grupo(admin_id, True, turma["id"], tipos={"alguem"})
+    assert "não tem estudantes" in resumo
+
+
+def test_preparar_resumo_grupo_fora_do_ambito_de_admin_de_grupo_levanta_erro():
+    admin_id = autenticacao.registar("prof@escola.pt", "password123")
+    outra_turma = grupos.criar_grupo("Turma B", criado_por=admin_id)
+    turma_geridas = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.definir_grupos_geridos(admin_id, [turma_geridas["id"]])
+    with pytest.raises(inv.ErroAcessoNegado):
+        ap.preparar_resumo_grupo(admin_id, False, outra_turma["id"], tipos={"alguem"})
+
+
+def test_gerar_analise_grupo_usa_o_mesmo_prompt(monkeypatch):
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    turma = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    _configurar_llm_apoio_pedagogico(admin_id)
+    fornecedor = _FornecedorFalso()
+    monkeypatch.setattr(ap, "criar_fornecedor", lambda *a, **k: fornecedor)
+
+    analise = ap.gerar_analise_grupo(admin_id, True, turma["id"], "Resumo do grupo confirmado.")
+    assert analise == "resumo-1"
+    mensagens = fornecedor.chamadas[0]
+    assert "apoio pedagógico" in mensagens[0]["content"].lower()
+    assert mensagens[1] == {"role": "user", "content": "Resumo do grupo confirmado."}
+
+
+def test_gerar_analise_grupo_sem_llm_configurado_levanta_erro():
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    turma = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    with pytest.raises(ap.ErroApoioPedagogicoIndisponivel):
+        ap.gerar_analise_grupo(admin_id, True, turma["id"], "Resumo qualquer.")
+
+
+def test_gerar_analise_grupo_fora_do_ambito_de_admin_de_grupo_levanta_erro():
+    admin_id = autenticacao.registar("prof@escola.pt", "password123")
+    outra_turma = grupos.criar_grupo("Turma B", criado_por=admin_id)
+    turma_geridas = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.definir_grupos_geridos(admin_id, [turma_geridas["id"]])
+    with pytest.raises(inv.ErroAcessoNegado):
+        ap.gerar_analise_grupo(admin_id, False, outra_turma["id"], "resumo qualquer")

@@ -595,16 +595,17 @@
       </section>
 
       <section id="aba-conteudo-apoiopedagogico" class="conteudo-aba-admin escondido">
-        <p class="subtitulo">Analisa o histórico de UM estudante (sessões do Alguem e/ou execuções de código) e
-          sugere apoio pedagógico -- visível só para ti, o estudante nunca vê este texto. Se não fores admin
-          global, só consegues escolher estudantes dos teus grupos.</p>
+        <p class="subtitulo">Analisa histórico (sessões do Alguem e/ou execuções de código) de UM estudante ou de
+          um grupo inteiro, e sugere apoio pedagógico -- visível só para ti, o(s) estudante(s) nunca vê(em) este
+          texto. Se não fores admin global, só consegues escolher estudantes/grupos que geres.</p>
 
         <nav class="abas-secundarias-admin">
-          <button type="button" class="aba-secundaria-admin ativa" data-subaba="apoio">Apoio</button>
+          <button type="button" class="aba-secundaria-admin ativa" data-subaba="individualizado">Individualizado</button>
+          <button type="button" class="aba-secundaria-admin" data-subaba="grupo">Grupo</button>
           <button type="button" class="aba-secundaria-admin" data-subaba="definicoes-apoiopedagogico">Definições</button>
         </nav>
 
-        <div id="subaba-conteudo-apoio" class="conteudo-subaba-admin">
+        <div id="subaba-conteudo-individualizado" class="conteudo-subaba-admin">
           <div class="seccao-definicoes-llm">
             <div class="filtros-admin">
               <select id="apoiopedagogico-select-estudante" aria-label="Escolhe um estudante">
@@ -643,6 +644,45 @@
           </div>
         </div>
 
+        <div id="subaba-conteudo-grupo" class="conteudo-subaba-admin escondido">
+          <div class="seccao-definicoes-llm">
+            <div class="filtros-admin">
+              <select id="apoiogrupo-select-grupo" aria-label="Escolhe um grupo">
+                <option value="">Escolhe um grupo...</option>
+              </select>
+              <label class="filtro-data">Desde <input type="date" id="apoiogrupo-data-inicio"></label>
+              <label class="filtro-data">Até <input type="date" id="apoiogrupo-data-fim"></label>
+              <label class="filtro-checkbox"><input type="checkbox" id="apoiogrupo-tipo-alguem" checked> Sessões do Alguem</label>
+              <label class="filtro-checkbox"><input type="checkbox" id="apoiogrupo-tipo-codigo" checked> Execuções de código</label>
+            </div>
+            <p class="ajuda-campo" id="apoiogrupo-contagem"></p>
+            <button type="button" id="botao-gerar-resumo-apoiogrupo" class="botao-primario botao-com-icone">
+              <svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg><span>Gerar resumo</span></button>
+            <p class="mensagem-erro" id="mensagem-erro-apoiogrupo"></p>
+          </div>
+
+          <div id="bloco-resumo-apoiogrupo" class="seccao-definicoes-llm escondido">
+            <div class="cabecalho-seccao-llm"><span>Resumo do histórico do grupo -- revê e edita antes de continuar</span></div>
+            <textarea id="apoiogrupo-texto-resumo" class="prompt-editavel" rows="10"></textarea>
+            <div class="acoes-modal">
+              <button type="button" id="botao-cancelar-resumo-apoiogrupo" class="botao-secundario">Cancelar</button>
+              <button type="button" id="botao-confirmar-analise-apoiogrupo" class="botao-primario botao-com-icone">
+                <svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg><span>Confirmar e analisar</span></button>
+            </div>
+          </div>
+
+          <div id="bloco-analise-apoiogrupo" class="seccao-definicoes-llm escondido">
+            <div class="cabecalho-seccao-llm"><span>Sugestão de apoio pedagógico para o grupo</span></div>
+            <pre id="apoiogrupo-texto-analise" class="prompt-omissao"></pre>
+          </div>
+        </div>
+
         <div id="subaba-conteudo-definicoes-apoiopedagogico" class="conteudo-subaba-admin escondido">
           <div id="bloco-prompt-apoiopedagogico" class="seccao-definicoes-llm">
             <div class="cabecalho-seccao-llm"><span>Prompt (o que o LLM recebe como instrução)</span></div>
@@ -663,8 +703,9 @@
                 </svg><span>Guardar</span></button>
             </div>
           </div>
-          <p class="ajuda-campo">Qual LLM este papel usa fica na aba "LLM". Esta secção (tal como a escolha do
-            LLM) só fica visível para um admin global.</p>
+          <p class="ajuda-campo">Qual LLM este papel usa fica na aba "LLM" -- o mesmo LLM/prompt serve os dois
+            modos acima (Individualizado e Grupo). Esta secção (tal como a escolha do LLM) só fica visível para
+            um admin global.</p>
         </div>
       </section>
 

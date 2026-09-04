@@ -265,3 +265,38 @@ def test_verificar_acesso_estudante_levanta_erro_fora_do_ambito():
     grupos.definir_grupos_geridos(admin_id, [turma_a["id"]])
     with pytest.raises(inv.ErroAcessoNegado):
         inv.verificar_acesso_estudante(admin_id, admin_global=False, estudante_id=id_est)
+
+
+# ---------- listar_grupos_no_ambito_admin / verificar_acesso_grupo (Apoio por Grupo) ----------
+
+def test_listar_grupos_no_ambito_admin_global_ve_todos():
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.criar_grupo("Turma B", criado_por=admin_id)
+    nomes = [g["nome"] for g in inv.listar_grupos_no_ambito_admin(admin_id, admin_global=True)]
+    assert nomes == ["Turma A", "Turma B"]
+
+
+def test_listar_grupos_no_ambito_admin_de_grupo_so_ve_os_que_gere():
+    admin_id = autenticacao.registar("prof@escola.pt", "password123")
+    turma_a = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.criar_grupo("Turma B", criado_por=admin_id)
+    grupos.definir_grupos_geridos(admin_id, [turma_a["id"]])
+    nomes = [g["nome"] for g in inv.listar_grupos_no_ambito_admin(admin_id, admin_global=False)]
+    assert nomes == ["Turma A"]
+
+
+def test_verificar_acesso_grupo_admin_global_sempre_permitido():
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    turma = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    inv.verificar_acesso_grupo(admin_id, admin_global=True, grupo_id=turma["id"])  # não levanta
+
+
+def test_verificar_acesso_grupo_levanta_erro_fora_do_ambito():
+    admin_id = autenticacao.registar("prof@escola.pt", "password123")
+    turma_a = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    turma_b = grupos.criar_grupo("Turma B", criado_por=admin_id)
+    grupos.definir_grupos_geridos(admin_id, [turma_a["id"]])
+    inv.verificar_acesso_grupo(admin_id, admin_global=False, grupo_id=turma_a["id"])  # não levanta
+    with pytest.raises(inv.ErroAcessoNegado):
+        inv.verificar_acesso_grupo(admin_id, admin_global=False, grupo_id=turma_b["id"])

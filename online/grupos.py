@@ -270,6 +270,22 @@ def limpar_grupos(estudante_id: int, dsn: str | None = None) -> None:
         bd.execute("DELETE FROM estudante_grupo WHERE estudante_id = %s", (estudante_id,))
 
 
+def listar_membros(grupo_id: int, dsn: str | None = None) -> list[dict]:
+    """Contas estudante (não admin) deste grupo -- id + email, para
+    quem precisa de operar sobre a turma inteira (ex:
+    online/apoio_pedagogico.py, Apoio por Grupo). Mesmo filtro
+    'admin = FALSE' que exportar_membros_csv já usa."""
+    with sessao_bd(dsn) as bd:
+        linhas = bd.execute(
+            "SELECT estudante.id, estudante.email FROM estudante_grupo "
+            "JOIN estudante ON estudante.id = estudante_grupo.estudante_id "
+            "WHERE estudante_grupo.grupo_id = %s AND estudante.admin = FALSE "
+            "ORDER BY estudante.email",
+            (grupo_id,),
+        ).fetchall()
+    return [dict(linha) for linha in linhas]
+
+
 def exportar_membros_csv(grupo_id: int, dsn: str | None = None) -> str:
     with sessao_bd(dsn) as bd:
         grupo = bd.execute("SELECT nome FROM grupo WHERE id = %s", (grupo_id,)).fetchone()

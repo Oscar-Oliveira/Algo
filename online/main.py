@@ -804,6 +804,80 @@ async def rota_apoio_pedagogico_analise(request: Request, id_estudante: int = De
     return {"analise": analise}
 
 
+# ---------- administração: Apoio por Grupo (mesmo fluxo, para uma turma inteira) ----------
+#
+# Ver apoio_pedagogico.py, secção "Apoio por Grupo" -- reaproveita tal e
+# qual o papel/prompt/LLM 'apoio_pedagogico', só muda o âmbito (um grupo
+# em vez de um estudante). Mesmo controlo de acesso (admin_atual, um
+# admin de grupo só consegue escolher grupos que gere).
+
+@app.get("/api/admin/apoio-pedagogico/grupos")
+async def rota_apoio_pedagogico_grupos(id_estudante: int = Depends(admin_atual)):
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    return {"grupos": await run_in_threadpool(
+        investigacao.listar_grupos_no_ambito_admin, id_estudante, admin_global)}
+
+
+@app.post("/api/admin/apoio-pedagogico/grupo/contagem")
+async def rota_apoio_pedagogico_grupo_contagem(request: Request, id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    grupo_alvo = dados.get("grupo_id")
+    if not isinstance(grupo_alvo, int):
+        raise HTTPException(status_code=400, detail="'grupo_id' em falta ou inválido.")
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    try:
+        contagem = await run_in_threadpool(
+            apoio_pedagogico.contar_historico_grupo, id_estudante, admin_global, grupo_alvo,
+            tipos=_corpo_tipos_apoio_pedagogico(dados),
+            data_inicio=dados.get("data_inicio"), data_fim=dados.get("data_fim"),
+            pasta_logs=_pasta_logs_alguem())
+    except investigacao.ErroAcessoNegado as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except apoio_pedagogico.ErroApoioPedagogico as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return contagem
+
+
+@app.post("/api/admin/apoio-pedagogico/grupo/resumo")
+async def rota_apoio_pedagogico_grupo_resumo(request: Request, id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    grupo_alvo = dados.get("grupo_id")
+    if not isinstance(grupo_alvo, int):
+        raise HTTPException(status_code=400, detail="'grupo_id' em falta ou inválido.")
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    try:
+        resumo = await run_in_threadpool(
+            apoio_pedagogico.preparar_resumo_grupo, id_estudante, admin_global, grupo_alvo,
+            tipos=_corpo_tipos_apoio_pedagogico(dados),
+            data_inicio=dados.get("data_inicio"), data_fim=dados.get("data_fim"),
+            pasta_logs=_pasta_logs_alguem())
+    except investigacao.ErroAcessoNegado as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except apoio_pedagogico.ErroApoioPedagogico as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"resumo": resumo}
+
+
+@app.post("/api/admin/apoio-pedagogico/grupo/analise")
+async def rota_apoio_pedagogico_grupo_analise(request: Request, id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    grupo_alvo = dados.get("grupo_id")
+    if not isinstance(grupo_alvo, int):
+        raise HTTPException(status_code=400, detail="'grupo_id' em falta ou inválido.")
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    try:
+        analise = await run_in_threadpool(
+            apoio_pedagogico.gerar_analise_grupo, id_estudante, admin_global, grupo_alvo,
+            dados.get("resumo", ""))
+    except investigacao.ErroAcessoNegado as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except apoio_pedagogico.ErroApoioPedagogico as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "apoio_pedagogico_grupo_gerado", id_estudante, None, grupo_alvo)
+    return {"analise": analise}
+
+
 # ---------- administração: relatórios de problemas enviados por estudantes ----------
 
 @app.get("/api/admin/relatorios")

@@ -113,6 +113,34 @@ def verificar_acesso_estudante(admin_id: int, admin_global: bool, estudante_id: 
     return email
 
 
+def listar_grupos_no_ambito_admin(admin_id: int, admin_global: bool, dsn: str | None = None) -> list[dict]:
+    """Grupos que este admin pode escolher (Apoio por Grupo) -- mesmo
+    âmbito de acesso que listar_estudantes_no_ambito_admin, mas devolve
+    GRUPOS, não contas: admin global vê todos; admin de grupo só os que
+    gere (grupos.listar_grupos_geridos)."""
+    todos = grupos.listar_grupos(dsn)
+    if admin_global:
+        permitidos = None
+    else:
+        permitidos = set(grupos.listar_grupos_geridos(admin_id, dsn))
+    return [
+        {"id": g["id"], "nome": g["nome"]}
+        for g in todos if permitidos is None or g["id"] in permitidos
+    ]
+
+
+def verificar_acesso_grupo(admin_id: int, admin_global: bool, grupo_id: int, dsn: str | None = None) -> None:
+    """Confirma que este admin pode operar sobre este grupo (secção 15)
+    -- levanta ErroAcessoNegado caso contrário. Equivalente a
+    verificar_acesso_estudante, mas para um grupo inteiro (Apoio por
+    Grupo)."""
+    if admin_global:
+        return
+    permitidos = set(grupos.listar_grupos_geridos(admin_id, dsn))
+    if grupo_id not in permitidos:
+        raise ErroAcessoNegado("Não geres este grupo.")
+
+
 def listar_sessoes_no_ambito(admin_id: int, admin_global: bool, pasta_logs: str | None = None,
                               dsn: str | None = None) -> list[dict]:
     """Todas as sessões que este admin tem permissão para ver (secção

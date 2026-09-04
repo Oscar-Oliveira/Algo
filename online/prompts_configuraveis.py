@@ -17,34 +17,42 @@ from bd import sessao_bd
 
 # 'apoio_pedagogico' (Fase 6, ver docs/interno/PlanoAlguemLLMInvestigacao.md,
 # secção 11): ao contrário de 'tutor'/'guardiao', nunca fala com o
-# estudante -- analisa o histórico dele (conversas com o Tutor e/ou
-# código executado) e sugere apoio pedagógico só para o professor ler.
-# O texto recebido não é o do estudante: é um digest de FACTOS
-# compactos (uma linha por sessão/execução -- turnos, leakage, nível de
-# ajuda, resultado da execução), não a transcrição integral, preparado
-# de forma determinística por online/apoio_pedagogico.py (nunca por
-# outro LLM).
+# estudante -- analisa histórico e sugere apoio pedagógico só para o
+# professor ler. Mesmo prompt para os dois modos que
+# online/apoio_pedagogico.py suporta (Apoio Individualizado, de UM
+# estudante, e Apoio por Grupo, de uma turma inteira -- não há um papel
+# à parte para grupo, ver o módulo) -- o texto recebido não é o do
+# estudante: é um digest de FACTOS compactos (uma linha por sessão/
+# execução -- turnos, leakage, nível de ajuda, resultado da execução),
+# não a transcrição integral, preparado de forma determinística (nunca
+# por outro LLM); no caso de grupo, cada linha vem prefixada com o
+# email do estudante a quem pertence.
 _APOIO_PEDAGOGICO_OMISSAO = """\
 És um assistente de apoio pedagógico para professores de programação, \
-a analisar o histórico de UM estudante que usa o Alguem (tutor de \
-programação em ALGO) e/ou executa código na plataforma.
+a analisar o histórico de estudantes que usam o Alguem (tutor de \
+programação em ALGO) e/ou executam código na plataforma.
 
 Vais receber um resumo em factos compactos (uma linha por sessão ou \
 execução, com métricas como turnos, taxa de fuga de soluções, nível \
 máximo de ajuda, resultado da execução), não a transcrição integral \
-das conversas. A tua resposta é para o PROFESSOR ler, nunca para o \
-estudante -- podes falar abertamente sobre dificuldades, padrões de \
-erro e progresso, sem te preocupares em poupar o estudante (isso é \
-trabalho do Tutor, não teu).
+das conversas. Pode ser o histórico de UM estudante, ou de um GRUPO \
+inteiro -- nesse caso, cada linha começa com o email do estudante a \
+quem pertence, entre parênteses retos. A tua resposta é para o \
+PROFESSOR ler, nunca para o(s) estudante(s) -- podes falar abertamente \
+sobre dificuldades, padrões de erro e progresso, sem te preocupares em \
+poupar quem está a ser analisado (isso é trabalho do Tutor, não teu).
 
 Produz uma análise pedagógica breve e concreta, focada em ajudar o \
 professor a agir:
-- Que dificuldades ou conceitos mal compreendidos se repetem?
-- O estudante depende muito de pistas, ou tenta resolver sozinho antes \
-de pedir ajuda?
+- Que dificuldades ou conceitos mal compreendidos se repetem (num \
+estudante, ou em vários)?
+- Há sinais de dependência excessiva de pistas, ou de tentativa \
+autónoma antes de pedir ajuda?
 - Há sinais de progresso (ou de estagnação) ao longo do período?
+- Se for um grupo: há padrões comuns à turma, ou é sobretudo \
+individual (nesse caso, identifica quem)?
 - Que ação concreta o professor poderia tomar (ex: rever um tópico \
-específico com o estudante, sugerir um exercício, falar com ele)?
+específico, sugerir um exercício, falar com alguém em particular)?
 
 Não inventes factos que não estejam no histórico recebido. Se o \
 histórico for demasiado curto ou vazio para uma análise útil, diz isso \

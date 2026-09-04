@@ -2016,6 +2016,11 @@ async function carregarApoioPedagogico() {
   if (EH_ADMIN_GLOBAL) carregarPrompts();
   await popularEstudantesApoioPedagogico();
   atualizarContagemApoioPedagogico();
+  // Subaba "Grupo" (ver mais abaixo) vive na mesma aba lateral --
+  // carrega-se aqui em vez de ter o seu próprio dispatch em
+  // carregarConteudoDaAba, já que "apoiogrupo" deixou de ser uma aba
+  // de topo (fundida nesta, ver secção 11-bis do plano).
+  await carregarApoioGrupo();
 }
 
 async function popularEstudantesApoioPedagogico() {
@@ -2176,6 +2181,184 @@ botaoConfirmarAnaliseApoioPedagogico.addEventListener("click", async () => {
     mensagemErroApoioPedagogico.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
   } finally {
     botaoConfirmarAnaliseApoioPedagogico.disabled = false;
+  }
+});
+
+// ---------- Apoio por Grupo (mesmo fluxo do Apoio Individualizado, para uma turma) ----------
+
+const selectGrupoApoioGrupo = document.getElementById("apoiogrupo-select-grupo");
+const dataInicioApoioGrupo = document.getElementById("apoiogrupo-data-inicio");
+const dataFimApoioGrupo = document.getElementById("apoiogrupo-data-fim");
+const checkboxTipoAlguemApoioGrupo = document.getElementById("apoiogrupo-tipo-alguem");
+const checkboxTipoCodigoApoioGrupo = document.getElementById("apoiogrupo-tipo-codigo");
+const botaoGerarResumoApoioGrupo = document.getElementById("botao-gerar-resumo-apoiogrupo");
+const mensagemErroApoioGrupo = document.getElementById("mensagem-erro-apoiogrupo");
+const blocoResumoApoioGrupo = document.getElementById("bloco-resumo-apoiogrupo");
+const textoResumoApoioGrupo = document.getElementById("apoiogrupo-texto-resumo");
+const botaoCancelarResumoApoioGrupo = document.getElementById("botao-cancelar-resumo-apoiogrupo");
+const botaoConfirmarAnaliseApoioGrupo = document.getElementById("botao-confirmar-analise-apoiogrupo");
+const blocoAnaliseApoioGrupo = document.getElementById("bloco-analise-apoiogrupo");
+const textoAnaliseApoioGrupo = document.getElementById("apoiogrupo-texto-analise");
+const contagemApoioGrupo = document.getElementById("apoiogrupo-contagem");
+
+async function carregarApoioGrupo() {
+  await popularGruposApoioGrupo();
+  atualizarContagemApoioGrupo();
+}
+
+async function popularGruposApoioGrupo() {
+  const valorAtual = selectGrupoApoioGrupo.value;
+  try {
+    const resposta = await fetch("/api/admin/apoio-pedagogico/grupos");
+    if (!resposta.ok) return;
+    const { grupos: listaGrupos } = await resposta.json();
+    selectGrupoApoioGrupo.innerHTML = '<option value="">Escolhe um grupo...</option>';
+    listaGrupos.forEach((grupo) => {
+      const opcao = document.createElement("option");
+      opcao.value = grupo.id;
+      opcao.textContent = grupo.nome;
+      selectGrupoApoioGrupo.appendChild(opcao);
+    });
+    selectGrupoApoioGrupo.value = valorAtual;
+  } catch (erro) {
+    console.error(erro);
+  }
+}
+
+function esconderResultadosApoioGrupo() {
+  blocoResumoApoioGrupo.classList.add("escondido");
+  blocoAnaliseApoioGrupo.classList.add("escondido");
+  textoResumoApoioGrupo.value = "";
+  textoAnaliseApoioGrupo.textContent = "";
+}
+
+function tiposEscolhidosApoioGrupo() {
+  const tipos = [];
+  if (checkboxTipoAlguemApoioGrupo.checked) tipos.push("alguem");
+  if (checkboxTipoCodigoApoioGrupo.checked) tipos.push("codigo");
+  return tipos;
+}
+
+let tokenContagemApoioGrupo = 0;
+
+async function atualizarContagemApoioGrupo() {
+  const token = ++tokenContagemApoioGrupo;
+  const grupoId = selectGrupoApoioGrupo.value;
+  if (!grupoId) {
+    contagemApoioGrupo.textContent = "";
+    return;
+  }
+  const tipos = tiposEscolhidosApoioGrupo();
+  if (!tipos.length) {
+    contagemApoioGrupo.textContent = "Escolhe pelo menos um tipo de histórico.";
+    return;
+  }
+  contagemApoioGrupo.textContent = "A calcular quantidade de histórico...";
+  try {
+    const resposta = await fetch("/api/admin/apoio-pedagogico/grupo/contagem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grupo_id: Number(grupoId),
+        tipos,
+        data_inicio: dataInicioApoioGrupo.value || null,
+        data_fim: dataFimApoioGrupo.value || null,
+      }),
+    });
+    if (token !== tokenContagemApoioGrupo) return;
+    if (!resposta.ok) {
+      contagemApoioGrupo.textContent = "";
+      return;
+    }
+    const contagem = await resposta.json();
+    if (!contagem.total) {
+      contagemApoioGrupo.textContent = `Sem histórico para estes filtros (${contagem.num_estudantes} estudante(s) no grupo).`;
+      return;
+    }
+    const partes = [];
+    if (contagem.alguem) partes.push(`${contagem.alguem} sessão(ões) do Alguem`);
+    if (contagem.codigo) partes.push(`${contagem.codigo} execução(ões) de código`);
+    contagemApoioGrupo.textContent =
+      `${contagem.total} item(ns) de histórico em ${contagem.num_estudantes} estudante(s) -- ${partes.join(", ")}.`;
+  } catch (erro) {
+    if (token !== tokenContagemApoioGrupo) return;
+    console.error(erro);
+    contagemApoioGrupo.textContent = "";
+  }
+}
+
+[selectGrupoApoioGrupo, dataInicioApoioGrupo, dataFimApoioGrupo,
+  checkboxTipoAlguemApoioGrupo, checkboxTipoCodigoApoioGrupo].forEach((el) =>
+  el.addEventListener("change", () => {
+    esconderResultadosApoioGrupo();
+    atualizarContagemApoioGrupo();
+  }));
+
+botaoGerarResumoApoioGrupo.addEventListener("click", async () => {
+  mensagemErroApoioGrupo.textContent = "";
+  esconderResultadosApoioGrupo();
+  const grupoId = selectGrupoApoioGrupo.value;
+  if (!grupoId) {
+    mensagemErroApoioGrupo.textContent = "Escolhe um grupo primeiro.";
+    return;
+  }
+  const tipos = tiposEscolhidosApoioGrupo();
+  if (!tipos.length) {
+    mensagemErroApoioGrupo.textContent = "Escolhe pelo menos um tipo de histórico.";
+    return;
+  }
+  botaoGerarResumoApoioGrupo.disabled = true;
+  try {
+    const resposta = await fetch("/api/admin/apoio-pedagogico/grupo/resumo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grupo_id: Number(grupoId),
+        tipos,
+        data_inicio: dataInicioApoioGrupo.value || null,
+        data_fim: dataFimApoioGrupo.value || null,
+      }),
+    });
+    const corpo = await resposta.json();
+    if (!resposta.ok) {
+      mensagemErroApoioGrupo.textContent = corpo.detail || "Não foi possível gerar o resumo.";
+      return;
+    }
+    textoResumoApoioGrupo.value = corpo.resumo;
+    blocoResumoApoioGrupo.classList.remove("escondido");
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroApoioGrupo.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  } finally {
+    botaoGerarResumoApoioGrupo.disabled = false;
+  }
+});
+
+botaoCancelarResumoApoioGrupo.addEventListener("click", esconderResultadosApoioGrupo);
+
+botaoConfirmarAnaliseApoioGrupo.addEventListener("click", async () => {
+  mensagemErroApoioGrupo.textContent = "";
+  const grupoId = selectGrupoApoioGrupo.value;
+  const resumo = textoResumoApoioGrupo.value;
+  botaoConfirmarAnaliseApoioGrupo.disabled = true;
+  try {
+    const resposta = await fetch("/api/admin/apoio-pedagogico/grupo/analise", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grupo_id: Number(grupoId), resumo }),
+    });
+    const corpo = await resposta.json();
+    if (!resposta.ok) {
+      mensagemErroApoioGrupo.textContent = corpo.detail || "Não foi possível gerar a análise.";
+      return;
+    }
+    textoAnaliseApoioGrupo.textContent = corpo.analise;
+    blocoAnaliseApoioGrupo.classList.remove("escondido");
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroApoioGrupo.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  } finally {
+    botaoConfirmarAnaliseApoioGrupo.disabled = false;
   }
 });
 

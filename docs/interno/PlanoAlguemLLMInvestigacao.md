@@ -842,6 +842,23 @@ por uma revisão humana antes de seguir para o LLM.
   recebe uma sugestão de apoio pedagógico -- sem o estudante alguma
   vez ver esse texto. Um admin de grupo só consegue fazer isto para
   estudantes dos seus grupos.
+- **Extensão em 2026-09-04: Apoio por Grupo.** Continua **um só** botão
+  na barra lateral ("Apoio Pedagógico"), agora com TRÊS subabas, nesta
+  ordem: "Individualizado" (o que já ficou descrito acima), "Grupo"
+  (mesmo fluxo, mas para uma turma inteira) e "Definições" (por
+  último). Reaproveita tudo entre Individualizado/Grupo: mesmo papel/
+  config de LLM, mesmo prompt `apoio_pedagogico` (generalizado para
+  cobrir os dois casos), mesmo mecanismo de resumo determinístico -- só
+  junta os blocos de cada membro do grupo (`grupos.listar_membros`),
+  prefixados com `[email do estudante]` para o LLM conseguir distinguir
+  um padrão comum à turma de algo isolado a uma pessoa
+  (`apoio_pedagogico.montar_blocos_historico_grupo`). Acesso pelo mesmo
+  princípio (`investigacao.verificar_acesso_grupo` -- admin de grupo só
+  escolhe grupos que gere); rotas em `/api/admin/apoio-pedagogico/
+  grupo/*` e `/api/admin/apoio-pedagogico/grupos` (listagem, âmbito-
+  filtrada). A subaba "Grupo" não tem "Definições" própria -- reaproveita
+  a mesma configuração de LLM/prompt da subaba "Definições" (que serve
+  os dois modos).
 
 ## Perguntas em aberto para a fase de implementação
 

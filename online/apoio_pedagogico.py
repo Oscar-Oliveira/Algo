@@ -1,24 +1,28 @@
 # -*- coding: utf-8 -*-
 """Apoio Pedagógico -- terceiro papel de LLM (ver
 docs/interno/PlanoAlguemLLMInvestigacao.md, secção 11/Fase 6): sempre
-da plataforma (nunca do estudante), analisa o histórico de UM
-estudante (sessões do Alguem e/ou execuções de código) sob pedido do
-admin e devolve uma sugestão de apoio pedagógico -- nunca gravada como
-sessão, nunca visível ao estudante.
+da plataforma (nunca do estudante), analisa o histórico de UM estudante
+("Apoio Individualizado") OU de um grupo inteiro ("Apoio por Grupo",
+mesmo fluxo, uma função *_grupo por cada uma abaixo) -- sessões do
+Alguem e/ou execuções de código -- sob pedido do admin, e devolve uma
+sugestão de apoio pedagógico -- nunca gravada como sessão, nunca
+visível ao(s) estudante(s).
 
 Fluxo em DOIS pedidos, com revisão humana obrigatória entre eles (nunca
 um só pedido que já entrega a análise final):
 
-1. preparar_resumo(...)  -- monta o histórico como FACTOS compactos
-   (não a transcrição/resultado integral, ver _formatar_sessao_alguem/
-   _formatar_execucao_codigo) e, se ainda assim não couber num limite
-   de tamanho, encolhe-o de forma DETERMINÍSTICA (_truncar_por_tamanho)
-   -- nenhum LLM é chamado neste passo, nem é preciso ter algum
-   configurado. Devolve o texto para o admin ler e, se quiser, editar.
-2. gerar_analise(...)    -- só depois do admin confirmar (com o texto
-   tal como ficou), envia-o ao LLM configurado, junto do prompt
-   'apoio_pedagogico', e devolve a análise. Este é o único passo que
-   fala com um LLM.
+1. preparar_resumo(...) / preparar_resumo_grupo(...) -- monta o
+   histórico como FACTOS compactos (não a transcrição/resultado
+   integral, ver _formatar_sessao_alguem/_formatar_execucao_codigo) e,
+   se ainda assim não couber num limite de tamanho, encolhe-o de forma
+   DETERMINÍSTICA (_truncar_por_tamanho) -- nenhum LLM é chamado neste
+   passo, nem é preciso ter algum configurado. Devolve o texto para o
+   admin ler e, se quiser, editar.
+2. gerar_analise(...) / gerar_analise_grupo(...) -- só depois do admin
+   confirmar (com o texto tal como ficou), envia-o ao LLM configurado,
+   junto do prompt 'apoio_pedagogico' (o mesmo para os dois casos, ver
+   prompts_configuraveis.py), e devolve a análise. Este é o único
+   passo que fala com um LLM.
 """
 from __future__ import annotations
 
@@ -27,6 +31,7 @@ from alguem.nucleo import registador
 from alguem.scripts import metricas
 
 import configuracao_llm
+import grupos
 import historico_codigo
 import investigacao
 import prompts_configuraveis
@@ -193,8 +198,9 @@ def _truncar_por_tamanho(blocos: list[str], limite: int) -> str:
 def preparar_resumo(admin_id: int, admin_global: bool, estudante_id: int, *, tipos: set[str],
                      data_inicio: str | None = None, data_fim: str | None = None,
                      pasta_logs: str | None = None, dsn: str | None = None) -> str:
-    """Primeiro passo do fluxo (ver módulo) -- puramente determinístico,
-    nunca fala com nenhum LLM (não precisa de nenhum configurado)."""
+    """Primeiro passo do fluxo (ver módulo), para UM estudante --
+    puramente determinístico, nunca fala com nenhum LLM (não precisa de
+    nenhum configurado)."""
     email = investigacao.verificar_acesso_estudante(admin_id, admin_global, estudante_id, dsn)
     blocos = montar_blocos_historico(
         estudante_id, email, tipos=tipos, data_inicio=data_inicio, data_fim=data_fim,
@@ -204,12 +210,11 @@ def preparar_resumo(admin_id: int, admin_global: bool, estudante_id: int, *, tip
     return _truncar_por_tamanho([b["texto"] for b in blocos], LIMITE_CARATERES_HISTORICO)
 
 
-def gerar_analise(admin_id: int, admin_global: bool, estudante_id: int, resumo: str,
-                   dsn: str | None = None) -> str:
-    """Segundo passo (ver módulo) -- 'resumo' é o texto que o admin
-    confirmou (o que preparar_resumo devolveu, editado ou não). Único
-    passo do fluxo que fala com um LLM."""
-    investigacao.verificar_acesso_estudante(admin_id, admin_global, estudante_id, dsn)
+def _gerar_analise_com_resumo(resumo: str, dsn: str | None) -> str:
+    """Partilhado por gerar_analise/gerar_analise_grupo -- o pedido ao
+    LLM em si não distingue estudante de grupo, só o resumo que recebe
+    (que já vem com o email de cada estudante quando é de um grupo, ver
+    montar_blocos_historico_grupo)."""
     if not resumo or not resumo.strip():
         raise ErroApoioPedagogico("O resumo está vazio -- gera ou escreve algo antes de pedir a análise.")
     fornecedor = _fornecedor_apoio_pedagogico()
@@ -219,3 +224,83 @@ def gerar_analise(admin_id: int, admin_global: bool, estudante_id: int, resumo: 
         return fornecedor.responder(mensagens)
     except ErroFornecedorLLM as e:
         raise ErroApoioPedagogicoIndisponivel(f"Falha ao gerar a análise: {e}") from e
+
+
+def gerar_analise(admin_id: int, admin_global: bool, estudante_id: int, resumo: str,
+                   dsn: str | None = None) -> str:
+    """Segundo passo (ver módulo), para UM estudante -- 'resumo' é o
+    texto que o admin confirmou (o que preparar_resumo devolveu,
+    editado ou não). Único passo do fluxo que fala com um LLM."""
+    investigacao.verificar_acesso_estudante(admin_id, admin_global, estudante_id, dsn)
+    return _gerar_analise_com_resumo(resumo, dsn)
+
+
+# ---------- Apoio por Grupo -- mesmo fluxo, para um grupo inteiro ----------
+#
+# Reaproveita tal e qual montar_blocos_historico/_truncar_por_tamanho/
+# _gerar_analise_com_resumo por estudante -- a única diferença é juntar
+# os blocos de cada membro do grupo (prefixados com o email, para o
+# LLM conseguir atribuir cada facto à pessoa certa) antes de aplicar o
+# mesmo mecanismo de truncagem. Mesmo papel de LLM, mesmo prompt
+# 'apoio_pedagogico' (que já cobre os dois casos, ver
+# prompts_configuraveis.py) -- não há um papel/config à parte para
+# grupo.
+
+def montar_blocos_historico_grupo(membros: list[dict], *, tipos: set[str],
+                                   data_inicio: str | None = None, data_fim: str | None = None,
+                                   pasta_logs: str | None = None, dsn: str | None = None) -> list[dict]:
+    """'membros' é a lista de {"id", "email"} do grupo (ver
+    grupos.listar_membros). Cada bloco fica prefixado com
+    '[email do estudante]', para uma análise de grupo conseguir
+    distinguir um padrão comum a toda a turma de algo isolado a uma
+    pessoa."""
+    _validar_tipos(tipos)
+    blocos: list[dict] = []
+    for membro in membros:
+        for bloco in montar_blocos_historico(
+                membro["id"], membro["email"], tipos=tipos, data_inicio=data_inicio,
+                data_fim=data_fim, pasta_logs=pasta_logs, dsn=dsn):
+            bloco["texto"] = f"[{membro['email']}] {bloco['texto']}"
+            blocos.append(bloco)
+    blocos.sort(key=lambda b: b["timestamp"])
+    return blocos
+
+
+def contar_historico_grupo(admin_id: int, admin_global: bool, grupo_id: int, *, tipos: set[str],
+                            data_inicio: str | None = None, data_fim: str | None = None,
+                            pasta_logs: str | None = None, dsn: str | None = None) -> dict:
+    """Equivalente a contar_historico, para um grupo inteiro -- inclui
+    'num_estudantes' (membros do grupo), além dos totais por tipo."""
+    investigacao.verificar_acesso_grupo(admin_id, admin_global, grupo_id, dsn)
+    membros = grupos.listar_membros(grupo_id, dsn)
+    blocos = montar_blocos_historico_grupo(
+        membros, tipos=tipos, data_inicio=data_inicio, data_fim=data_fim, pasta_logs=pasta_logs, dsn=dsn)
+    return {
+        "total": len(blocos),
+        "alguem": sum(1 for b in blocos if b["tipo"] == "alguem"),
+        "codigo": sum(1 for b in blocos if b["tipo"] == "codigo"),
+        "num_estudantes": len(membros),
+    }
+
+
+def preparar_resumo_grupo(admin_id: int, admin_global: bool, grupo_id: int, *, tipos: set[str],
+                           data_inicio: str | None = None, data_fim: str | None = None,
+                           pasta_logs: str | None = None, dsn: str | None = None) -> str:
+    """Equivalente a preparar_resumo, para um grupo inteiro --
+    puramente determinístico, nunca fala com nenhum LLM."""
+    investigacao.verificar_acesso_grupo(admin_id, admin_global, grupo_id, dsn)
+    membros = grupos.listar_membros(grupo_id, dsn)
+    if not membros:
+        return "(Este grupo não tem estudantes.)"
+    blocos = montar_blocos_historico_grupo(
+        membros, tipos=tipos, data_inicio=data_inicio, data_fim=data_fim, pasta_logs=pasta_logs, dsn=dsn)
+    if not blocos:
+        return "(Sem histórico para este grupo no período/âmbito escolhido.)"
+    return _truncar_por_tamanho([b["texto"] for b in blocos], LIMITE_CARATERES_HISTORICO)
+
+
+def gerar_analise_grupo(admin_id: int, admin_global: bool, grupo_id: int, resumo: str,
+                         dsn: str | None = None) -> str:
+    """Equivalente a gerar_analise, para um grupo inteiro."""
+    investigacao.verificar_acesso_grupo(admin_id, admin_global, grupo_id, dsn)
+    return _gerar_analise_com_resumo(resumo, dsn)

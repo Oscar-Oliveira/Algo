@@ -2447,3 +2447,99 @@ def test_admin_de_grupo_acede_apoio_pedagogico_dos_seus_grupos_mas_nao_fora(clie
         "estudante_id": id_fora, "tipos": ["alguem", "codigo"]})
     assert r_fora.status_code == 403
 
+
+# ---------- Apoio por Grupo (mesmo fluxo do Apoio Individualizado, para uma turma) ----------
+
+def test_apoio_pedagogico_grupos_lista_grupos_no_ambito(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    cliente.post("/api/admin/grupos", json={"nome": "Turma A"})
+    r = cliente.get("/api/admin/apoio-pedagogico/grupos")
+    assert r.status_code == 200
+    nomes = [g["nome"] for g in r.json()["grupos"]]
+    assert "Turma A" in nomes
+
+
+def test_apoio_pedagogico_grupo_contagem_nao_precisa_de_llm_configurado(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Turma A"}).json()
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={
+        "email": "aluno@escola.pt", "password": "password123", "codigo_grupo": grupo["codigo"]})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_est = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "aluno@escola.pt")
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+
+    r = cliente.post("/api/admin/apoio-pedagogico/grupo/contagem", json={
+        "grupo_id": grupo["id"], "tipos": ["alguem", "codigo"]})
+    assert r.status_code == 200
+    assert r.json() == {"total": 1, "alguem": 0, "codigo": 1, "num_estudantes": 1}
+
+
+def test_apoio_pedagogico_grupo_fluxo_completo_resumo_e_analise(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Turma A"}).json()
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={
+        "email": "aluno@escola.pt", "password": "password123", "codigo_grupo": grupo["codigo"]})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_est = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "aluno@escola.pt")
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+    _configurar_llm_apoio_pedagogico_admin(cliente)
+
+    fornecedor = _FornecedorApoioPedagogicoFalso()
+    monkeypatch.setattr(apoio_pedagogico, "criar_fornecedor", lambda *a, **k: fornecedor)
+
+    r = cliente.post("/api/admin/apoio-pedagogico/grupo/resumo", json={
+        "grupo_id": grupo["id"], "tipos": ["codigo"]})
+    assert r.status_code == 200
+    resumo = r.json()["resumo"]
+    assert "[aluno@escola.pt]" in resumo
+    assert "p.algo" in resumo
+
+    r = cliente.post("/api/admin/apoio-pedagogico/grupo/analise", json={
+        "grupo_id": grupo["id"], "resumo": resumo})
+    assert r.status_code == 200
+    assert r.json()["analise"] == "Sugestão de apoio pedagógico."
+
+    log = cliente.get("/api/admin/log").json()
+    tipos = {e["tipo"] for e in log["eventos"]}
+    assert "apoio_pedagogico_grupo_gerado" in tipos
+
+
+def test_apoio_pedagogico_grupo_analise_sem_llm_configurado_devolve_400(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Turma A"}).json()
+    r = cliente.post("/api/admin/apoio-pedagogico/grupo/analise", json={
+        "grupo_id": grupo["id"], "resumo": "Resumo qualquer."})
+    assert r.status_code == 400
+
+
+def test_admin_de_grupo_acede_apoio_por_grupo_dos_seus_grupos_mas_nao_fora(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    turma_dentro = cliente.post("/api/admin/grupos", json={"nome": "Turma Dentro"}).json()
+    turma_fora = cliente.post("/api/admin/grupos", json={"nome": "Turma Fora"}).json()
+    _configurar_llm_apoio_pedagogico_admin(cliente)
+    _tornar_outro_admin_de_grupo(cliente, monkeypatch, turma_dentro["id"])
+    cliente.post("/api/sair")
+
+    cliente.post("/api/entrar", json={"email": "outro@escola.pt", "password": "password123"})
+    r_dentro = cliente.post("/api/admin/apoio-pedagogico/grupo/resumo", json={
+        "grupo_id": turma_dentro["id"], "tipos": ["alguem", "codigo"]})
+    assert r_dentro.status_code == 200
+
+    r_fora = cliente.post("/api/admin/apoio-pedagogico/grupo/resumo", json={
+        "grupo_id": turma_fora["id"], "tipos": ["alguem", "codigo"]})
+    assert r_fora.status_code == 403
+

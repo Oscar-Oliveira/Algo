@@ -162,6 +162,18 @@ def test_exportar_membros_csv_grupo_inexistente_da_erro():
         grupos.exportar_membros_csv(999)
 
 
+def test_listar_membros_devolve_id_e_email():
+    resultado = grupos.criar_grupo("Grupo A")
+    id_est = autenticacao.registar("aluno@escola.pt", "password123", codigo_grupo=resultado["codigo"])
+    membros = grupos.listar_membros(resultado["id"])
+    assert membros == [{"id": id_est, "email": "aluno@escola.pt"}]
+
+
+def test_listar_membros_grupo_vazio():
+    resultado = grupos.criar_grupo("Grupo A")
+    assert grupos.listar_membros(resultado["id"]) == []
+
+
 # ---------- grupos geridos por um admin de grupo (estudante_grupo, âmbito N) ----------
 
 def test_definir_grupos_geridos_e_listar():
