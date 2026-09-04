@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """Testes de online.apoio_pedagogico -- terceiro papel de LLM (ver
 docs/interno/PlanoAlguemLLMInvestigacao.md, secção 11/Fase 6): monta o
-histórico filtrado de um estudante, resume-o (mecanismo automático por
-tamanho) e gera uma análise, sempre com o controlo de acesso por grupo
-já usado pela Investigação."""
+histórico filtrado de um estudante como factos compactos, encolhe-o de
+forma determinística se necessário (sem LLM nenhum) e só depois gera
+uma análise (o único passo que fala com um LLM), sempre com o controlo
+de acesso por grupo já usado pela Investigação."""
 import pytest
 
 import apoio_pedagogico as ap
@@ -49,15 +50,23 @@ def test_montar_blocos_historico_valida_tipos():
         ap.montar_blocos_historico(1, "a@b.com", tipos={"desconhecido"})
 
 
-def test_montar_blocos_historico_so_alguem(tmp_path):
+def test_montar_blocos_historico_so_alguem_e_um_facto_compacto_nao_a_transcricao(tmp_path):
+    """Decisão revista: o bloco de uma sessão é um facto de uma linha
+    (métricas), não a transcrição integral da conversa -- é o que
+    permite a preparar_resumo nunca precisar de um LLM para encolher."""
     id_est = autenticacao.registar("a@b.com", "password123")
     _sessao_com_turno(tmp_path, "a@b.com")
     historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
 
     blocos = ap.montar_blocos_historico(id_est, "a@b.com", tipos={"alguem"}, pasta_logs=str(tmp_path))
     assert len(blocos) == 1
-    assert "Estudante: Como faço um ciclo?" in blocos[0]["texto"]
-    assert "Alguem: Tenta pensar em repetição." in blocos[0]["texto"]
+    assert blocos[0]["tipo"] == "alguem"
+    texto = blocos[0]["texto"]
+    assert "1 turno(s)" in texto
+    assert "leakage" in texto
+    # nunca o conteúdo real da conversa
+    assert "Como faço um ciclo?" not in texto
+    assert "Tenta pensar em repetição." not in texto
 
 
 def test_montar_blocos_historico_so_codigo(tmp_path):
@@ -67,6 +76,7 @@ def test_montar_blocos_historico_so_codigo(tmp_path):
 
     blocos = ap.montar_blocos_historico(id_est, "a@b.com", tipos={"codigo"}, pasta_logs=str(tmp_path))
     assert len(blocos) == 1
+    assert blocos[0]["tipo"] == "codigo"
     assert "p.algo" in blocos[0]["texto"]
 
 
@@ -98,78 +108,83 @@ def test_montar_blocos_historico_filtra_por_periodo(tmp_path):
     assert blocos == []
 
 
-# ---------- _resumir_por_tamanho (mecanismo automático) ----------
+# ---------- _truncar_por_tamanho (determinístico, sem LLM) ----------
 
-def test_resumir_por_tamanho_cabe_num_so_pedido():
-    fornecedor = _FornecedorFalso()
-    resultado = ap._resumir_por_tamanho(fornecedor, ["bloco pequeno"], limite=1000)
-    assert len(fornecedor.chamadas) == 1
-    assert resultado == "resumo-1"
+def test_truncar_por_tamanho_cabe_devolve_tal_qual():
+    resultado = ap._truncar_por_tamanho(["bloco pequeno"], limite=1000)
+    assert resultado == "bloco pequeno"
 
 
-def test_resumir_por_tamanho_sem_blocos_nao_chama_llm():
-    fornecedor = _FornecedorFalso()
-    assert ap._resumir_por_tamanho(fornecedor, [], limite=1000) == ""
-    assert fornecedor.chamadas == []
+def test_truncar_por_tamanho_sem_blocos():
+    assert ap._truncar_por_tamanho([], limite=1000) == ""
 
 
-def test_resumir_por_tamanho_map_reduce_quando_nao_cabe():
-    """Quatro blocos de 30 caracteres cada (120 no total) não cabem num
-    limite de 50 -- tem de agrupar em fatias, resumir cada uma (mais de
-    uma chamada), e só devolver sem precisar de uma segunda ronda
-    porque os resumos já cabem no limite."""
-    fornecedor = _FornecedorFalso()
-    blocos = ["b" * 30, "c" * 30, "d" * 30, "e" * 30]
-    resultado = ap._resumir_por_tamanho(fornecedor, blocos, limite=50)
-    assert len(fornecedor.chamadas) > 1
-    assert resultado  # algum texto voltou
+def test_truncar_por_tamanho_mantem_inicio_e_fim_quando_nao_cabe():
+    """Seis blocos de 10 caracteres, limite pequeno -- tem de manter
+    alguns do início e alguns do fim (nunca só recência), com uma marca
+    de quantos ficaram de fora pelo meio."""
+    blocos = [f"bloco{i:02d} " for i in range(6)]  # 8 caracteres cada
+    resultado = ap._truncar_por_tamanho(blocos, limite=20)
+    assert blocos[0].strip() in resultado
+    assert blocos[-1].strip() in resultado
+    assert "omitido" in resultado
 
 
-def test_resumir_por_tamanho_nunca_corta_um_bloco_a_meio():
-    fornecedor = _FornecedorFalso()
+def test_truncar_por_tamanho_nunca_corta_um_bloco_a_meio():
     blocos = ["x" * 40, "y" * 40]
-    ap._resumir_por_tamanho(fornecedor, blocos, limite=50)
-    # cada bloco (40) excede metade do limite (50) -- teem de ir cada um
-    # para a sua própria fatia, nunca os dois juntos (80 > 50)
-    for chamada in fornecedor.chamadas:
-        texto_enviado = chamada[-1]["content"]
-        assert "x" * 40 not in texto_enviado or "y" * 40 not in texto_enviado
+    resultado = ap._truncar_por_tamanho(blocos, limite=50)
+    # cada bloco (40) excede metade do limite (50) -- não podem os dois
+    # inteiros aparecer juntos sem cortar nenhum a meio
+    assert not ("x" * 40 in resultado and "y" * 40 in resultado)
 
 
-# ---------- preparar_resumo / gerar_analise (fluxo completo) ----------
+# ---------- contar_historico (pré-visualização, sem LLM) ----------
 
-def test_preparar_resumo_sem_llm_configurado_levanta_erro(tmp_path):
+def test_contar_historico_conta_por_tipo(tmp_path):
     admin_id = autenticacao.registar("admin@escola.pt", "password123")
     id_est = autenticacao.registar("a@b.com", "password123")
     _sessao_com_turno(tmp_path, "a@b.com")
-    with pytest.raises(ap.ErroApoioPedagogicoIndisponivel):
-        ap.preparar_resumo(
-            admin_id, True, id_est, tipos={"alguem"}, pasta_logs=str(tmp_path))
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+    historico_codigo.registar_execucao(id_est, "executa", "q.algo", [], "Sucesso")
+
+    contagem = ap.contar_historico(admin_id, True, id_est, tipos={"alguem", "codigo"}, pasta_logs=str(tmp_path))
+    assert contagem == {"total": 3, "alguem": 1, "codigo": 2}
 
 
-def test_preparar_resumo_sem_historico_nao_chama_llm(tmp_path, monkeypatch):
+def test_contar_historico_nao_precisa_de_llm_configurado(tmp_path):
     admin_id = autenticacao.registar("admin@escola.pt", "password123")
     id_est = autenticacao.registar("a@b.com", "password123")
-    _configurar_llm_apoio_pedagogico(admin_id)
-    fornecedor = _FornecedorFalso()
-    monkeypatch.setattr(ap, "criar_fornecedor", lambda *a, **k: fornecedor)
+    _sessao_com_turno(tmp_path, "a@b.com")
+    contagem = ap.contar_historico(admin_id, True, id_est, tipos={"alguem"}, pasta_logs=str(tmp_path))
+    assert contagem == {"total": 1, "alguem": 1, "codigo": 0}
 
+
+def test_contar_historico_fora_do_ambito_de_admin_de_grupo_levanta_erro():
+    admin_id = autenticacao.registar("prof@escola.pt", "password123")
+    id_est = autenticacao.registar("a@b.com", "password123")
+    turma_a = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.definir_grupos_geridos(admin_id, [turma_a["id"]])
+    with pytest.raises(inv.ErroAcessoNegado):
+        ap.contar_historico(admin_id, False, id_est, tipos={"alguem"})
+
+
+# ---------- preparar_resumo (determinístico, sem LLM nenhum) ----------
+
+def test_preparar_resumo_nao_precisa_de_llm_configurado(tmp_path):
+    """Decisão revista: preparar_resumo nunca fala com um LLM -- deve
+    funcionar mesmo sem NENHUMA configuração de 'apoio_pedagogico'."""
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    id_est = autenticacao.registar("a@b.com", "password123")
+    _sessao_com_turno(tmp_path, "a@b.com")
     resumo = ap.preparar_resumo(admin_id, True, id_est, tipos={"alguem"}, pasta_logs=str(tmp_path))
+    assert "turno(s)" in resumo
+
+
+def test_preparar_resumo_sem_historico():
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    id_est = autenticacao.registar("a@b.com", "password123")
+    resumo = ap.preparar_resumo(admin_id, True, id_est, tipos={"alguem"}, pasta_logs=None)
     assert "Sem histórico" in resumo
-    assert fornecedor.chamadas == []
-
-
-def test_preparar_resumo_com_historico_chama_llm(tmp_path, monkeypatch):
-    admin_id = autenticacao.registar("admin@escola.pt", "password123")
-    id_est = autenticacao.registar("a@b.com", "password123")
-    _configurar_llm_apoio_pedagogico(admin_id)
-    _sessao_com_turno(tmp_path, "a@b.com")
-    fornecedor = _FornecedorFalso()
-    monkeypatch.setattr(ap, "criar_fornecedor", lambda *a, **k: fornecedor)
-
-    resumo = ap.preparar_resumo(admin_id, True, id_est, tipos={"alguem"}, pasta_logs=str(tmp_path))
-    assert resumo == "resumo-1"
-    assert len(fornecedor.chamadas) == 1
 
 
 def test_preparar_resumo_fora_do_ambito_de_admin_de_grupo_levanta_erro(tmp_path):
@@ -180,6 +195,8 @@ def test_preparar_resumo_fora_do_ambito_de_admin_de_grupo_levanta_erro(tmp_path)
     with pytest.raises(inv.ErroAcessoNegado):
         ap.preparar_resumo(admin_id, False, id_est, tipos={"alguem"}, pasta_logs=str(tmp_path))
 
+
+# ---------- gerar_analise (o único passo que fala com um LLM) ----------
 
 def test_gerar_analise_usa_o_prompt_configurado(monkeypatch):
     admin_id = autenticacao.registar("admin@escola.pt", "password123")
@@ -194,6 +211,13 @@ def test_gerar_analise_usa_o_prompt_configurado(monkeypatch):
     assert mensagens[0]["role"] == "system"
     assert "apoio pedagógico" in mensagens[0]["content"].lower()
     assert mensagens[1] == {"role": "user", "content": "Resumo confirmado pelo admin."}
+
+
+def test_gerar_analise_sem_llm_configurado_levanta_erro():
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    id_est = autenticacao.registar("a@b.com", "password123")
+    with pytest.raises(ap.ErroApoioPedagogicoIndisponivel):
+        ap.gerar_analise(admin_id, True, id_est, "Resumo qualquer.")
 
 
 def test_gerar_analise_rejeita_resumo_vazio():

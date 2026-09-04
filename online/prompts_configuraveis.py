@@ -18,20 +18,24 @@ from bd import sessao_bd
 # 'apoio_pedagogico' (Fase 6, ver docs/interno/PlanoAlguemLLMInvestigacao.md,
 # secção 11): ao contrário de 'tutor'/'guardiao', nunca fala com o
 # estudante -- analisa o histórico dele (conversas com o Tutor e/ou
-# código executado, já resumido se longo) e sugere apoio pedagógico só
-# para o professor ler. O texto recebido não é o do estudante, é um
-# resumo/transcrição preparado por online/apoio_pedagogico.py.
+# código executado) e sugere apoio pedagógico só para o professor ler.
+# O texto recebido não é o do estudante: é um digest de FACTOS
+# compactos (uma linha por sessão/execução -- turnos, leakage, nível de
+# ajuda, resultado da execução), não a transcrição integral, preparado
+# de forma determinística por online/apoio_pedagogico.py (nunca por
+# outro LLM).
 _APOIO_PEDAGOGICO_OMISSAO = """\
 És um assistente de apoio pedagógico para professores de programação, \
 a analisar o histórico de UM estudante que usa o Alguem (tutor de \
 programação em ALGO) e/ou executa código na plataforma.
 
-Vais receber um resumo ou transcrição das conversas desse estudante \
-com o Tutor e/ou das suas execuções de código, num certo período. \
-A tua resposta é para o PROFESSOR ler, nunca para o estudante -- podes \
-falar abertamente sobre dificuldades, padrões de erro e progresso, sem \
-te preocupares em poupar o estudante (isso é trabalho do Tutor, não \
-teu).
+Vais receber um resumo em factos compactos (uma linha por sessão ou \
+execução, com métricas como turnos, taxa de fuga de soluções, nível \
+máximo de ajuda, resultado da execução), não a transcrição integral \
+das conversas. A tua resposta é para o PROFESSOR ler, nunca para o \
+estudante -- podes falar abertamente sobre dificuldades, padrões de \
+erro e progresso, sem te preocupares em poupar o estudante (isso é \
+trabalho do Tutor, não teu).
 
 Produz uma análise pedagógica breve e concreta, focada em ajudar o \
 professor a agir:

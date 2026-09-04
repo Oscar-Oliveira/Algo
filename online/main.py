@@ -26,7 +26,6 @@ from contextlib import asynccontextmanager
 import bd
 import autenticacao
 import atividade
-import apoio_pedagogico
 import definicoes
 import grupos
 import limitador_registo
@@ -36,6 +35,12 @@ import configuracao_llm
 import historico_codigo
 import investigacao
 import prompts_configuraveis
+# 'apoio_pedagogico' importa de 'alguem.*' tal como os módulos acima --
+# tem de vir depois de 'modo_codemirror' (é esse import, efeito
+# secundário à parte, que insere a raiz do projeto em sys.path; ver
+# modo_codemirror.py:14-15). Pô-lo antes disso parte o arranque do
+# servidor com ModuleNotFoundError: 'alguem'.
+import apoio_pedagogico
 import executor
 import projeto
 import relatorios
@@ -730,6 +735,30 @@ def _corpo_tipos_apoio_pedagogico(dados: dict) -> set[str]:
     if not isinstance(tipos, list):
         raise HTTPException(status_code=400, detail="'tipos' tem de ser uma lista.")
     return set(tipos)
+
+
+@app.post("/api/admin/apoio-pedagogico/contagem")
+async def rota_apoio_pedagogico_contagem(request: Request, id_estudante: int = Depends(admin_atual)):
+    """Pré-visualização da quantidade de histórico (sessões do Alguem/
+    execuções de código) para os filtros escolhidos, ANTES de pedir o
+    resumo -- não chama nenhum LLM, nem exige um configurado (ver
+    apoio_pedagogico.contar_historico)."""
+    dados = await corpo_json(request)
+    estudante_alvo = dados.get("estudante_id")
+    if not isinstance(estudante_alvo, int):
+        raise HTTPException(status_code=400, detail="'estudante_id' em falta ou inválido.")
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    try:
+        contagem = await run_in_threadpool(
+            apoio_pedagogico.contar_historico, id_estudante, admin_global, estudante_alvo,
+            tipos=_corpo_tipos_apoio_pedagogico(dados),
+            data_inicio=dados.get("data_inicio"), data_fim=dados.get("data_fim"),
+            pasta_logs=_pasta_logs_alguem())
+    except investigacao.ErroAcessoNegado as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except apoio_pedagogico.ErroApoioPedagogico as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return contagem
 
 
 @app.post("/api/admin/apoio-pedagogico/resumo")

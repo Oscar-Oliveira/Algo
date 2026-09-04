@@ -2002,16 +2002,20 @@ const botaoCancelarResumoApoioPedagogico = document.getElementById("botao-cancel
 const botaoConfirmarAnaliseApoioPedagogico = document.getElementById("botao-confirmar-analise-apoiopedagogico");
 const blocoAnaliseApoioPedagogico = document.getElementById("bloco-analise-apoiopedagogico");
 const textoAnaliseApoioPedagogico = document.getElementById("apoiopedagogico-texto-analise");
-const blocoPromptApoioPedagogico = document.getElementById("bloco-prompt-apoiopedagogico");
+const contagemApoioPedagogico = document.getElementById("apoiopedagogico-contagem");
+const subabaDefinicoesApoioPedagogico = document.querySelector(
+  '.aba-secundaria-admin[data-subaba="definicoes-apoiopedagogico"]');
 
 // Editar o prompt/LLM deste papel fica só para admin global (secção
 // 15) -- gerar uma análise, não: um admin de grupo continua a poder
 // usar esta aba para os estudantes dos seus grupos, só não edita o
-// prompt nem escolhe o LLM (isso fica na aba "LLM"/aqui escondido).
+// prompt nem escolhe o LLM (isso fica na aba "LLM"), por isso nem vê a
+// subaba "Definições".
 async function carregarApoioPedagogico() {
-  blocoPromptApoioPedagogico.classList.toggle("escondido", !EH_ADMIN_GLOBAL);
+  subabaDefinicoesApoioPedagogico.classList.toggle("escondido", !EH_ADMIN_GLOBAL);
   if (EH_ADMIN_GLOBAL) carregarPrompts();
   await popularEstudantesApoioPedagogico();
+  atualizarContagemApoioPedagogico();
 }
 
 async function popularEstudantesApoioPedagogico() {
@@ -2040,7 +2044,72 @@ function esconderResultadosApoioPedagogico() {
   textoAnaliseApoioPedagogico.textContent = "";
 }
 
-selectEstudanteApoioPedagogico.addEventListener("change", esconderResultadosApoioPedagogico);
+function tiposEscolhidosApoioPedagogico() {
+  const tipos = [];
+  if (checkboxTipoAlguemApoioPedagogico.checked) tipos.push("alguem");
+  if (checkboxTipoCodigoApoioPedagogico.checked) tipos.push("codigo");
+  return tipos;
+}
+
+// Pré-visualização da quantidade de histórico ANTES de pedir o resumo
+// (não chama nenhum LLM) -- atualiza sempre que o estudante, o
+// período ou os tipos mudam, para o admin decidir se vale a pena
+// gerar o resumo. 'token' evita que uma resposta antiga (pedido lento,
+// filtro mudou entretanto) sobreponha o resultado de um pedido mais
+// recente.
+let tokenContagemApoioPedagogico = 0;
+
+async function atualizarContagemApoioPedagogico() {
+  const token = ++tokenContagemApoioPedagogico;
+  const estudanteId = selectEstudanteApoioPedagogico.value;
+  if (!estudanteId) {
+    contagemApoioPedagogico.textContent = "";
+    return;
+  }
+  const tipos = tiposEscolhidosApoioPedagogico();
+  if (!tipos.length) {
+    contagemApoioPedagogico.textContent = "Escolhe pelo menos um tipo de histórico.";
+    return;
+  }
+  contagemApoioPedagogico.textContent = "A calcular quantidade de histórico...";
+  try {
+    const resposta = await fetch("/api/admin/apoio-pedagogico/contagem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        estudante_id: Number(estudanteId),
+        tipos,
+        data_inicio: dataInicioApoioPedagogico.value || null,
+        data_fim: dataFimApoioPedagogico.value || null,
+      }),
+    });
+    if (token !== tokenContagemApoioPedagogico) return;
+    if (!resposta.ok) {
+      contagemApoioPedagogico.textContent = "";
+      return;
+    }
+    const contagem = await resposta.json();
+    if (!contagem.total) {
+      contagemApoioPedagogico.textContent = "Sem histórico para estes filtros.";
+      return;
+    }
+    const partes = [];
+    if (contagem.alguem) partes.push(`${contagem.alguem} sessão(ões) do Alguem`);
+    if (contagem.codigo) partes.push(`${contagem.codigo} execução(ões) de código`);
+    contagemApoioPedagogico.textContent = `${contagem.total} item(ns) de histórico -- ${partes.join(", ")}.`;
+  } catch (erro) {
+    if (token !== tokenContagemApoioPedagogico) return;
+    console.error(erro);
+    contagemApoioPedagogico.textContent = "";
+  }
+}
+
+[selectEstudanteApoioPedagogico, dataInicioApoioPedagogico, dataFimApoioPedagogico,
+  checkboxTipoAlguemApoioPedagogico, checkboxTipoCodigoApoioPedagogico].forEach((el) =>
+  el.addEventListener("change", () => {
+    esconderResultadosApoioPedagogico();
+    atualizarContagemApoioPedagogico();
+  }));
 
 botaoGerarResumoApoioPedagogico.addEventListener("click", async () => {
   mensagemErroApoioPedagogico.textContent = "";
@@ -2050,9 +2119,7 @@ botaoGerarResumoApoioPedagogico.addEventListener("click", async () => {
     mensagemErroApoioPedagogico.textContent = "Escolhe um estudante primeiro.";
     return;
   }
-  const tipos = [];
-  if (checkboxTipoAlguemApoioPedagogico.checked) tipos.push("alguem");
-  if (checkboxTipoCodigoApoioPedagogico.checked) tipos.push("codigo");
+  const tipos = tiposEscolhidosApoioPedagogico();
   if (!tipos.length) {
     mensagemErroApoioPedagogico.textContent = "Escolhe pelo menos um tipo de histórico.";
     return;

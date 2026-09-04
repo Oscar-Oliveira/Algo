@@ -7,5 +7,4 @@ docker compose up -d --build
 
 ---
 
-permitir apoio pedagogico filtrado por tipos de logs
-
+manual de admin

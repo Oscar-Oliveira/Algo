@@ -885,6 +885,25 @@ button {
   color: var(--texto-claro);
 }
 
+/* Checkbox + texto na mesma linha de filtros (.filtros-admin) -- mesma
+   altura/moldura que .filtro-data acima, para não ficar desalinhado ao
+   lado dos chips de data ou do select (sem isto, o checkbox usa o
+   tamanho de letra por omissão do browser e fica sem caixa nenhuma à
+   volta, com uma altura/baseline diferente de tudo o resto na linha). */
+.filtro-checkbox {
+  display: inline-flex;
+  align-items: center;
+  height: 2.3rem;
+  box-sizing: border-box;
+  gap: 0.4rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--tinta-borda);
+  border-radius: 8px;
+  background: var(--tinta-clara);
+  font-size: 0.82rem;
+  color: var(--texto-esmaecido);
+}
+
 /* ---------- Investigação: dashboard (secção 6, skill dataviz) ---------- */
 
 .grelha-graficos {

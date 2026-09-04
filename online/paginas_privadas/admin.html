@@ -599,64 +599,72 @@
           sugere apoio pedagógico -- visível só para ti, o estudante nunca vê este texto. Se não fores admin
           global, só consegues escolher estudantes dos teus grupos.</p>
 
-        <div class="seccao-definicoes-llm">
-          <div class="formulario formulario-inline">
-            <label>Estudante
-              <select id="apoiopedagogico-select-estudante">
+        <nav class="abas-secundarias-admin">
+          <button type="button" class="aba-secundaria-admin ativa" data-subaba="apoio">Apoio</button>
+          <button type="button" class="aba-secundaria-admin" data-subaba="definicoes-apoiopedagogico">Definições</button>
+        </nav>
+
+        <div id="subaba-conteudo-apoio" class="conteudo-subaba-admin">
+          <div class="seccao-definicoes-llm">
+            <div class="filtros-admin">
+              <select id="apoiopedagogico-select-estudante" aria-label="Escolhe um estudante">
                 <option value="">Escolhe um estudante...</option>
               </select>
-            </label>
-            <label class="filtro-data">Desde <input type="date" id="apoiopedagogico-data-inicio"></label>
-            <label class="filtro-data">Até <input type="date" id="apoiopedagogico-data-fim"></label>
-          </div>
-          <div class="formulario formulario-inline">
-            <label><input type="checkbox" id="apoiopedagogico-tipo-alguem" checked> Sessões do Alguem</label>
-            <label><input type="checkbox" id="apoiopedagogico-tipo-codigo" checked> Execuções de código</label>
-          </div>
-          <button type="button" id="botao-gerar-resumo-apoiopedagogico" class="botao-primario botao-com-icone">
-            <svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg><span>Gerar resumo</span></button>
-          <p class="mensagem-erro" id="mensagem-erro-apoiopedagogico"></p>
-        </div>
-
-        <div id="bloco-resumo-apoiopedagogico" class="seccao-definicoes-llm escondido">
-          <div class="cabecalho-seccao-llm"><span>Resumo do histórico -- revê e edita antes de continuar</span></div>
-          <textarea id="apoiopedagogico-texto-resumo" class="prompt-editavel" rows="10"></textarea>
-          <div class="acoes-modal">
-            <button type="button" id="botao-cancelar-resumo-apoiopedagogico" class="botao-secundario">Cancelar</button>
-            <button type="button" id="botao-confirmar-analise-apoiopedagogico" class="botao-primario botao-com-icone">
+              <label class="filtro-data">Desde <input type="date" id="apoiopedagogico-data-inicio"></label>
+              <label class="filtro-data">Até <input type="date" id="apoiopedagogico-data-fim"></label>
+              <label class="filtro-checkbox"><input type="checkbox" id="apoiopedagogico-tipo-alguem" checked> Sessões do Alguem</label>
+              <label class="filtro-checkbox"><input type="checkbox" id="apoiopedagogico-tipo-codigo" checked> Execuções de código</label>
+            </div>
+            <p class="ajuda-campo" id="apoiopedagogico-contagem"></p>
+            <button type="button" id="botao-gerar-resumo-apoiopedagogico" class="botao-primario botao-com-icone">
               <svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg><span>Confirmar e analisar</span></button>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg><span>Gerar resumo</span></button>
+            <p class="mensagem-erro" id="mensagem-erro-apoiopedagogico"></p>
+          </div>
+
+          <div id="bloco-resumo-apoiopedagogico" class="seccao-definicoes-llm escondido">
+            <div class="cabecalho-seccao-llm"><span>Resumo do histórico -- revê e edita antes de continuar</span></div>
+            <textarea id="apoiopedagogico-texto-resumo" class="prompt-editavel" rows="10"></textarea>
+            <div class="acoes-modal">
+              <button type="button" id="botao-cancelar-resumo-apoiopedagogico" class="botao-secundario">Cancelar</button>
+              <button type="button" id="botao-confirmar-analise-apoiopedagogico" class="botao-primario botao-com-icone">
+                <svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg><span>Confirmar e analisar</span></button>
+            </div>
+          </div>
+
+          <div id="bloco-analise-apoiopedagogico" class="seccao-definicoes-llm escondido">
+            <div class="cabecalho-seccao-llm"><span>Sugestão de apoio pedagógico</span></div>
+            <pre id="apoiopedagogico-texto-analise" class="prompt-omissao"></pre>
           </div>
         </div>
 
-        <div id="bloco-analise-apoiopedagogico" class="seccao-definicoes-llm escondido">
-          <div class="cabecalho-seccao-llm"><span>Sugestão de apoio pedagógico</span></div>
-          <pre id="apoiopedagogico-texto-analise" class="prompt-omissao"></pre>
-        </div>
-
-        <div id="bloco-prompt-apoiopedagogico" class="seccao-definicoes-llm escondido">
-          <div class="cabecalho-seccao-llm"><span>Prompt (o que o LLM recebe como instrução)</span></div>
-          <textarea id="prompt-texto-apoio_pedagogico" class="prompt-editavel" rows="8"></textarea>
-          <p class="ajuda-campo">Valor por omissão:</p>
-          <pre id="prompt-omissao-apoio_pedagogico" class="prompt-omissao"></pre>
-          <div class="acoes-modal">
-            <button type="button" id="botao-repor-prompt-apoio_pedagogico" class="botao-secundario botao-com-icone"><svg
-                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="1 4 1 10 7 10" />
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg><span>Repor por omissão</span></button>
-            <button type="button" id="botao-guardar-prompt-apoio_pedagogico" class="botao-primario botao-com-icone"><svg
-                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg><span>Guardar</span></button>
+        <div id="subaba-conteudo-definicoes-apoiopedagogico" class="conteudo-subaba-admin escondido">
+          <div id="bloco-prompt-apoiopedagogico" class="seccao-definicoes-llm">
+            <div class="cabecalho-seccao-llm"><span>Prompt (o que o LLM recebe como instrução)</span></div>
+            <textarea id="prompt-texto-apoio_pedagogico" class="prompt-editavel" rows="8"></textarea>
+            <p class="ajuda-campo">Valor por omissão:</p>
+            <pre id="prompt-omissao-apoio_pedagogico" class="prompt-omissao"></pre>
+            <div class="acoes-modal">
+              <button type="button" id="botao-repor-prompt-apoio_pedagogico" class="botao-secundario botao-com-icone"><svg
+                  class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg><span>Repor por omissão</span></button>
+              <button type="button" id="botao-guardar-prompt-apoio_pedagogico" class="botao-primario botao-com-icone"><svg
+                  class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg><span>Guardar</span></button>
+            </div>
           </div>
+          <p class="ajuda-campo">Qual LLM este papel usa fica na aba "LLM". Esta secção (tal como a escolha do
+            LLM) só fica visível para um admin global.</p>
         </div>
       </section>
 

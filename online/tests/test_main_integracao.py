@@ -2324,6 +2324,22 @@ def test_investigacao_estudantes_lista_contas_no_ambito(cliente, monkeypatch):
     assert "aluno@escola.pt" in emails
 
 
+def test_apoio_pedagogico_contagem_nao_precisa_de_llm_configurado(cliente, monkeypatch):
+    """Pré-visualização (secção 11/Fase 6, refinamento) -- ao contrário
+    de /resumo e /analise, não exige nenhum LLM configurado, porque
+    nunca chama nenhum, só conta histórico."""
+    _entrar_como_admin(cliente, monkeypatch)
+    id_est = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "professor@escola.pt")
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+
+    r = cliente.post("/api/admin/apoio-pedagogico/contagem", json={
+        "estudante_id": id_est, "tipos": ["alguem", "codigo"]})
+    assert r.status_code == 200
+    assert r.json() == {"total": 1, "alguem": 0, "codigo": 1}
+
+
 def test_apoio_pedagogico_resumo_exige_pelo_menos_um_tipo(cliente, monkeypatch):
     _entrar_como_admin(cliente, monkeypatch)
     _configurar_llm_apoio_pedagogico_admin(cliente)
@@ -2334,16 +2350,28 @@ def test_apoio_pedagogico_resumo_exige_pelo_menos_um_tipo(cliente, monkeypatch):
     assert r.status_code == 400
 
 
-def test_apoio_pedagogico_resumo_sem_llm_configurado_devolve_400(cliente, monkeypatch):
+def test_apoio_pedagogico_resumo_nao_precisa_de_llm_configurado(cliente, monkeypatch):
+    """Decisão revista (ver apoio_pedagogico.py): /resumo é puramente
+    determinístico -- funciona mesmo sem NENHUM LLM configurado para
+    'apoio_pedagogico'. Só /analise precisa de um."""
     _entrar_como_admin(cliente, monkeypatch)
     id_est = next(
         u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
         if u["email"] == "professor@escola.pt")
-    # precisa de ALGUM histórico -- sem nenhum, preparar_resumo devolve
-    # a mensagem "sem histórico" ANTES de sequer precisar do LLM.
     historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
     r = cliente.post("/api/admin/apoio-pedagogico/resumo", json={
         "estudante_id": id_est, "tipos": ["alguem", "codigo"]})
+    assert r.status_code == 200
+    assert "p.algo" in r.json()["resumo"]
+
+
+def test_apoio_pedagogico_analise_sem_llm_configurado_devolve_400(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    id_est = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "professor@escola.pt")
+    r = cliente.post("/api/admin/apoio-pedagogico/analise", json={
+        "estudante_id": id_est, "resumo": "Resumo qualquer."})
     assert r.status_code == 400
 
 

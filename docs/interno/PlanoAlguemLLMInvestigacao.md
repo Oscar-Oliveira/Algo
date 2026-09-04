@@ -767,45 +767,54 @@ por uma revisão humana antes de seguir para o LLM.
     "pesquisa direta por email" que a secção 10 previa e ainda não
     tinha ficado exposta) como pelo novo seletor do Apoio Pedagógico.
   - `montar_blocos_historico(estudante_id, *, tipos, data_inicio,
-    data_fim, pasta_logs=None) -> list[str]`: um bloco de texto por
-    sessão do Alguem (se `"alguem" in tipos`) e/ou por execução de
-    código (se `"codigo" in tipos`), já formatado para leitura humana
-    -- a sessão inclui a transcrição real (pergunta do estudante +
-    resposta final entregue, por turno, a partir dos eventos
-    `tentativa_guardiao`/`resposta_final` em bruto, não só as métricas
-    agregadas que `investigacao.py` usa) porque um LLM de apoio
-    pedagógico precisa do conteúdo, não só de números. `tipos` é
-    `{"alguem"}`, `{"codigo"}` ou `{"alguem", "codigo"}` (pelo menos um
-    -- validado). `historico_codigo.listar_por_estudante` ganha
-    `data_inicio`/`data_fim` opcionais (mesma convenção ISO-8601 já
-    usada em `investigacao.filtrar_sessoes`), para o filtro de período
-    também cobrir código, não só sessões.
-  - **Resumo, mecanismo automático por tamanho** (não uma escolha do
-    admin -- essa é uma decisão técnica que não lhe compete): se o
-    texto de todos os blocos juntos couber num limite de carateres
-    configurável, uma única chamada ao LLM de apoio pedagógico pede um
-    resumo do histórico completo; se não couber, os blocos são
-    agrupados em fatias que cabem no limite, cada fatia é resumida à
-    parte (uma chamada por fatia), e se os resumos juntos ainda
-    excederem o limite, o mesmo processo repete-se sobre os resumos
-    (map-reduce simples, com um limite de rondas por segurança --
-    histórico de um estudante não deve precisar de mais que 2-3). Um
-    bloco nunca é cortado a meio.
+    data_fim, pasta_logs=None) -> list[dict]`: um bloco
+    `{"timestamp", "texto", "tipo"}` por sessão do Alguem (se
+    `"alguem" in tipos`) e/ou por execução de código (se
+    `"codigo" in tipos`). `tipos` é `{"alguem"}`, `{"codigo"}` ou
+    `{"alguem", "codigo"}` (pelo menos um -- validado).
+    `historico_codigo.listar_por_estudante` ganha `data_inicio`/
+    `data_fim` opcionais (mesma convenção ISO-8601 já usada em
+    `investigacao.filtrar_sessoes`), para o filtro de período também
+    cobrir código, não só sessões.
+  - **Revisto em 2026-09-04, depois de uma primeira versão implementada**:
+    a ideia original desta secção usava a transcrição real da sessão
+    (pergunta + resposta por turno) e, se não coubesse num limite de
+    carateres, chamava o próprio LLM de apoio pedagógico para a
+    resumir (map-reduce). Trocado por um desenho mais simples e mais
+    barato depois de reconsiderado com o utilizador: cada bloco passa a
+    ser um FACTO compacto de uma linha (reaproveitando as métricas que
+    `metricas.calcular_metricas_da_sessao` já calcula -- turnos,
+    Solution Leakage Rate, nível máximo de escalada -- para sessões; o
+    `resultado` já resumido de `execucao_codigo`, para código), não a
+    transcrição integral. Isto normalmente já cabe sozinho no limite,
+    sem precisar de encolher nada; quando não cabe,
+    `_truncar_por_tamanho` corta de forma **determinística** (mantém o
+    início e o fim do período, a meio orçamento de carateres cada, para
+    preservar sinal de progressão ao longo do tempo em vez de só
+    recência, e assinala quantos itens ficaram de fora pelo meio) --
+    **nenhum LLM é chamado neste passo**. Perde-se o conteúdo literal
+    das trocas (menos narrativo), mas ganha-se: zero custo/latência
+    extra, nada para um resumo-LLM hallucinate ou cortar em silêncio, e
+    o que o admin revê antes de confirmar é a informação real, não a
+    paráfrase de um LLM sobre ela.
   - **Revisão humana obrigatória antes da análise final** -- por isso
-    o fluxo fica em DOIS pedidos distintos, nunca um só:
-    1. `preparar_resumo(...) -> str` -- só gera e devolve o resumo (ou
-       o histórico bruto tal qual, se já coubesse sem precisar de
-       resumir), para o admin ler, e se quiser, editar.
+    o fluxo continua em DOIS pedidos distintos, nunca um só:
+    1. `preparar_resumo(...) -> str` -- monta os blocos e, se
+       necessário, trunca-os deterministicamente; devolve o texto para
+       o admin ler e, se quiser, editar. **Não fala com nenhum LLM,
+       nem exige um configurado.**
     2. `gerar_analise(estudante_id, resumo_texto, admin_id) -> str` --
        o admin confirma (com o texto tal como ficou, editado ou não);
        só agora se envia esse texto, mais o prompt `apoio_pedagogico`,
-       ao LLM configurado, e a resposta é devolvida. Não fica gravada
-       como sessão nova (decisão validada, ponto 6) -- só o pedido
-       fica auditado (ver abaixo).
-  - Ambas as chamadas (resumo e análise final) usam o MESMO fornecedor
-    -- o configurado para `apoio_pedagogico` -- não há um "LLM
-    diferente para resumir"; simplifica o desenho e evita um quarto
-    papel.
+       ao LLM configurado, e a resposta é devolvida -- **o único passo
+       do fluxo que fala com um LLM**. Não fica gravada como sessão
+       nova (decisão validada, ponto 6) -- só o pedido fica auditado
+       (ver abaixo).
+  - `contar_historico(...) -> {"total", "alguem", "codigo"}`:
+    pré-visualização da quantidade de histórico para os filtros
+    escolhidos, ANTES de pedir o resumo -- também nunca fala com um
+    LLM. Rota `/api/admin/apoio-pedagogico/contagem`, chamada pela UI
+    sempre que o estudante/período/tipos mudam.
 - **Auditoria**: gerar uma análise (não só ver o histórico bruto) fica
   registado em `log_atividade` (tipo `apoio_pedagogico_gerado`, ator =
   admin, alvo = estudante), mesmo espírito do ponto 8 já aplicado à
