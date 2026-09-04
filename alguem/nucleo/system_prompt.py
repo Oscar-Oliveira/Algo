@@ -32,8 +32,12 @@ descobrir o passo seguinte por si mesmo -- não te limites a dizer que \
 não podes ajudar."""
 
 
-def construir_system_prompt(politica: PoliticaPedagogica) -> str:
-    partes = [IDENTIDADE, "\n" + REFERENCIA_SINTAXE]
+def construir_system_prompt(politica: PoliticaPedagogica, identidade: str = IDENTIDADE) -> str:
+    """'identidade' é editável pelo admin no painel web (ver
+    docs/interno/PlanoAlguemLLMInvestigacao.md, secção 13/Fase 3) --
+    substitui só este bloco inicial, o resto do prompt continua
+    derivado da política pedagógica como sempre."""
+    partes = [identidade, "\n" + REFERENCIA_SINTAXE]
 
     partes.append(
         "\nEscada de níveis de ajuda -- usa sempre o nível mais baixo "

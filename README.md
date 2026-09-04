@@ -18,8 +18,8 @@ se precisares).
 ### 1. Linha de comandos (uso individual, numa máquina)
 
 ```bash
-./instaladores/algo.sh        # Linux/macOS -- algo.command também funciona no macOS
-instaladores\algo.bat         # Windows
+./repl/algo.sh        # Linux/macOS -- algo.command também funciona no macOS
+repl\algo.bat         # Windows
 ```
 
 Instala tudo o que for preciso na primeira vez (ambiente virtual
@@ -44,7 +44,7 @@ arquitetura, e o que ainda falta testar em `online/README.md`.
 
 ```
 .
-├── instaladores/        # scripts de arranque da consola local (algo.sh / algo.bat / algo.command)
+├── repl/                # scripts de arranque da consola local (algo.sh / algo.bat / algo.command)
 ├── algo_lang/          # o compilador -- nunca alterado entre CLI e online
 │   └── tests/            # suite de testes do compilador (CLI)
 ├── editores/vscode-algo/ # extensão de realce de sintaxe para VS Code

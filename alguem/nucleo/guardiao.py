@@ -137,8 +137,13 @@ Categoria (uma palavra só, maiúsculas):"""
 
 
 class GuardiaoPedagogico:
-    def __init__(self, fornecedor: AgenteLLM):
+    def __init__(self, fornecedor: AgenteLLM, prompt_classificacao: str = PROMPT_CLASSIFICACAO):
+        """'prompt_classificacao' é editável pelo admin no painel web
+        (ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção 13/Fase
+        3) -- tem de manter o placeholder '{delimitador}' (duas vezes)
+        e '{resposta}', usados em _classificar_por_llm."""
         self.fornecedor = fornecedor
+        self.prompt_classificacao = prompt_classificacao
 
     def classificar(self, resposta: str) -> Classificacao:
         """Classifica uma resposta proposta pelo Alguem. Primeiro tenta
@@ -164,7 +169,7 @@ class GuardiaoPedagogico:
         # a avaliar, confundindo onde o "dado" acaba e as instruções
         # do prompt continuam.
         delimitador = f"===={secrets.token_hex(8)}===="
-        pedido = [{"role": "user", "content": PROMPT_CLASSIFICACAO.format(
+        pedido = [{"role": "user", "content": self.prompt_classificacao.format(
             resposta=resposta, delimitador=delimitador)}]
         try:
             texto = self.fornecedor.responder(pedido).strip().upper()

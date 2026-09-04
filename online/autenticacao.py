@@ -94,12 +94,13 @@ def registar(email: str, password: str, codigo_grupo: str | None = None,
     email for um dos admins -- caso contrário a conta fica pendente até
     um admin a aprovar. 'codigo_grupo' é sempre opcional: se indicado,
     tem de corresponder a um grupo ativo (ErroAutenticacao caso
-    contrário); se omitido, a conta fica sem grupo (grupo_id NULL) até
-    um admin lha atribuir. Levanta ErroAutenticacao se os dados forem
-    inválidos ou se o email já estiver em uso -- ON-12: a mensagem para
-    email já em uso é deliberadamente genérica (não diz "já existe
-    conta"), para não revelar a quem regista quais emails já têm
-    conta -- a mesma filosofia já aplicada em autenticar()."""
+    contrário); se omitido, a conta fica sem grupo (nenhuma linha em
+    estudante_grupo) até um admin lha atribuir. Levanta ErroAutenticacao
+    se os dados forem inválidos ou se o email já estiver em uso --
+    ON-12: a mensagem para email já em uso é deliberadamente genérica
+    (não diz "já existe conta"), para não revelar a quem regista quais
+    emails já têm conta -- a mesma filosofia já aplicada em
+    autenticar()."""
     email = _validar_email(email)
     _validar_password(password)
     password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
@@ -117,11 +118,17 @@ def registar(email: str, password: str, codigo_grupo: str | None = None,
     try:
         with sessao_bd(dsn) as bd:
             cursor = bd.execute(
-                "INSERT INTO estudante (email, password_hash, id_pseudonimo, aprovado, admin, grupo_id) "
-                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                (email, password_hash, id_pseudonimo, aprovado, eh_admin, grupo_id),
+                "INSERT INTO estudante (email, password_hash, id_pseudonimo, aprovado, admin) "
+                "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                (email, password_hash, id_pseudonimo, aprovado, eh_admin),
             )
-            return cursor.fetchone()["id"]
+            estudante_id = cursor.fetchone()["id"]
+            if grupo_id is not None:
+                bd.execute(
+                    "INSERT INTO estudante_grupo (estudante_id, grupo_id) VALUES (%s, %s)",
+                    (estudante_id, grupo_id),
+                )
+            return estudante_id
     except psycopg.errors.UniqueViolation as e:
         raise ErroAutenticacao(
             "Não foi possível concluir o registo com estes dados. Se já "
@@ -137,6 +144,21 @@ def esta_aprovado(estudante_id: int, dsn: str | None = None) -> bool:
     return bool(linha and linha["aprovado"])
 
 
+def obter_email(estudante_id: int, dsn: str | None = None) -> str:
+    """Ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção 4/Fase 4:
+    os eventos do Alguem passam a identificar o estudante pelo email
+    diretamente, não pelo id_pseudonimo (ver obter_id_pseudonimo
+    abaixo, que continua a existir só para o isolamento de pasta de
+    execução em executor.py, sem relação com isto)."""
+    with sessao_bd(dsn) as bd:
+        linha = bd.execute(
+            "SELECT email FROM estudante WHERE id = %s", (estudante_id,)
+        ).fetchone()
+    if linha is None:
+        raise ErroAutenticacao("Conta não encontrada.")
+    return linha["email"]
+
+
 def obter_id_pseudonimo(estudante_id: int, dsn: str | None = None) -> str:
     """O identificador usado nos logs do Alguem -- nunca o id da conta
     nem o email diretamente, para as conversas registadas não ficarem
@@ -148,6 +170,21 @@ def obter_id_pseudonimo(estudante_id: int, dsn: str | None = None) -> str:
     if linha is None:
         raise ErroAutenticacao("Conta não encontrada.")
     return linha["id_pseudonimo"]
+
+
+def _grupo_do_estudante_esta_inativo(estudante_id: int, dsn: str | None = None) -> bool:
+    """Só usado para o bloqueio de login por grupo desativado (ver
+    autenticar) -- só se aplica a contas não-admin, por isso só olha
+    para uma linha (uma conta não-admin tem no máximo uma em
+    estudante_grupo, ver grupos.reatribuir_grupo)."""
+    with sessao_bd(dsn) as bd:
+        linha = bd.execute(
+            "SELECT grupo.ativo FROM estudante_grupo "
+            "JOIN grupo ON grupo.id = estudante_grupo.grupo_id "
+            "WHERE estudante_grupo.estudante_id = %s LIMIT 1",
+            (estudante_id,),
+        ).fetchone()
+    return linha is not None and not linha["ativo"]
 
 
 def autenticar(email: str, password: str, dsn: str | None = None) -> int:
@@ -164,16 +201,18 @@ def autenticar(email: str, password: str, dsn: str | None = None) -> int:
     _duracao_bloqueio_segundos) -- verificado ANTES de comparar a
     password, para não gastar ciclos de bcrypt numa conta já bloqueada.
 
-    Um grupo desativado bloqueia o login dos seus membros, sem exceção
-    (incluindo contas admin) -- decisão explícita, ver notes.md."""
+    Um grupo desativado bloqueia o login dos seus membros -- só
+    estudantes (contas não-admin). Um admin de grupo pode gerir várias
+    turmas ao mesmo tempo; bloquear-lhe o login só porque UMA delas foi
+    desativada não faria sentido -- decisão explícita (reverte a versão
+    anterior desta regra, de quando só havia um tipo de admin), ver
+    docs/interno/PlanoAlguemLLMInvestigacao.md."""
     email = email.strip().lower()
     with sessao_bd(dsn) as bd:
         linha = bd.execute(
-            "SELECT estudante.id, estudante.password_hash, estudante.aprovado, estudante.admin, "
-            "       estudante.tentativas_login_falhadas, estudante.bloqueado_ate, "
-            "       estudante.grupo_id, grupo.ativo AS grupo_ativo "
-            "FROM estudante LEFT JOIN grupo ON grupo.id = estudante.grupo_id "
-            "WHERE estudante.email = %s", (email,)
+            "SELECT id, password_hash, aprovado, admin, "
+            "       tentativas_login_falhadas, bloqueado_ate "
+            "FROM estudante WHERE email = %s", (email,)
         ).fetchone()
     erro = ErroAutenticacao("Email ou password incorretos.")
     if linha is None:
@@ -212,12 +251,12 @@ def autenticar(email: str, password: str, dsn: str | None = None) -> int:
 
     # bootstrap tardio: se o email só se tornou admin DEPOIS de a conta
     # já existir (ONLINE_EMAIL_ADMIN configurada mais tarde), atualiza-a
-    # aqui em vez de deixar o estudante bloqueado para sempre. O grupo
-    # desativado continua a bloquear -- verificado ANTES de promover/
-    # devolver, para não abrir uma exceção ao "sem exceção (incluindo
-    # contas admin)" do docstring acima só por causa desta promoção.
+    # aqui em vez de deixar o estudante bloqueado para sempre. Nesta
+    # altura a conta ainda NÃO é admin (linha["admin"] é False) -- por
+    # isso o bloqueio por grupo desativado ainda se aplica, verificado
+    # ANTES de promover/devolver.
     if email in _emails_admin() and not (linha["admin"] and linha["aprovado"]):
-        if linha["grupo_id"] is not None and not linha["grupo_ativo"]:
+        if _grupo_do_estudante_esta_inativo(linha["id"], dsn):
             raise ErroAutenticacao(
                 "O teu grupo foi desativado. Contacta o administrador responsável por este grupo."
             )
@@ -234,7 +273,7 @@ def autenticar(email: str, password: str, dsn: str | None = None) -> int:
             "esperavas, contacta o professor ou administrador responsável por este grupo."
         )
 
-    if linha["grupo_id"] is not None and not linha["grupo_ativo"]:
+    if not linha["admin"] and _grupo_do_estudante_esta_inativo(linha["id"], dsn):
         raise ErroAutenticacao(
             "O teu grupo foi desativado. Contacta o administrador responsável por este grupo."
         )
@@ -248,6 +287,19 @@ def eh_admin(estudante_id: int, dsn: str | None = None) -> bool:
             "SELECT admin FROM estudante WHERE id = %s", (estudante_id,)
         ).fetchone()
     return bool(linha and linha["admin"])
+
+
+def eh_admin_global(estudante_id: int, dsn: str | None = None) -> bool:
+    """Admin GLOBAL (por oposição a admin de grupo): vê e gere tudo --
+    Utilizadores, Grupos, Problemas Reportados, Registo de Atividade,
+    Definições. Um admin de grupo não passa aqui (403), só acede à
+    futura aba de Investigação, filtrada aos seus grupos."""
+    with sessao_bd(dsn) as bd:
+        linha = bd.execute(
+            "SELECT admin AND admin_global AS admin_global FROM estudante WHERE id = %s",
+            (estudante_id,),
+        ).fetchone()
+    return bool(linha and linha["admin_global"])
 
 
 def listar_pendentes(dsn: str | None = None) -> list[dict]:
@@ -283,13 +335,27 @@ def rejeitar_conta(estudante_id: int, dsn: str | None = None) -> str | None:
 
 def listar_todos(dsn: str | None = None) -> list[dict]:
     """Todas as contas (pendentes, aprovadas e admin), mais antigas
-    primeiro -- para a tabela de utilizadores do painel de admin."""
+    primeiro -- para a tabela de utilizadores do painel de admin.
+    'grupo_id'/'grupo_nome' (pertença, só relevante para uma conta
+    não-admin) e 'grupos_geridos_ids' (âmbito de gestão, só relevante
+    para um admin de grupo) vêm todos da mesma relação
+    (estudante_grupo, ver grupos.py) -- por subqueries em vez de
+    JOIN+GROUP BY, para não obrigar a listar todas as colunas no GROUP
+    BY. 'grupo_id'/'grupo_nome' assumem no máximo uma linha (LIMIT 1),
+    o que só é garantido para contas não-admin."""
     with sessao_bd(dsn) as bd:
         linhas = bd.execute(
             "SELECT estudante.id, estudante.email, estudante.criado_em, estudante.aprovado, "
-            "       estudante.admin, estudante.grupo_id, grupo.nome AS grupo_nome "
-            "FROM estudante LEFT JOIN grupo ON grupo.id = estudante.grupo_id "
-            "ORDER BY estudante.criado_em"
+            "       estudante.admin, estudante.admin_global, "
+            "       (SELECT eg.grupo_id FROM estudante_grupo eg "
+            "        WHERE eg.estudante_id = estudante.id LIMIT 1) AS grupo_id, "
+            "       (SELECT grupo.nome FROM estudante_grupo eg JOIN grupo ON grupo.id = eg.grupo_id "
+            "        WHERE eg.estudante_id = estudante.id LIMIT 1) AS grupo_nome, "
+            "       COALESCE("
+            "         (SELECT array_agg(eg.grupo_id ORDER BY eg.grupo_id) "
+            "          FROM estudante_grupo eg WHERE eg.estudante_id = estudante.id), "
+            "         '{}') AS grupos_geridos_ids "
+            "FROM estudante ORDER BY estudante.criado_em"
         ).fetchall()
     return [dict(linha) for linha in linhas]
 
@@ -318,15 +384,45 @@ def remover_admin(estudante_id: int, ator_id: int, dsn: str | None = None) -> bo
     ativo (subquery COUNT no próprio WHERE, para a condição ser
     avaliada atomicamente com o UPDATE e não deixar uma janela de
     corrida entre "contar admins" e "remover admin" em dois pedidos
-    concorrentes). Devolve True se a conta foi mesmo alterada -- False
-    significa que uma das guardas impediu a ação (quem chamar pode
-    então mostrar uma mensagem clara em vez de um sucesso silencioso
-    que não fez nada)."""
+    concorrentes). A mesma lógica aplica-se a admins globais: se
+    'estudante_id' for o único admin global ativo, a remoção também é
+    bloqueada -- caso contrário ninguém ficaria capaz de aceder às abas
+    restritas a admin global (Utilizadores, Grupos, ...). Devolve True
+    se a conta foi mesmo alterada -- False significa que uma das
+    guardas impediu a ação (quem chamar pode então mostrar uma mensagem
+    clara em vez de um sucesso silencioso que não fez nada)."""
     with sessao_bd(dsn) as bd:
         cursor = bd.execute(
             "UPDATE estudante SET admin = FALSE "
             "WHERE id = %s AND id != %s AND admin = TRUE "
-            "AND (SELECT COUNT(*) FROM estudante WHERE admin = TRUE AND aprovado = TRUE) > 1",
+            "AND (SELECT COUNT(*) FROM estudante WHERE admin = TRUE AND aprovado = TRUE) > 1 "
+            "AND (NOT admin_global OR (SELECT COUNT(*) FROM estudante "
+            "     WHERE admin = TRUE AND admin_global = TRUE AND aprovado = TRUE) > 1)",
             (estudante_id, ator_id),
         )
+        return cursor.rowcount > 0
+
+
+def definir_admin_global(estudante_id: int, admin_global: bool, ator_id: int,
+                          dsn: str | None = None) -> bool:
+    """Muda o estatuto de admin global de 'estudante_id' (só se aplica a
+    contas já admin -- promover diretamente a admin global uma conta
+    não-admin não faz sentido). Ao RETIRAR o estatuto global, aplica as
+    mesmas guardas de remover_admin: nunca à própria conta do ator, e
+    nunca se isso deixasse a aplicação sem nenhum admin global ativo.
+    Devolve True se a conta foi mesmo alterada."""
+    with sessao_bd(dsn) as bd:
+        if admin_global:
+            cursor = bd.execute(
+                "UPDATE estudante SET admin_global = TRUE WHERE id = %s AND admin = TRUE",
+                (estudante_id,),
+            )
+        else:
+            cursor = bd.execute(
+                "UPDATE estudante SET admin_global = FALSE "
+                "WHERE id = %s AND id != %s AND admin = TRUE AND admin_global = TRUE "
+                "AND (SELECT COUNT(*) FROM estudante "
+                "     WHERE admin = TRUE AND admin_global = TRUE AND aprovado = TRUE) > 1",
+                (estudante_id, ator_id),
+            )
         return cursor.rowcount > 0

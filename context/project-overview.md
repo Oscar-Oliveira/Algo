@@ -30,11 +30,11 @@ python3 -m pytest alguem/tests/ -v
 cd online && python3 -m pytest -v
 
 # Run the CLI/console locally (creates a venv on first run, no manual activation needed)
-./instaladores/algo.sh          # Linux/macOS
-instaladores\algo.bat           # Windows
+./repl/algo.sh          # Linux/macOS
+repl\algo.bat           # Windows
 ````
 
-Tests marked `slow` (in `algo_lang/tests/`) actually build a real venv via `instaladores/algo.sh`. Skip with `-m "not slow"` for a quick loop.
+Tests marked `slow` (in `algo_lang/tests/`) actually build a real venv via `repl/algo.sh`. Skip with `-m "not slow"` for a quick loop.
 
 The `online/` service needs two env vars to boot (it refuses to start without them): `ONLINE_CHAVE_CIFRAGEM` (Fernet key, encrypts stored LLM credentials) and `ONLINE_CHAVE_SESSAO` (session cookie signing key). Generate via `python3 -c "from cifragem import gerar_chave_nova; print(gerar_chave_nova())"` and `python3 -c "import secrets; print(secrets.token_hex(32))"`.
 

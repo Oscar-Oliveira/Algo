@@ -1,202 +1,645 @@
 <!DOCTYPE html>
 <html lang="pt">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Algo — admin</title>
-<link rel="icon" href="/estatico/favicon.ico">
-<link rel="stylesheet" href="/estatico/estilo.css">
-<script src="/estatico/tema.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Algo — admin</title>
+  <link rel="icon" href="/estatico/favicon.ico">
+  <link rel="stylesheet" href="/estatico/estilo.css">
+  <script src="/estatico/tema.js"></script>
 </head>
+
 <body class="pagina-admin">
   <header class="barra-topo" id="cabecalho-pagina">
-    <span class="marca marca-pequena"><img src="/estatico/algo-logo.svg" alt="" class="marca-simbolo"> Algo — admin</span>
+    <a href="/admin" class="marca marca-pequena" title="Painel de admin"><img src="/estatico/algo-logo.svg" alt=""
+        class="marca-simbolo"> Algo — admin</a>
+    <div class="acoes-topo">
+      <a href="/editor" target="algo-editor" class="botao-icone" title="Abrir o editor"><svg class="icone-botao"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg></a>
+    </div>
   </header>
 
   <div class="corpo-admin">
     <nav class="barra-lateral-admin">
-      <button type="button" class="item-lateral-admin ativa" data-aba="grupos"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg><span>Grupos</span></button>
-      <button type="button" class="item-lateral-admin" data-aba="utilizadores"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg><span>Utilizadores</span></button>
-      <button type="button" class="item-lateral-admin" data-aba="registoatividade"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg><span>Registo de Atividade</span></button>
-      <!-- Separador "Atividade" (métricas do Alguem) fica temporariamente
-           oculto -- funcionalidade ainda não usada, mas os dados/rota/lógica
-           continuam intactos (ver online/main.py rota_admin_atividade). Reverter
-           removendo a classe "escondido" do botão e da secção abaixo. -->
-      <button type="button" class="item-lateral-admin escondido" data-aba="atividade"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg><span>Atividade</span></button>
-      <button type="button" class="item-lateral-admin" data-aba="relatorios"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg><span>Problemas Reportados</span></button>
-      <button type="button" class="item-lateral-admin" data-aba="definicoes"><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg><span>Definições</span></button>
+      <div class="grupo-lateral-admin">
+        <span class="titulo-grupo-lateral-admin">Trabalho</span>
+        <button type="button" class="item-lateral-admin" data-aba="atividade"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg><span>Investigação</span></button>
+        <button type="button" class="item-lateral-admin brevemente" disabled title="Ainda por implementar (fase 6)"><svg
+            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          </svg><span>Apoio Pedagógico</span><span class="badge-lateral-neutro">Fase 6</span></button>
+      </div>
+      <div class="grupo-lateral-admin">
+        <span class="titulo-grupo-lateral-admin">Definições</span>
+        <button type="button" class="item-lateral-admin ativa" data-aba="grupos"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg><span>Grupos</span></button>
+        <button type="button" class="item-lateral-admin" data-aba="utilizadores"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg><span>Utilizadores</span></button>
+        <button type="button" class="item-lateral-admin" data-aba="alguem"><svg class="icone-botao" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <line x1="8" y1="9" x2="8.01" y2="9" />
+            <line x1="12" y1="9" x2="12.01" y2="9" />
+            <line x1="16" y1="9" x2="16.01" y2="9" />
+          </svg><span>Alguem</span></button>
+        <button type="button" class="item-lateral-admin" data-aba="llm"><svg class="icone-botao" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path
+              d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5z" />
+            <circle cx="9" cy="16" r="1.5" />
+            <path d="M9 17.5V20" />
+          </svg><span>LLM</span></button>
+        <button type="button" class="item-lateral-admin" data-aba="registoatividade"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6" />
+            <line x1="8" y1="12" x2="21" y2="12" />
+            <line x1="8" y1="18" x2="21" y2="18" />
+            <line x1="3" y1="6" x2="3.01" y2="6" />
+            <line x1="3" y1="12" x2="3.01" y2="12" />
+            <line x1="3" y1="18" x2="3.01" y2="18" />
+          </svg><span>Registo de Atividade</span></button>
+        <button type="button" class="item-lateral-admin" data-aba="relatorios"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg><span>Problemas Reportados</span><span class="badge-lateral escondido"
+            id="relatorios-badge-lateral"></span></button>
+        <button type="button" class="item-lateral-admin" data-aba="definicoes"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg><span>Geral</span></button>
+      </div>
     </nav>
 
     <main class="conteudo-admin">
-    <section id="aba-conteudo-grupos" class="conteudo-aba-admin">
-      <p class="subtitulo">Cria um grupo para gerares um código de junção para os teus estudantes. Só podes apagar definitivamente um grupo sem membros -- se já tiver estudantes, desativa-o em vez disso (os membros existentes continuam a poder entrar, mas o grupo deixa de aceitar novos registos com o código antigo).</p>
-      <form id="form-criar-grupo" class="formulario formulario-inline">
-        <label>Nome do grupo
-          <input type="text" id="grupo-novo-nome" required placeholder="ex: 12ºA 2026">
-        </label>
-        <button type="submit" class="botao-primario">Criar grupo</button>
-      </form>
-      <p class="mensagem-erro" id="mensagem-erro-grupos"></p>
-      <table class="tabela-admin">
-        <thead>
-          <tr><th>Nome</th><th>Estado</th><th class="numero">Membros</th><th>Código</th><th></th></tr>
-        </thead>
-        <tbody id="corpo-tabela-grupos"></tbody>
-      </table>
-      <p id="mensagem-sem-grupos" class="ajuda-campo escondido">Ainda não criaste nenhum grupo.</p>
-    </section>
+      <section id="aba-conteudo-grupos" class="conteudo-aba-admin">
+        <p class="subtitulo">Cria um grupo para gerares um código de junção para os teus estudantes. Só podes apagar
+          definitivamente um grupo sem membros -- se já tiver estudantes, desativa-o em vez disso (os membros existentes
+          continuam a poder entrar, mas o grupo deixa de aceitar novos registos com o código antigo).</p>
+        <form id="form-criar-grupo" class="formulario formulario-inline">
+          <label>Nome do grupo
+            <input type="text" id="grupo-novo-nome" required placeholder="ex: 12ºA 2026">
+          </label>
+          <button type="submit" class="botao-primario botao-com-icone"><svg class="icone-botao" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg><span>Criar grupo</span></button>
+        </form>
+        <p class="mensagem-erro" id="mensagem-erro-grupos"></p>
+        <table class="tabela-admin">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Estado</th>
+              <th>Alguem</th>
+              <th class="numero">Membros</th>
+              <th>Código</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-tabela-grupos"></tbody>
+        </table>
+        <p id="mensagem-sem-grupos" class="ajuda-campo escondido">Ainda não criaste nenhum grupo.</p>
+      </section>
 
-    <section id="aba-conteudo-utilizadores" class="conteudo-aba-admin escondido">
-      <p class="subtitulo">Contas registadas: aprova ou rejeita quem está pendente, revoga o acesso de quem já tinha sido aprovado, muda o grupo de alguém, ou atribui/remove privilégios de administrador.</p>
-      <table class="tabela-admin">
-        <thead>
-          <tr><th>Email</th><th>Estado</th><th>Grupo</th><th>Registada em</th><th></th></tr>
-        </thead>
-        <tbody id="corpo-tabela-utilizadores"></tbody>
-      </table>
-      <p id="mensagem-sem-utilizadores" class="ajuda-campo escondido">Ainda não há nenhuma conta registada.</p>
-      <p class="mensagem-erro" id="mensagem-erro-utilizadores"></p>
-    </section>
+      <section id="aba-conteudo-utilizadores" class="conteudo-aba-admin escondido">
+        <p class="subtitulo">Contas registadas: aprova ou rejeita quem está pendente, revoga o acesso de quem já tinha
+          sido aprovado, ou atribui/remove privilégios de administrador. A coluna "Grupo" muda de significado consoante
+          o tipo de conta: para um estudante é a turma a que pertence (no máximo uma); para um admin global não há nada
+          a escolher (já vê tudo); para um admin de grupo são as turmas que gere (pode ser mais do que uma) -- usa
+          "Tornar admin de grupo"/"Tornar admin global" para alternar entre os dois tipos de admin.</p>
+        <table class="tabela-admin">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Estado</th>
+              <th>Grupo</th>
+              <th>Registada em</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-tabela-utilizadores"></tbody>
+        </table>
+        <p id="mensagem-sem-utilizadores" class="ajuda-campo escondido">Ainda não há nenhuma conta registada.</p>
+        <p class="mensagem-erro" id="mensagem-erro-utilizadores"></p>
+      </section>
 
-    <section id="aba-conteudo-registoatividade" class="conteudo-aba-admin escondido">
-      <p class="subtitulo">Registo geral de atividade da aplicação (contas, grupos, privilégios) -- separado das conversas com o Alguem.</p>
-      <div class="filtros-admin">
-        <select id="log-filtro-utilizador" aria-label="Filtrar por utilizador">
-          <option value="">Todos os utilizadores</option>
-        </select>
-        <select id="log-filtro-grupo" aria-label="Filtrar por grupo">
-          <option value="">Todos os grupos</option>
-        </select>
-        <select id="log-filtro-tipo" aria-label="Filtrar por tipo de evento">
-          <option value="">Todos os tipos</option>
-        </select>
-        <label class="ajuda-campo">De <input type="date" id="log-filtro-data-inicio"></label>
-        <label class="ajuda-campo">Até <input type="date" id="log-filtro-data-fim"></label>
-        <button type="button" id="log-aplicar-filtros" class="botao-secundario">Filtrar</button>
-        <a id="log-exportar-csv" class="botao-secundario" href="#" target="_blank">Exportar CSV</a>
-      </div>
-      <div class="filtros-admin">
-        <button type="button" id="log-apagar-selecionados" class="botao-perigo botao-com-icone" disabled><svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 20 7" /><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" /><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" /></svg><span>Apagar selecionados</span></button>
-        <span id="log-texto-selecionados" class="ajuda-campo"></span>
-      </div>
-      <table class="tabela-admin">
-        <thead>
-          <tr>
-            <th><input type="checkbox" id="log-selecionar-tudo" aria-label="Selecionar todos os registos"></th>
-            <th>Data/hora</th><th>Tipo</th><th>Ator</th><th>Alvo</th><th>Grupo</th><th>Detalhes</th>
-          </tr>
-        </thead>
-        <tbody id="corpo-tabela-log"></tbody>
-      </table>
-      <p id="mensagem-sem-log" class="ajuda-campo escondido">Nenhum registo corresponde aos filtros atuais.</p>
-      <div class="paginacao-admin">
-        <button type="button" id="log-pagina-anterior" class="botao-secundario">Anterior</button>
-        <span id="log-texto-pagina" class="ajuda-campo"></span>
-        <button type="button" id="log-pagina-seguinte" class="botao-secundario">Seguinte</button>
-      </div>
-      <p class="mensagem-erro" id="mensagem-erro-log"></p>
-    </section>
+      <section id="aba-conteudo-registoatividade" class="conteudo-aba-admin escondido">
+        <p class="subtitulo">Registo geral de atividade da aplicação (contas, grupos, privilégios) -- separado das
+          conversas com o Alguem.</p>
+        <div class="filtros-admin">
+          <select id="log-filtro-utilizador" aria-label="Filtrar por utilizador">
+            <option value="">Todos os utilizadores</option>
+          </select>
+          <select id="log-filtro-grupo" aria-label="Filtrar por grupo">
+            <option value="">Todos os grupos</option>
+          </select>
+          <select id="log-filtro-tipo" aria-label="Filtrar por tipo de evento">
+            <option value="">Todos os tipos</option>
+          </select>
+          <label class="filtro-data">De <input type="date" id="log-filtro-data-inicio"></label>
+          <label class="filtro-data">Até <input type="date" id="log-filtro-data-fim"></label>
+          <button type="button" id="log-aplicar-filtros" class="botao-secundario botao-com-icone"><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg><span>Filtrar</span></button>
+        </div>
+        <div class="filtros-admin">
+          <a id="log-exportar-csv" class="botao-secundario botao-com-icone" href="#" target="_blank"><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v12" />
+              <polyline points="7 10 12 15 17 10" />
+              <path d="M4 19h16" />
+            </svg><span>Exportar CSV</span></a>
+          <button type="button" id="log-apagar-selecionados" class="botao-perigo botao-com-icone" disabled><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 7 20 7" />
+              <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+              <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+            </svg><span>Apagar selecionados</span></button>
+          <span id="log-texto-selecionados" class="ajuda-campo"></span>
+        </div>
+        <table class="tabela-admin">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="log-selecionar-tudo" aria-label="Selecionar todos os registos"></th>
+              <th>Data/hora</th>
+              <th>Tipo</th>
+              <th>Ator</th>
+              <th>Alvo</th>
+              <th>Grupo</th>
+              <th>Detalhes</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-tabela-log"></tbody>
+        </table>
+        <p id="mensagem-sem-log" class="ajuda-campo escondido">Nenhum registo corresponde aos filtros atuais.</p>
+        <div class="paginacao-admin">
+          <button type="button" id="log-pagina-anterior" class="botao-secundario">Anterior</button>
+          <span id="log-texto-pagina" class="ajuda-campo"></span>
+          <button type="button" id="log-pagina-seguinte" class="botao-secundario">Seguinte</button>
+        </div>
+        <p class="mensagem-erro" id="mensagem-erro-log"></p>
+      </section>
 
-    <section id="aba-conteudo-atividade" class="conteudo-aba-admin escondido">
-      <p class="subtitulo">Métricas calculadas a partir dos logs de conversa com o Alguem (identificação por ID pseudónimo, nunca por email).</p>
-      <div class="cartoes-metricas">
-        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-sessoes">-</span><span class="cartao-metrica-titulo">Sessões</span></div>
-        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-estudantes">-</span><span class="cartao-metrica-titulo">Estudantes distintos</span></div>
-        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-leakage-global">-</span><span class="cartao-metrica-titulo">Solution Leakage Rate</span></div>
-        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-hint-dependency">-</span><span class="cartao-metrica-titulo">Hint Dependency (turnos/sessão)</span></div>
-      </div>
-      <div class="filtros-admin">
-        <input type="search" id="atividade-pesquisa" placeholder="Pesquisar por sessão ou estudante...">
-        <select id="atividade-filtro-fornecedor">
-          <option value="">Todos os fornecedores</option>
-        </select>
-      </div>
-      <table class="tabela-admin">
-        <thead>
-          <tr>
-            <th>Sessão</th>
-            <th>Estudante</th>
-            <th class="ordenavel" data-ordenar="num_turnos">Turnos</th>
-            <th class="ordenavel" data-ordenar="solution_leakage_rate">Leakage</th>
-            <th class="ordenavel" data-ordenar="hint_escalation_maxima">Nível máx.</th>
-            <th>Modelo</th>
-            <th class="ordenavel" data-ordenar="num_recusas_seguras">Recusas seguras</th>
-          </tr>
-        </thead>
-        <tbody id="corpo-tabela-atividade"></tbody>
-      </table>
-      <p id="mensagem-sem-atividade" class="ajuda-campo escondido">Nenhuma sessão corresponde aos filtros atuais.</p>
-      <div class="paginacao-admin">
-        <button type="button" id="atividade-pagina-anterior" class="botao-secundario botao-com-icone"><svg
-            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      <section id="aba-conteudo-atividade" class="conteudo-aba-admin escondido">
+        <p class="subtitulo">Investigação: dashboard, relatório e exportação a partir das sessões do Alguem --
+          identificação direta por email. Se não fores admin global, tudo aqui já vem filtrado aos teus grupos.</p>
+
+        <div class="filtros-admin filtros-investigacao">
+          <select id="investigacao-filtro-grupo">
+            <option value="">Todos os grupos</option>
+          </select>
+          <label class="filtro-data">Desde <input type="date" id="investigacao-filtro-data-inicio"></label>
+          <label class="filtro-data">Até <input type="date" id="investigacao-filtro-data-fim"></label>
+          <select id="investigacao-filtro-fornecedor">
+            <option value="">Todos os fornecedores</option>
+          </select>
+          <select id="investigacao-filtro-apoio-escopo">
+            <option value="">Apoio -- qualquer escopo</option>
+            <option value="global">Apoio -- global</option>
+            <option value="pessoal">Apoio -- pessoal</option>
+          </select>
+          <select id="investigacao-filtro-guardiao-escopo">
+            <option value="">Guardião -- qualquer escopo</option>
+            <option value="global">Guardião -- global</option>
+            <option value="indisponivel">Guardião -- indisponível</option>
+          </select>
+        </div>
+
+        <div class="cartoes-metricas">
+          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-sessoes">-</span><span
+              class="cartao-metrica-titulo">Sessões</span></div>
+          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-estudantes">-</span><span
+              class="cartao-metrica-titulo">Estudantes distintos</span></div>
+          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-leakage-global">-</span><span
+              class="cartao-metrica-titulo">Solution Leakage Rate</span></div>
+          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-hint-dependency">-</span><span
+              class="cartao-metrica-titulo">Hint Dependency (turnos/sessão)</span></div>
+        </div>
+
+        <h3>Dashboard</h3>
+        <div class="grelha-graficos">
+          <div class="cartao-grafico">
+            <h4>Sessões por dia</h4>
+            <div id="grafico-sessoes-dia" class="grafico-svg"></div>
+          </div>
+          <div class="cartao-grafico">
+            <h4>Solution Leakage Rate por grupo</h4>
+            <div id="grafico-leakage-grupo" class="grafico-svg"></div>
+          </div>
+          <div class="cartao-grafico">
+            <h4>Nível máximo de escalada (0-7)</h4>
+            <div id="grafico-nivel-maximo" class="grafico-svg"></div>
+          </div>
+          <div class="cartao-grafico">
+            <h4>Turnos por sessão</h4>
+            <div id="grafico-turnos" class="grafico-svg"></div>
+          </div>
+          <div class="cartao-grafico cartao-grafico-largo">
+            <h4>Sessões por fornecedor/modelo, por escopo do apoio</h4>
+            <div id="grafico-fornecedor-escopo" class="grafico-svg"></div>
+            <div class="legenda-grafico" id="legenda-fornecedor-escopo"></div>
+          </div>
+        </div>
+
+        <h3>Relatório</h3>
+        <div class="acoes-exportacao">
+          <a id="botao-exportar-csv" class="botao-secundario botao-com-icone" target="_blank"><svg class="icone-botao"
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M12 3v12" />
+              <polyline points="7 10 12 15 17 10" />
+              <path d="M4 19h16" />
+            </svg><span>Exportar CSV</span></a>
+          <a id="botao-exportar-json" class="botao-secundario botao-com-icone" target="_blank"><svg class="icone-botao"
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M12 3v12" />
+              <polyline points="7 10 12 15 17 10" />
+              <path d="M4 19h16" />
+            </svg><span>Exportar JSON</span></a>
+        </div>
+        <table class="tabela-admin">
+          <thead>
+            <tr>
+              <th>Estudante</th>
+              <th>Grupo</th>
+              <th class="ordenavel" data-ordenar="num_turnos">Turnos</th>
+              <th class="ordenavel" data-ordenar="solution_leakage_rate">Leakage</th>
+              <th class="ordenavel" data-ordenar="hint_escalation_maxima">Nível máx.</th>
+              <th>Modelo (apoio)</th>
+              <th>Escopo apoio</th>
+              <th>Escopo guardião</th>
+              <th class="ordenavel" data-ordenar="num_recusas_seguras">Recusas seguras</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="corpo-tabela-atividade"></tbody>
+        </table>
+        <p id="mensagem-sem-atividade" class="ajuda-campo escondido">Nenhuma sessão corresponde aos filtros atuais.</p>
+        <div class="paginacao-admin">
+          <button type="button" id="atividade-pagina-anterior" class="botao-secundario botao-com-icone"><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg><span>Anterior</span></button>
+          <span id="atividade-texto-pagina" class="ajuda-campo"></span>
+          <button type="button" id="atividade-pagina-seguinte"
+            class="botao-secundario botao-com-icone"><span>Seguinte</span><svg class="icone-botao" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg></button>
+        </div>
+        <p class="mensagem-erro" id="mensagem-erro-atividade"></p>
+
+        <div id="painel-eliminar-execucoes" class="seccao-definicoes-llm escondido">
+          <div class="cabecalho-seccao-llm"><span>Eliminar histórico de código executado</span></div>
+          <p class="ajuda-campo">Só o histórico de execução/debug de código -- nunca as sessões do Alguem
+            acima, eliminação física e definitiva, sem confirmação a meio.</p>
+          <div class="formulario formulario-inline">
+            <label>Apagar tudo com mais de
+              <input type="number" id="campo-dias-eliminar-execucoes" min="0" value="90" style="width:5rem">
+              dias
+            </label>
+            <button type="button" id="botao-apagar-execucoes-por-periodo" class="botao-secundario botao-com-icone"><svg
+                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 7 20 7" />
+                <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+                <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+              </svg><span>Apagar por período</span></button>
+            <button type="button" id="botao-apagar-todas-execucoes" class="botao-perigo botao-com-icone"><svg
+                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 7 20 7" />
+                <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+                <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+              </svg><span>Apagar tudo</span></button>
+          </div>
+          <p class="mensagem-erro" id="mensagem-erro-eliminar-execucoes"></p>
+        </div>
+      </section>
+
+      <section id="aba-conteudo-relatorios" class="conteudo-aba-admin escondido">
+        <p class="subtitulo">Problemas reportados pelos estudantes a partir do editor.</p>
+        <div class="cartoes-metricas">
+          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="relatorios-total">-</span><span
+              class="cartao-metrica-titulo">Relatórios</span></div>
+          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="relatorios-nao-vistos">-</span><span
+              class="cartao-metrica-titulo">Não vistos</span></div>
+        </div>
+        <table class="tabela-admin tabela-relatorios">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Descrição</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="corpo-tabela-relatorios"></tbody>
+        </table>
+        <p id="mensagem-sem-relatorios" class="ajuda-campo escondido">Ainda não há nenhum relatório reportado.</p>
+        <div class="paginacao-admin">
+          <button type="button" id="relatorios-pagina-anterior" class="botao-secundario botao-com-icone"><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg><span>Anterior</span></button>
+          <span id="relatorios-texto-pagina" class="ajuda-campo"></span>
+          <button type="button" id="relatorios-pagina-seguinte"
+            class="botao-secundario botao-com-icone"><span>Seguinte</span><svg class="icone-botao" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg></button>
+        </div>
+        <p class="mensagem-erro" id="mensagem-erro-relatorios"></p>
+      </section>
+
+      <section id="aba-conteudo-alguem" class="conteudo-aba-admin escondido">
+        <p class="subtitulo">Definições do Alguem: o Tutor (quem conversa com o estudante) e o Guardião (segunda
+          verificação independente antes de cada resposta chegar ao estudante). Qual LLM cada um usa fica na
+          aba <strong>LLM</strong>.</p>
+        <p>
+          <label>
+            <input type="checkbox" id="definicao-alguem-ativo">
+            Ativar Alguem para os estudantes
+          </label>
+        </p>
+        <p class="mensagem-erro" id="mensagem-erro-definicoes"></p>
+
+        <div id="aviso-alguem-sem-llm" class="aviso-bloco escondido">
+          <svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
             stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg><span>Anterior</span></button>
-        <span id="atividade-texto-pagina" class="ajuda-campo"></span>
-        <button type="button" id="atividade-pagina-seguinte" class="botao-secundario botao-com-icone"><span>Seguinte</span><svg
-            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12" />
-            <polyline points="12 5 19 12 12 19" />
-          </svg></button>
-      </div>
-      <p class="mensagem-erro" id="mensagem-erro-atividade"></p>
-    </section>
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span>O Alguem está ativado, mas não há nenhuma configuração de LLM disponível -- nem global, nem
+            permitida aos estudantes -- por isso fica indisponível na prática. Vai à aba "LLM" e define uma
+            configuração global de Apoio, ou liga a permissão para os estudantes usarem a própria.</span>
+        </div>
 
-    <section id="aba-conteudo-relatorios" class="conteudo-aba-admin escondido">
-      <p class="subtitulo">Problemas reportados pelos estudantes a partir do editor.</p>
-      <div class="cartoes-metricas">
-        <div class="cartao-metrica"><span class="cartao-metrica-valor" id="relatorios-total">-</span><span class="cartao-metrica-titulo">Relatórios</span></div>
-      </div>
-      <table class="tabela-admin tabela-relatorios">
-        <thead>
-          <tr><th>Email</th><th>Descrição</th><th></th></tr>
-        </thead>
-        <tbody id="corpo-tabela-relatorios"></tbody>
-      </table>
-      <p id="mensagem-sem-relatorios" class="ajuda-campo escondido">Ainda não há nenhum relatório reportado.</p>
-      <div class="paginacao-admin">
-        <button type="button" id="relatorios-pagina-anterior" class="botao-secundario botao-com-icone"><svg
-            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg><span>Anterior</span></button>
-        <span id="relatorios-texto-pagina" class="ajuda-campo"></span>
-        <button type="button" id="relatorios-pagina-seguinte" class="botao-secundario botao-com-icone"><span>Seguinte</span><svg
-            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12" />
-            <polyline points="12 5 19 12 12 19" />
-          </svg></button>
-      </div>
-      <p class="mensagem-erro" id="mensagem-erro-relatorios"></p>
-    </section>
+        <h3>Tutor</h3>
+        <p class="subtitulo">O texto que identifica o Tutor perante o estudante.</p>
 
-    <section id="aba-conteudo-definicoes" class="conteudo-aba-admin escondido">
-      <p class="subtitulo">Definições globais da aplicação.</p>
-      <p>
-        <label>
-          <input type="checkbox" id="definicao-alguem-ativo">
-          Ativar o Alguem (tutor LLM) para os estudantes
-        </label>
-      </p>
-      <button type="button" id="botao-guardar-definicoes" class="botao-primario">Guardar</button>
-      <p class="mensagem-erro" id="mensagem-erro-definicoes"></p>
-      <p class="mensagem-sucesso escondido" id="mensagem-sucesso-definicoes">Guardado.</p>
+        <div class="seccao-definicoes-llm">
+          <div class="cabecalho-seccao-llm"><span>Identidade (prompt)</span></div>
+          <textarea id="prompt-texto-tutor" class="prompt-editavel" rows="8"></textarea>
+          <p class="ajuda-campo">Valor por omissão:</p>
+          <pre id="prompt-omissao-tutor" class="prompt-omissao"></pre>
+          <div class="acoes-modal">
+            <button type="button" id="botao-repor-prompt-tutor" class="botao-secundario botao-com-icone"><svg
+                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg><span>Repor por omissão</span></button>
+            <button type="button" id="botao-guardar-prompt-tutor" class="botao-primario botao-com-icone"><svg
+                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg><span>Guardar</span></button>
+          </div>
+        </div>
 
-      <h3>Backup da base de dados</h3>
-      <p class="subtitulo">Descarrega uma cópia completa da base de dados (contas e credenciais cifradas) para guardar como backup ou analisar offline.</p>
-      <a href="/api/admin/bd" download class="botao-primario botao-com-icone"><svg class="icone-botao"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-          stroke-linejoin="round">
-          <path d="M12 3v12" />
-          <polyline points="7 10 12 15 17 10" />
-          <path d="M4 19h16" />
-        </svg><span>Descarregar base de dados</span></a>
-    </section>
+        <h3>Guardião</h3>
+        <p class="subtitulo">Segunda verificação, independente do Tutor, antes de cada resposta chegar ao
+          estudante. Nunca é uma escolha do estudante.</p>
+
+        <div class="seccao-definicoes-llm">
+          <div class="cabecalho-seccao-llm"><span>Ativação e nível máximo de ajuda</span></div>
+          <p>
+            <label>
+              <input type="checkbox" id="definicao-usar-guardiao">
+              Guardião Pedagógico ativo
+            </label>
+          </p>
+          <div class="formulario formulario-inline">
+            <label>Nível máximo de ajuda
+              <select id="definicao-nivel-maximo-ajuda"></select>
+            </label>
+          </div>
+          <p class="ajuda-campo" id="descricao-nivel-maximo-ajuda"></p>
+          <p class="ajuda-campo">Este nível é sempre enviado ao Tutor como instrução (parte do que o LLM
+            recebe), mas só é IMPOSTO pelo código -- bloqueando ou pedindo uma resposta mais contida -- enquanto
+            o Guardião estiver ativo e tiver um LLM atribuído (aba "LLM"). Sem Guardião, é só um pedido ao LLM,
+            não uma garantia.</p>
+        </div>
+
+        <div class="seccao-definicoes-llm">
+          <div class="cabecalho-seccao-llm"><span>Critério de classificação (prompt)</span></div>
+          <textarea id="prompt-texto-guardiao" class="prompt-editavel" rows="8"></textarea>
+          <p class="ajuda-campo">Valor por omissão:</p>
+          <pre id="prompt-omissao-guardiao" class="prompt-omissao"></pre>
+          <div class="acoes-modal">
+            <button type="button" id="botao-repor-prompt-guardiao" class="botao-secundario botao-com-icone"><svg
+                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg><span>Repor por omissão</span></button>
+            <button type="button" id="botao-guardar-prompt-guardiao" class="botao-primario botao-com-icone"><svg
+                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg><span>Guardar</span></button>
+          </div>
+        </div>
+
+        <p class="mensagem-erro" id="mensagem-erro-prompts"></p>
+
+        <h3>Referência da linguagem ALGO</h3>
+        <p class="subtitulo">Resumo da sintaxe do ALGO enviado ao Tutor em todas as conversas, gerado
+          automaticamente a partir do compilador -- não editável aqui, só para consulta/cópia.</p>
+
+        <div class="seccao-definicoes-llm">
+          <div class="cabecalho-seccao-llm">
+            <span>Texto enviado ao Tutor</span>
+            <button type="button" id="botao-copiar-referencia-algo" class="botao-secundario botao-com-icone"><svg
+                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg><span>Copiar</span></button>
+          </div>
+          <pre id="referencia-algo-texto" class="prompt-omissao"></pre>
+        </div>
+      </section>
+
+      <section id="aba-conteudo-llm" class="conteudo-aba-admin escondido">
+        <p class="subtitulo">Fornecedores de LLM geridos por ti -- o "armazém" de configurações -- e qual delas
+          cada papel do Alguem usa (Tutor/Apoio, Guardião).</p>
+
+        <div class="seccao-definicoes-llm">
+          <div class="cabecalho-seccao-llm">
+            <span>Configurações guardadas</span>
+            <button type="button" id="botao-nova-configuracao-llm-global" class="botao-secundario botao-com-icone"><svg
+                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg><span>Nova configuração de LLM</span></button>
+          </div>
+          <div id="admin-lista-configuracoes-llm" class="lista-configuracoes-llm"></div>
+          <div id="admin-vazio-configuracoes-llm" class="vazio-configuracoes-llm escondido">
+            <p class="ajuda-campo">Ainda não há nenhuma configuração global guardada -- sem uma, o Alguem só
+              funciona se permitires aos estudantes usar o próprio LLM.</p>
+            <button type="button" id="botao-nova-configuracao-llm-global-vazio"
+              class="botao-primario botao-com-icone"><svg class="icone-botao" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg><span>Criar a primeira configuração</span></button>
+          </div>
+        </div>
+        <p class="mensagem-erro" id="mensagem-erro-definicoes-llm"></p>
+
+        <h3>Atribuição de papéis</h3>
+        <p class="subtitulo">Qual configuração acima é usada pelo Tutor (Apoio) e pelo Guardião -- a ativação e
+          o comportamento de cada um ficam na aba "Alguem".</p>
+
+        <div class="seccao-definicoes-llm">
+          <div class="cabecalho-seccao-llm"><span>LLM ativo para Apoio (Tutor)</span></div>
+          <div class="formulario formulario-inline">
+            <label>Configuração global
+              <select id="admin-select-papel-apoio">
+                <option value="">Nenhuma -- deixar ao critério do estudante</option>
+              </select>
+            </label>
+          </div>
+          <p>
+            <label>
+              <input type="checkbox" id="admin-permissao-apoio">
+              Permitir o próprio LLM quando não houver nenhum definido pela plataforma
+            </label>
+          </p>
+          <p class="ajuda-campo escondido" id="nota-apoio-global-manda">Neste momento não se aplica: há uma
+            configuração global escolhida acima, que manda sempre enquanto lá estiver -- os estudantes usam-na,
+            sejam ou não permitidos a configurar a sua própria.</p>
+        </div>
+
+        <div class="seccao-definicoes-llm">
+          <div class="cabecalho-seccao-llm"><span>LLM ativo para Guardião</span></div>
+          <div class="formulario formulario-inline">
+            <label>Configuração global
+              <select id="admin-select-papel-guardiao">
+                <option value="">Nenhuma -- conversa continua sem guardião</option>
+              </select>
+            </label>
+          </div>
+          <p class="ajuda-campo">O Guardião nunca usa o LLM pessoal de um estudante, mesmo que a permissão de
+            Apoio (acima) esteja ligada -- só esta configuração global. Sem uma escolhida aqui, ou com o Guardião
+            desativado (aba "Alguem"), as conversas continuam sem esta verificação extra.</p>
+        </div>
+      </section>
+
+      <section id="aba-conteudo-definicoes" class="conteudo-aba-admin escondido">
+        <p class="subtitulo">Definições globais da aplicação.</p>
+
+        <h3>Backup da base de dados</h3>
+        <p class="subtitulo">Descarrega uma cópia completa da base de dados (contas e credenciais cifradas) para guardar
+          como backup ou analisar offline.</p>
+        <a href="/api/admin/bd" download class="botao-primario botao-com-icone"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M12 3v12" />
+            <polyline points="7 10 12 15 17 10" />
+            <path d="M4 19h16" />
+          </svg><span>Descarregar base de dados</span></a>
+      </section>
     </main>
+  </div>
+
+  <div id="modal-configuracao-llm" class="modal escondido">
+    <div class="modal-caixa modal-caixa-media">
+      <div class="modal-cabecalho">
+        <h2 id="modal-configuracao-llm-titulo">Nova configuração global</h2>
+        <button id="botao-fechar-configuracao-llm" type="button" class="botao-icone" title="Fechar"><svg
+            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg></button>
+      </div>
+      <form id="form-configuracao-llm-admin" class="formulario">
+        <input type="hidden" id="admin-campo-configuracao-id">
+        <label>Etiqueta
+          <input type="text" name="etiqueta" id="admin-campo-etiqueta" placeholder="ex: GPT rápido para testes"
+            required>
+        </label>
+        <label>Fornecedor
+          <select name="fornecedor" id="admin-campo-fornecedor">
+            <option value="openrouter">OpenRouter</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="huggingface">HuggingFace</option>
+            <option value="ollama">Ollama (local, sem chave)</option>
+            <option value="opencode">OpenCode Go</option>
+          </select>
+        </label>
+        <label>Modelo
+          <input type="text" name="modelo" id="admin-campo-modelo" placeholder="ex: openai/gpt-4o-mini" required>
+        </label>
+        <label id="admin-rotulo-api-key">Chave de API
+          <input type="password" name="api_key" id="admin-campo-api-key" autocomplete="off">
+        </label>
+        <label id="admin-rotulo-host" class="escondido">Endereço da Ollama
+          <input type="text" name="host" id="admin-campo-host" placeholder="http://localhost:11434">
+        </label>
+        <div class="acoes-modal">
+          <button type="button" id="botao-cancelar-configuracao-llm" class="botao-secundario botao-com-icone"><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg><span>Cancelar</span></button>
+          <button type="submit" class="botao-primario botao-com-icone"><svg class="icone-botao" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg><span>Guardar</span></button>
+        </div>
+        <p class="mensagem-erro" data-form="configuracao-llm-admin"></p>
+      </form>
+    </div>
   </div>
 
   <div id="modal-detalhes-log" class="modal escondido">
@@ -214,6 +657,42 @@
     </div>
   </div>
 
+  <div id="modal-vista-estudante" class="modal escondido">
+    <div class="modal-caixa modal-caixa-larga">
+      <div class="modal-cabecalho">
+        <h2 id="vista-estudante-titulo">Estudante</h2>
+        <button id="botao-fechar-vista-estudante" type="button" class="botao-icone" title="Fechar"><svg
+            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg></button>
+      </div>
+      <p class="ajuda-campo">Linha temporal única -- sessões do Alguem e execuções/debug de código, por ordem
+        cronológica. Este acesso fica registado no Registo de Atividade.</p>
+      <div id="vista-estudante-acoes-execucoes" class="acoes-modal escondido">
+        <button type="button" id="botao-apagar-execucoes-selecionadas" class="botao-perigo botao-com-icone"><svg
+            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 7 20 7" />
+            <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+            <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+          </svg><span>Apagar execuções selecionadas</span></button>
+      </div>
+      <div id="vista-estudante-linha-do-tempo" class="linha-do-tempo"></div>
+      <p class="mensagem-erro" id="mensagem-erro-vista-estudante"></p>
+    </div>
+  </div>
+
+  <output id="toast-notificacao" class="toast-notificacao" aria-live="polite">
+    <svg class="icone-toast" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+    <span id="toast-notificacao-texto"></span>
+  </output>
+
   <script src="/estatico/admin.js"></script>
 </body>
+
 </html>

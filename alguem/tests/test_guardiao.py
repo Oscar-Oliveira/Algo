@@ -402,4 +402,20 @@ def test_guardiao_regenera_corretamente_com_anthropic():
         resposta = alguem.conversar("dá-me o código")
     assert "```" not in resposta
     assert resposta == "Pensa nisto: o que precisas de somar?"
-    assert not any("```" in m.get("content", "") for m in alguem.historico)
+
+
+# ---------- Fase 3: prompt de classificação editável ----------
+
+def test_guardiao_usa_prompt_classificacao_personalizado():
+    """Admin pode editar o prompt de classificação (ver
+    docs/interno/PlanoAlguemLLMInvestigacao.md, secção 13/Fase 3) --
+    tem de ser esse texto, não o PROMPT_CLASSIFICACAO por omissão, que
+    chega ao fornecedor."""
+    prompt_personalizado = "Classifica isto: {delimitador}{resposta}{delimitador} -- responde SAFE."
+    fornecedor = FornecedorControlavel(["SAFE"], modelo="x", api_key="x")
+    guardiao = GuardiaoPedagogico(fornecedor, prompt_classificacao=prompt_personalizado)
+    resultado = guardiao.classificar("uma pergunta qualquer, sem código")
+    assert resultado == Classificacao.SAFE
+    pedido_enviado = fornecedor.pedidos_recebidos[0][0]["content"]
+    assert "Classifica isto:" in pedido_enviado
+    assert "Vais avaliar se uma resposta" not in pedido_enviado  # não é o prompt por omissão

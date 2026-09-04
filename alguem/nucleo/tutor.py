@@ -9,7 +9,7 @@ import secrets
 
 from ..fornecedores.base import AgenteLLM
 from .politica_pedagogica import PoliticaPedagogica
-from .system_prompt import construir_system_prompt
+from .system_prompt import construir_system_prompt, IDENTIDADE
 from .guardiao import (
     GuardiaoPedagogico, Classificacao, CLASSIFICACOES_BLOQUEAVEIS,
     NIVEL_APROXIMADO_POR_CLASSIFICACAO,
@@ -59,11 +59,25 @@ class Alguem:
     def __init__(self, fornecedor: AgenteLLM, politica: PoliticaPedagogica,
                  ficheiros_visiveis: list[tuple[str, str]] | None = None,
                  guardiao: GuardiaoPedagogico | None = None,
-                 registador: Registador | None = None):
+                 registador: Registador | None = None,
+                 identidade_tutor: str | None = None,
+                 apoio_escopo: str | None = None,
+                 guardiao_escopo: str | None = None,
+                 guardiao_fornecedor: str | None = None,
+                 guardiao_modelo: str | None = None,
+                 grupo: str | None = None):
+        """'identidade_tutor' é o texto de identidade editável pelo
+        admin (ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção
+        13/Fase 3) -- None usa o texto por omissão (IDENTIDADE).
+        'apoio_escopo'/'guardiao_escopo'/'guardiao_fornecedor'/
+        'guardiao_modelo'/'grupo' só o online/alguem_ponte.py preenche
+        (secção 4/Fase 4) -- passados tal e qual ao Registador, sem
+        nenhuma lógica própria aqui."""
         self.fornecedor = fornecedor
         self.politica = politica
         self.historico: list[dict] = [
-            {"role": "system", "content": construir_system_prompt(politica)},
+            {"role": "system", "content": construir_system_prompt(
+                politica, identidade_tutor if identidade_tutor is not None else IDENTIDADE)},
         ]
         self.nomes_ficheiros_visiveis: list[str] = []
 
@@ -94,7 +108,10 @@ class Alguem:
             nomes_iniciais = [nome for nome, _ in (ficheiros_visiveis or [])]
             self.registador.inicio_sessao(
                 fornecedor=fornecedor.nome, modelo=fornecedor.modelo,
-                politica=vars(politica), nomes_ficheiros_iniciais=nomes_iniciais)
+                politica=vars(politica), nomes_ficheiros_iniciais=nomes_iniciais,
+                apoio_escopo=apoio_escopo, guardiao_escopo=guardiao_escopo,
+                guardiao_fornecedor=guardiao_fornecedor, guardiao_modelo=guardiao_modelo,
+                grupo=grupo)
 
             if ficheiros_visiveis:
                 self.considerar_ficheiros(ficheiros_visiveis)

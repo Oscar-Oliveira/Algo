@@ -82,15 +82,61 @@ def desativar_grupo(grupo_id: int, dsn: str | None = None) -> None:
         bd.execute("UPDATE grupo SET ativo = FALSE WHERE id = %s", (grupo_id,))
 
 
-def apagar_grupo(grupo_id: int, dsn: str | None = None) -> None:
-    """Só apaga se o grupo não tiver nenhum membro -- levanta ErroGrupo
-    com uma mensagem clara caso contrário, em vez de um no-op
-    silencioso (ao contrário de revogar_conta/rejeitar_conta, esta é
-    uma ação destrutiva pedida explicitamente pelo admin; um "não
-    aconteceu nada" sem explicação seria confuso)."""
+def ativar_alguem_grupo(grupo_id: int, dsn: str | None = None) -> None:
+    with sessao_bd(dsn) as bd:
+        bd.execute("UPDATE grupo SET alguem_ativo = TRUE WHERE id = %s", (grupo_id,))
+
+
+def desativar_alguem_grupo(grupo_id: int, dsn: str | None = None) -> None:
+    with sessao_bd(dsn) as bd:
+        bd.execute("UPDATE grupo SET alguem_ativo = FALSE WHERE id = %s", (grupo_id,))
+
+
+def grupo_bloqueia_alguem(estudante_id: int, dsn: str | None = None) -> bool:
+    """Verdadeiro se o estudante pertencer a um grupo com o Alguem
+    excluído (grupo.alguem_ativo = FALSE) -- independente do interruptor
+    global (definicoes.alguem_ativo), que manda por cima de tudo. Um
+    estudante sem grupo, ou cujo grupo permite o Alguem, nunca é
+    bloqueado por isto."""
     with sessao_bd(dsn) as bd:
         linha = bd.execute(
-            "SELECT COUNT(*) AS n FROM estudante WHERE grupo_id = %s", (grupo_id,)
+            "SELECT 1 FROM estudante_grupo eg JOIN grupo ON grupo.id = eg.grupo_id "
+            "WHERE eg.estudante_id = %s AND grupo.alguem_ativo = FALSE",
+            (estudante_id,),
+        ).fetchone()
+    return linha is not None
+
+
+def nome_grupo_do_estudante(estudante_id: int, dsn: str | None = None) -> str | None:
+    """Nome do grupo do estudante neste momento, ou None se não
+    pertencer a nenhum -- usado para denormalizar o grupo nos eventos
+    do Alguem (ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção
+    4/Fase 4: preserva o grupo tal como era nessa sessão, mesmo que o
+    estudante mude de grupo depois)."""
+    with sessao_bd(dsn) as bd:
+        linha = bd.execute(
+            "SELECT grupo.nome FROM estudante_grupo eg JOIN grupo ON grupo.id = eg.grupo_id "
+            "WHERE eg.estudante_id = %s LIMIT 1",
+            (estudante_id,),
+        ).fetchone()
+    return linha["nome"] if linha else None
+
+
+def apagar_grupo(grupo_id: int, dsn: str | None = None) -> None:
+    """Só apaga se o grupo não tiver nenhum membro ESTUDANTE -- levanta
+    ErroGrupo com uma mensagem clara caso contrário, em vez de um no-op
+    silencioso (ao contrário de revogar_conta/rejeitar_conta, esta é
+    uma ação destrutiva pedida explicitamente pelo admin; um "não
+    aconteceu nada" sem explicação seria confuso). Um admin de grupo
+    que giria este grupo não conta como "membro" -- a linha dele em
+    estudante_grupo desaparece sozinha (ON DELETE CASCADE), só deixa
+    de gerir este grupo, não bloqueia a eliminação."""
+    with sessao_bd(dsn) as bd:
+        linha = bd.execute(
+            "SELECT COUNT(*) AS n FROM estudante_grupo eg "
+            "JOIN estudante ON estudante.id = eg.estudante_id "
+            "WHERE eg.grupo_id = %s AND estudante.admin = FALSE",
+            (grupo_id,),
         ).fetchone()
         if linha["n"] > 0:
             raise ErroGrupo("Este grupo tem membros associados -- desativa-o em vez de o eliminar.")
@@ -100,11 +146,16 @@ def apagar_grupo(grupo_id: int, dsn: str | None = None) -> None:
 
 
 def listar_grupos(dsn: str | None = None) -> list[dict]:
+    """'num_membros' conta só estudantes (admin = FALSE) -- um admin de
+    grupo que giria este grupo aparece em estudante_grupo mas não é um
+    "membro" da turma, ver apagar_grupo."""
     with sessao_bd(dsn) as bd:
         linhas = bd.execute(
-            "SELECT grupo.id, grupo.nome, grupo.ativo, grupo.criado_em, "
-            "       COUNT(estudante.id) AS num_membros "
-            "FROM grupo LEFT JOIN estudante ON estudante.grupo_id = grupo.id "
+            "SELECT grupo.id, grupo.nome, grupo.ativo, grupo.alguem_ativo, grupo.criado_em, "
+            "       COUNT(membro.id) AS num_membros "
+            "FROM grupo "
+            "LEFT JOIN estudante_grupo eg ON eg.grupo_id = grupo.id "
+            "LEFT JOIN estudante membro ON membro.id = eg.estudante_id AND membro.admin = FALSE "
             "GROUP BY grupo.id ORDER BY grupo.nome"
         ).fetchall()
     return [dict(linha) for linha in linhas]
@@ -149,10 +200,13 @@ def verificar_codigo(codigo: str, dsn: str | None = None) -> int | None:
 
 
 def reatribuir_grupo(estudante_id: int, novo_grupo_id: int | None, dsn: str | None = None) -> int | None:
-    """Move um estudante para outro grupo (ou para None = sem grupo).
-    Devolve o id do grupo anterior, para quem chamar poder registar o
-    evento de auditoria com o antes/depois. Levanta ErroGrupo se
-    'novo_grupo_id' não corresponder a um grupo existente e ativo."""
+    """Move um estudante para outro grupo (ou para None = sem grupo) --
+    substitui SEMPRE por completo a linha existente em estudante_grupo
+    (nunca acrescenta), porque uma conta não-admin só pode ter uma
+    pertença. Devolve o id do grupo anterior, para quem chamar poder
+    registar o evento de auditoria com o antes/depois. Levanta ErroGrupo
+    se 'novo_grupo_id' não corresponder a um grupo existente e ativo, ou
+    se 'estudante_id' não existir."""
     with sessao_bd(dsn) as bd:
         if novo_grupo_id is not None:
             existe = bd.execute(
@@ -160,15 +214,60 @@ def reatribuir_grupo(estudante_id: int, novo_grupo_id: int | None, dsn: str | No
             ).fetchone()
             if existe is None:
                 raise ErroGrupo("Grupo de destino inválido ou inativo.")
-        linha_anterior = bd.execute(
-            "SELECT grupo_id FROM estudante WHERE id = %s", (estudante_id,)
+        existe_estudante = bd.execute(
+            "SELECT 1 FROM estudante WHERE id = %s", (estudante_id,)
         ).fetchone()
-        if linha_anterior is None:
+        if existe_estudante is None:
             raise ErroGrupo("Estudante não encontrado.")
-        bd.execute(
-            "UPDATE estudante SET grupo_id = %s WHERE id = %s", (novo_grupo_id, estudante_id)
-        )
-    return linha_anterior["grupo_id"]
+        linha_anterior = bd.execute(
+            "SELECT grupo_id FROM estudante_grupo WHERE estudante_id = %s LIMIT 1", (estudante_id,)
+        ).fetchone()
+        bd.execute("DELETE FROM estudante_grupo WHERE estudante_id = %s", (estudante_id,))
+        if novo_grupo_id is not None:
+            bd.execute(
+                "INSERT INTO estudante_grupo (estudante_id, grupo_id) VALUES (%s, %s)",
+                (estudante_id, novo_grupo_id),
+            )
+    return linha_anterior["grupo_id"] if linha_anterior else None
+
+
+def definir_grupos_geridos(admin_id: int, grupo_ids: list[int], dsn: str | None = None) -> None:
+    """Substitui por completo o conjunto de grupos geridos por um admin
+    de grupo (não-global) pelos indicados em 'grupo_ids' -- mais
+    simples de refletir de uma vez o que a UI escolheu do que um
+    add/remove incremental. Ao contrário de reatribuir_grupo, aqui pode
+    ficar mais do que uma linha (um admin pode gerir várias turmas).
+    Levanta ErroGrupo se algum id não corresponder a um grupo existente."""
+    grupo_ids = list(dict.fromkeys(grupo_ids))
+    try:
+        with sessao_bd(dsn) as bd:
+            bd.execute("DELETE FROM estudante_grupo WHERE estudante_id = %s", (admin_id,))
+            for grupo_id in grupo_ids:
+                bd.execute(
+                    "INSERT INTO estudante_grupo (estudante_id, grupo_id) VALUES (%s, %s)",
+                    (admin_id, grupo_id),
+                )
+    except psycopg.errors.ForeignKeyViolation as e:
+        raise ErroGrupo("Um dos grupos indicados não existe.") from e
+
+
+def listar_grupos_geridos(admin_id: int, dsn: str | None = None) -> list[int]:
+    with sessao_bd(dsn) as bd:
+        linhas = bd.execute(
+            "SELECT grupo_id FROM estudante_grupo WHERE estudante_id = %s ORDER BY grupo_id",
+            (admin_id,),
+        ).fetchall()
+    return [linha["grupo_id"] for linha in linhas]
+
+
+def limpar_grupos(estudante_id: int, dsn: str | None = None) -> None:
+    """Remove toda e qualquer associação a grupos de uma conta -- usado
+    ao remover o estatuto de admin (ver main.py): um admin de grupo
+    pode gerir várias turmas ao mesmo tempo, o que deixa de ser válido
+    assim que a conta volta a ser um estudante normal (no máximo uma,
+    ver reatribuir_grupo)."""
+    with sessao_bd(dsn) as bd:
+        bd.execute("DELETE FROM estudante_grupo WHERE estudante_id = %s", (estudante_id,))
 
 
 def exportar_membros_csv(grupo_id: int, dsn: str | None = None) -> str:
@@ -177,8 +276,11 @@ def exportar_membros_csv(grupo_id: int, dsn: str | None = None) -> str:
         if grupo is None:
             raise ErroGrupo("Grupo não encontrado.")
         membros = bd.execute(
-            "SELECT email, criado_em, aprovado, admin FROM estudante "
-            "WHERE grupo_id = %s ORDER BY email",
+            "SELECT estudante.email, estudante.criado_em, estudante.aprovado, estudante.admin "
+            "FROM estudante_grupo "
+            "JOIN estudante ON estudante.id = estudante_grupo.estudante_id "
+            "WHERE estudante_grupo.grupo_id = %s AND estudante.admin = FALSE "
+            "ORDER BY estudante.email",
             (grupo_id,),
         ).fetchall()
 

@@ -78,6 +78,15 @@ def calcular_metricas_da_sessao(eventos: list[dict]) -> dict:
         ),
         "num_recusas_seguras": sum(
             1 for r in respostas_finais if r.get("veio_de_recusa_segura")),
+        # Campos da Fase 4 (docs/interno/PlanoAlguemLLMInvestigacao.md,
+        # secção 4) -- None em logs de antes dessa fase (AG-31: .get()
+        # já protege contra eventos mais antigos sem estes campos).
+        "timestamp_inicio": inicio.get("timestamp") if inicio else None,
+        "apoio_escopo": inicio.get("apoio_escopo") if inicio else None,
+        "guardiao_escopo": inicio.get("guardiao_escopo") if inicio else None,
+        "guardiao_fornecedor": inicio.get("guardiao_fornecedor") if inicio else None,
+        "guardiao_modelo": inicio.get("guardiao_modelo") if inicio else None,
+        "grupo": inicio.get("grupo") if inicio else None,
     }
 
 

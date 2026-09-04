@@ -7,7 +7,7 @@
 # ativar na tua shell.
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Corre tanto daqui (instaladores/, dentro do repositório -- pyproject.toml
+# Corre tanto daqui (repl/, dentro do repositório -- pyproject.toml
 # um nível acima) como da raiz de um pacote distribuído a estudantes
 # (empacotar.py copia este script para lá, ao lado do pyproject.toml).
 if [ -f "$DIR/pyproject.toml" ]; then

@@ -13,6 +13,11 @@
   --ambar-forte: #52525b;
   --erro: #d9695a;
   --sucesso: #7fb88a;
+  /* Paleta de gráficos (skill dataviz) -- passos "dark" da ordem
+     categórica validada (blue/orange), usados aqui como tema por
+     omissão porque este :root já É o tema escuro do site. */
+  --grafico-serie-1: #3987e5;
+  --grafico-serie-2: #d95926;
   font-size: 16px;
 }
 
@@ -30,6 +35,8 @@
   --ambar-forte: #3f3f46;
   --erro: #b23b2c;
   --sucesso: #3f7a4f;
+  --grafico-serie-1: #2a78d6;
+  --grafico-serie-2: #eb6834;
 }
 
 * {
@@ -289,10 +296,40 @@ button {
   min-height: 1.2em;
 }
 
-.mensagem-sucesso {
+.toast-notificacao {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(26rem, calc(100vw - 3rem));
+  background: var(--tinta-clara);
+  border: 1px solid var(--tinta-borda);
+  border-left: 3px solid var(--sucesso);
+  border-radius: 10px;
+  padding: 0.8rem 1.2rem;
+  box-shadow: 0 20px 45px -20px rgba(0, 0, 0, 0.6);
+  color: var(--texto-claro);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  opacity: 0;
+  transform: translateY(0.5rem);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast-notificacao.visivel {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-notificacao .icone-toast {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
   color: var(--sucesso);
-  font-size: 0.85rem;
-  margin: 0.6rem 0 0;
 }
 
 /* ---------- painel de admin (página própria, não um modal) ---------- */
@@ -346,9 +383,34 @@ button {
   vertical-align: middle;
 }
 
+/* A célula de ações de cada linha (Grupos, Utilizadores, Registo de
+   Atividade, Problemas Reportados) é sempre a última coluna -- em flex
+   para dar espaço real entre botões em vez de os deixar colados (sem
+   isto, dois <button> seguidos no DOM não têm nenhum espaço entre si). */
 .tabela-admin td:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  align-items: center;
   text-align: right;
   white-space: nowrap;
+}
+
+/* Grupos: as ações de uma linha juntam-se em subgrupos (estado vs.
+   utilitárias vs. destrutiva) com um espaço maior e um traço fino entre
+   subgrupos, em vez de cinco botões soltos em fila. */
+.grupo-acoes-tabela {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid var(--tinta-borda);
+}
+
+.grupo-acoes-tabela:first-child {
+  padding-left: 0;
+  border-left: none;
 }
 
 /* Etiquetas de estado -- convenção habitual (verde=ativo/aprovado,
@@ -403,6 +465,13 @@ button {
   font-size: 0.85rem;
 }
 
+/* Código de junção do grupo, revelado pelo botão "Ver código" (ver
+   admin.js alternarCodigoGrupo) -- na mesma linha dos botões (que já
+   estão em .grupo-acoes-tabela, flex), não numa linha à parte. */
+.texto-codigo-grupo:empty {
+  display: none;
+}
+
 .tabela-admin td.numero,
 .tabela-admin th.numero {
   text-align: right;
@@ -432,6 +501,21 @@ button {
   outline: 2px solid var(--ambar);
   outline-offset: 1px;
   border-color: var(--ambar);
+}
+
+.lista-grupos-geridos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.opcao-grupo-gerido {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .tabela-relatorios th:nth-child(1),
@@ -482,10 +566,53 @@ button {
   font-size: 0.82rem;
 }
 
-.tabela-admin .botao-primario {
+.botao-sucesso {
+  background: var(--sucesso);
+  color: #fff;
+  border: none;
   padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  font-weight: 600;
   font-size: 0.82rem;
-  margin-right: 0.4rem;
+}
+
+/* No admin, "secundário" cobre ações neutras/utilitárias (filtrar, paginar,
+   exportar, ver detalhes) -- ao contrário do resto do site, aqui tem sempre
+   fundo sólido: nenhum botão do admin fica "sem fundo". Ações que mudam
+   estado para uma condição positiva (Ativar, Tornar admin) usam
+   .botao-sucesso; as destrutivas continuam a usar .botao-perigo. */
+.pagina-admin .botao-secundario {
+  background: var(--tinta-clara);
+  border: 1px solid var(--tinta-borda);
+}
+
+.pagina-admin .botao-secundario:hover {
+  background: var(--tinta-borda);
+}
+
+/* Todos os botões de texto do admin com a mesma altura/tipografia,
+   mesmo misturando variantes (primário/secundário/perigo/sucesso) na
+   mesma linha -- ex: linha de ações de um grupo, ou os filtros do
+   registo de atividade misturados com selects/inputs (ver
+   .filtros-admin mais abaixo). Uma segunda régua, mais compacta, cobre
+   os botões dentro de células de tabela e da lista de configurações de
+   LLM, onde o texto normal ficaria demasiado grande. */
+.pagina-admin :is(.botao-primario, .botao-secundario, .botao-perigo, .botao-sucesso) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.3rem;
+  box-sizing: border-box;
+  padding: 0 0.9rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.pagina-admin :is(.tabela-admin, .linha-configuracao-llm) :is(.botao-primario, .botao-secundario, .botao-perigo, .botao-sucesso) {
+  height: 2rem;
+  padding: 0 0.6rem;
+  font-size: 0.8rem;
+  margin-right: 0;
 }
 
 /* Menu de admin: barra lateral com a altura toda (ver .corpo-admin),
@@ -495,11 +622,39 @@ button {
   flex: 0 0 220px;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 1.2rem;
   padding: 1.5rem 1rem;
   border-right: 1px solid var(--tinta-borda);
   background: var(--tinta-clara);
   overflow-y: auto;
+}
+
+/* Duas secções na barra lateral: "Trabalho" (o que se faz com os dados
+   -- investigação, e futuramente apoio pedagógico) e "Definições" (tudo
+   o que configura a plataforma). */
+.grupo-lateral-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.titulo-grupo-lateral-admin {
+  padding: 0 0.7rem 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--texto-esmaecido);
+}
+
+.item-lateral-admin.brevemente {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.item-lateral-admin.brevemente:hover {
+  background: transparent;
+  color: var(--texto-esmaecido);
 }
 
 .item-lateral-admin {
@@ -534,6 +689,31 @@ button {
   border-left-color: var(--ambar);
 }
 
+/* Contador de não vistos junto ao botão da aba na barra lateral --
+   reaproveita a cor de .badge-erro em vez de inventar nova paleta. */
+.badge-lateral {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(217, 105, 90, 0.18);
+  color: var(--erro);
+}
+
+/* Etiqueta neutra "Fase 6" no item de Apoio Pedagógico (ainda por
+   implementar) -- mesma posição/forma de .badge-lateral, sem a
+   conotação de alerta da cor de erro. */
+.badge-lateral-neutro {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--tinta-borda);
+  color: var(--texto-esmaecido);
+}
+
 .conteudo-aba-admin.escondido {
   display: none;
 }
@@ -551,10 +731,21 @@ button {
   .barra-lateral-admin {
     flex-direction: row;
     flex-wrap: wrap;
+    align-items: center;
     width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--tinta-borda);
     overflow-y: visible;
+  }
+
+  .grupo-lateral-admin {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .titulo-grupo-lateral-admin {
+    padding: 0 0.3rem 0 0;
   }
 
   .conteudo-admin {
@@ -605,11 +796,183 @@ button {
 .filtros-admin input,
 .filtros-admin select {
   font: inherit;
+  height: 2.3rem;
+  box-sizing: border-box;
   padding: 0.5rem 0.7rem;
   border: 1px solid var(--tinta-borda);
   border-radius: 8px;
   background: var(--tinta-clara);
   color: var(--texto-claro);
+}
+
+/* Mesma altura dos selects/inputs à volta (ver .filtros-admin acima) --
+   um <label> com texto + <input type="date"> tinha, sem isto, a altura
+   do texto pequeno em vez da do campo, e ficava desalinhado ao lado de
+   um <select> ou <button> na mesma linha de filtros. */
+.filtro-data {
+  display: inline-flex;
+  align-items: center;
+  height: 2.3rem;
+  box-sizing: border-box;
+  gap: 0.4rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--tinta-borda);
+  border-radius: 8px;
+  background: var(--tinta-clara);
+  font-size: 0.82rem;
+  color: var(--texto-esmaecido);
+}
+
+.filtro-data input {
+  font: inherit;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--texto-claro);
+}
+
+/* ---------- Investigação: dashboard (secção 6, skill dataviz) ---------- */
+
+.grelha-graficos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1.4rem;
+}
+
+.cartao-grafico {
+  background: var(--tinta-clara);
+  border: 1px solid var(--tinta-borda);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+
+.cartao-grafico-largo {
+  grid-column: 1 / -1;
+}
+
+.cartao-grafico h4 {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--texto-esmaecido);
+}
+
+.grafico-svg {
+  width: 100%;
+  height: 160px;
+}
+
+.grafico-svg svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.grafico-barra {
+  fill: var(--grafico-serie-1);
+}
+
+.grafico-barra-serie-2 {
+  fill: var(--grafico-serie-2);
+}
+
+.grafico-eixo {
+  stroke: var(--tinta-borda);
+  stroke-width: 1;
+}
+
+.grafico-rotulo {
+  fill: var(--texto-esmaecido);
+  font-size: 9px;
+}
+
+.grafico-valor {
+  fill: var(--texto-claro);
+  font-size: 9px;
+}
+
+.grafico-vazio {
+  color: var(--texto-esmaecido);
+  font-size: 0.82rem;
+  padding: 1.5rem 0;
+  text-align: center;
+}
+
+.legenda-grafico {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--texto-esmaecido);
+}
+
+.legenda-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.legenda-cor {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.acoes-exportacao {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+/* ---------- Investigação: vista por estudante (secção 10) ---------- */
+
+.linha-do-tempo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.item-linha-do-tempo {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  background: var(--tinta-clara);
+  border: 1px solid var(--tinta-borda);
+  font-size: 0.85rem;
+}
+
+.item-linha-do-tempo-sessao {
+  border-left: 3px solid var(--grafico-serie-1);
+}
+
+.item-linha-do-tempo-execucao {
+  border-left: 3px solid var(--grafico-serie-2);
+}
+
+.item-linha-do-tempo-corpo {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-linha-do-tempo-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.item-linha-do-tempo-data {
+  font-weight: 400;
+  color: var(--texto-esmaecido);
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .tabela-admin th.ordenavel {
@@ -932,7 +1295,27 @@ button {
 
 .acoes-topo {
   display: flex;
+  align-items: center;
   gap: 0.6rem;
+}
+
+/* Separa visualmente os grupos de ícones da barra de topo (workspace /
+   suporte / preferências / conta) -- sem isto, ações muito diferentes
+   entre si (mostrar o Alguem, pedir ajuda, mudar de tema, sair da
+   conta) ficavam todas em fila, sem nenhuma hierarquia. */
+.divisor-acoes-topo {
+  width: 1px;
+  height: 1.4rem;
+  background: var(--tinta-borda);
+}
+
+/* #botao-alternar-alguem começa (e pode continuar) escondido -- sem
+   isto, o divisor logo a seguir ficava "órfão" à esquerda de tudo,
+   sem nenhum ícone antes dele (ver app.js, só este botão troca de
+   visibilidade dinamicamente; os outros divisores ficam sempre entre
+   dois ícones sempre visíveis). */
+#botao-alternar-alguem.escondido + .divisor-acoes-topo {
+  display: none;
 }
 
 /* FEAT-02: o botão de tema mostra o ícone do tema para onde vai
@@ -1271,6 +1654,152 @@ button {
 
 .vista-definicoes-alguem .formulario label {
   color: var(--texto-esmaecido);
+}
+
+.cabecalho-definicoes-lista {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* Cada bloco (configurações guardadas / seleção ativa / permissões) fica
+   claramente separado dos outros, no mesmo espírito tipográfico de
+   .painel-cabecalho -- é o que faltava para "organizar melhor" o painel,
+   que antes misturava tudo junto sem hierarquia visual. */
+.seccao-definicoes-llm {
+  margin-bottom: 1.4rem;
+}
+
+.seccao-definicoes-llm:last-child {
+  margin-bottom: 0;
+}
+
+.cabecalho-seccao-llm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--texto-esmaecido);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* .selecao-papel-llm combina-se sempre com .formulario (ver editor.html/
+   admin.html) para herdar o estilo real dos campos (padding, cantos
+   arredondados, cor de fundo/contraste) já definido em .formulario
+   select -- sem isso os <select> ficavam sem qualquer estilo aplicado. */
+.selecao-papel-llm.formulario {
+  gap: 0.6rem;
+}
+
+.prompt-editavel {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  background: var(--tinta-clara);
+  border: 1px solid var(--tinta-borda);
+  color: inherit;
+  resize: vertical;
+  margin-bottom: 0.5rem;
+}
+
+.prompt-omissao {
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  background: var(--tinta-clara);
+  border: 1px solid var(--tinta-borda);
+  color: var(--texto-esmaecido);
+  margin: 0 0 0.6rem;
+}
+
+.lista-configuracoes-llm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.linha-configuracao-llm {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--tinta-clara);
+  border: 1px solid var(--tinta-borda);
+}
+
+.texto-configuracao-llm {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.texto-configuracao-llm strong {
+  color: var(--texto-claro);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.texto-configuracao-llm span {
+  color: var(--texto-esmaecido);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Aviso inline (não flutuante, ao contrário do toast) para um estado que
+   fica visível enquanto persistir -- ex: Alguem ativado sem nenhum LLM
+   disponível -- em vez de aparecer e desaparecer sozinho. */
+.aviso-bloco {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  background: rgba(224, 166, 61, 0.12);
+  border: 1px solid rgba(224, 166, 61, 0.4);
+  border-left: 3px solid var(--ambar);
+  color: var(--texto-claro);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin-bottom: 1.4rem;
+}
+
+.aviso-bloco .icone-botao {
+  flex-shrink: 0;
+  color: var(--ambar);
+  margin-top: 0.1rem;
+}
+
+.vazio-configuracoes-llm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 1rem;
+  border: 1px dashed var(--tinta-borda);
+  border-radius: 8px;
+}
+
+.vazio-configuracoes-llm .ajuda-campo {
+  margin: 0;
 }
 
 .modal {

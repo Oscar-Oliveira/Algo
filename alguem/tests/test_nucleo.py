@@ -135,3 +135,13 @@ def test_system_prompt_respeita_nivel_maximo_de_ajuda():
     prompt_permissivo = construir_system_prompt(PoliticaPedagogica(nivel_maximo_ajuda=6))
     assert "Nível 5" not in prompt_restrito
     assert "Nível 5" in prompt_permissivo
+
+
+def test_system_prompt_aceita_identidade_personalizada():
+    """Fase 3: 'identidade' é editável pelo admin no painel web -- só
+    substitui este bloco inicial, o resto do prompt (derivado da
+    política) mantém-se."""
+    prompt = construir_system_prompt(PoliticaPedagogica(), identidade="Sou um tutor de teste.")
+    assert "Sou um tutor de teste." in prompt
+    assert "És o Alguem" not in prompt
+    assert "Escada de níveis de ajuda" in prompt  # resto do prompt não mudou

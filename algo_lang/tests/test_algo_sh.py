@@ -29,19 +29,19 @@ def _preparar_copia_do_projeto(tmp_path):
     """Copia só o necessário para o algo.sh conseguir instalar-se: o
     pacote, o pyproject.toml e o próprio script -- disposição igual à do
     pacote distribuído por empacotar.py (algo.sh solto na raiz, ao lado
-    do pyproject.toml), não à do repositório (onde vive em instaladores/)."""
+    do pyproject.toml), não à do repositório (onde vive em repl/)."""
     destino = tmp_path / "projeto"
     destino.mkdir()
     shutil.copytree(RAIZ_PROJETO / "algo_lang", destino / "algo_lang",
                      ignore=shutil.ignore_patterns("__pycache__", "tests"))
     shutil.copy(RAIZ_PROJETO / "pyproject.toml", destino / "pyproject.toml")
-    shutil.copy(RAIZ_PROJETO / "instaladores" / "algo.sh", destino / "algo.sh")
+    shutil.copy(RAIZ_PROJETO / "repl" / "algo.sh", destino / "algo.sh")
     os.chmod(destino / "algo.sh", 0o755)
     return destino
 
 
 def _preparar_copia_do_repositorio(tmp_path):
-    """Disposição igual à do repositório: algo.sh dentro de instaladores/,
+    """Disposição igual à do repositório: algo.sh dentro de repl/,
     com o pyproject.toml um nível acima. Confirma o fallback do próprio
     algo.sh (que procura o pyproject.toml na sua própria pasta antes de
     subir um nível) para esta disposição, distinta da do pacote
@@ -51,27 +51,27 @@ def _preparar_copia_do_repositorio(tmp_path):
     shutil.copytree(RAIZ_PROJETO / "algo_lang", destino / "algo_lang",
                      ignore=shutil.ignore_patterns("__pycache__", "tests"))
     shutil.copy(RAIZ_PROJETO / "pyproject.toml", destino / "pyproject.toml")
-    (destino / "instaladores").mkdir()
-    shutil.copy(RAIZ_PROJETO / "instaladores" / "algo.sh",
-                destino / "instaladores" / "algo.sh")
-    os.chmod(destino / "instaladores" / "algo.sh", 0o755)
+    (destino / "repl").mkdir()
+    shutil.copy(RAIZ_PROJETO / "repl" / "algo.sh",
+                destino / "repl" / "algo.sh")
+    os.chmod(destino / "repl" / "algo.sh", 0o755)
     return destino
 
 
 @_SO_NAO_SUPORTADO
 @pytest.mark.slow
-def test_algo_sh_a_partir_de_instaladores_usa_venv_na_raiz(tmp_path):
+def test_algo_sh_a_partir_de_repl_usa_venv_na_raiz(tmp_path):
     projeto = _preparar_copia_do_repositorio(tmp_path)
     (projeto / "soma.algo").write_text(
         'algoritmo "T"\ninicio\n    escrever(2 + 3)\n', encoding="utf-8")
 
     resultado = subprocess.run(
-        ["./instaladores/algo.sh", "executa", "soma.algo"], cwd=projeto,
+        ["./repl/algo.sh", "executa", "soma.algo"], cwd=projeto,
         capture_output=True, text=True, timeout=120)
     assert resultado.returncode == 0, resultado.stdout + resultado.stderr
     assert "5" in resultado.stdout
     assert (projeto / ".venv" / "bin" / "algo").exists()
-    assert not (projeto / "instaladores" / ".venv").exists()
+    assert not (projeto / "repl" / ".venv").exists()
 
 
 @_SO_NAO_SUPORTADO
@@ -116,7 +116,7 @@ def test_algo_sh_funciona_com_espacos_no_caminho(tmp_path):
     shutil.copytree(RAIZ_PROJETO / "algo_lang", pasta_com_espacos / "algo_lang",
                      ignore=shutil.ignore_patterns("__pycache__", "tests"))
     shutil.copy(RAIZ_PROJETO / "pyproject.toml", pasta_com_espacos / "pyproject.toml")
-    shutil.copy(RAIZ_PROJETO / "instaladores" / "algo.sh", pasta_com_espacos / "algo.sh")
+    shutil.copy(RAIZ_PROJETO / "repl" / "algo.sh", pasta_com_espacos / "algo.sh")
     os.chmod(pasta_com_espacos / "algo.sh", 0o755)
     (pasta_com_espacos / "soma.algo").write_text(
         'algoritmo "T"\ninicio\n    escrever(2 + 3)\n', encoding="utf-8")
@@ -151,8 +151,8 @@ def test_algo_command_e_identico_ao_algo_sh():
     """algo.command (macOS, duplo-clique) tem de ter o mesmo conteúdo do
     algo.sh -- é literalmente o mesmo script, só muda a extensão para o
     Finder o reconhecer como executável."""
-    conteudo_sh = (RAIZ_PROJETO / "instaladores" / "algo.sh").read_text(encoding="utf-8")
-    conteudo_command = (RAIZ_PROJETO / "instaladores" / "algo.command").read_text(encoding="utf-8")
+    conteudo_sh = (RAIZ_PROJETO / "repl" / "algo.sh").read_text(encoding="utf-8")
+    conteudo_command = (RAIZ_PROJETO / "repl" / "algo.command").read_text(encoding="utf-8")
     assert conteudo_sh == conteudo_command
 
 

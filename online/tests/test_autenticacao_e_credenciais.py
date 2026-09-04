@@ -4,7 +4,7 @@ import os
 import pytest
 
 import autenticacao
-import credenciais
+import configuracao_llm
 import cifragem
 
 
@@ -294,8 +294,12 @@ def test_bootstrap_tardio_ainda_e_bloqueado_por_grupo_desativado(monkeypatch):
     """Achado 3 (PlanoAuditoria.md): a promoção tardia a admin
     (ONLINE_EMAIL_ADMIN configurada DEPOIS de a conta já existir e já
     pertencer a um grupo entretanto desativado) continua bloqueada pelo
-    grupo desativado, tal como o docstring de autenticar() promete --
-    'sem exceção (incluindo contas admin)'."""
+    grupo desativado -- neste momento a conta AINDA não é admin
+    (admin=False até este mesmo autenticar() a promover), por isso o
+    bloqueio por grupo desativado (só para não-admin, ver
+    _grupo_do_estudante_esta_inativo) ainda se aplica. Contraste com
+    test_login_de_admin_nao_e_bloqueado_por_grupo_desativado, onde a
+    conta já é admin no momento do login."""
     import grupos
     monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
     grupo = grupos.criar_grupo("Grupo A")
@@ -349,18 +353,19 @@ def test_login_bloqueado_quando_grupo_esta_desativado(monkeypatch):
         autenticacao.autenticar("aluno@escola.pt", "password123")
 
 
-def test_login_de_admin_tambem_e_bloqueado_por_grupo_desativado(monkeypatch):
-    """Decisão explícita: sem exceção para admins -- desativar o
-    próprio grupo pode auto-excluir um admin (risco aceite, ver
-    notes.md)."""
+def test_login_de_admin_nao_e_bloqueado_por_grupo_desativado(monkeypatch):
+    """Decisão explícita (reverte a versão anterior desta regra, de
+    quando só havia um tipo de admin): um admin de grupo pode gerir
+    várias turmas ao mesmo tempo -- bloquear-lhe o login só porque UMA
+    delas foi desativada não faria sentido. O bloqueio por grupo
+    desativado só se aplica a contas não-admin."""
     import grupos
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
     grupo = grupos.criar_grupo("Grupo A")
     id_admin = autenticacao.registar("professor@escola.pt", "password123", codigo_grupo=grupo["codigo"])
     assert autenticacao.eh_admin(id_admin) is True
     grupos.desativar_grupo(grupo["id"])
-    with pytest.raises(autenticacao.ErroAutenticacao, match="grupo foi desativado"):
-        autenticacao.autenticar("professor@escola.pt", "password123")
+    assert autenticacao.autenticar("professor@escola.pt", "password123") == id_admin
 
 
 def test_login_permitido_quando_grupo_e_reativado(monkeypatch):
@@ -423,54 +428,157 @@ def test_remover_admin_do_proprio_ator_nao_muda_nada():
     assert autenticacao.eh_admin(id_admin1) is True
 
 
-# ---------- credenciais ----------
+# ---------- admin global vs. admin de grupo ----------
 
-def test_sem_credencial_configurada():
+def test_tornar_admin_fica_global_por_omissao():
+    """DEFAULT TRUE na coluna admin_global (bd.py) -- decisão
+    deliberada: preserva o comportamento atual (todos os admins
+    equivalentes) até alguém decidir restringir um admin a um grupo."""
     id_est = autenticacao.registar("a@b.com", "password123")
-    assert credenciais.obter_credencial(id_est) is None
+    autenticacao.tornar_admin(id_est)
+    assert autenticacao.eh_admin_global(id_est) is True
 
 
-def test_guardar_e_ler_credencial():
+def test_eh_admin_global_falso_para_nao_admin():
     id_est = autenticacao.registar("a@b.com", "password123")
-    credenciais.guardar_credencial(id_est, "openai", "gpt-4o-mini", "sk-teste")
-    c = credenciais.obter_credencial(id_est)
+    assert autenticacao.eh_admin_global(id_est) is False
+
+
+def test_definir_admin_global_para_false_torna_admin_de_grupo():
+    id_admin1 = autenticacao.registar("a@b.com", "password123")
+    id_admin2 = autenticacao.registar("c@d.com", "password123")
+    autenticacao.tornar_admin(id_admin1)
+    autenticacao.tornar_admin(id_admin2)
+
+    alterou = autenticacao.definir_admin_global(id_admin2, False, ator_id=id_admin1)
+    assert alterou is True
+    assert autenticacao.eh_admin_global(id_admin2) is False
+    assert autenticacao.eh_admin(id_admin2) is True  # continua admin, só deixa de ser global
+
+
+def test_definir_admin_global_nao_se_deixasse_zero_admins_globais():
+    id_admin1 = autenticacao.registar("a@b.com", "password123")
+    id_admin2 = autenticacao.registar("c@d.com", "password123")
+    autenticacao.tornar_admin(id_admin1)
+    autenticacao.tornar_admin(id_admin2)
+    autenticacao.definir_admin_global(id_admin2, False, ator_id=id_admin1)
+
+    alterou = autenticacao.definir_admin_global(id_admin1, False, ator_id=id_admin2)
+    assert alterou is False
+    assert autenticacao.eh_admin_global(id_admin1) is True
+
+
+def test_definir_admin_global_do_proprio_ator_nao_muda_nada():
+    id_admin1 = autenticacao.registar("a@b.com", "password123")
+    id_admin2 = autenticacao.registar("c@d.com", "password123")
+    autenticacao.tornar_admin(id_admin1)
+    autenticacao.tornar_admin(id_admin2)
+
+    alterou = autenticacao.definir_admin_global(id_admin1, False, ator_id=id_admin1)
+    assert alterou is False
+    assert autenticacao.eh_admin_global(id_admin1) is True
+
+
+def test_remover_admin_do_unico_admin_global_nao_muda_nada_mesmo_havendo_outro_admin():
+    """Guarda extra em remover_admin (não só 'sobra pelo menos um
+    admin'): remover o estatuto de admin por completo do único admin
+    GLOBAL não pode deixar a aplicação sem ninguém capaz de aceder às
+    abas restritas (Utilizadores, Grupos, ...), mesmo que sobre um
+    admin de grupo."""
+    id_admin_global = autenticacao.registar("a@b.com", "password123")
+    id_admin_grupo = autenticacao.registar("c@d.com", "password123")
+    autenticacao.tornar_admin(id_admin_global)
+    autenticacao.tornar_admin(id_admin_grupo)
+    autenticacao.definir_admin_global(id_admin_grupo, False, ator_id=id_admin_global)
+
+    alterou = autenticacao.remover_admin(id_admin_global, ator_id=id_admin_grupo)
+    assert alterou is False
+    assert autenticacao.eh_admin(id_admin_global) is True
+
+
+def test_listar_todos_inclui_admin_global_e_grupos_geridos():
+    import grupos
+    grupo = grupos.criar_grupo("Grupo A")
+    id_admin_global = autenticacao.registar("a@b.com", "password123")
+    id_admin_grupo = autenticacao.registar("c@d.com", "password123")
+    autenticacao.tornar_admin(id_admin_global)
+    autenticacao.tornar_admin(id_admin_grupo)
+    autenticacao.definir_admin_global(id_admin_grupo, False, ator_id=id_admin_global)
+    grupos.definir_grupos_geridos(id_admin_grupo, [grupo["id"]])
+
+    contas = {c["id"]: c for c in autenticacao.listar_todos()}
+    assert contas[id_admin_global]["admin_global"] is True
+    assert contas[id_admin_global]["grupos_geridos_ids"] == []
+    assert contas[id_admin_grupo]["admin_global"] is False
+    assert contas[id_admin_grupo]["grupos_geridos_ids"] == [grupo["id"]]
+
+
+# ---------- configuração de LLM ----------
+
+def test_sem_configuracao_llm():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    assert configuracao_llm.listar_configuracoes_estudante(id_est) == []
+
+
+def test_criar_e_obter_configuracao():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    config_id = configuracao_llm.criar_configuracao(id_est, "Principal", "openai", "gpt-4o-mini", "sk-teste")
+    c = configuracao_llm.obter_configuracao(config_id)
+    assert c.etiqueta == "Principal"
     assert c.fornecedor == "openai"
     assert c.modelo == "gpt-4o-mini"
     assert c.api_key == "sk-teste"
+    assert c.estudante_id == id_est
 
 
-def test_guardar_credencial_substitui_a_anterior():
+def test_criar_varias_configuracoes_ficam_independentes():
     id_est = autenticacao.registar("a@b.com", "password123")
-    credenciais.guardar_credencial(id_est, "openai", "gpt-4o-mini", "sk-1")
+    configuracao_llm.criar_configuracao(id_est, "Rápida", "openai", "gpt-4o-mini", "sk-1")
     # 8.8.8.8 é um IP público real (Google DNS) só para não depender de
     # resolução de DNS num ambiente de teste sem rede -- não é loopback
     # nem privado, por isso passa a validação de ON-14.
-    credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
-    c = credenciais.obter_credencial(id_est)
+    configuracao_llm.criar_configuracao(id_est, "Local", "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
+    configs = configuracao_llm.listar_configuracoes_estudante(id_est)
+    assert {c.etiqueta for c in configs} == {"Rápida", "Local"}
+
+
+def test_editar_configuracao_substitui_campos():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    config_id = configuracao_llm.criar_configuracao(id_est, "Principal", "openai", "gpt-4o-mini", "sk-1")
+    configuracao_llm.editar_configuracao(config_id, "Principal", "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
+    c = configuracao_llm.obter_configuracao(config_id)
     assert c.fornecedor == "ollama"
     assert c.host == "http://8.8.8.8:11434"
+
+
+def test_apagar_configuracao():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    config_id = configuracao_llm.criar_configuracao(id_est, "Principal", "openai", "gpt-4o-mini", "sk-1")
+    configuracao_llm.apagar_configuracao(config_id)
+    assert configuracao_llm.obter_configuracao(config_id) is None
 
 
 # ---------- ON-15: 'host' só é suportado pelo fornecedor ollama ----------
 
 def test_host_em_fornecedor_que_nao_e_ollama_da_erro():
     id_est = autenticacao.registar("a@b.com", "password123")
-    with pytest.raises(credenciais.ErroCredencial, match="ollama"):
-        credenciais.guardar_credencial(
-            id_est, "openai", "gpt-4o-mini", "sk-teste", host="http://8.8.8.8:11434")
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="ollama"):
+        configuracao_llm.criar_configuracao(
+            id_est, "Principal", "openai", "gpt-4o-mini", "sk-teste", host="http://8.8.8.8:11434")
 
 
 def test_host_em_ollama_continua_a_funcionar():
     id_est = autenticacao.registar("a@b.com", "password123")
-    credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
-    c = credenciais.obter_credencial(id_est)
+    config_id = configuracao_llm.criar_configuracao(
+        id_est, "Local", "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
+    c = configuracao_llm.obter_configuracao(config_id)
     assert c.host == "http://8.8.8.8:11434"
 
 
-def test_credencial_fornecedor_desconhecido():
+def test_configuracao_fornecedor_desconhecido():
     id_est = autenticacao.registar("a@b.com", "password123")
-    with pytest.raises(credenciais.ErroCredencial, match="desconhecido"):
-        credenciais.guardar_credencial(id_est, "naoexiste", "x", "chave")
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="desconhecido"):
+        configuracao_llm.criar_configuracao(id_est, "X", "naoexiste", "x", "chave")
 
 
 def test_fornecedores_validos_vem_do_registo_real_do_alguem():
@@ -478,23 +586,29 @@ def test_fornecedores_validos_vem_do_registo_real_do_alguem():
     desatualizar-se em relação a alguem/fornecedores/__init__.py sem
     nenhum erro até alguém notar."""
     from alguem.fornecedores import FORNECEDORES
-    assert credenciais.FORNECEDORES_VALIDOS == frozenset(FORNECEDORES)
+    assert configuracao_llm.FORNECEDORES_VALIDOS == frozenset(FORNECEDORES)
 
 
-def test_credencial_sem_chave_quando_e_obrigatoria():
+def test_configuracao_sem_etiqueta_da_erro():
     id_est = autenticacao.registar("a@b.com", "password123")
-    with pytest.raises(credenciais.ErroCredencial, match="precisa de uma chave"):
-        credenciais.guardar_credencial(id_est, "openai", "gpt-4o-mini", "")
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="etiqueta"):
+        configuracao_llm.criar_configuracao(id_est, "", "openai", "gpt-4o-mini", "sk-teste")
 
 
-def test_credencial_ollama_nao_precisa_de_chave():
+def test_configuracao_sem_chave_quando_e_obrigatoria():
     id_est = autenticacao.registar("a@b.com", "password123")
-    credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "")
-    c = credenciais.obter_credencial(id_est)
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="precisa de uma chave"):
+        configuracao_llm.criar_configuracao(id_est, "X", "openai", "gpt-4o-mini", "")
+
+
+def test_configuracao_ollama_nao_precisa_de_chave():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    config_id = configuracao_llm.criar_configuracao(id_est, "Local", "ollama", "llama3.2", "")
+    c = configuracao_llm.obter_configuracao(config_id)
     assert c.fornecedor == "ollama"
 
 
-# ---------- ON-14: SSRF via host da credencial Ollama ----------
+# ---------- ON-14: SSRF via host da configuração Ollama ----------
 
 @pytest.mark.parametrize("host", [
     "http://127.0.0.1:11434",       # loopback
@@ -503,34 +617,139 @@ def test_credencial_ollama_nao_precisa_de_chave():
     "http://10.0.0.5:11434",        # rede privada
     "http://192.168.1.10:11434",    # rede privada
 ])
-def test_credencial_ollama_com_host_interno_e_rejeitada(host):
+def test_configuracao_ollama_com_host_interno_e_rejeitada(host):
     id_est = autenticacao.registar("a@b.com", "password123")
-    with pytest.raises(credenciais.ErroCredencial, match="interno|privado"):
-        credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host=host)
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="interno|privado"):
+        configuracao_llm.criar_configuracao(id_est, "Local", "ollama", "llama3.2", "", host=host)
 
 
-def test_credencial_ollama_com_esquema_invalido_e_rejeitada():
+def test_configuracao_ollama_com_esquema_invalido_e_rejeitada():
     id_est = autenticacao.registar("a@b.com", "password123")
-    with pytest.raises(credenciais.ErroCredencial, match="inválido"):
-        credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host="file:///etc/passwd")
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="inválido"):
+        configuracao_llm.criar_configuracao(id_est, "Local", "ollama", "llama3.2", "", host="file:///etc/passwd")
 
 
-def test_credencial_ollama_com_host_publico_e_aceite():
+def test_configuracao_ollama_com_host_publico_e_aceite():
     id_est = autenticacao.registar("a@b.com", "password123")
-    credenciais.guardar_credencial(id_est, "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
-    c = credenciais.obter_credencial(id_est)
+    config_id = configuracao_llm.criar_configuracao(
+        id_est, "Local", "ollama", "llama3.2", "", host="http://8.8.8.8:11434")
+    c = configuracao_llm.obter_configuracao(config_id)
     assert c.host == "http://8.8.8.8:11434"
 
 
-def test_credencial_fica_cifrada_em_disco(dsn):
+def test_configuracao_fica_cifrada_em_disco(dsn):
     id_est = autenticacao.registar("a@b.com", "password123", dsn=dsn)
-    credenciais.guardar_credencial(id_est, "openai", "gpt-4o-mini", "sk-super-secreta", dsn=dsn)
+    config_id = configuracao_llm.criar_configuracao(
+        id_est, "Principal", "openai", "gpt-4o-mini", "sk-super-secreta", dsn=dsn)
     import bd
     with bd.sessao_bd(dsn) as ligacao:
         linha = ligacao.execute(
-            "SELECT api_key_cifrada FROM credencial_llm WHERE estudante_id=%s", (id_est,)
+            "SELECT api_key_cifrada FROM configuracao_llm WHERE id=%s", (config_id,)
         ).fetchone()
     assert b"sk-super-secreta" not in bytes(linha["api_key_cifrada"])
+
+
+# ---------- seleção por papel e regra de precedência ----------
+# (ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção 2)
+
+def test_selecao_estudante_recusa_configuracao_de_outra_conta():
+    id_a = autenticacao.registar("a@b.com", "password123")
+    id_b = autenticacao.registar("b@b.com", "password123")
+    config_id = configuracao_llm.criar_configuracao(id_a, "X", "openai", "gpt-4o-mini", "sk-1")
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="não pertence"):
+        configuracao_llm.definir_selecao_estudante(id_b, "apoio", config_id)
+
+
+def test_selecao_global_recusa_configuracao_pessoal():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    config_id = configuracao_llm.criar_configuracao(id_est, "X", "openai", "gpt-4o-mini", "sk-1")
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="global"):
+        configuracao_llm.definir_selecao_global("apoio", config_id)
+
+
+def test_resolver_sem_nada_configurado_devolve_none():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    assert configuracao_llm.resolver_configuracao_ativa(id_est, "apoio") is None
+
+
+def test_resolver_usa_global_mesmo_com_permissao_desligada():
+    admin_id = autenticacao.registar("admin@b.com", "password123")
+    id_est = autenticacao.registar("a@b.com", "password123")
+    global_id = configuracao_llm.criar_configuracao(
+        None, "Global", "openai", "gpt-4o-mini", "sk-global", criado_por=admin_id)
+    configuracao_llm.definir_selecao_global("apoio", global_id)
+    c = configuracao_llm.resolver_configuracao_ativa(id_est, "apoio")
+    assert c.id == global_id
+
+
+def test_resolver_usa_pessoal_quando_permissao_ligada_e_sem_global():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    configuracao_llm.definir_permissao("apoio", True)
+    pessoal_id = configuracao_llm.criar_configuracao(id_est, "Minha", "openai", "gpt-4o-mini", "sk-pessoal")
+    configuracao_llm.definir_selecao_estudante(id_est, "apoio", pessoal_id)
+    c = configuracao_llm.resolver_configuracao_ativa(id_est, "apoio")
+    assert c.id == pessoal_id
+
+
+def test_resolver_ignora_pessoal_quando_permissao_desligada():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    configuracao_llm.definir_permissao("apoio", False)
+    pessoal_id = configuracao_llm.criar_configuracao(id_est, "Minha", "openai", "gpt-4o-mini", "sk-pessoal")
+    configuracao_llm.definir_selecao_estudante(id_est, "apoio", pessoal_id)
+    assert configuracao_llm.resolver_configuracao_ativa(id_est, "apoio") is None
+
+
+def test_resolver_global_manda_sobre_pessoal():
+    admin_id = autenticacao.registar("admin@b.com", "password123")
+    id_est = autenticacao.registar("a@b.com", "password123")
+    configuracao_llm.definir_permissao("apoio", True)
+    pessoal_id = configuracao_llm.criar_configuracao(id_est, "Minha", "openai", "gpt-4o-mini", "sk-pessoal")
+    configuracao_llm.definir_selecao_estudante(id_est, "apoio", pessoal_id)
+    global_id = configuracao_llm.criar_configuracao(
+        None, "Global", "openai", "gpt-4o-mini", "sk-global", criado_por=admin_id)
+    configuracao_llm.definir_selecao_global("apoio", global_id)
+    c = configuracao_llm.resolver_configuracao_ativa(id_est, "apoio")
+    assert c.id == global_id
+
+
+def test_apagar_configuracao_global_selecionada_limpa_a_selecao():
+    admin_id = autenticacao.registar("admin@b.com", "password123")
+    id_est = autenticacao.registar("a@b.com", "password123")
+    global_id = configuracao_llm.criar_configuracao(
+        None, "Global", "openai", "gpt-4o-mini", "sk-global", criado_por=admin_id)
+    configuracao_llm.definir_selecao_global("apoio", global_id)
+    configuracao_llm.apagar_configuracao(global_id)
+    assert configuracao_llm.obter_selecao_global("apoio") is None
+    assert configuracao_llm.resolver_configuracao_ativa(id_est, "apoio") is None
+
+
+# ---------- guardião nunca é escolha pessoal do estudante (transparente para ele) ----------
+
+def test_selecao_estudante_recusa_papel_guardiao():
+    id_est = autenticacao.registar("a@b.com", "password123")
+    config_id = configuracao_llm.criar_configuracao(id_est, "X", "openai", "gpt-4o-mini", "sk-1")
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="não tem seleção pessoal"):
+        configuracao_llm.definir_selecao_estudante(id_est, "guardiao", config_id)
+
+
+def test_permissao_recusa_papel_guardiao():
+    with pytest.raises(configuracao_llm.ErroConfiguracaoLLM, match="não tem seleção pessoal"):
+        configuracao_llm.definir_permissao("guardiao", True)
+
+
+def test_resolver_guardiao_ignora_a_bd_mesmo_que_alguem_tenha_forcado_uma_selecao_pessoal():
+    """Só por garantia extra (não devia ser possível chegar aqui por via
+    normal, ver os dois testes acima): mesmo que a linha em
+    selecao_llm_estudante exista na BD, resolver_configuracao_ativa nunca
+    usa seleção pessoal para 'guardiao' -- só a global."""
+    id_est = autenticacao.registar("a@b.com", "password123")
+    assert configuracao_llm.resolver_configuracao_ativa(id_est, "guardiao") is None
+    admin_id = autenticacao.registar("admin@b.com", "password123")
+    global_id = configuracao_llm.criar_configuracao(
+        None, "Global", "openai", "gpt-4o-mini", "sk-global", criado_por=admin_id)
+    configuracao_llm.definir_selecao_global("guardiao", global_id)
+    c = configuracao_llm.resolver_configuracao_ativa(id_est, "guardiao")
+    assert c.id == global_id
 
 
 # ---------- arranque do servidor: validação cedo das chaves ----------

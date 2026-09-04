@@ -45,3 +45,34 @@ def test_apagar_relatorio():
 
 def test_apagar_relatorio_inexistente_nao_da_erro():
     relatorios.apagar_relatorio(999)
+
+
+def test_novo_relatorio_comeca_nao_visto():
+    id_estudante = autenticacao.registar("estudante@exemplo.com", "password123")
+    relatorios.criar_relatorio(id_estudante, "primeiro")
+
+    assert relatorios.listar_relatorios()[0]["visto"] is False
+    assert relatorios.contar_nao_vistos() == 1
+
+
+def test_marcar_todos_vistos_zera_a_contagem():
+    id_estudante = autenticacao.registar("estudante@exemplo.com", "password123")
+    relatorios.criar_relatorio(id_estudante, "primeiro")
+    relatorios.criar_relatorio(id_estudante, "segundo")
+
+    relatorios.marcar_todos_vistos()
+
+    assert relatorios.contar_nao_vistos() == 0
+    assert all(r["visto"] for r in relatorios.listar_relatorios())
+
+
+def test_marcar_todos_vistos_e_idempotente_para_relatorios_ja_vistos():
+    id_estudante = autenticacao.registar("estudante@exemplo.com", "password123")
+    relatorios.criar_relatorio(id_estudante, "primeiro")
+    relatorios.marcar_todos_vistos()
+
+    relatorios.criar_relatorio(id_estudante, "segundo")
+    relatorios.marcar_todos_vistos()
+
+    assert relatorios.contar_nao_vistos() == 0
+    assert all(r["visto"] for r in relatorios.listar_relatorios())

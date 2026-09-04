@@ -69,6 +69,28 @@ def test_ativar_e_desativar_grupo():
     assert grupos.listar_grupos()[0]["ativo"] is True
 
 
+def test_ativar_e_desativar_alguem_no_grupo():
+    resultado = grupos.criar_grupo("Grupo A")
+    assert grupos.listar_grupos()[0]["alguem_ativo"] is True
+    grupos.desativar_alguem_grupo(resultado["id"])
+    assert grupos.listar_grupos()[0]["alguem_ativo"] is False
+    grupos.ativar_alguem_grupo(resultado["id"])
+    assert grupos.listar_grupos()[0]["alguem_ativo"] is True
+
+
+def test_grupo_bloqueia_alguem_para_membro_de_grupo_excluido():
+    resultado = grupos.criar_grupo("Grupo A")
+    id_est = autenticacao.registar("aluno@escola.pt", "password123", codigo_grupo=resultado["codigo"])
+    assert grupos.grupo_bloqueia_alguem(id_est) is False
+    grupos.desativar_alguem_grupo(resultado["id"])
+    assert grupos.grupo_bloqueia_alguem(id_est) is True
+
+
+def test_grupo_bloqueia_alguem_falso_para_estudante_sem_grupo():
+    id_est = autenticacao.registar("aluno@escola.pt", "password123")
+    assert grupos.grupo_bloqueia_alguem(id_est) is False
+
+
 def test_apagar_grupo_sem_membros():
     resultado = grupos.criar_grupo("Grupo A")
     grupos.apagar_grupo(resultado["id"])
@@ -138,3 +160,80 @@ def test_exportar_membros_csv():
 def test_exportar_membros_csv_grupo_inexistente_da_erro():
     with pytest.raises(grupos.ErroGrupo, match="não encontrado"):
         grupos.exportar_membros_csv(999)
+
+
+# ---------- grupos geridos por um admin de grupo (estudante_grupo, âmbito N) ----------
+
+def test_definir_grupos_geridos_e_listar():
+    grupo1 = grupos.criar_grupo("Grupo A")
+    grupo2 = grupos.criar_grupo("Grupo B")
+    id_admin = autenticacao.registar("prof@escola.pt", "password123")
+    autenticacao.tornar_admin(id_admin)
+
+    grupos.definir_grupos_geridos(id_admin, [grupo1["id"], grupo2["id"]])
+    assert grupos.listar_grupos_geridos(id_admin) == sorted([grupo1["id"], grupo2["id"]])
+
+
+def test_definir_grupos_geridos_substitui_o_conjunto_anterior():
+    grupo1 = grupos.criar_grupo("Grupo A")
+    grupo2 = grupos.criar_grupo("Grupo B")
+    id_admin = autenticacao.registar("prof@escola.pt", "password123")
+    autenticacao.tornar_admin(id_admin)
+
+    grupos.definir_grupos_geridos(id_admin, [grupo1["id"]])
+    grupos.definir_grupos_geridos(id_admin, [grupo2["id"]])
+    assert grupos.listar_grupos_geridos(id_admin) == [grupo2["id"]]
+
+
+def test_definir_grupos_geridos_lista_vazia_remove_tudo():
+    grupo1 = grupos.criar_grupo("Grupo A")
+    id_admin = autenticacao.registar("prof@escola.pt", "password123")
+    autenticacao.tornar_admin(id_admin)
+
+    grupos.definir_grupos_geridos(id_admin, [grupo1["id"]])
+    grupos.definir_grupos_geridos(id_admin, [])
+    assert grupos.listar_grupos_geridos(id_admin) == []
+
+
+def test_definir_grupos_geridos_com_grupo_inexistente_da_erro():
+    id_admin = autenticacao.registar("prof@escola.pt", "password123")
+    autenticacao.tornar_admin(id_admin)
+    with pytest.raises(grupos.ErroGrupo, match="não existe"):
+        grupos.definir_grupos_geridos(id_admin, [999])
+
+
+def test_apagar_grupo_com_admin_associado_nao_bloqueia(dsn):
+    """estudante_grupo aponta para grupo com ON DELETE CASCADE (bd.py)
+    -- um admin de grupo que giria este grupo não conta como "membro"
+    (apagar_grupo só conta linhas de contas não-admin), por isso não
+    bloqueia a eliminação (só por ter MEMBROS, ver
+    test_apagar_grupo_com_membros_da_erro)."""
+    grupo = grupos.criar_grupo("Grupo A", dsn=dsn)
+    id_admin = autenticacao.registar("prof@escola.pt", "password123", dsn=dsn)
+    autenticacao.tornar_admin(id_admin, dsn=dsn)
+    grupos.definir_grupos_geridos(id_admin, [grupo["id"]], dsn=dsn)
+
+    grupos.apagar_grupo(grupo["id"], dsn=dsn)
+    assert grupos.listar_grupos_geridos(id_admin, dsn=dsn) == []
+
+
+def test_limpar_grupos_remove_todas_as_associacoes():
+    grupo1 = grupos.criar_grupo("Grupo A")
+    grupo2 = grupos.criar_grupo("Grupo B")
+    id_admin = autenticacao.registar("prof@escola.pt", "password123")
+    autenticacao.tornar_admin(id_admin)
+    grupos.definir_grupos_geridos(id_admin, [grupo1["id"], grupo2["id"]])
+
+    grupos.limpar_grupos(id_admin)
+    assert grupos.listar_grupos_geridos(id_admin) == []
+
+
+def test_listar_grupos_num_membros_nao_conta_admin_associado():
+    """Contraste com test_listar_grupos_inclui_contagem_de_membros: um
+    admin de grupo associado a uma turma não entra na contagem de
+    membros -- só estudantes contam."""
+    grupo = grupos.criar_grupo("Grupo A")
+    id_admin = autenticacao.registar("prof@escola.pt", "password123")
+    autenticacao.tornar_admin(id_admin)
+    grupos.definir_grupos_geridos(id_admin, [grupo["id"]])
+    assert grupos.listar_grupos()[0]["num_membros"] == 0

@@ -78,6 +78,14 @@ funções/procedimentos).
 `div` (divisão inteira), `mod` (resto).
 - Estruturas: `estrutura Nome` com campos `nome:tipo`, um por linha.
 - Comentários: `//` até ao fim da linha, ou `/* ... */`.
+- Dentro de um ciclo: `sair` termina-o imediatamente, `continuar` salta \
+para a iteração seguinte.
+- `nulo` é o valor de ausência (ex: para uma referência/estrutura ainda \
+por preencher).
+- `incluir "ficheiro.algo" como alias` importa funções/estruturas de \
+outro ficheiro do projeto -- o `como alias` é sempre obrigatório. \
+`importar biblioteca` (sem alias) importa uma biblioteca do sistema \
+(ex: `matematica`, `cadeia`).
 - NÃO há chavetas `{{}}` para blocos -- a indentação (tabs OU grupos \
 de 4 espaços, nunca misturados) é o que define o bloco.
 

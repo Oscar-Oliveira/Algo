@@ -31,13 +31,18 @@ import grupos
 import limitador_registo
 import modo_codemirror
 import cifragem
-import credenciais
+import configuracao_llm
+import historico_codigo
+import investigacao
+import prompts_configuraveis
 import executor
 import projeto
 import relatorios
 import alguem_ponte
+from alguem.fornecedores import criar_fornecedor
 from alguem.fornecedores.base import ErroFornecedorLLM
-from alguem.scripts import metricas
+from alguem.nucleo.escada_de_ajuda import ESCADA_DE_AJUDA
+from alguem.nucleo.conhecimento_algo import REFERENCIA_SINTAXE
 from alguem.nucleo import registador as registador_alguem
 
 PASTA_ESTATICO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "estatico")
@@ -211,6 +216,20 @@ async def admin_atual(id_estudante: int = Depends(estudante_atual)) -> int:
     return id_estudante
 
 
+async def admin_global_atual(id_estudante: int = Depends(admin_atual)) -> int:
+    """Como admin_atual, mas exige também que a conta seja admin
+    GLOBAL (ver autenticacao.eh_admin_global) -- 403 caso contrário.
+    Usado nas rotas que um admin de grupo não deve poder tocar:
+    Utilizadores, Grupos, Problemas Reportados, Registo de Atividade e
+    Definições (ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção
+    15). As rotas de investigação (ex: rota_admin_atividade) continuam
+    a usar admin_atual -- um admin de grupo acede-lhes, filtradas aos
+    seus grupos, a partir da Fase 5."""
+    if not await run_in_threadpool(autenticacao.eh_admin_global, id_estudante):
+        raise HTTPException(status_code=403, detail="Só administradores globais podem aceder a isto.")
+    return id_estudante
+
+
 async def pasta_execucao_atual(id_estudante: int = Depends(estudante_atual)) -> str:
     """Dependência partilhada (ARCH-12): "resolver pseudónimo → preparar
     pasta de execução" estava repetido de forma idêntica nas rotas
@@ -293,7 +312,16 @@ async def rota_eu(id_estudante: int = Depends(estudante_atual)):
     return {
         "id": id_estudante,
         "admin": await run_in_threadpool(autenticacao.eh_admin, id_estudante),
-        "alguem_ativo": await run_in_threadpool(definicoes.alguem_ativo),
+        "admin_global": await run_in_threadpool(autenticacao.eh_admin_global, id_estudante),
+        "alguem_ativo": (
+            await run_in_threadpool(definicoes.alguem_ativo)
+            and not await run_in_threadpool(grupos.grupo_bloqueia_alguem, id_estudante)
+        ),
+        # Gate das Definições do LLM do próprio estudante (ver
+        # botao-definicoes-alguem em app.js): só fazem sentido se a
+        # plataforma permitir escolher um LLM pessoal -- sem isto, o
+        # painel só mostrava configurações que nunca podem ficar ativas.
+        "llm_pessoal_permitido": await run_in_threadpool(configuracao_llm.permissao_ativa, "apoio"),
     }
 
 
@@ -310,19 +338,19 @@ async def rota_criar_relatorio(request: Request, id_estudante: int = Depends(est
 # ---------- administração: aprovar/rejeitar contas pendentes ----------
 
 @app.get("/api/admin/pendentes")
-async def rota_admin_pendentes(id_estudante: int = Depends(admin_atual)):
+async def rota_admin_pendentes(id_estudante: int = Depends(admin_global_atual)):
     return {"pendentes": await run_in_threadpool(autenticacao.listar_pendentes)}
 
 
 @app.post("/api/admin/aprovar/{id_estudante_alvo}")
-async def rota_admin_aprovar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_aprovar(id_estudante_alvo: int, id_estudante: int = Depends(admin_global_atual)):
     await run_in_threadpool(autenticacao.aprovar_conta, id_estudante_alvo)
     await run_in_threadpool(atividade.registar_evento, "conta_aprovada", id_estudante, id_estudante_alvo)
     return {"ok": True}
 
 
 @app.post("/api/admin/rejeitar/{id_estudante_alvo}")
-async def rota_admin_rejeitar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_rejeitar(id_estudante_alvo: int, id_estudante: int = Depends(admin_global_atual)):
     # rejeitar_conta APAGA a conta -- por isso o evento não pode
     # referenciar id_estudante_alvo em alvo_id (deixaria de existir na
     # tabela estudante); regista-se antes o email como snapshot.
@@ -337,12 +365,12 @@ async def rota_admin_rejeitar(id_estudante_alvo: int, id_estudante: int = Depend
 # ---------- administração: todos os utilizadores, revogação e privilégios ----------
 
 @app.get("/api/admin/utilizadores")
-async def rota_admin_utilizadores(id_estudante: int = Depends(admin_atual)):
+async def rota_admin_utilizadores(id_estudante: int = Depends(admin_global_atual)):
     return {"utilizadores": await run_in_threadpool(autenticacao.listar_todos)}
 
 
 @app.post("/api/admin/revogar/{id_estudante_alvo}")
-async def rota_admin_revogar(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_revogar(id_estudante_alvo: int, id_estudante: int = Depends(admin_global_atual)):
     if id_estudante_alvo == id_estudante:
         raise HTTPException(status_code=400, detail="Não podes revogar a tua própria conta.")
     await run_in_threadpool(autenticacao.revogar_conta, id_estudante_alvo)
@@ -351,14 +379,14 @@ async def rota_admin_revogar(id_estudante_alvo: int, id_estudante: int = Depends
 
 
 @app.post("/api/admin/tornar_admin/{id_estudante_alvo}")
-async def rota_admin_tornar_admin(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_tornar_admin(id_estudante_alvo: int, id_estudante: int = Depends(admin_global_atual)):
     await run_in_threadpool(autenticacao.tornar_admin, id_estudante_alvo)
     await run_in_threadpool(atividade.registar_evento, "admin_concedido", id_estudante, id_estudante_alvo)
     return {"ok": True}
 
 
 @app.post("/api/admin/remover_admin/{id_estudante_alvo}")
-async def rota_admin_remover_admin(id_estudante_alvo: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_remover_admin(id_estudante_alvo: int, id_estudante: int = Depends(admin_global_atual)):
     if id_estudante_alvo == id_estudante:
         raise HTTPException(status_code=400, detail="Não podes remover os teus próprios privilégios de admin.")
     alterou = await run_in_threadpool(autenticacao.remover_admin, id_estudante_alvo, id_estudante)
@@ -367,13 +395,54 @@ async def rota_admin_remover_admin(id_estudante_alvo: int, id_estudante: int = D
             status_code=400,
             detail="Não é possível remover: teria de sobrar pelo menos um administrador ativo.",
         )
+    # Um admin de grupo pode gerir várias turmas -- deixa de ser válido
+    # assim que a conta volta a ser um estudante normal (no máximo uma,
+    # ver grupos.reatribuir_grupo), por isso limpa-se aqui.
+    await run_in_threadpool(grupos.limpar_grupos, id_estudante_alvo)
     await run_in_threadpool(atividade.registar_evento, "admin_revogado", id_estudante, id_estudante_alvo)
+    return {"ok": True}
+
+
+@app.post("/api/admin/utilizadores/{id_estudante_alvo}/admin_global")
+async def rota_admin_definir_admin_global(id_estudante_alvo: int, request: Request,
+                                           id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    admin_global = bool(dados.get("admin_global"))
+    if not admin_global and id_estudante_alvo == id_estudante:
+        raise HTTPException(
+            status_code=400, detail="Não podes retirar a ti próprio o estatuto de admin global.")
+    alterou = await run_in_threadpool(
+        autenticacao.definir_admin_global, id_estudante_alvo, admin_global, id_estudante)
+    if not alterou:
+        detail = ("Não é possível remover: teria de sobrar pelo menos um administrador global ativo."
+                   if not admin_global else "Não foi possível concluir a ação -- a conta tem de ser admin primeiro.")
+        raise HTTPException(status_code=400, detail=detail)
+    await run_in_threadpool(
+        atividade.registar_evento, "admin_global_alterado", id_estudante, id_estudante_alvo, None,
+        {"admin_global": admin_global})
+    return {"ok": True}
+
+
+@app.post("/api/admin/utilizadores/{id_estudante_alvo}/grupos_geridos")
+async def rota_admin_definir_grupos_geridos(id_estudante_alvo: int, request: Request,
+                                             id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    grupo_ids = dados.get("grupo_ids", [])
+    if not isinstance(grupo_ids, list) or not all(isinstance(i, int) for i in grupo_ids):
+        raise HTTPException(status_code=400, detail="'grupo_ids' tem de ser uma lista de inteiros.")
+    try:
+        await run_in_threadpool(grupos.definir_grupos_geridos, id_estudante_alvo, grupo_ids)
+    except grupos.ErroGrupo as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "grupos_geridos_alterados", id_estudante, id_estudante_alvo, None,
+        {"grupo_ids": grupo_ids})
     return {"ok": True}
 
 
 @app.post("/api/admin/utilizadores/{id_estudante_alvo}/grupo")
 async def rota_admin_reatribuir_grupo(id_estudante_alvo: int, request: Request,
-                                       id_estudante: int = Depends(admin_atual)):
+                                       id_estudante: int = Depends(admin_global_atual)):
     dados = await corpo_json(request)
     novo_grupo_id = dados.get("grupo_id")
     if novo_grupo_id is not None and not isinstance(novo_grupo_id, int):
@@ -392,12 +461,12 @@ async def rota_admin_reatribuir_grupo(id_estudante_alvo: int, request: Request,
 # ---------- administração: grupos ----------
 
 @app.get("/api/admin/grupos")
-async def rota_admin_listar_grupos(id_estudante: int = Depends(admin_atual)):
+async def rota_admin_listar_grupos(id_estudante: int = Depends(admin_global_atual)):
     return {"grupos": await run_in_threadpool(grupos.listar_grupos)}
 
 
 @app.post("/api/admin/grupos")
-async def rota_admin_criar_grupo(request: Request, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_criar_grupo(request: Request, id_estudante: int = Depends(admin_global_atual)):
     dados = await corpo_json(request)
     try:
         resultado = await run_in_threadpool(grupos.criar_grupo, dados.get("nome", ""), id_estudante)
@@ -410,7 +479,7 @@ async def rota_admin_criar_grupo(request: Request, id_estudante: int = Depends(a
 
 
 @app.post("/api/admin/grupos/{grupo_id}/editar")
-async def rota_admin_editar_grupo(grupo_id: int, request: Request, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_editar_grupo(grupo_id: int, request: Request, id_estudante: int = Depends(admin_global_atual)):
     dados = await corpo_json(request)
     try:
         await run_in_threadpool(grupos.editar_grupo, grupo_id, dados.get("nome", ""))
@@ -423,31 +492,51 @@ async def rota_admin_editar_grupo(grupo_id: int, request: Request, id_estudante:
 
 
 @app.post("/api/admin/grupos/{grupo_id}/ativar")
-async def rota_admin_ativar_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_ativar_grupo(grupo_id: int, id_estudante: int = Depends(admin_global_atual)):
     await run_in_threadpool(grupos.ativar_grupo, grupo_id)
     await run_in_threadpool(atividade.registar_evento, "grupo_ativado", id_estudante, None, grupo_id)
     return {"ok": True}
 
 
 @app.post("/api/admin/grupos/{grupo_id}/desativar")
-async def rota_admin_desativar_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_desativar_grupo(grupo_id: int, id_estudante: int = Depends(admin_global_atual)):
     await run_in_threadpool(grupos.desativar_grupo, grupo_id)
     await run_in_threadpool(atividade.registar_evento, "grupo_desativado", id_estudante, None, grupo_id)
     return {"ok": True}
 
 
+@app.post("/api/admin/grupos/{grupo_id}/ativar_alguem")
+async def rota_admin_ativar_alguem_grupo(grupo_id: int, id_estudante: int = Depends(admin_global_atual)):
+    await run_in_threadpool(grupos.ativar_alguem_grupo, grupo_id)
+    await run_in_threadpool(atividade.registar_evento, "grupo_alguem_ativado", id_estudante, None, grupo_id)
+    return {"ok": True}
+
+
+@app.post("/api/admin/grupos/{grupo_id}/desativar_alguem")
+async def rota_admin_desativar_alguem_grupo(grupo_id: int, id_estudante: int = Depends(admin_global_atual)):
+    await run_in_threadpool(grupos.desativar_alguem_grupo, grupo_id)
+    await run_in_threadpool(atividade.registar_evento, "grupo_alguem_desativado", id_estudante, None, grupo_id)
+    return {"ok": True}
+
+
 @app.post("/api/admin/grupos/{grupo_id}/apagar")
-async def rota_admin_apagar_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_apagar_grupo(grupo_id: int, id_estudante: int = Depends(admin_global_atual)):
     try:
         await run_in_threadpool(grupos.apagar_grupo, grupo_id)
     except grupos.ErroGrupo as e:
         raise HTTPException(status_code=400, detail=str(e))
-    await run_in_threadpool(atividade.registar_evento, "grupo_eliminado", id_estudante, None, grupo_id)
+    # 'grupo_id' NÃO pode ir no parâmetro grupo_id do evento (FK para
+    # grupo.id) -- apagar_grupo já eliminou a linha, por isso vai antes
+    # como detalhe (mesmo padrão de conta_rejeitada, que também apaga a
+    # linha referenciada e por isso guarda o id/email como snapshot em
+    # vez de referência).
+    await run_in_threadpool(
+        atividade.registar_evento, "grupo_eliminado", id_estudante, None, None, {"grupo_id": grupo_id})
     return {"ok": True}
 
 
 @app.get("/api/admin/grupos/{grupo_id}/codigo")
-async def rota_admin_ver_codigo_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_ver_codigo_grupo(grupo_id: int, id_estudante: int = Depends(admin_global_atual)):
     try:
         codigo = await run_in_threadpool(grupos.ver_codigo, grupo_id)
     except grupos.ErroGrupo as e:
@@ -456,7 +545,7 @@ async def rota_admin_ver_codigo_grupo(grupo_id: int, id_estudante: int = Depends
 
 
 @app.post("/api/admin/grupos/{grupo_id}/regenerar_codigo")
-async def rota_admin_regenerar_codigo_grupo(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_regenerar_codigo_grupo(grupo_id: int, id_estudante: int = Depends(admin_global_atual)):
     try:
         codigo = await run_in_threadpool(grupos.regenerar_codigo, grupo_id)
     except grupos.ErroGrupo as e:
@@ -467,7 +556,7 @@ async def rota_admin_regenerar_codigo_grupo(grupo_id: int, id_estudante: int = D
 
 
 @app.get("/api/admin/grupos/{grupo_id}/membros.csv")
-async def rota_admin_exportar_membros_csv(grupo_id: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_exportar_membros_csv(grupo_id: int, id_estudante: int = Depends(admin_global_atual)):
     try:
         csv_texto = await run_in_threadpool(grupos.exportar_membros_csv, grupo_id)
     except grupos.ErroGrupo as e:
@@ -481,7 +570,7 @@ async def rota_admin_exportar_membros_csv(grupo_id: int, id_estudante: int = Dep
 # ---------- administração: registo geral de atividade ----------
 
 @app.get("/api/admin/log")
-async def rota_admin_listar_log(id_estudante: int = Depends(admin_atual),
+async def rota_admin_listar_log(id_estudante: int = Depends(admin_global_atual),
                                  estudante_id: int | None = None, grupo_id: int | None = None,
                                  tipo: str | None = None, data_inicio: str | None = None,
                                  data_fim: str | None = None, pagina: int = 1):
@@ -490,17 +579,20 @@ async def rota_admin_listar_log(id_estudante: int = Depends(admin_atual),
 
 
 @app.post("/api/admin/log/apagar")
-async def rota_admin_apagar_log(request: Request, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_apagar_log(request: Request, id_estudante: int = Depends(admin_global_atual)):
     dados = await corpo_json(request)
     ids = dados.get("ids", [])
     if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
         raise HTTPException(status_code=400, detail="'ids' tem de ser uma lista de inteiros.")
     apagados = await run_in_threadpool(atividade.apagar_eventos, ids)
+    await run_in_threadpool(
+        atividade.registar_evento, "log_apagado", id_estudante, None, None,
+        {"ids": ids, "apagados": apagados})
     return {"ok": True, "apagados": apagados}
 
 
 @app.get("/api/admin/log.csv")
-async def rota_admin_exportar_log_csv(id_estudante: int = Depends(admin_atual),
+async def rota_admin_exportar_log_csv(id_estudante: int = Depends(admin_global_atual),
                                        estudante_id: int | None = None, grupo_id: int | None = None,
                                        tipo: str | None = None, data_inicio: str | None = None,
                                        data_fim: str | None = None):
@@ -512,39 +604,149 @@ async def rota_admin_exportar_log_csv(id_estudante: int = Depends(admin_atual),
     )
 
 
-# ---------- administração: atividade/métricas dos logs do Alguem ----------
+# ---------- administração: Investigação (dashboard/relatório/exportação/vista por estudante) ----------
+#
+# Ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção 6/10/15, Fase
+# 5. Todas usam admin_atual (não admin_global_atual) -- um admin de
+# grupo acede-lhes, mas só vê estudantes cuja pertença ATUAL aponte
+# para um dos grupos que gere (online/investigacao.py aplica isto).
 
-@app.get("/api/admin/atividade")
-async def rota_admin_atividade(id_estudante: int = Depends(admin_atual)):
+def _pasta_logs_alguem() -> str:
     # Lê a pasta de logs do módulo registador, não a constante (idêntica
     # em produção) do próprio metricas -- é aquele módulo que o
     # alguem_ponte usa de facto para escrever os logs, e os testes já
     # isolam esse caminho com monkeypatch (ver tests/conftest.py).
-    return metricas.gerar_relatorio(registador_alguem.PASTA_LOGS_POR_OMISSAO)
+    return registador_alguem.PASTA_LOGS_POR_OMISSAO
+
+
+async def _sessoes_no_ambito_filtradas(
+        id_estudante: int, grupo: str | None, data_inicio: str | None, data_fim: str | None,
+        fornecedor: str | None, apoio_escopo: str | None, guardiao_escopo: str | None,
+) -> tuple[list[dict], list[dict]]:
+    """Devolve (sessões filtradas, sessões no âmbito sem filtro nenhum)
+    -- a segunda serve para online/investigacao.opcoes_de_filtro."""
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    no_ambito = await run_in_threadpool(
+        investigacao.listar_sessoes_no_ambito, id_estudante, admin_global, _pasta_logs_alguem())
+    sessoes = investigacao.filtrar_sessoes(
+        no_ambito, grupo=grupo, data_inicio=data_inicio, data_fim=data_fim,
+        fornecedor=fornecedor, apoio_escopo=apoio_escopo, guardiao_escopo=guardiao_escopo)
+    return sessoes, no_ambito
+
+
+@app.get("/api/admin/investigacao/filtros")
+async def rota_investigacao_filtros(id_estudante: int = Depends(admin_atual)):
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    no_ambito = await run_in_threadpool(
+        investigacao.listar_sessoes_no_ambito, id_estudante, admin_global, _pasta_logs_alguem())
+    return investigacao.opcoes_de_filtro(no_ambito)
+
+
+@app.get("/api/admin/investigacao/relatorio")
+async def rota_investigacao_relatorio(
+        id_estudante: int = Depends(admin_atual),
+        grupo: str | None = None, data_inicio: str | None = None, data_fim: str | None = None,
+        fornecedor: str | None = None, apoio_escopo: str | None = None, guardiao_escopo: str | None = None):
+    sessoes, _ = await _sessoes_no_ambito_filtradas(
+        id_estudante, grupo, data_inicio, data_fim, fornecedor, apoio_escopo, guardiao_escopo)
+    return {"sessoes": sessoes}
+
+
+@app.get("/api/admin/investigacao/dashboard")
+async def rota_investigacao_dashboard(
+        id_estudante: int = Depends(admin_atual),
+        grupo: str | None = None, data_inicio: str | None = None, data_fim: str | None = None,
+        fornecedor: str | None = None, apoio_escopo: str | None = None, guardiao_escopo: str | None = None):
+    sessoes, _ = await _sessoes_no_ambito_filtradas(
+        id_estudante, grupo, data_inicio, data_fim, fornecedor, apoio_escopo, guardiao_escopo)
+    return investigacao.gerar_dashboard(sessoes)
+
+
+@app.get("/api/admin/investigacao/exportar.csv")
+async def rota_investigacao_exportar_csv(
+        id_estudante: int = Depends(admin_atual),
+        grupo: str | None = None, data_inicio: str | None = None, data_fim: str | None = None,
+        fornecedor: str | None = None, apoio_escopo: str | None = None, guardiao_escopo: str | None = None):
+    sessoes, _ = await _sessoes_no_ambito_filtradas(
+        id_estudante, grupo, data_inicio, data_fim, fornecedor, apoio_escopo, guardiao_escopo)
+    return Response(
+        content=investigacao.exportar_csv(sessoes), media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="investigacao.csv"'},
+    )
+
+
+@app.get("/api/admin/investigacao/exportar.json")
+async def rota_investigacao_exportar_json(
+        id_estudante: int = Depends(admin_atual),
+        grupo: str | None = None, data_inicio: str | None = None, data_fim: str | None = None,
+        fornecedor: str | None = None, apoio_escopo: str | None = None, guardiao_escopo: str | None = None):
+    sessoes, _ = await _sessoes_no_ambito_filtradas(
+        id_estudante, grupo, data_inicio, data_fim, fornecedor, apoio_escopo, guardiao_escopo)
+    return Response(
+        content=investigacao.exportar_json(sessoes), media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="investigacao.json"'},
+    )
+
+
+@app.get("/api/admin/investigacao/estudante/{estudante_id}")
+async def rota_investigacao_estudante(estudante_id: int, id_estudante: int = Depends(admin_atual)):
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    try:
+        vista = await run_in_threadpool(
+            investigacao.vista_estudante, id_estudante, admin_global, estudante_id, _pasta_logs_alguem())
+    except investigacao.ErroAcessoNegado as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    # Decisão validada, ponto 8: dados deixaram de estar pseudonimizados
+    # (Fase 4) -- este acesso é sensível, fica auditado como qualquer
+    # outro evento de log_atividade.
+    await run_in_threadpool(
+        atividade.registar_evento, "investigacao_estudante_visto", id_estudante, estudante_id)
+    return vista
 
 
 # ---------- administração: relatórios de problemas enviados por estudantes ----------
 
 @app.get("/api/admin/relatorios")
-async def rota_admin_relatorios(id_estudante: int = Depends(admin_atual)):
-    return {"relatorios": await run_in_threadpool(relatorios.listar_relatorios)}
+async def rota_admin_relatorios(id_estudante: int = Depends(admin_global_atual)):
+    lista = await run_in_threadpool(relatorios.listar_relatorios)
+    await run_in_threadpool(relatorios.marcar_todos_vistos)
+    return {"relatorios": lista}
+
+
+@app.get("/api/admin/relatorios/nao_vistos")
+async def rota_admin_relatorios_nao_vistos(id_estudante: int = Depends(admin_global_atual)):
+    return {"nao_vistos": await run_in_threadpool(relatorios.contar_nao_vistos)}
 
 
 @app.post("/api/admin/relatorios/apagar/{id_relatorio}")
-async def rota_admin_apagar_relatorio(id_relatorio: int, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_apagar_relatorio(id_relatorio: int, id_estudante: int = Depends(admin_global_atual)):
     await run_in_threadpool(relatorios.apagar_relatorio, id_relatorio)
+    await run_in_threadpool(
+        atividade.registar_evento, "relatorio_apagado", id_estudante, None, None,
+        {"relatorio_id": id_relatorio})
     return {"ok": True}
 
 
 # ---------- administração: definições globais ----------
 
 @app.get("/api/admin/definicoes")
-async def rota_admin_obter_definicoes(id_estudante: int = Depends(admin_atual)):
-    return {"alguem_ativo": await run_in_threadpool(definicoes.alguem_ativo)}
+async def rota_admin_obter_definicoes(id_estudante: int = Depends(admin_global_atual)):
+    return {
+        "alguem_ativo": await run_in_threadpool(definicoes.alguem_ativo),
+        "nivel_maximo_ajuda": await run_in_threadpool(definicoes.nivel_maximo_ajuda),
+        "usar_guardiao": await run_in_threadpool(definicoes.usar_guardiao),
+        # Nível 7 (Código) fica de fora -- ver comentário em
+        # definicoes.definir_nivel_maximo_ajuda: fica sempre bloqueado
+        # à parte, oferecê-lo aqui seria uma opção sem efeito.
+        "escada_ajuda": [
+            {"numero": n.numero, "nome": n.nome, "descricao": n.descricao}
+            for n in ESCADA_DE_AJUDA if n.numero <= 6
+        ],
+    }
 
 
 @app.post("/api/admin/definicoes/alguem")
-async def rota_admin_definir_alguem_ativo(request: Request, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_definir_alguem_ativo(request: Request, id_estudante: int = Depends(admin_global_atual)):
     dados = await corpo_json(request)
     ativo = bool(dados.get("ativo"))
     await run_in_threadpool(definicoes.definir_alguem_ativo, ativo)
@@ -554,10 +756,139 @@ async def rota_admin_definir_alguem_ativo(request: Request, id_estudante: int = 
     return {"ok": True}
 
 
+@app.post("/api/admin/definicoes/guardiao")
+async def rota_admin_definir_usar_guardiao(request: Request, id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    ativo = bool(dados.get("ativo"))
+    await run_in_threadpool(definicoes.definir_usar_guardiao, ativo)
+    await run_in_threadpool(
+        atividade.registar_evento, "definicao_alterada", id_estudante, None, None,
+        {"chave": "usar_guardiao", "valor": ativo})
+    return {"ok": True}
+
+
+@app.post("/api/admin/definicoes/nivel-ajuda")
+async def rota_admin_definir_nivel_maximo_ajuda(request: Request, id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    try:
+        nivel = int(dados.get("nivel"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Nível inválido.")
+    try:
+        await run_in_threadpool(definicoes.definir_nivel_maximo_ajuda, nivel)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "definicao_alterada", id_estudante, None, None,
+        {"chave": "nivel_maximo_ajuda", "valor": nivel})
+    return {"ok": True}
+
+
+# ---------- administração: referência da sintaxe ALGO enviada ao Tutor ----------
+
+@app.get("/api/admin/referencia-algo")
+async def rota_admin_obter_referencia_algo(id_estudante: int = Depends(admin_global_atual)):
+    return {"texto": REFERENCIA_SINTAXE}
+
+
+# ---------- administração: prompts editáveis (tutor, guardião) ----------
+
+@app.get("/api/admin/prompts")
+async def rota_admin_obter_prompts(id_estudante: int = Depends(admin_global_atual)):
+    resultado = {}
+    for chave, omissao in prompts_configuraveis.PROMPTS_OMISSAO.items():
+        personalizado = await run_in_threadpool(prompts_configuraveis.obter_prompt_personalizado, chave)
+        resultado[chave] = {
+            "texto": personalizado if personalizado is not None else omissao,
+            "omissao": omissao,
+            "personalizado": personalizado is not None,
+        }
+    return resultado
+
+
+@app.put("/api/admin/prompts/{chave}")
+async def rota_admin_definir_prompt(chave: str, request: Request,
+                                     id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    try:
+        await run_in_threadpool(
+            prompts_configuraveis.definir_prompt, chave, dados.get("texto", ""), id_estudante)
+    except prompts_configuraveis.ErroPromptConfiguravel as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "prompt_alterado", id_estudante, None, None, {"chave": chave})
+    return {"ok": True}
+
+
+@app.delete("/api/admin/prompts/{chave}")
+async def rota_admin_repor_prompt_omissao(chave: str, id_estudante: int = Depends(admin_global_atual)):
+    try:
+        await run_in_threadpool(prompts_configuraveis.repor_omissao, chave)
+    except prompts_configuraveis.ErroPromptConfiguravel as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "prompt_reposto_omissao", id_estudante, None, None, {"chave": chave})
+    return {"ok": True}
+
+
+# ---------- administração: eliminação do histórico de código executado ----------
+#
+# Só o histórico de código (secção 14/Fase 4) tem esta ferramenta --
+# nem as sessões do Alguem (logs/*.jsonl), nem configurações de LLM
+# antigas (decisão validada, ponto 11). Três modos, sem soft-delete
+# nem papelaria (decisão explícita de simplicidade, ver secção 14):
+# por período, por seleção manual, ou tudo.
+
+@app.post("/api/admin/execucoes/apagar")
+async def rota_admin_apagar_execucoes(request: Request, id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    ids = dados.get("ids", [])
+    if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+        raise HTTPException(status_code=400, detail="'ids' tem de ser uma lista de inteiros.")
+    apagados = await run_in_threadpool(historico_codigo.apagar_por_ids, ids)
+    await run_in_threadpool(
+        atividade.registar_evento, "execucoes_apagadas", id_estudante, None, None,
+        {"modo": "selecao", "ids": ids, "apagados": apagados})
+    return {"ok": True, "apagados": apagados}
+
+
+@app.post("/api/admin/execucoes/apagar-por-periodo")
+async def rota_admin_apagar_execucoes_por_periodo(request: Request,
+                                                    id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    try:
+        dias = int(dados.get("dias"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="'dias' tem de ser um inteiro.")
+    if dias < 0:
+        raise HTTPException(status_code=400, detail="'dias' não pode ser negativo.")
+    apagados = await run_in_threadpool(historico_codigo.apagar_por_periodo, dias)
+    await run_in_threadpool(
+        atividade.registar_evento, "execucoes_apagadas", id_estudante, None, None,
+        {"modo": "periodo", "dias": dias, "apagados": apagados})
+    return {"ok": True, "apagados": apagados}
+
+
+@app.post("/api/admin/execucoes/apagar-tudo")
+async def rota_admin_apagar_todas_as_execucoes(request: Request,
+                                                id_estudante: int = Depends(admin_global_atual)):
+    # Ação destrutiva e irreversível sobre TODO o histórico -- exige um
+    # sinal explícito no corpo do pedido, não só o método POST, para
+    # não ficar acionável por engano.
+    dados = await corpo_json(request)
+    if dados.get("confirmar") is not True:
+        raise HTTPException(status_code=400, detail="Confirmação em falta ('confirmar': true).")
+    apagados = await run_in_threadpool(historico_codigo.apagar_tudo)
+    await run_in_threadpool(
+        atividade.registar_evento, "execucoes_apagadas", id_estudante, None, None,
+        {"modo": "tudo", "apagados": apagados})
+    return {"ok": True, "apagados": apagados}
+
+
 # ---------- administração: descarregar a base de dados para backup ----------
 
 @app.get("/api/admin/bd")
-async def rota_admin_descarregar_bd(tarefas: BackgroundTasks, id_estudante: int = Depends(admin_atual)):
+async def rota_admin_descarregar_bd(tarefas: BackgroundTasks, id_estudante: int = Depends(admin_global_atual)):
     """Devolve um dump .sql da base de dados inteira (via pg_dump), para
     o admin guardar como backup ou analisar offline -- ver
     bd.gerar_backup_sql."""
@@ -570,6 +901,7 @@ async def rota_admin_descarregar_bd(tarefas: BackgroundTasks, id_estudante: int 
         _logger.error("pg_dump falhou ao gerar backup: %s", e)
         raise HTTPException(status_code=500, detail="Não foi possível gerar o backup.")
     tarefas.add_task(os.remove, caminho_copia)
+    await run_in_threadpool(atividade.registar_evento, "bd_descarregada", id_estudante)
     nome_ficheiro = f"algo-online-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.sql"
     return FileResponse(
         caminho_copia,
@@ -579,32 +911,218 @@ async def rota_admin_descarregar_bd(tarefas: BackgroundTasks, id_estudante: int 
     )
 
 
-# ---------- credenciais de LLM ----------
+# ---------- configurações de LLM ----------
 
-@app.get("/api/credencial")
-async def rota_obter_credencial(id_estudante: int = Depends(estudante_atual)):
-    """Nunca devolve a chave de API -- só o que é seguro mostrar de
-    volta ao estudante para confirmar o que já tem configurado."""
-    c = await run_in_threadpool(credenciais.obter_credencial, id_estudante)
-    if c is None:
-        return {"configurado": False}
-    return {"configurado": True, "fornecedor": c.fornecedor, "modelo": c.modelo, "host": c.host}
+def _configuracao_para_json(c: configuracao_llm.ConfiguracaoLLM) -> dict:
+    """Nunca inclui a chave de API -- só o que é seguro mostrar de volta
+    para confirmar o que já está configurado."""
+    return {"id": c.id, "etiqueta": c.etiqueta, "fornecedor": c.fornecedor, "modelo": c.modelo, "host": c.host}
 
 
-@app.post("/api/credencial")
-async def rota_guardar_credencial(request: Request, id_estudante: int = Depends(estudante_atual)):
+@app.get("/api/llm/configuracoes")
+async def rota_llm_listar_configuracoes(id_estudante: int = Depends(estudante_atual)):
+    """O guardião é sempre transparente para o estudante -- só existe
+    seleção pessoal para 'apoio' (ver configuracao_llm.PAPEIS_PESSOAIS),
+    por isso esta resposta nem tem noção de 'papel': o estudante escolhe
+    um único LLM."""
+    configuracoes = await run_in_threadpool(configuracao_llm.listar_configuracoes_estudante, id_estudante)
+    return {
+        "configuracoes": [_configuracao_para_json(c) for c in configuracoes],
+        "configuracao_ativa_id": await run_in_threadpool(
+            configuracao_llm.obter_selecao_estudante, id_estudante, "apoio"),
+        "llm_pessoal_permitido": await run_in_threadpool(configuracao_llm.permissao_ativa, "apoio"),
+        "definido_pela_plataforma": (
+            await run_in_threadpool(configuracao_llm.obter_selecao_global, "apoio")) is not None,
+    }
+
+
+@app.post("/api/llm/configuracoes")
+async def rota_llm_criar_configuracao(request: Request, id_estudante: int = Depends(estudante_atual)):
     dados = await corpo_json(request)
     try:
-        await run_in_threadpool(
-            credenciais.guardar_credencial,
+        novo_id = await run_in_threadpool(
+            configuracao_llm.criar_configuracao,
             id_estudante,
+            dados.get("etiqueta", ""),
             dados.get("fornecedor", ""),
             dados.get("modelo", ""),
             dados.get("api_key", ""),
             host=dados.get("host") or None,
         )
-    except credenciais.ErroCredencial as e:
+    except configuracao_llm.ErroConfiguracaoLLM as e:
         raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "id": novo_id}
+
+
+async def _exigir_configuracao_do_estudante(config_id: int, id_estudante: int) -> None:
+    c = await run_in_threadpool(configuracao_llm.obter_configuracao, config_id)
+    if c is None or c.estudante_id != id_estudante:
+        raise HTTPException(status_code=404, detail="Configuração não encontrada.")
+
+
+@app.put("/api/llm/configuracoes/{config_id}")
+async def rota_llm_editar_configuracao(config_id: int, request: Request,
+                                        id_estudante: int = Depends(estudante_atual)):
+    await _exigir_configuracao_do_estudante(config_id, id_estudante)
+    dados = await corpo_json(request)
+    try:
+        await run_in_threadpool(
+            configuracao_llm.editar_configuracao,
+            config_id,
+            dados.get("etiqueta", ""),
+            dados.get("fornecedor", ""),
+            dados.get("modelo", ""),
+            dados.get("api_key", ""),
+            host=dados.get("host") or None,
+        )
+    except configuracao_llm.ErroConfiguracaoLLM as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/llm/configuracoes/{config_id}")
+async def rota_llm_apagar_configuracao(config_id: int, id_estudante: int = Depends(estudante_atual)):
+    await _exigir_configuracao_do_estudante(config_id, id_estudante)
+    await run_in_threadpool(configuracao_llm.apagar_configuracao, config_id)
+    return {"ok": True}
+
+
+@app.post("/api/llm/selecao")
+async def rota_llm_definir_selecao(request: Request, id_estudante: int = Depends(estudante_atual)):
+    """Só escolhe o LLM de apoio -- não existe seleção pessoal de
+    guardião (ver configuracao_llm.PAPEIS_PESSOAIS)."""
+    dados = await corpo_json(request)
+    if not await run_in_threadpool(configuracao_llm.permissao_ativa, "apoio"):
+        raise HTTPException(status_code=403, detail="A plataforma não permite escolher o próprio LLM.")
+    try:
+        await run_in_threadpool(
+            configuracao_llm.definir_selecao_estudante, id_estudante, "apoio", dados.get("configuracao_id"))
+    except configuracao_llm.ErroConfiguracaoLLM as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+# ---------- administração: configurações globais de LLM ----------
+
+@app.get("/api/admin/llm")
+async def rota_admin_llm_listar(id_estudante: int = Depends(admin_global_atual)):
+    configuracoes = await run_in_threadpool(configuracao_llm.listar_configuracoes_globais)
+    selecao_global, permissoes = {}, {}
+    for papel in configuracao_llm.PAPEIS_GLOBAIS:
+        selecao_global[papel] = await run_in_threadpool(configuracao_llm.obter_selecao_global, papel)
+    for papel in configuracao_llm.PAPEIS_PESSOAIS:
+        permissoes[papel] = await run_in_threadpool(configuracao_llm.permissao_ativa, papel)
+    return {
+        "configuracoes": [_configuracao_para_json(c) for c in configuracoes],
+        "selecao_global": selecao_global,
+        "permissoes": permissoes,
+    }
+
+
+@app.post("/api/admin/llm/configuracoes")
+async def rota_admin_llm_criar_configuracao(request: Request, id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    try:
+        novo_id = await run_in_threadpool(
+            configuracao_llm.criar_configuracao,
+            None,
+            dados.get("etiqueta", ""),
+            dados.get("fornecedor", ""),
+            dados.get("modelo", ""),
+            dados.get("api_key", ""),
+            host=dados.get("host") or None,
+            criado_por=id_estudante,
+        )
+    except configuracao_llm.ErroConfiguracaoLLM as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "llm_configuracao_criada", id_estudante, None, None,
+        {"id": novo_id, "etiqueta": dados.get("etiqueta", "")})
+    return {"ok": True, "id": novo_id}
+
+
+async def _exigir_configuracao_global(config_id: int) -> None:
+    c = await run_in_threadpool(configuracao_llm.obter_configuracao, config_id)
+    if c is None or c.estudante_id is not None:
+        raise HTTPException(status_code=404, detail="Configuração não encontrada.")
+
+
+@app.put("/api/admin/llm/configuracoes/{config_id}")
+async def rota_admin_llm_editar_configuracao(config_id: int, request: Request,
+                                              id_estudante: int = Depends(admin_global_atual)):
+    await _exigir_configuracao_global(config_id)
+    dados = await corpo_json(request)
+    try:
+        await run_in_threadpool(
+            configuracao_llm.editar_configuracao,
+            config_id,
+            dados.get("etiqueta", ""),
+            dados.get("fornecedor", ""),
+            dados.get("modelo", ""),
+            dados.get("api_key", ""),
+            host=dados.get("host") or None,
+        )
+    except configuracao_llm.ErroConfiguracaoLLM as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "llm_configuracao_editada", id_estudante, None, None, {"id": config_id})
+    return {"ok": True}
+
+
+@app.delete("/api/admin/llm/configuracoes/{config_id}")
+async def rota_admin_llm_apagar_configuracao(config_id: int, id_estudante: int = Depends(admin_global_atual)):
+    await _exigir_configuracao_global(config_id)
+    await run_in_threadpool(configuracao_llm.apagar_configuracao, config_id)
+    await run_in_threadpool(
+        atividade.registar_evento, "llm_configuracao_apagada", id_estudante, None, None, {"id": config_id})
+    return {"ok": True}
+
+
+@app.post("/api/admin/llm/selecao")
+async def rota_admin_llm_definir_selecao(request: Request, id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    papel = dados.get("papel", "")
+    if papel not in configuracao_llm.PAPEIS_GLOBAIS:
+        raise HTTPException(status_code=400, detail="Papel inválido.")
+    try:
+        await run_in_threadpool(
+            configuracao_llm.definir_selecao_global, papel, dados.get("configuracao_id"))
+    except configuracao_llm.ErroConfiguracaoLLM as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await run_in_threadpool(
+        atividade.registar_evento, "llm_selecao_alterada", id_estudante, None, None,
+        {"papel": papel, "configuracao_id": dados.get("configuracao_id")})
+    return {"ok": True}
+
+
+@app.post("/api/admin/llm/permissao")
+async def rota_admin_llm_definir_permissao(request: Request, id_estudante: int = Depends(admin_global_atual)):
+    dados = await corpo_json(request)
+    papel = dados.get("papel", "")
+    if papel not in configuracao_llm.PAPEIS_PESSOAIS:
+        raise HTTPException(status_code=400, detail="Papel inválido.")
+    ativa = bool(dados.get("ativa"))
+    await run_in_threadpool(configuracao_llm.definir_permissao, papel, ativa)
+    await run_in_threadpool(
+        atividade.registar_evento, "llm_permissao_alterada", id_estudante, None, None,
+        {"papel": papel, "ativa": ativa})
+    return {"ok": True}
+
+
+@app.post("/api/admin/llm/configuracoes/{config_id}/testar")
+async def rota_admin_llm_testar_configuracao(config_id: int, id_estudante: int = Depends(admin_global_atual)):
+    """Pedido mínimo real ao fornecedor, só para confirmar que a
+    configuração (chave de API, modelo, host) funciona -- não guarda
+    nem mostra a resposta do modelo, só se houve erro ou não."""
+    c = await run_in_threadpool(configuracao_llm.obter_configuracao, config_id)
+    if c is None or c.estudante_id is not None:
+        raise HTTPException(status_code=404, detail="Configuração não encontrada.")
+    extras = {"host": c.host} if c.host else {}
+    try:
+        agente = criar_fornecedor(c.fornecedor, c.modelo, c.api_key, **extras)
+        await run_in_threadpool(agente.responder, [{"role": "user", "content": "Responde só 'ok'."}])
+    except ErroFornecedorLLM as e:
+        return {"ok": False, "detail": str(e)}
     return {"ok": True}
 
 
@@ -790,6 +1308,22 @@ async def _adquirir_vaga_de_execucao(websocket: WebSocket) -> None:
     await _semaforo_execucoes.acquire()
 
 
+async def _registar_execucao_com_seguranca(id_estudante: int, tipo: str, nome_principal: str,
+                                            ficheiros: list[dict], resultado: str) -> None:
+    """Grava o histórico de execução/debug (secção 9/Fase 4). Chamada
+    sempre DEPOIS de o estudante já ter recebido o resultado da sua
+    execução (o 'fim'/'erro'/'erro_compilacao' já foi enviado antes) --
+    não atrasa nada que o estudante perceba, só o momento em que este
+    pedido HTTP/WebSocket termina de vez do lado do servidor. Falhas
+    ficam só em log: perder um registo de histórico não pode derrubar
+    uma execução que já correu bem para o estudante."""
+    try:
+        await run_in_threadpool(
+            historico_codigo.registar_execucao, id_estudante, tipo, nome_principal, ficheiros, resultado)
+    except Exception:
+        _logger.exception("Falha ao gravar histórico de execução de código.")
+
+
 @app.websocket("/ws/executar")
 async def ws_executar(websocket: WebSocket):
     await websocket.accept()
@@ -812,9 +1346,16 @@ async def ws_executar(websocket: WebSocket):
     try:
         caminho_py = executor.compilar_codigo(ficheiros, nome_principal, pasta_estudante)
     except executor.ErroCompilacao as e:
+        await _registar_execucao_com_seguranca(
+            id_estudante, "executa", nome_principal, ficheiros, f"Erro de compilação: {e}")
         await websocket.send_json({"tipo": "erro_compilacao", "mensagem": str(e)})
         await websocket.close()
         return
+
+    # Valor por omissão -- cobre as saídas que nunca chegam a um "fim"/
+    # "erro" claro (ligação perdida a meio, tarefa cancelada); os ramos
+    # dentro de ler_e_reencaminhar substituem-no pelo resultado real.
+    resultado_execucao = "Ligação terminada antes da execução acabar"
 
     await _adquirir_vaga_de_execucao(websocket)
     try:
@@ -826,10 +1367,16 @@ async def ws_executar(websocket: WebSocket):
             await websocket.send_json({"tipo": "saida", "texto": linha})
 
         async def ler_e_reencaminhar():
+            nonlocal resultado_execucao
             try:
                 await executor.correr_com_limite_de_tempo(execucao, enviar_linha)
                 await websocket.send_json({"tipo": "fim", "codigo_saida": execucao.codigo_saida})
+                resultado_execucao = (
+                    "Sucesso" if execucao.codigo_saida == 0
+                    else f"Terminou com código de saída {execucao.codigo_saida}"
+                )
             except TimeoutError:
+                resultado_execucao = "Interrompida: excedeu o tempo limite (possível ciclo infinito)"
                 await websocket.send_json({
                     "tipo": "erro",
                     # UX-18: uniformizado com o aviso equivalente da consola
@@ -837,6 +1384,7 @@ async def ws_executar(websocket: WebSocket):
                     "mensagem": "Execução interrompida: excedeu o tempo limite (possível ciclo infinito).",
                 })
             except executor.SaidaExcessiva:
+                resultado_execucao = "Interrompida: linha de saída demasiado longa"
                 await websocket.send_json({
                     "tipo": "erro",
                     "mensagem": "Execução interrompida: produziu uma linha de saída demasiado longa.",
@@ -882,6 +1430,8 @@ async def ws_executar(websocket: WebSocket):
             await execucao.terminar_a_forcar()
     finally:
         _semaforo_execucoes.release()
+        await _registar_execucao_com_seguranca(
+            id_estudante, "executa", nome_principal, ficheiros, resultado_execucao)
 
 
 # ---------- WebSocket: rasto ao vivo (--debug interativo) ----------
@@ -914,9 +1464,15 @@ async def ws_debug(websocket: WebSocket):
     try:
         dados_compilados = executor.preparar_debug_ao_vivo(ficheiros, nome_principal, pasta_estudante)
     except executor.ErroCompilacao as e:
+        await _registar_execucao_com_seguranca(
+            id_estudante, "debug", nome_principal, ficheiros, f"Erro de compilação: {e}")
         await websocket.send_json({"tipo": "erro_compilacao", "mensagem": str(e)})
         await websocket.close()
         return
+
+    # Ver o mesmo comentário em ws_executar -- valor por omissão para
+    # as saídas que nunca chegam a um evento "fim"/"erro" claro.
+    resultado_execucao = "Ligação terminada antes da execução acabar"
 
     await _adquirir_vaga_de_execucao(websocket)
     try:
@@ -925,10 +1481,15 @@ async def ws_debug(websocket: WebSocket):
         execucao.iniciar()
 
         async def ler_e_reencaminhar():
+            nonlocal resultado_execucao
             while True:
                 evento = await execucao.proximo_evento()
                 await websocket.send_json(evento)
-                if evento.get("tipo") in ("fim", "erro"):
+                if evento.get("tipo") == "fim":
+                    resultado_execucao = "Sucesso"
+                    break
+                if evento.get("tipo") == "erro":
+                    resultado_execucao = f"Erro em execução: {evento.get('mensagem', '')}"
                     break
 
         tarefa_leitura = asyncio.create_task(ler_e_reencaminhar())
@@ -960,6 +1521,8 @@ async def ws_debug(websocket: WebSocket):
             execucao.terminar_a_forcar()
     finally:
         _semaforo_execucoes.release()
+        await _registar_execucao_com_seguranca(
+            id_estudante, "debug", nome_principal, ficheiros, resultado_execucao)
 
 
 # ---------- WebSocket: conversa com o Alguem ----------
@@ -968,19 +1531,25 @@ async def ws_debug(websocket: WebSocket):
 async def ws_alguem(websocket: WebSocket):
     await websocket.accept()
     if not await run_in_threadpool(definicoes.alguem_ativo):
-        await websocket.send_json({"tipo": "erro", "mensagem": "O Alguem está temporariamente desativado."})
+        await websocket.send_json({
+            "tipo": "erro", "mensagem": "O Alguem está temporariamente desativado.", "acionavel": False})
         await websocket.close()
         return
     id_estudante = _id_estudante_do_websocket(websocket)
     if id_estudante is None:
-        await websocket.send_json({"tipo": "erro", "mensagem": "Não autenticado."})
+        await websocket.send_json({"tipo": "erro", "mensagem": "Não autenticado.", "acionavel": False})
+        await websocket.close()
+        return
+    if await run_in_threadpool(grupos.grupo_bloqueia_alguem, id_estudante):
+        await websocket.send_json({
+            "tipo": "erro", "mensagem": "O Alguem está desativado para o teu grupo.", "acionavel": False})
         await websocket.close()
         return
 
     try:
         tutor = await run_in_threadpool(alguem_ponte.construir_alguem, id_estudante)
     except alguem_ponte.ErroAlguemIndisponivel as e:
-        await websocket.send_json({"tipo": "erro", "mensagem": str(e)})
+        await websocket.send_json({"tipo": "erro", "mensagem": str(e), "acionavel": e.acionavel})
         await websocket.close()
         return
 

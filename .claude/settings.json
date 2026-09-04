@@ -26,7 +26,12 @@
       "Bash(node --check online/estatico/admin.js)",
       "Bash(node --check online/estatico/app.js)",
       "Bash(python3 -m pytest tests/test_main_integracao.py -k tema -v)",
-      "Bash(py -3 -m pytest tests/test_main_integracao.py -k tema -v)"
+      "Bash(py -3 -m pytest tests/test_main_integracao.py -k tema -v)",
+      "Bash(python -m pytest tests/test_relatorios.py tests/test_main_integracao.py -v)",
+      "Bash(python -m pytest tests/test_relatorios.py tests/test_main_integracao.py -q)",
+      "Bash(python3 -c ' *)",
+      "Bash(py -3 -c \"print\\('hi'\\)\")",
+      "Bash(docker --version)"
     ],
     "additionalDirectories": [
       "C:\\Users\\oscar\\Documents\\Repos\\algo\\aulas\\diagramas\\08-funcoes-e-procedimentos"

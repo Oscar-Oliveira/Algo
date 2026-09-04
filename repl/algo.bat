@@ -24,7 +24,7 @@ rem fechar a string, e o argumento a seguir fica todo trocado. Por isso
 rem tiramos essa barra final aqui, uma vez por todas.
 if "%DIR:~-1%"=="\" set "DIR=%DIR:~0,-1%"
 
-rem Corre tanto daqui (instaladores\, dentro do repositorio -- pyproject.toml
+rem Corre tanto daqui (repl\, dentro do repositorio -- pyproject.toml
 rem um nivel acima) como da raiz de um pacote distribuido a estudantes
 rem (empacotar.py copia este script para la, ao lado do pyproject.toml).
 if exist "%DIR%\pyproject.toml" (

@@ -13,6 +13,8 @@ from fastapi.testclient import TestClient
 import bd
 import main
 import autenticacao
+import configuracao_llm
+import historico_codigo
 import executor
 
 
@@ -33,6 +35,21 @@ def _resposta_llm_falsa(texto):
     cm.__enter__.return_value.read.return_value = json.dumps(
         {"choices": [{"message": {"content": texto}}]}).encode()
     return cm
+
+
+def _configurar_llm_pessoal_ativo(cliente, fornecedor="openai", modelo="gpt-4o-mini", api_key="sk-teste"):
+    """Cria uma configuração de LLM pessoal para a conta já autenticada em
+    'cliente' e torna-a a ativa para 'apoio' -- equivalente, para efeitos
+    destes testes, ao antigo /api/credencial (uma única credencial já
+    implicitamente 'ativa'). A permissão em si é uma definição global
+    (só o admin a liga), por isso é ligada diretamente aqui em vez de por
+    uma rota de admin autenticada à parte."""
+    configuracao_llm.definir_permissao("apoio", True)
+    r = cliente.post("/api/llm/configuracoes", json={
+        "etiqueta": "Principal", "fornecedor": fornecedor, "modelo": modelo, "api_key": api_key})
+    config_id = r.json()["id"]
+    cliente.post("/api/llm/selecao", json={"configuracao_id": config_id})
+    return config_id
 
 
 # ---------- UX-11: visualizador de rasto sem dependência de CDN externo ----------
@@ -91,7 +108,7 @@ def test_app_js_desativa_entrada_alguem_quando_falta_credencial(cliente):
     assert r.status_code == 200
     assert "desativarEntradaAlguem" in r.text
     assert "ativarEntradaAlguem" in r.text
-    assert "if (!alguemPronto) desativarEntradaAlguem();" in r.text
+    assert "if (!alguemPronto) desativarEntradaAlguem(dados.mensagem, dados.acionavel);" in r.text
 
     editor_html = (Path(__file__).parent.parent / "paginas_privadas" / "editor.html").read_text(encoding="utf-8")
     assert 'id="aviso-credencial-alguem"' in editor_html
@@ -414,6 +431,14 @@ def test_api_eu_reflete_se_a_conta_e_admin(cliente, monkeypatch):
     assert isinstance(corpo["id"], int)
 
 
+def test_api_eu_reflete_permissao_de_llm_pessoal(cliente):
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    assert cliente.get("/api/eu").json()["llm_pessoal_permitido"] is False
+
+    configuracao_llm.definir_permissao("apoio", True)
+    assert cliente.get("/api/eu").json()["llm_pessoal_permitido"] is True
+
+
 def test_pagina_admin_redireciona_quem_nao_e_admin(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     r = cliente.get("/admin", follow_redirects=False)
@@ -475,26 +500,110 @@ def test_admin_nao_pode_revogar_a_propria_conta(cliente, monkeypatch):
     assert r.status_code == 400
 
 
-def test_admin_atividade_exige_admin(cliente, monkeypatch):
+def test_admin_investigacao_relatorio_exige_admin(cliente, monkeypatch):
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
     cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
     cliente.post("/api/sair")
 
     monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
     cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
-    r = cliente.get("/api/admin/atividade")
+    r = cliente.get("/api/admin/investigacao/relatorio")
     assert r.status_code == 403
 
 
-def test_admin_atividade_sem_logs_devolve_relatorio_vazio(cliente, monkeypatch):
+def test_admin_investigacao_relatorio_sem_logs_devolve_vazio(cliente, monkeypatch):
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "a@b.com")
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
 
-    r = cliente.get("/api/admin/atividade")
+    r = cliente.get("/api/admin/investigacao/relatorio")
     assert r.status_code == 200
-    corpo = r.json()
-    assert corpo["por_sessao"] == []
-    assert corpo["globais"]["num_sessoes"] == 0
+    assert r.json()["sessoes"] == []
+
+
+def _sessao_alguem(email, **kwargs_inicio):
+    from alguem.nucleo.registador import Registador
+    r = Registador(id_estudante=email)  # pasta_logs por omissão -- já isolada por conftest
+    r.inicio_sessao("openrouter", "gpt-4o-mini", {}, [], **kwargs_inicio)
+    r.fim_sessao()
+
+
+def test_admin_investigacao_relatorio_e_dashboard_e_filtros(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    _sessao_alguem("a@b.com", grupo="Turma A", apoio_escopo="global")
+    cliente.post("/api/sair")
+    _entrar_como_admin(cliente, monkeypatch)
+
+    r = cliente.get("/api/admin/investigacao/filtros")
+    assert r.status_code == 200
+    assert r.json()["grupos"] == ["Turma A"]
+
+    r = cliente.get("/api/admin/investigacao/relatorio")
+    assert len(r.json()["sessoes"]) == 1
+
+    r = cliente.get("/api/admin/investigacao/relatorio", params={"grupo": "Turma Inexistente"})
+    assert r.json()["sessoes"] == []
+
+    r = cliente.get("/api/admin/investigacao/dashboard")
+    assert r.status_code == 200
+    dashboard = r.json()
+    assert dashboard["sessoes_por_dia"][0]["sessoes"] == 1
+
+
+def test_admin_investigacao_exportar_csv_e_json(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    _sessao_alguem("a@b.com")
+    cliente.post("/api/sair")
+    _entrar_como_admin(cliente, monkeypatch)
+
+    r = cliente.get("/api/admin/investigacao/exportar.csv")
+    assert r.status_code == 200
+    assert "a@b.com" in r.text
+
+    r = cliente.get("/api/admin/investigacao/exportar.json")
+    assert r.status_code == 200
+    assert r.json()[0]["id_estudante"] == "a@b.com"
+
+
+def test_admin_investigacao_vista_estudante_regista_auditoria(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    id_est = autenticacao.registar("a@b.com", "password123")
+    _sessao_alguem("a@b.com")
+
+    r = cliente.get(f"/api/admin/investigacao/estudante/{id_est}")
+    assert r.status_code == 200
+    assert r.json()["email"] == "a@b.com"
+    assert len(r.json()["linha_do_tempo"]) == 1
+
+    log = cliente.get("/api/admin/log").json()["eventos"]
+    evento = next(e for e in log if e["tipo"] == "investigacao_estudante_visto")
+    assert evento["alvo_email"] == "a@b.com"
+
+
+def test_admin_investigacao_vista_estudante_fora_do_ambito_de_admin_de_grupo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+    id_alvo = autenticacao.registar("alvo@escola.pt", "password123")
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_outro = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/admin_global", json={"admin_global": False})
+    cliente.post("/api/sair")
+
+    cliente.post("/api/entrar", json={"email": "outro@escola.pt", "password": "password123"})
+    # alvo@escola.pt não está em nenhum grupo gerido por outro@escola.pt
+    # (nem em nenhum grupo, de todo) -- fora do âmbito de um admin de grupo.
+    r = cliente.get(f"/api/admin/investigacao/estudante/{id_alvo}")
+    assert r.status_code == 403
 
 
 def test_criar_relatorio_exige_sessao(cliente):
@@ -543,6 +652,35 @@ def test_admin_relatorios_lista_com_email_de_quem_reportou(cliente, monkeypatch)
     assert relatorios[0]["descricao"] == "O botão de guardar não funciona."
 
 
+def test_admin_relatorios_marca_como_vistos_ao_listar(cliente, monkeypatch):
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    cliente.post("/api/relatorios", json={"descricao": "O botão de guardar não funciona."})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+
+    assert cliente.get("/api/admin/relatorios/nao_vistos").json()["nao_vistos"] == 1
+
+    r = cliente.get("/api/admin/relatorios")
+    assert r.json()["relatorios"][0]["visto"] is False
+
+    assert cliente.get("/api/admin/relatorios/nao_vistos").json()["nao_vistos"] == 0
+    assert cliente.get("/api/admin/relatorios").json()["relatorios"][0]["visto"] is True
+
+
+def test_admin_relatorios_nao_vistos_exige_admin(cliente, monkeypatch):
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = cliente.get("/api/admin/relatorios/nao_vistos")
+    assert r.status_code == 403
+
+
 def test_admin_apagar_relatorio_exige_admin(cliente, monkeypatch):
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
     cliente.post("/api/registar", json={"email": "professor@escola.pt", "password": "password123"})
@@ -568,6 +706,9 @@ def test_admin_apagar_relatorio(cliente, monkeypatch):
     assert r.status_code == 200
     assert cliente.get("/api/admin/relatorios").json()["relatorios"] == []
 
+    log = cliente.get("/api/admin/log", params={"tipo": "relatorio_apagado"}).json()
+    assert log["total"] == 1
+
 
 def test_admin_bd_exige_admin(cliente, monkeypatch):
     monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
@@ -591,6 +732,9 @@ def test_admin_bd_devolve_dump_sql_valido(cliente, monkeypatch):
     conteudo = r.content.decode("utf-8", errors="replace")
     assert "estudante" in conteudo
     assert "a@b.com" in conteudo
+
+    log = cliente.get("/api/admin/log", params={"tipo": "bd_descarregada"}).json()
+    assert log["total"] == 1
 
 
 # ---------- grupos, registo de atividade e privilégios de admin ----------
@@ -678,6 +822,39 @@ def test_desativar_grupo_bloqueia_login_do_membro(cliente, monkeypatch):
     assert "desativado" in r_login.json()["detail"]
 
 
+def test_ativar_e_desativar_alguem_do_grupo_via_http(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+    assert cliente.get("/api/admin/grupos").json()["grupos"][0]["alguem_ativo"] is True
+
+    r = cliente.post(f"/api/admin/grupos/{grupo['id']}/desativar_alguem")
+    assert r.status_code == 200
+    assert cliente.get("/api/admin/grupos").json()["grupos"][0]["alguem_ativo"] is False
+
+    r = cliente.post(f"/api/admin/grupos/{grupo['id']}/ativar_alguem")
+    assert r.status_code == 200
+    assert cliente.get("/api/admin/grupos").json()["grupos"][0]["alguem_ativo"] is True
+
+
+def test_api_eu_alguem_ativo_reflete_exclusao_do_grupo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post("/api/admin/definicoes/alguem", json={"ativo": True})
+    assert r.status_code == 200
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+    cliente.post(f"/api/admin/grupos/{grupo['id']}/desativar_alguem")
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={
+        "email": "aluno@escola.pt", "password": "password123", "codigo_grupo": grupo["codigo"],
+    })
+    assert cliente.get("/api/eu").json()["alguem_ativo"] is False
+
+    cliente.post("/api/sair")
+    cliente.post("/api/registar", json={"email": "semgrupo@escola.pt", "password": "password123"})
+    assert cliente.get("/api/eu").json()["alguem_ativo"] is True
+
+
 def test_apagar_grupo_com_membros_da_400(cliente, monkeypatch):
     _entrar_como_admin(cliente, monkeypatch)
     grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
@@ -691,6 +868,19 @@ def test_apagar_grupo_com_membros_da_400(cliente, monkeypatch):
     _entrar_como_admin(cliente, monkeypatch)
     r = cliente.post(f"/api/admin/grupos/{grupo['id']}/apagar")
     assert r.status_code == 400
+
+
+def test_apagar_grupo_sem_membros_via_http(cliente, monkeypatch):
+    """Regressão: a rota apagava o grupo com sucesso mas depois tentava
+    registar o evento de atividade com o grupo_id (agora inexistente,
+    FK para grupo.id) -- violava a FK e devolvia 500 mesmo com o grupo
+    já apagado. Ver rota_admin_apagar_grupo em main.py."""
+    _entrar_como_admin(cliente, monkeypatch)
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+
+    r = cliente.post(f"/api/admin/grupos/{grupo['id']}/apagar")
+    assert r.status_code == 200
+    assert cliente.get("/api/admin/grupos").json()["grupos"] == []
 
 
 def test_reatribuir_grupo_de_utilizador(cliente, monkeypatch):
@@ -763,6 +953,163 @@ def test_nao_pode_remover_o_ultimo_admin_ativo(cliente, monkeypatch):
     assert r.status_code == 400
 
 
+# ---------- admin global vs. admin de grupo (Fase 1) ----------
+
+def test_novo_admin_fica_global_por_omissao_via_http(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    id_outro = next(u["id"] for u in utilizadores if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    assert next(u for u in utilizadores if u["id"] == id_outro)["admin_global"] is True
+
+
+def test_eu_devolve_admin_global(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    assert cliente.get("/api/eu").json()["admin_global"] is True
+
+
+def test_definir_admin_global_via_http(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_outro = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+
+    r = cliente.post(f"/api/admin/utilizadores/{id_outro}/admin_global", json={"admin_global": False})
+    assert r.status_code == 200
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    assert next(u for u in utilizadores if u["id"] == id_outro)["admin_global"] is False
+
+
+def test_admin_nao_pode_retirar_a_si_proprio_o_estatuto_global(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    id_proprio = cliente.get("/api/eu").json()["id"]
+    r = cliente.post(f"/api/admin/utilizadores/{id_proprio}/admin_global", json={"admin_global": False})
+    assert r.status_code == 400
+
+
+def test_definir_grupos_geridos_via_http(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_outro = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/admin_global", json={"admin_global": False})
+
+    r = cliente.post(f"/api/admin/utilizadores/{id_outro}/grupos_geridos", json={"grupo_ids": [grupo["id"]]})
+    assert r.status_code == 200
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    assert next(u for u in utilizadores if u["id"] == id_outro)["grupos_geridos_ids"] == [grupo["id"]]
+
+
+def test_remover_admin_limpa_grupos_geridos(cliente, monkeypatch):
+    """Um admin de grupo pode gerir várias turmas ao mesmo tempo -- isso
+    deixa de ser válido assim que a conta volta a ser um estudante
+    normal (no máximo uma pertença), por isso remover_admin limpa
+    tudo (ver main.py, rota_admin_remover_admin)."""
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_outro = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/admin_global", json={"admin_global": False})
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/grupos_geridos", json={"grupo_ids": [grupo["id"]]})
+
+    r = cliente.post(f"/api/admin/remover_admin/{id_outro}")
+    assert r.status_code == 200
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    conta = next(u for u in utilizadores if u["id"] == id_outro)
+    assert conta["grupos_geridos_ids"] == []
+    assert conta["grupo_id"] is None
+
+
+@pytest.mark.parametrize("rota,metodo", [
+    ("/api/admin/utilizadores", "get"),
+    ("/api/admin/grupos", "get"),
+    ("/api/admin/log", "get"),
+    ("/api/admin/log.csv", "get"),
+    ("/api/admin/relatorios", "get"),
+    ("/api/admin/definicoes", "get"),
+    ("/api/admin/llm", "get"),
+])
+def test_admin_de_grupo_recebe_403_nas_rotas_restritas_a_admin_global(cliente, monkeypatch, rota, metodo):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_outro = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/admin_global", json={"admin_global": False})
+    cliente.post("/api/sair")
+
+    cliente.post("/api/entrar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = getattr(cliente, metodo)(rota)
+    assert r.status_code == 403
+
+
+def test_admin_de_grupo_continua_a_aceder_a_rota_investigacao(cliente, monkeypatch):
+    """As rotas de Investigação (métricas do Alguem) ficam de fora da
+    restrição a admin_global -- um admin de grupo continua a poder
+    chamá-las, filtradas aos seus grupos (ver
+    docs/interno/PlanoAlguemLLMInvestigacao.md, secção 15/Fase 5)."""
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_outro = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/admin_global", json={"admin_global": False})
+    cliente.post("/api/sair")
+
+    cliente.post("/api/entrar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = cliente.get("/api/admin/investigacao/relatorio")
+    assert r.status_code == 200
+
+
 def test_registo_de_atividade_regista_login_e_pode_ser_filtrado_e_apagado(cliente, monkeypatch):
     _entrar_como_admin(cliente, monkeypatch)
     cliente.post("/api/sair")
@@ -778,7 +1125,12 @@ def test_registo_de_atividade_regista_login_e_pode_ser_filtrado_e_apagado(client
     r = cliente.post("/api/admin/log/apagar", json={"ids": ids})
     assert r.status_code == 200
     assert r.json()["apagados"] == len(ids)
-    assert cliente.get("/api/admin/log").json()["total"] == 0
+    # Apagar registos do log é, por si, uma atividade que também fica
+    # registada ("log_apagado") -- por isso sobra sempre este último
+    # evento, nunca zero, mesmo apagando "tudo" de uma vez.
+    log_final = cliente.get("/api/admin/log").json()
+    assert log_final["total"] == 1
+    assert log_final["eventos"][0]["tipo"] == "log_apagado"
 
 
 def test_login_falhado_fica_registado_no_log(cliente, monkeypatch):
@@ -817,33 +1169,239 @@ def test_exportar_csv_de_membros_do_grupo(cliente, monkeypatch):
     assert "aluno@escola.pt" in r.text
 
 
-# ---------- credenciais ----------
+# ---------- configurações de LLM ----------
 
-def test_credencial_exige_autenticacao(cliente):
-    r = cliente.get("/api/credencial")
+def test_llm_configuracoes_exige_autenticacao(cliente):
+    r = cliente.get("/api/llm/configuracoes")
     assert r.status_code == 401
 
 
-def test_credencial_fluxo_completo(cliente):
+def test_llm_configuracoes_fluxo_completo(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
-    r = cliente.get("/api/credencial")
-    assert r.json() == {"configurado": False}
+    r = cliente.get("/api/llm/configuracoes")
+    assert r.json()["configuracoes"] == []
 
-    r = cliente.post("/api/credencial", json={
-        "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+    r = cliente.post("/api/llm/configuracoes", json={
+        "etiqueta": "Principal", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+    assert r.status_code == 200
+    config_id = r.json()["id"]
+
+    r = cliente.get("/api/llm/configuracoes")
+    dados = r.json()
+    assert len(dados["configuracoes"]) == 1
+    configuracao = dados["configuracoes"][0]
+    assert configuracao["etiqueta"] == "Principal"
+    assert configuracao["fornecedor"] == "openai"
+    assert "api_key" not in configuracao  # nunca devolvida
+
+    r = cliente.put(f"/api/llm/configuracoes/{config_id}", json={
+        "etiqueta": "Principal (editada)", "fornecedor": "openai", "modelo": "gpt-4o", "api_key": "sk-teste-2"})
+    assert r.status_code == 200
+    assert cliente.get("/api/llm/configuracoes").json()["configuracoes"][0]["modelo"] == "gpt-4o"
+
+    r = cliente.delete(f"/api/llm/configuracoes/{config_id}")
+    assert r.status_code == 200
+    assert cliente.get("/api/llm/configuracoes").json()["configuracoes"] == []
+
+
+def test_llm_configuracao_invalida_da_400(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    r = cliente.post("/api/llm/configuracoes", json={
+        "etiqueta": "X", "fornecedor": "naoexiste", "modelo": "x", "api_key": "y"})
+    assert r.status_code == 400
+
+
+def test_llm_editar_configuracao_de_outra_conta_da_404(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    config_id = cliente.post("/api/llm/configuracoes", json={
+        "etiqueta": "X", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"}).json()["id"]
+    cliente.post("/api/sair")
+    cliente.post("/api/registar", json={"email": "b@b.com", "password": "password123"})
+    r = cliente.put(f"/api/llm/configuracoes/{config_id}", json={
+        "etiqueta": "X", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+    assert r.status_code == 404
+
+
+def test_llm_selecao_recusada_sem_permissao(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    config_id = cliente.post("/api/llm/configuracoes", json={
+        "etiqueta": "X", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"}).json()["id"]
+    r = cliente.post("/api/llm/selecao", json={"configuracao_id": config_id})
+    assert r.status_code == 403
+
+
+# ---------- administração: configurações globais de LLM ----------
+
+def test_admin_llm_fluxo_completo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post("/api/admin/llm/configuracoes", json={
+        "etiqueta": "Global", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-global"})
+    assert r.status_code == 200
+    config_id = r.json()["id"]
+
+    r = cliente.post("/api/admin/llm/selecao", json={"papel": "apoio", "configuracao_id": config_id})
     assert r.status_code == 200
 
-    r = cliente.get("/api/credencial")
-    dados = r.json()
-    assert dados["configurado"] is True
-    assert dados["fornecedor"] == "openai"
-    assert "api_key" not in dados  # nunca devolvida
+    dados = cliente.get("/api/admin/llm").json()
+    assert dados["selecao_global"]["apoio"] == config_id
+
+    r = cliente.post("/api/admin/llm/permissao", json={"papel": "apoio", "ativa": True})
+    assert r.status_code == 200
+    assert cliente.get("/api/admin/llm").json()["permissoes"]["apoio"] is True
+
+    r = cliente.delete(f"/api/admin/llm/configuracoes/{config_id}")
+    assert r.status_code == 200
+    dados = cliente.get("/api/admin/llm").json()
+    assert dados["configuracoes"] == []
+    assert dados["selecao_global"]["apoio"] is None  # limpa-se sozinha ao apagar
 
 
-def test_credencial_invalida_da_400(cliente):
-    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
-    r = cliente.post("/api/credencial", json={"fornecedor": "naoexiste", "modelo": "x", "api_key": "y"})
+def test_admin_llm_selecao_global_aceita_guardiao_mas_permissao_nao(cliente, monkeypatch):
+    """O admin continua a poder escolher um LLM global para o guardião
+    (papel independente do estudante) mas não pode ligar uma permissão de
+    "guardião pessoal" que já não existe -- ver
+    configuracao_llm.PAPEIS_PESSOAIS."""
+    _entrar_como_admin(cliente, monkeypatch)
+    config_id = cliente.post("/api/admin/llm/configuracoes", json={
+        "etiqueta": "Global", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-global"
+    }).json()["id"]
+
+    r = cliente.post("/api/admin/llm/selecao", json={"papel": "guardiao", "configuracao_id": config_id})
+    assert r.status_code == 200
+    assert cliente.get("/api/admin/llm").json()["selecao_global"]["guardiao"] == config_id
+
+    r = cliente.post("/api/admin/llm/permissao", json={"papel": "guardiao", "ativa": True})
     assert r.status_code == 400
+
+
+def test_admin_llm_testar_configuracao_sucesso(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    config_id = cliente.post("/api/admin/llm/configuracoes", json={
+        "etiqueta": "Global", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-global"
+    }).json()["id"]
+
+    class _FornecedorFalso:
+        def __init__(self, modelo, api_key, **extras):
+            pass
+
+        def responder(self, mensagens):
+            return "ok"
+
+    monkeypatch.setattr(main, "criar_fornecedor", lambda *a, **k: _FornecedorFalso(*a, **k))
+    r = cliente.post(f"/api/admin/llm/configuracoes/{config_id}/testar")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+
+
+def test_admin_llm_testar_configuracao_falha(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    config_id = cliente.post("/api/admin/llm/configuracoes", json={
+        "etiqueta": "Global", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-global"
+    }).json()["id"]
+
+    class _FornecedorFalso:
+        def __init__(self, modelo, api_key, **extras):
+            pass
+
+        def responder(self, mensagens):
+            raise main.ErroFornecedorLLM("chave inválida")
+
+    monkeypatch.setattr(main, "criar_fornecedor", lambda *a, **k: _FornecedorFalso(*a, **k))
+    r = cliente.post(f"/api/admin/llm/configuracoes/{config_id}/testar")
+    assert r.status_code == 200
+    assert r.json() == {"ok": False, "detail": "chave inválida"}
+
+
+def test_admin_llm_testar_configuracao_inexistente(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post("/api/admin/llm/configuracoes/9999/testar")
+    assert r.status_code == 404
+
+
+def test_admin_llm_nao_pode_editar_configuracao_pessoal_de_estudante(cliente, monkeypatch):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    config_id = cliente.post("/api/llm/configuracoes", json={
+        "etiqueta": "X", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"}).json()["id"]
+    cliente.post("/api/sair")
+
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.put(f"/api/admin/llm/configuracoes/{config_id}", json={
+        "etiqueta": "X", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+    assert r.status_code == 404
+
+
+# ---------- administração: Fase 3 -- nível de ajuda, guardião, prompts ----------
+
+def test_admin_definicoes_guardiao_e_nivel_ajuda_fluxo_completo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    dados = cliente.get("/api/admin/definicoes").json()
+    assert dados["usar_guardiao"] is True
+    assert dados["nivel_maximo_ajuda"] == 5
+    # 0-6, não 0-7 -- nível 7 (Código) fica sempre bloqueado à parte
+    # (ver definicoes.definir_nivel_maximo_ajuda).
+    assert [n["numero"] for n in dados["escada_ajuda"]] == [0, 1, 2, 3, 4, 5, 6]
+    assert dados["escada_ajuda"][0]["nome"] == "Autonomia"
+
+    r = cliente.post("/api/admin/definicoes/guardiao", json={"ativo": False})
+    assert r.status_code == 200
+    assert cliente.get("/api/admin/definicoes").json()["usar_guardiao"] is False
+
+    r = cliente.post("/api/admin/definicoes/nivel-ajuda", json={"nivel": 3})
+    assert r.status_code == 200
+    assert cliente.get("/api/admin/definicoes").json()["nivel_maximo_ajuda"] == 3
+
+    r = cliente.post("/api/admin/definicoes/nivel-ajuda", json={"nivel": 7})
+    assert r.status_code == 400
+    r = cliente.post("/api/admin/definicoes/nivel-ajuda", json={"nivel": 9})
+    assert r.status_code == 400
+
+
+def test_admin_prompts_fluxo_completo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    dados = cliente.get("/api/admin/prompts").json()
+    assert dados["tutor"]["personalizado"] is False
+    assert dados["tutor"]["texto"] == dados["tutor"]["omissao"]
+    assert "guardiao" in dados
+
+    r = cliente.put("/api/admin/prompts/tutor", json={"texto": "Texto novo do tutor."})
+    assert r.status_code == 200
+    dados = cliente.get("/api/admin/prompts").json()
+    assert dados["tutor"]["personalizado"] is True
+    assert dados["tutor"]["texto"] == "Texto novo do tutor."
+
+    r = cliente.put("/api/admin/prompts/tutor", json={"texto": "   "})
+    assert r.status_code == 400
+
+    r = cliente.delete("/api/admin/prompts/tutor")
+    assert r.status_code == 200
+    dados = cliente.get("/api/admin/prompts").json()
+    assert dados["tutor"]["personalizado"] is False
+
+
+@pytest.mark.parametrize("rota,metodo", [
+    ("/api/admin/definicoes/guardiao", "post"),
+    ("/api/admin/definicoes/nivel-ajuda", "post"),
+    ("/api/admin/prompts", "get"),
+])
+def test_admin_de_grupo_recebe_403_nas_rotas_novas_da_fase_3(cliente, monkeypatch, rota, metodo):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_outro = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/admin_global", json={"admin_global": False})
+    cliente.post("/api/sair")
+
+    cliente.post("/api/entrar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = getattr(cliente, metodo)(rota, json={}) if metodo == "post" else getattr(cliente, metodo)(rota)
+    assert r.status_code == 403
 
 
 # ---------- WebSocket: execução ----------
@@ -1032,6 +1590,135 @@ def test_ws_debug_com_entrada_interativa(cliente):
     assert "Soma: 7" in textos
 
 
+# ---------- Fase 4: histórico de execução/debug gravado a partir dos WebSockets ----------
+
+def _historico(estudante_id):
+    with bd.sessao_bd() as ligacao:
+        return ligacao.execute(
+            "SELECT * FROM execucao_codigo WHERE estudante_id = %s ORDER BY id", (estudante_id,)
+        ).fetchall()
+
+
+def test_ws_executar_regista_sucesso_no_historico(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    id_est = cliente.get("/api/eu").json()["id"]
+    with cliente.websocket_connect("/ws/executar") as ws:
+        ws.send_json(_msg('algoritmo "T"\ninicio\n    escrever("ola")\n', nome="p.algo"))
+        while ws.receive_json()["tipo"] != "fim":
+            pass
+    linhas = _historico(id_est)
+    assert len(linhas) == 1
+    assert linhas[0]["tipo"] == "executa"
+    assert linhas[0]["nome_ficheiro_principal"] == "p.algo"
+    assert linhas[0]["resultado"] == "Sucesso"
+
+
+def test_ws_executar_regista_erro_de_compilacao_no_historico(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    id_est = cliente.get("/api/eu").json()["id"]
+    with cliente.websocket_connect("/ws/executar") as ws:
+        ws.send_json(_msg("algoritmo sem aspas\ninicio\n    escrever(1)\n"))
+        assert ws.receive_json()["tipo"] == "erro_compilacao"
+    linhas = _historico(id_est)
+    assert len(linhas) == 1
+    assert linhas[0]["resultado"].startswith("Erro de compilação:")
+
+
+def test_ws_debug_regista_sucesso_no_historico(cliente):
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    id_est = cliente.get("/api/eu").json()["id"]
+    with cliente.websocket_connect("/ws/debug") as ws:
+        ws.send_json(_msg('algoritmo "T"\ninicio\n    x:inteiro = 1\n    escrever(x)\n'))
+        while ws.receive_json()["tipo"] != "fim":
+            pass
+    linhas = _historico(id_est)
+    assert len(linhas) == 1
+    assert linhas[0]["tipo"] == "debug"
+    assert linhas[0]["resultado"] == "Sucesso"
+
+
+# ---------- Fase 4: eliminação do histórico de execução de código ----------
+
+def test_admin_apagar_execucoes_por_ids(cliente, monkeypatch):
+    id_est = autenticacao.registar("a@b.com", "password123")
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+    linhas = _historico(id_est)
+
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post("/api/admin/execucoes/apagar", json={"ids": [linhas[0]["id"]]})
+    assert r.status_code == 200
+    assert r.json()["apagados"] == 1
+    assert len(_historico(id_est)) == 1
+
+
+def test_admin_apagar_execucoes_por_ids_rejeita_lista_invalida(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post("/api/admin/execucoes/apagar", json={"ids": "tudo"})
+    assert r.status_code == 400
+
+
+def test_admin_apagar_execucoes_por_periodo(cliente, monkeypatch):
+    id_est = autenticacao.registar("a@b.com", "password123")
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+    with bd.sessao_bd() as ligacao:
+        ligacao.execute("UPDATE execucao_codigo SET criado_em = now() - interval '100 days'")
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post("/api/admin/execucoes/apagar-por-periodo", json={"dias": 90})
+    assert r.status_code == 200
+    assert r.json()["apagados"] == 1
+    assert len(_historico(id_est)) == 1
+
+
+def test_admin_apagar_execucoes_por_periodo_rejeita_dias_negativo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post("/api/admin/execucoes/apagar-por-periodo", json={"dias": -1})
+    assert r.status_code == 400
+
+
+def test_admin_apagar_todas_as_execucoes_exige_confirmacao(cliente, monkeypatch):
+    id_est = autenticacao.registar("a@b.com", "password123")
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+
+    _entrar_como_admin(cliente, monkeypatch)
+    r = cliente.post("/api/admin/execucoes/apagar-tudo", json={})
+    assert r.status_code == 400
+    assert len(_historico(id_est)) == 1
+
+    r = cliente.post("/api/admin/execucoes/apagar-tudo", json={"confirmar": True})
+    assert r.status_code == 200
+    assert r.json()["apagados"] == 1
+    assert len(_historico(id_est)) == 0
+
+
+@pytest.mark.parametrize("rota", [
+    "/api/admin/execucoes/apagar",
+    "/api/admin/execucoes/apagar-por-periodo",
+    "/api/admin/execucoes/apagar-tudo",
+])
+def test_admin_de_grupo_recebe_403_nas_rotas_de_eliminacao_de_execucoes(cliente, monkeypatch, rota):
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_outro = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/admin_global", json={"admin_global": False})
+    cliente.post("/api/sair")
+
+    cliente.post("/api/entrar", json={"email": "outro@escola.pt", "password": "password123"})
+    r = cliente.post(rota, json={})
+    assert r.status_code == 403
+
+
 # ---------- WebSocket: Alguem ----------
 
 def test_ws_alguem_sem_autenticacao(cliente):
@@ -1040,19 +1727,55 @@ def test_ws_alguem_sem_autenticacao(cliente):
         assert m["tipo"] == "erro"
 
 
+def test_ws_alguem_bloqueado_para_grupo_excluido(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    cliente.post("/api/admin/definicoes/alguem", json={"ativo": True})
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Grupo A"}).json()
+    cliente.post(f"/api/admin/grupos/{grupo['id']}/desativar_alguem")
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={
+        "email": "aluno@escola.pt", "password": "password123", "codigo_grupo": grupo["codigo"],
+    })
+    with cliente.websocket_connect("/ws/alguem") as ws:
+        m = ws.receive_json()
+        assert m["tipo"] == "erro"
+        assert "grupo" in m["mensagem"]
+        assert m["acionavel"] is False
+
+
 @pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
-def test_ws_alguem_sem_credencial_configurada(cliente):
+def test_ws_alguem_sem_llm_nenhum_disponivel(cliente):
+    """Nem configuração global, nem permissão para uma pessoal -- não há
+    nada que o próprio estudante possa fazer, por isso a mensagem não
+    deve mandá-lo às Definições (ver alguem_ponte.construir_alguem)."""
+    cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
+    with cliente.websocket_connect("/ws/alguem") as ws:
+        m = ws.receive_json()
+        assert m["tipo"] == "erro"
+        assert "configuraste" not in m["mensagem"]
+        assert m["acionavel"] is False
+
+
+@pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
+def test_ws_alguem_permitido_mas_sem_configuracao_pessoal(cliente):
+    """Com permissão ligada, mas ainda sem nenhuma configuração pessoal
+    escolhida, a mensagem continua a mandar o estudante às Definições --
+    aqui sim há algo que ele próprio pode fazer."""
+    configuracao_llm.definir_permissao("apoio", True)
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
     with cliente.websocket_connect("/ws/alguem") as ws:
         m = ws.receive_json()
         assert m["tipo"] == "erro"
         assert "configuraste" in m["mensagem"]
+        assert m["acionavel"] is not False
 
 
 @pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
 def test_ws_alguem_conversa_completa(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
-    cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+    _configurar_llm_pessoal_ativo(cliente)
 
     respostas = iter([
         json.dumps({"choices": [{"message": {"content": "Boa pergunta! O que sabes já?"}}]}),
@@ -1097,7 +1820,7 @@ def test_ws_alguem_fecha_sessao_mesmo_com_excecao_inesperada(cliente, monkeypatc
     WebSocketDisconnect' -- qualquer outra exceção no loop deixava o
     ficheiro de log aberto e nunca escrevia o evento fim_sessao."""
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
-    cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+    _configurar_llm_pessoal_ativo(cliente)
 
     tutor_falso = _TutorFalsoQueRebenta()
     monkeypatch.setattr(main.alguem_ponte, "construir_alguem", lambda id_estudante: tutor_falso)
@@ -1114,7 +1837,7 @@ def test_ws_alguem_fecha_sessao_mesmo_com_excecao_inesperada(cliente, monkeypatc
 @pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
 def test_ws_alguem_logs_usam_pseudonimo_nao_email(cliente, tmp_path):
     cliente.post("/api/registar", json={"email": "privacidade@b.com", "password": "password123"})
-    cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+    _configurar_llm_pessoal_ativo(cliente)
 
     with patch("urllib.request.urlopen", return_value=_resposta_llm_falsa("SAFE")):
         with cliente.websocket_connect("/ws/alguem") as ws:
@@ -1307,7 +2030,7 @@ def test_ws_executar_incluir_ficheiro_em_falta(cliente):
 @pytest.mark.skip(reason="alguem desativado por omissão (ver definicoes.alguem_ativo, ligado na aba Definições do admin)")
 def test_ws_alguem_recebe_varios_ficheiros(cliente):
     cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
-    cliente.post("/api/credencial", json={"fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-teste"})
+    _configurar_llm_pessoal_ativo(cliente)
 
     capturado = {}
 
@@ -1385,9 +2108,9 @@ def test_erro_inesperado_devolve_sempre_json():
     é só uma particularidade do TestClient em modo de depuração)."""
     with TestClient(main.app, raise_server_exceptions=False) as cliente:
         cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
-        with patch("credenciais.guardar_credencial", side_effect=RuntimeError("algo inesperado")):
-            r = cliente.post("/api/credencial", json={
-                "fornecedor": "openai", "modelo": "x", "api_key": "sk-teste"})
+        with patch("configuracao_llm.criar_configuracao", side_effect=RuntimeError("algo inesperado")):
+            r = cliente.post("/api/llm/configuracoes", json={
+                "etiqueta": "X", "fornecedor": "openai", "modelo": "x", "api_key": "sk-teste"})
     assert r.status_code == 500
     corpo = r.json()  # nunca deve levantar exceção -- tem de ser sempre JSON válido
     assert "detail" in corpo
@@ -1399,10 +2122,10 @@ def test_erro_inesperado_nao_revela_a_mensagem_da_excecao_ao_cliente(caplog):
     nunca para a resposta JSON devolvida ao cliente."""
     with TestClient(main.app, raise_server_exceptions=False) as cliente:
         cliente.post("/api/registar", json={"email": "a@b.com", "password": "password123"})
-        with patch("credenciais.guardar_credencial", side_effect=RuntimeError("segredo interno")):
+        with patch("configuracao_llm.criar_configuracao", side_effect=RuntimeError("segredo interno")):
             with caplog.at_level("ERROR", logger="online"):
-                r = cliente.post("/api/credencial", json={
-                    "fornecedor": "openai", "modelo": "x", "api_key": "sk-teste"})
+                r = cliente.post("/api/llm/configuracoes", json={
+                    "etiqueta": "X", "fornecedor": "openai", "modelo": "x", "api_key": "sk-teste"})
     corpo = r.json()
     assert "segredo interno" not in corpo["detail"]
     assert corpo["detail"] == "Erro interno do servidor. Tenta outra vez daqui a pouco."

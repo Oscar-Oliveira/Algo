@@ -64,6 +64,16 @@ def test_alguem_ficheiros_visiveis_inclui_o_nome_no_prompt():
     assert "exercicio.algo" in alguem.historico[1]["content"]
 
 
+def test_alguem_aceita_identidade_tutor_personalizada():
+    """Fase 3: alguem_ponte.py passa o texto guardado em
+    prompt_configuravel (chave 'tutor'), se existir -- None (o
+    omisso) continua a usar o texto por omissão do código."""
+    fornecedor = FornecedorFalso(modelo="x", api_key="x")
+    alguem = Alguem(fornecedor, PoliticaPedagogica(), identidade_tutor="Sou um tutor de teste.")
+    assert "Sou um tutor de teste." in alguem.historico[0]["content"]
+    assert "És o Alguem" not in alguem.historico[0]["content"]
+
+
 def test_alguem_com_varios_ficheiros_visiveis_inclui_todos_os_nomes():
     fornecedor = FornecedorFalso(modelo="x", api_key="x")
     alguem = Alguem(fornecedor, PoliticaPedagogica(), ficheiros_visiveis=[

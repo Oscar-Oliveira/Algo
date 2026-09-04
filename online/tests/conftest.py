@@ -37,8 +37,9 @@ _DSN_TESTE = os.environ.setdefault(
 # CASCADE não precisar de se preocupar com a ordem (CASCADE já trata
 # das dependências de chave estrangeira sozinho).
 _TABELAS = (
-    "log_atividade", "tentativa_registo", "relatorio_problema",
-    "credencial_llm", "estudante", "grupo", "definicao",
+    "log_atividade", "tentativa_registo", "relatorio_problema", "execucao_codigo",
+    "selecao_llm_estudante", "configuracao_llm", "estudante_grupo", "estudante", "grupo", "definicao",
+    "prompt_configuravel",
 )
 
 

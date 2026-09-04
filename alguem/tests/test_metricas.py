@@ -99,6 +99,39 @@ def test_solution_leakage_rate_de_uma_sessao(tmp_path):
     assert sessao["solution_leakage_rate"] == 0.5
 
 
+def test_calcular_metricas_expoe_os_campos_da_fase_4(tmp_path):
+    def eventos(r):
+        r.inicio_sessao(
+            "openrouter", "x", {}, [],
+            apoio_escopo="global", guardiao_escopo="global",
+            guardiao_fornecedor="anthropic", guardiao_modelo="claude-3-haiku",
+            grupo="Turma A")
+        r.fim_sessao()
+    registador = _sessao_com(tmp_path, "aluno@escola.pt", eventos)
+
+    relatorio = gerar_relatorio(str(tmp_path))
+    sessao = relatorio["por_sessao"][0]
+    assert sessao["id_estudante"] == "aluno@escola.pt"
+    assert sessao["apoio_escopo"] == "global"
+    assert sessao["guardiao_escopo"] == "global"
+    assert sessao["guardiao_fornecedor"] == "anthropic"
+    assert sessao["guardiao_modelo"] == "claude-3-haiku"
+    assert sessao["grupo"] == "Turma A"
+    assert sessao["timestamp_inicio"] is not None
+
+
+def test_calcular_metricas_campos_da_fase_4_sao_none_em_logs_antigos():
+    """Um log de antes da Fase 4 (sem estes campos no evento
+    inicio_sessao) não pode fazer as métricas rebentar -- AG-31."""
+    eventos = [
+        {"id_sessao": "a", "id_estudante": "est-1", "tipo": "inicio_sessao",
+         "fornecedor": "openrouter", "modelo": "x"},
+    ]
+    resultado = calcular_metricas_da_sessao(eventos)
+    assert resultado["apoio_escopo"] is None
+    assert resultado["grupo"] is None
+
+
 def test_hint_escalation_maxima_e_o_nivel_mais_alto_atingido(tmp_path):
     def eventos(r):
         r.inicio_sessao("openrouter", "x", {}, [])
@@ -148,6 +181,8 @@ def test_sessao_vazia_de_eventos_devolve_dicionario_vazio():
         "modelo": None, "num_turnos": 0, "num_tentativas_totais": 0,
         "num_tentativas_rejeitadas": 0, "solution_leakage_rate": None,
         "hint_escalation_maxima": None, "num_recusas_seguras": 0,
+        "timestamp_inicio": None, "apoio_escopo": None, "guardiao_escopo": None,
+        "guardiao_fornecedor": None, "guardiao_modelo": None, "grupo": None,
     }
 
 

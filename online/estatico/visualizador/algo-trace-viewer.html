@@ -40,9 +40,17 @@
 
 <body>
   <header class="barra-topo">
-    <span class="marca marca-pequena"><img src="/estatico/algo-logo.svg" alt="" class="marca-simbolo"> Algo —
-      visualizador</span>
-    <div class="acoes-topo" id="acoes-topo-visualizador"></div>
+    <a href="/estatico/visualizador/algo-trace-viewer.html" class="marca marca-pequena" title="Visualizador de execução"><img
+        src="/estatico/algo-logo.svg" alt="" class="marca-simbolo"> Algo —
+      visualizador</a>
+    <div class="acoes-topo">
+      <div class="acoes-topo" id="acoes-topo-visualizador"></div>
+      <a href="/editor" target="algo-editor" class="botao-icone" title="Abrir o editor"><svg class="icone-botao" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg></a>
+    </div>
   </header>
   <div id="root"></div>
 

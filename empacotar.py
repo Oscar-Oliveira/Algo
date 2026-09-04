@@ -17,13 +17,13 @@ RAIZ = Path(__file__).resolve().parent
 PASTA_EXTENSAO = RAIZ / "editores" / "vscode-algo"
 
 # (origem relativa à raiz, destino relativo à raiz do pacote) -- os
-# scripts de arranque vivem em instaladores/ no repositório, mas saem
+# scripts de arranque vivem em repl/ no repositório, mas saem
 # soltos na raiz do pacote, para o estudante continuar a fazer
 # duplo-clique sem abrir subpastas.
 FICHEIROS = [
-    ("instaladores/algo.sh", "algo.sh"),
-    ("instaladores/algo.bat", "algo.bat"),
-    ("instaladores/algo.command", "algo.command"),
+    ("repl/algo.sh", "algo.sh"),
+    ("repl/algo.bat", "algo.bat"),
+    ("repl/algo.command", "algo.command"),
     ("docs/manuais/ManualCLI.md", "docs/manuais/ManualCLI.md"),
 ]
 PASTAS = [
@@ -60,7 +60,7 @@ diretamente a consola interativa.
 """
 
 # pyproject.toml mínimo para o pacote distribuído -- só o necessário para
-# o "pip install -e" que instaladores/algo.sh faz. O pyproject.toml do
+# o "pip install -e" que repl/algo.sh faz. O pyproject.toml do
 # repositório tem secções de desenvolvimento (dev deps, pytest, mutmut)
 # que não fazem sentido no pacote do estudante.
 PYPROJECT_PACOTE = """\

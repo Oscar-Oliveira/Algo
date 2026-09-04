@@ -58,13 +58,31 @@ class Registador:
         self._ficheiro.flush()
 
     def inicio_sessao(self, fornecedor: str, modelo: str, politica: dict,
-                       nomes_ficheiros_iniciais: list[str]) -> None:
+                       nomes_ficheiros_iniciais: list[str],
+                       apoio_escopo: str | None = None,
+                       guardiao_escopo: str | None = None,
+                       guardiao_fornecedor: str | None = None,
+                       guardiao_modelo: str | None = None,
+                       grupo: str | None = None) -> None:
+        """Os cinco últimos campos só o online/alguem_ponte.py preenche
+        (ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção 4/Fase
+        4) -- ficam None para quem usa o pacote alguem/ diretamente
+        (config.json local, sem noção de escopo global/pessoal nem de
+        grupo). 'apoio_escopo'/'guardiao_escopo': "global" | "pessoal"
+        | "indisponivel" (só guardiao_escopo usa este último -- o
+        guardião nunca tem escopo pessoal, ver
+        configuracao_llm.PAPEIS_PESSOAIS)."""
         self._escrever({
             "tipo": "inicio_sessao",
             "fornecedor": fornecedor,
             "modelo": modelo,
             "politica": politica,
             "ficheiros_iniciais": nomes_ficheiros_iniciais,
+            "apoio_escopo": apoio_escopo,
+            "guardiao_escopo": guardiao_escopo,
+            "guardiao_fornecedor": guardiao_fornecedor,
+            "guardiao_modelo": guardiao_modelo,
+            "grupo": grupo,
         })
 
     def ficheiros_atualizados(self, nomes_ficheiros: list[str]) -> None:

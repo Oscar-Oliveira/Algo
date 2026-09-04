@@ -20,13 +20,13 @@ online/
 ├── main.py                  # aplicação FastAPI -- rotas HTTP + os 2 WebSockets
 ├── bd.py                    # esquema PostgreSQL (sem ORM, psycopg)
 ├── autenticacao.py          # registo/login, hash de password (bcrypt)
-├── grupos.py                 # grupos: CRUD, código de junção, reatribuição
+├── grupos.py                 # grupos: CRUD, código de junção, pertença/gestão (estudante_grupo)
 ├── atividade.py               # registo geral de atividade (separado dos logs do Alguem)
 ├── limitador_registo.py        # rate limiting por IP no registo com código de grupo errado
-├── credenciais.py            # credencial de LLM por conta, cifrada em repouso
+├── configuracao_llm.py        # configurações de LLM (globais/pessoais, por papel), cifradas em repouso
 ├── cifragem.py                 # cifragem simétrica (Fernet) das chaves de API
 ├── executor.py                  # execução assíncrona e interativa de programas Algo
-├── alguem_ponte.py               # constrói um Alguem a partir da credencial da BD
+├── alguem_ponte.py               # constrói um Alguem a partir da configuração de LLM ativa
 ├── modo_codemirror.py         # gera o realce de sintaxe a partir do compilador
 ├── estatico/                      # HTML/CSS/JS -- sem framework de frontend
 │   ├── vendor/codemirror6/           # CodeMirror 6 auto-hospedado (não depende de CDN)
@@ -36,8 +36,8 @@ online/
 
 `algo_lang/` (o compilador) e `alguem/` (o tutor) não são alterados —
 são só importados. A única adaptação foi `alguem_ponte.py`, que
-constrói o `Alguem` a partir da credencial guardada na base de dados
-em vez de um `config.json` local.
+constrói o `Alguem` a partir da configuração de LLM ativa (ver
+`configuracao_llm.py`) em vez de um `config.json` local.
 
 ## Decisões de design que valem a pena conhecer
 
@@ -77,9 +77,13 @@ em vez de um `config.json` local.
   `id` da conta nem o email -- mantém a mesma filosofia de privacidade
   já estabelecida no resto do projeto, mesmo havendo agora contas
   reais com login.
-- **Cada estudante traz a sua própria chave de LLM**, cifrada em
-  repouso (Fernet) com uma chave de cifragem que nunca fica na base de
-  dados nem no código.
+- **Configurações de LLM**: cada conta (estudante ou admin) pode guardar
+  várias, com etiqueta, cifradas em repouso (Fernet) com uma chave de
+  cifragem que nunca fica na base de dados nem no código. Um admin
+  global pode definir uma configuração global (ativa por omissão para
+  todos) por papel (apoio/guardião) e decidir se os estudantes podem
+  usar a sua própria em alternativa -- ver
+  `docs/interno/PlanoAlguemLLMInvestigacao.md`.
 - **Grupos**: geridos por um admin, com um código de junção
   gerado pelo servidor (alta entropia, nunca escolhido por uma
   pessoa). Guardado de duas formas -- um hash SHA-256 determinístico
@@ -89,9 +93,18 @@ em vez de um `config.json` local.
   código em claro no painel a qualquer momento). O código no registo é
   **sempre opcional** -- um admin pode atribuir/mudar o grupo de
   qualquer conta depois. Desativar um grupo bloqueia o login dos seus
-  membros **sem exceção**, incluindo contas admin (decisão explícita:
-  simplicidade e previsibilidade acima de evitar um caso raro de
-  auto-exclusão).
+  membros estudantes -- não de um admin que o giria (ver "Privilégios
+  de admin" abaixo).
+- **Uma só relação para conta<->grupo** (`estudante_grupo`, tabela
+  `estudante_id`+`grupo_id`, PK composta): substitui os dois sítios
+  que existiam antes (`estudante.grupo_id`, tabela `admin_grupo`) --
+  a cardinalidade certa para cada tipo de conta é decidida pelo código
+  em `grupos.py`, não pelo esquema: um estudante tem no máximo uma
+  linha (pertença, `grupos.reatribuir_grupo`); um admin de grupo pode
+  ter várias (âmbito de gestão, `grupos.definir_grupos_geridos`); um
+  admin global não precisa de nenhuma (já vê tudo, ver
+  `estudante.admin_global` abaixo). `bd.py` migra os dois sítios
+  antigos para esta relação automaticamente no arranque (idempotente).
 - **Registo geral de atividade** (`atividade.py`, tabela
   `log_atividade`): separado dos logs de conversa com o Alguem
   (`alguem/nucleo/registador.py`, ficheiros `.jsonl`, inalterados). A
@@ -99,11 +112,26 @@ em vez de um `config.json` local.
   decisão explícita, ver `notes.md`. O separador "Atividade" (métricas
   do Alguem) no painel de admin está temporariamente oculto por CSS
   (funcionalidade ainda não usada), sem apagar dados nem a rota.
-- **Privilégios de admin**: um único booleano (`estudante.admin`), sem
-  tabela de papéis. Conceder/remover fica registado em
-  `log_atividade`; remover está protegido contra auto-remoção e contra
-  deixar a aplicação sem nenhum admin ativo (ambas as guardas embutidas
-  na própria query SQL, não só na rota).
+- **Privilégios de admin**: dois booleanos (`estudante.admin`,
+  `estudante.admin_global`) -- um admin **global** (`admin_global=
+  TRUE`) vê e gere tudo; um admin **de grupo** (`admin_global=FALSE`)
+  só acede à aba de Investigação, filtrada aos grupos que gere (ver
+  `estudante_grupo` acima, um admin de grupo pode gerir várias
+  turmas). Um grupo desativado só bloqueia o login dos seus membros
+  estudantes -- nunca o de um admin que o giria (bloquear-lhe o login
+  só porque UMA das várias turmas que gere foi desativada não faria
+  sentido). `admin_global` nasce `TRUE` por
+  omissão (ver `bd.py`, coluna com `DEFAULT TRUE`) -- preserva o
+  comportamento anterior (todos os admins equivalentes) tanto para
+  admins já existentes como para novos, até alguém os restringir a um
+  grupo. As rotas de Utilizadores, Grupos, Problemas Reportados,
+  Registo de Atividade e Definições exigem `admin_global` explicitamente
+  (`main.py`, dependência `admin_global_atual`) -- um admin de grupo
+  recebe 403. Conceder/remover admin, e alternar entre global/de grupo,
+  fica registado em `log_atividade`; ambas as operações estão
+  protegidas contra auto-remoção e contra deixar a aplicação sem nenhum
+  admin (ou nenhum admin global) ativo -- guardas embutidas na própria
+  query SQL, não só na rota.
 
 ## Docker
 

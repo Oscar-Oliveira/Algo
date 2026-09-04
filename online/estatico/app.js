@@ -1,5 +1,23 @@
 const CODIGO_POR_OMISSAO = 'algoritmo "MeuPrograma"\ninicio\n    escrever("ola")\n';
 
+// ---------- notificação flutuante (toast) ----------
+// Confirmação visual de que uma ação foi guardada -- mesmo padrão do
+// painel de admin (ver mostrarToast em admin.js): as mensagens de erro
+// continuam inline, perto do formulário/lista em causa, mas uma ação
+// bem-sucedida (guardar/apagar/escolher um LLM) não tinha, até aqui,
+// nenhum sinal visual de que resultou em algo -- só o próprio efeito
+// (a lista a mudar) indicava sucesso, facilmente perdido.
+const elementoToast = document.getElementById("toast-notificacao");
+const textoToast = document.getElementById("toast-notificacao-texto");
+let timeoutToast = null;
+
+function mostrarToast(texto) {
+  textoToast.textContent = texto;
+  clearTimeout(timeoutToast);
+  elementoToast.classList.add("visivel");
+  timeoutToast = setTimeout(() => elementoToast.classList.remove("visivel"), 2200);
+}
+
 // ---------- ligação entre o CodeMirror 6 (vendorizado, ver
 // estatico/vendor/codemirror6/) e o resto de app.js -- devolve um
 // objeto com a mesma superfície que o CodeMirror 5 antigo expunha
@@ -577,6 +595,8 @@ const conversaAlguem = document.getElementById("conversa-alguem");
 const entradaAlguem = document.getElementById("entrada-alguem");
 const botaoEnviarAlguem = document.querySelector("#form-alguem button[type=submit]");
 const avisoCredencialAlguem = document.getElementById("aviso-credencial-alguem");
+const textoAvisoCredencialAlguem = document.getElementById("texto-aviso-credencial-alguem");
+const botaoIrDefinicoes = document.getElementById("botao-ir-definicoes");
 let wsAlguem = null;
 
 // UX-14: se faltar (ou for inválida) a credencial LLM, o servidor envia
@@ -584,9 +604,16 @@ let wsAlguem = null;
 // submeter no chat depois disso não fazia absolutamente nada, sem aviso.
 let alguemPronto = false;
 
-function desativarEntradaAlguem() {
+// 'acionavel' (enviado pelo servidor, ver alguem_ponte.ErroAlguemIndisponivel)
+// diz se ir a Definições resolve alguma coisa -- quando não há NENHUM LLM
+// disponível (nem global, nem permissão para um pessoal), Definições nem
+// sequer mostra a opção de criar um, por isso o link fica escondido em vez
+// de mandar o estudante para um sítio sem solução nenhuma.
+function desativarEntradaAlguem(mensagem, acionavel) {
   entradaAlguem.disabled = true;
   botaoEnviarAlguem.disabled = true;
+  textoAvisoCredencialAlguem.textContent = mensagem || "Ainda não configuraste um fornecedor de LLM.";
+  botaoIrDefinicoes.classList.toggle("escondido", acionavel === false);
   avisoCredencialAlguem.classList.remove("escondido");
 }
 
@@ -613,7 +640,7 @@ function ligarAlguem() {
     } else if (dados.tipo === "erro") {
       esconderIndicadorAPensar();
       adicionarMensagem(dados.mensagem, "mensagem-erro-chat");
-      if (!alguemPronto) desativarEntradaAlguem();
+      if (!alguemPronto) desativarEntradaAlguem(dados.mensagem, dados.acionavel);
     }
   });
 }
@@ -666,12 +693,25 @@ document.getElementById("botao-mostrar-ficheiro").addEventListener("click", () =
 });
 
 // ---------- definições do LLM (vivem dentro do painel do Alguem) ----------
+//
+// Dois níveis dentro do mesmo painel (secção 5b de
+// docs/interno/PlanoAlguemLLMInvestigacao.md): a lista de configurações
+// guardadas (vista por omissão ao abrir) e o formulário para criar/editar
+// uma delas.
 
 const vistaConversaAlguem = document.getElementById("vista-conversa-alguem");
 const vistaDefinicoesAlguem = document.getElementById("vista-definicoes-alguem");
+const vistaDefinicoesLista = document.getElementById("vista-definicoes-lista");
+const vistaDefinicoesFormulario = document.getElementById("vista-definicoes-formulario");
+const botaoDefinicoesAlguem = document.getElementById("botao-definicoes-alguem");
+const botaoMostrarFicheiro = document.getElementById("botao-mostrar-ficheiro");
 const campoFornecedor = document.getElementById("campo-fornecedor");
 const rotuloApiKey = document.getElementById("rotulo-api-key");
 const rotuloHost = document.getElementById("rotulo-host");
+const campoConfiguracaoId = document.getElementById("campo-configuracao-id");
+const listaConfiguracoesLlm = document.getElementById("lista-configuracoes-llm");
+const mensagemSemConfiguracoesLlm = document.getElementById("mensagem-sem-configuracoes-llm");
+const selectConfiguracaoAtiva = document.getElementById("select-configuracao-ativa");
 
 function atualizarCamposFornecedor() {
   const ollama = campoFornecedor.value === "ollama";
@@ -680,48 +720,234 @@ function atualizarCamposFornecedor() {
 }
 campoFornecedor.addEventListener("change", atualizarCamposFornecedor);
 
+// Só faz sentido "mostrar-lhe o meu código" durante uma conversa -- nas
+// definições esconde-se, e o próprio botão de definições (engrenagem)
+// passa a servir de "voltar à conversa" enquanto esta vista está aberta,
+// em vez de haver dois botões a fazer praticamente a mesma coisa.
+const ICONE_DEFINICOES_LLM = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+  + 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14" />'
+  + '<line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />'
+  + '<line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" />'
+  + '<line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>';
+const ICONE_VOLTAR_CONVERSA = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+  + 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12" />'
+  + '<polyline points="12 19 5 12 12 5" /></svg>';
+
 async function abrirDefinicoes() {
   vistaConversaAlguem.classList.add("escondido");
   vistaDefinicoesAlguem.classList.remove("escondido");
-  try {
-    const resposta = await fetch("/api/credencial");
-    const dados = await resposta.json();
-    if (dados.configurado) {
-      campoFornecedor.value = dados.fornecedor;
-      document.getElementById("campo-modelo").value = dados.modelo;
-      if (dados.host) document.getElementById("campo-host").value = dados.host;
-    }
-  } catch (erro) { /* silencioso -- só um pré-preenchimento */ }
-  atualizarCamposFornecedor();
+  vistaDefinicoesFormulario.classList.add("escondido");
+  vistaDefinicoesLista.classList.remove("escondido");
+  botaoMostrarFicheiro.classList.add("escondido");
+  botaoDefinicoesAlguem.innerHTML = ICONE_VOLTAR_CONVERSA;
+  botaoDefinicoesAlguem.title = "Voltar à conversa";
+  carregarConfiguracoesLlm();
 }
 
 function fecharDefinicoes() {
   vistaDefinicoesAlguem.classList.add("escondido");
   vistaConversaAlguem.classList.remove("escondido");
+  botaoMostrarFicheiro.classList.remove("escondido");
+  botaoDefinicoesAlguem.innerHTML = ICONE_DEFINICOES_LLM;
+  botaoDefinicoesAlguem.title = "Definições do LLM";
 }
 
-document.getElementById("botao-definicoes-alguem").addEventListener("click", abrirDefinicoes);
+function alternarPainelDefinicoes() {
+  if (vistaDefinicoesAlguem.classList.contains("escondido")) {
+    abrirDefinicoes();
+  } else {
+    fecharDefinicoes();
+  }
+}
+
+botaoDefinicoesAlguem.addEventListener("click", alternarPainelDefinicoes);
 document.getElementById("botao-ir-definicoes").addEventListener("click", abrirDefinicoes);
-document.getElementById("botao-fechar-definicoes").addEventListener("click", fecharDefinicoes);
+
+function abrirFormularioLlm(configuracao) {
+  const mensagemErro = document.querySelector('.mensagem-erro[data-form="definicoes"]');
+  mensagemErro.textContent = "";
+  const form = document.getElementById("form-definicoes");
+  form.reset();
+  campoConfiguracaoId.value = configuracao ? configuracao.id : "";
+  if (configuracao) {
+    document.getElementById("campo-etiqueta").value = configuracao.etiqueta;
+    campoFornecedor.value = configuracao.fornecedor;
+    document.getElementById("campo-modelo").value = configuracao.modelo;
+    if (configuracao.host) document.getElementById("campo-host").value = configuracao.host;
+  }
+  atualizarCamposFornecedor();
+  vistaDefinicoesLista.classList.add("escondido");
+  vistaDefinicoesFormulario.classList.remove("escondido");
+}
+
+function fecharFormularioLlm() {
+  vistaDefinicoesFormulario.classList.add("escondido");
+  vistaDefinicoesLista.classList.remove("escondido");
+  carregarConfiguracoesLlm();
+}
+
+document.getElementById("botao-nova-configuracao-llm").addEventListener("click", () => abrirFormularioLlm(null));
+document.getElementById("botao-cancelar-formulario-llm").addEventListener("click", fecharFormularioLlm);
+
+async function carregarConfiguracoesLlm() {
+  const mensagemErro = document.querySelector('.mensagem-erro[data-form="definicoes-lista"]');
+  mensagemErro.textContent = "";
+  try {
+    const resposta = await fetch("/api/llm/configuracoes");
+    const dados = await resposta.json();
+    renderizarConfiguracoesLlm(dados);
+  } catch (erro) {
+    console.error(erro);
+    mensagemErro.textContent = "Não foi possível carregar as configurações: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+function renderizarConfiguracoesLlm(dados) {
+  const { configuracoes, configuracao_ativa_id, llm_pessoal_permitido, definido_pela_plataforma } = dados;
+
+  listaConfiguracoesLlm.innerHTML = "";
+  mensagemSemConfiguracoesLlm.classList.toggle("escondido", configuracoes.length > 0);
+  configuracoes.forEach((configuracao) => {
+    const linha = document.createElement("div");
+    linha.className = "linha-configuracao-llm";
+
+    const texto = document.createElement("div");
+    texto.className = "texto-configuracao-llm";
+    const etiqueta = document.createElement("strong");
+    etiqueta.textContent = configuracao.etiqueta;
+    const detalhe = document.createElement("span");
+    detalhe.textContent = `${configuracao.fornecedor} · ${configuracao.modelo}`;
+    texto.appendChild(etiqueta);
+    texto.appendChild(detalhe);
+
+    const botaoEditar = document.createElement("button");
+    botaoEditar.type = "button";
+    botaoEditar.className = "botao-icone botao-icone-pequeno";
+    botaoEditar.title = "Editar";
+    botaoEditar.innerHTML = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+      + 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>';
+    botaoEditar.addEventListener("click", () => abrirFormularioLlm(configuracao));
+
+    const botaoApagar = document.createElement("button");
+    botaoApagar.type = "button";
+    botaoApagar.className = "botao-icone botao-icone-pequeno";
+    botaoApagar.title = "Apagar";
+    botaoApagar.innerHTML = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+      + 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+      + '<polyline points="4 7 20 7" /><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />'
+      + '<path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" /></svg>';
+    botaoApagar.addEventListener("click", () => apagarConfiguracaoLlm(configuracao));
+
+    linha.appendChild(texto);
+    linha.appendChild(botaoEditar);
+    linha.appendChild(botaoApagar);
+    listaConfiguracoesLlm.appendChild(linha);
+  });
+
+  preencherSelecaoConfiguracaoAtiva(configuracoes, configuracao_ativa_id, llm_pessoal_permitido, definido_pela_plataforma);
+}
+
+// Um único LLM, usado para conversar -- o guardião é sempre transparente
+// para o estudante (nunca uma escolha à parte dele, ver
+// docs/interno/PlanoAlguemLLMInvestigacao.md e configuracao_llm.
+// PAPEIS_PESSOAIS), por isso não há noção de "papel" aqui, ao contrário
+// do painel de admin (que gere apoio/guardião como conceitos distintos).
+const textoDefinidoPelaPlataforma = document.getElementById("texto-definido-pela-plataforma");
+
+function preencherSelecaoConfiguracaoAtiva(configuracoes, configuracaoAtivaId, permitido, definidoPelaPlataforma) {
+  const rotulo = selectConfiguracaoAtiva.closest("label");
+  if (definidoPelaPlataforma || !permitido) {
+    rotulo.classList.add("escondido");
+    textoDefinidoPelaPlataforma.classList.remove("escondido");
+    textoDefinidoPelaPlataforma.textContent = definidoPelaPlataforma
+      ? "Definido pela plataforma."
+      : "A plataforma não permite escolher o próprio LLM.";
+    return;
+  }
+  rotulo.classList.remove("escondido");
+  textoDefinidoPelaPlataforma.classList.add("escondido");
+  selectConfiguracaoAtiva.innerHTML = "";
+  const opcaoNenhuma = document.createElement("option");
+  opcaoNenhuma.value = "";
+  opcaoNenhuma.textContent = "Nenhuma";
+  selectConfiguracaoAtiva.appendChild(opcaoNenhuma);
+  configuracoes.forEach((configuracao) => {
+    const opcao = document.createElement("option");
+    opcao.value = configuracao.id;
+    opcao.textContent = configuracao.etiqueta;
+    selectConfiguracaoAtiva.appendChild(opcao);
+  });
+  selectConfiguracaoAtiva.value = configuracaoAtivaId != null ? String(configuracaoAtivaId) : "";
+}
+
+async function definirConfiguracaoAtiva() {
+  const mensagemErro = document.querySelector('.mensagem-erro[data-form="definicoes-lista"]');
+  mensagemErro.textContent = "";
+  const configuracaoId = selectConfiguracaoAtiva.value ? Number(selectConfiguracaoAtiva.value) : null;
+  try {
+    const resposta = await fetch("/api/llm/selecao", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ configuracao_id: configuracaoId }),
+    });
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErro.textContent = corpo.detail || "Não foi possível guardar a escolha.";
+      return;
+    }
+    mostrarToast("LLM ativo atualizado.");
+    if (ALGUEM_ATIVO) ligarAlguem();
+  } catch (erro) {
+    console.error(erro);
+    mensagemErro.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+selectConfiguracaoAtiva.addEventListener("change", definirConfiguracaoAtiva);
+
+async function apagarConfiguracaoLlm(configuracao) {
+  if (!confirm(`Apagar a configuração "${configuracao.etiqueta}"?`)) return;
+  const mensagemErro = document.querySelector('.mensagem-erro[data-form="definicoes-lista"]');
+  mensagemErro.textContent = "";
+  try {
+    const resposta = await fetch(`/api/llm/configuracoes/${configuracao.id}`, { method: "DELETE" });
+    if (!resposta.ok) {
+      const corpo = await resposta.json();
+      mensagemErro.textContent = corpo.detail || "Não foi possível apagar a configuração.";
+      return;
+    }
+    mostrarToast("Configuração apagada.");
+    carregarConfiguracoesLlm();
+    if (ALGUEM_ATIVO) ligarAlguem();
+  } catch (erro) {
+    console.error(erro);
+    mensagemErro.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+}
 
 document.getElementById("form-definicoes").addEventListener("submit", async (evento) => {
   evento.preventDefault();
   const mensagemErro = document.querySelector('.mensagem-erro[data-form="definicoes"]');
   mensagemErro.textContent = "";
   const dados = Object.fromEntries(new FormData(evento.target));
+  const configuracaoId = campoConfiguracaoId.value;
   try {
-    const resposta = await fetch("/api/credencial", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(dados),
-    });
+    const resposta = await fetch(
+      configuracaoId ? `/api/llm/configuracoes/${configuracaoId}` : "/api/llm/configuracoes",
+      {
+        method: configuracaoId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dados),
+      },
+    );
     if (!resposta.ok) {
       const corpo = await resposta.json();
       mensagemErro.textContent = corpo.detail || "Algo correu mal.";
       return;
     }
-    fecharDefinicoes();
-    if (ALGUEM_ATIVO) ligarAlguem();
+    mostrarToast(configuracaoId ? "Configuração atualizada." : "Configuração criada.");
+    fecharFormularioLlm();
   } catch (erro) {
     console.error(erro);
     mensagemErro.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
@@ -745,6 +971,11 @@ const botaoAdmin = document.getElementById("botao-admin");
     const dados = await resposta.json();
     if (dados.admin) botaoAdmin.classList.remove("escondido");
     ALGUEM_ATIVO = !!dados.alguem_ativo;
+    // As Definições do LLM do estudante só fazem sentido se a plataforma
+    // permitir escolher um LLM pessoal -- sem isso, o painel só geria
+    // configurações que nunca podiam ficar ativas (ver rota_eu em
+    // main.py e a regra de precedência em configuracao_llm.py).
+    if (dados.llm_pessoal_permitido) botaoDefinicoesAlguem.classList.remove("escondido");
   } catch (erro) { /* silencioso -- só uma ligação a mais */ }
   if (ALGUEM_ATIVO) {
     ligarAlguem();
@@ -1054,9 +1285,14 @@ function alternarPainelAlguem() {
     const restauradas = ultimasColunasComAlguem || colunas.concat(["6px", colunas[0]]);
     disposicao.style.gridTemplateColumns = restauradas.map((c, i) => i % 2 === 1 ? "6px" : `${c}fr`).join(" ");
   }
-  const ICONE_OLHO = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
-  const ICONE_OLHO_FECHADO = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 20c-7 0-11-8-11-8a18.6 18.6 0 0 1 4.2-5.2M9.9 5.2A9.7 9.7 0 0 1 12 5c7 0 11 8 11 8a18.4 18.4 0 0 1-2.2 3.1M14.1 14.1a3 3 0 1 1-4.2-4.2"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
-  botaoAlternarAlguem.innerHTML = escondido ? ICONE_OLHO : ICONE_OLHO_FECHADO;
+  // Mesmo balão-com-pontinhos usado como ícone do Alguem na barra
+  // lateral do admin (identidade visual consistente) -- "esconder"
+  // acrescenta um traço diagonal, no mesmo espírito de um ícone de
+  // olho/olho-fechado, mas com a forma do Alguem em vez de um olho
+  // genérico.
+  const ICONE_ALGUEM_MOSTRAR = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="9" x2="8.01" y2="9"/><line x1="12" y1="9" x2="12.01" y2="9"/><line x1="16" y1="9" x2="16.01" y2="9"/></svg>';
+  const ICONE_ALGUEM_ESCONDER = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="9" x2="8.01" y2="9"/><line x1="12" y1="9" x2="12.01" y2="9"/><line x1="16" y1="9" x2="16.01" y2="9"/><line x1="3" y1="3" x2="21" y2="19"/></svg>';
+  botaoAlternarAlguem.innerHTML = escondido ? ICONE_ALGUEM_MOSTRAR : ICONE_ALGUEM_ESCONDER;
   botaoAlternarAlguem.title = escondido ? "Mostrar Alguem" : "Esconder Alguem";
   if (editor.refresh) editor.refresh();
 }
