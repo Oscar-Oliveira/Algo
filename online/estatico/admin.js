@@ -98,6 +98,19 @@ abas.forEach((aba) => {
   });
 });
 
+// Subabas horizontais dentro de uma aba (ex: Investigação -> Dashboard/
+// Relatório) -- só alternam visibilidade, os dados de ambas já vêm
+// carregados juntos por atualizarInvestigacao().
+document.querySelectorAll(".aba-secundaria-admin").forEach((subaba) => {
+  subaba.addEventListener("click", () => {
+    const grupo = subaba.closest(".conteudo-aba-admin");
+    grupo.querySelectorAll(".aba-secundaria-admin").forEach((s) => s.classList.remove("ativa"));
+    subaba.classList.add("ativa");
+    grupo.querySelectorAll(".conteudo-subaba-admin").forEach((secao) => secao.classList.add("escondido"));
+    document.getElementById(`subaba-conteudo-${subaba.dataset.subaba}`).classList.remove("escondido");
+  });
+});
+
 // Abas só para admin global (ver online/main.py admin_global_atual) --
 // esconder aqui é só cosmético, a proteção real é do lado do servidor
 // (403 em cada rota destas abas para um admin de grupo).
@@ -782,7 +795,7 @@ async function carregarGrupos() {
       grupoEstado.appendChild(botaoAlternarAlguem);
 
       const botaoExportar = document.createElement("a");
-      botaoExportar.className = "botao-secundario botao-com-icone";
+      botaoExportar.className = "botao-exportar botao-com-icone";
       botaoExportar.innerHTML = ICONES.descarregar + "<span>Exportar CSV</span>";
       botaoExportar.href = `/api/admin/grupos/${grupo.id}/membros.csv`;
       botaoExportar.target = "_blank";
@@ -1492,7 +1505,7 @@ function renderizarConfiguracoesLlmAdmin(dados) {
 
     const botaoApagar = document.createElement("button");
     botaoApagar.type = "button";
-    botaoApagar.className = "botao-icone botao-icone-pequeno";
+    botaoApagar.className = "botao-icone botao-icone-pequeno botao-icone-perigo";
     botaoApagar.title = "Apagar";
     botaoApagar.innerHTML = '<svg class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
       + 'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'

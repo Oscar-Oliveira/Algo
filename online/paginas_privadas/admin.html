@@ -27,22 +27,6 @@
   <div class="corpo-admin">
     <nav class="barra-lateral-admin">
       <div class="grupo-lateral-admin">
-        <span class="titulo-grupo-lateral-admin">Trabalho</span>
-        <button type="button" class="item-lateral-admin" data-aba="atividade"><svg class="icone-botao"
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-            stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10" />
-            <line x1="12" y1="20" x2="12" y2="4" />
-            <line x1="6" y1="20" x2="6" y2="14" />
-          </svg><span>Investigação</span></button>
-        <button type="button" class="item-lateral-admin brevemente" disabled title="Ainda por implementar (fase 6)"><svg
-            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-          </svg><span>Apoio Pedagógico</span><span class="badge-lateral-neutro">Fase 6</span></button>
-      </div>
-      <div class="grupo-lateral-admin">
         <span class="titulo-grupo-lateral-admin">Definições</span>
         <button type="button" class="item-lateral-admin ativa" data-aba="grupos"><svg class="icone-botao"
             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -97,6 +81,22 @@
             <path
               d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg><span>Geral</span></button>
+      </div>
+      <div class="grupo-lateral-admin">
+        <span class="titulo-grupo-lateral-admin">Trabalho</span>
+        <button type="button" class="item-lateral-admin" data-aba="atividade"><svg class="icone-botao"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg><span>Investigação</span></button>
+        <button type="button" class="item-lateral-admin brevemente" disabled title="Ainda por implementar"><svg
+            class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          </svg><span>Apoio Pedagógico</span></button>
       </div>
     </nav>
 
@@ -176,13 +176,6 @@
             </svg><span>Filtrar</span></button>
         </div>
         <div class="filtros-admin">
-          <a id="log-exportar-csv" class="botao-secundario botao-com-icone" href="#" target="_blank"><svg
-              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 3v12" />
-              <polyline points="7 10 12 15 17 10" />
-              <path d="M4 19h16" />
-            </svg><span>Exportar CSV</span></a>
           <button type="button" id="log-apagar-selecionados" class="botao-perigo botao-com-icone" disabled><svg
               class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
               stroke-linecap="round" stroke-linejoin="round">
@@ -191,6 +184,13 @@
               <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
             </svg><span>Apagar selecionados</span></button>
           <span id="log-texto-selecionados" class="ajuda-campo"></span>
+          <a id="log-exportar-csv" class="botao-exportar botao-com-icone" style="margin-left: auto;" href="#" target="_blank"><svg
+              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v12" />
+              <polyline points="7 10 12 15 17 10" />
+              <path d="M4 19h16" />
+            </svg><span>Exportar CSV</span></a>
         </div>
         <table class="tabela-admin">
           <thead>
@@ -240,119 +240,128 @@
           </select>
         </div>
 
-        <div class="cartoes-metricas">
-          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-sessoes">-</span><span
-              class="cartao-metrica-titulo">Sessões</span></div>
-          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-estudantes">-</span><span
-              class="cartao-metrica-titulo">Estudantes distintos</span></div>
-          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-leakage-global">-</span><span
-              class="cartao-metrica-titulo">Solution Leakage Rate</span></div>
-          <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-hint-dependency">-</span><span
-              class="cartao-metrica-titulo">Hint Dependency (turnos/sessão)</span></div>
+        <nav class="abas-secundarias-admin">
+          <button type="button" class="aba-secundaria-admin ativa" data-subaba="dashboard">Dashboard</button>
+          <button type="button" class="aba-secundaria-admin" data-subaba="relatorio">Relatório</button>
+        </nav>
+
+        <div id="subaba-conteudo-dashboard" class="conteudo-subaba-admin">
+          <div class="cartoes-metricas">
+            <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-sessoes">-</span><span
+                class="cartao-metrica-titulo">Sessões</span></div>
+            <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-num-estudantes">-</span><span
+                class="cartao-metrica-titulo">Estudantes distintos</span></div>
+            <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-leakage-global">-</span><span
+                class="cartao-metrica-titulo">Solution Leakage Rate</span></div>
+            <div class="cartao-metrica"><span class="cartao-metrica-valor" id="metrica-hint-dependency">-</span><span
+                class="cartao-metrica-titulo">Hint Dependency (turnos/sessão)</span></div>
+          </div>
+
+          <div class="grelha-graficos">
+            <div class="cartao-grafico">
+              <h4>Sessões por dia</h4>
+              <div id="grafico-sessoes-dia" class="grafico-svg"></div>
+            </div>
+            <div class="cartao-grafico">
+              <h4>Solution Leakage Rate por grupo</h4>
+              <div id="grafico-leakage-grupo" class="grafico-svg"></div>
+            </div>
+            <div class="cartao-grafico">
+              <h4>Nível máximo de escalada (0-7)</h4>
+              <div id="grafico-nivel-maximo" class="grafico-svg"></div>
+            </div>
+            <div class="cartao-grafico">
+              <h4>Turnos por sessão</h4>
+              <div id="grafico-turnos" class="grafico-svg"></div>
+            </div>
+            <div class="cartao-grafico cartao-grafico-largo">
+              <h4>Sessões por fornecedor/modelo, por escopo do apoio</h4>
+              <div id="grafico-fornecedor-escopo" class="grafico-svg"></div>
+              <div class="legenda-grafico" id="legenda-fornecedor-escopo"></div>
+            </div>
+          </div>
         </div>
 
-        <h3>Dashboard</h3>
-        <div class="grelha-graficos">
-          <div class="cartao-grafico">
-            <h4>Sessões por dia</h4>
-            <div id="grafico-sessoes-dia" class="grafico-svg"></div>
+        <div id="subaba-conteudo-relatorio" class="conteudo-subaba-admin escondido">
+          <div class="acoes-exportacao">
+            <a id="botao-exportar-csv" class="botao-exportar botao-com-icone" target="_blank"><svg class="icone-botao"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M12 3v12" />
+                <polyline points="7 10 12 15 17 10" />
+                <path d="M4 19h16" />
+              </svg><span>Exportar CSV</span></a>
+            <a id="botao-exportar-json" class="botao-exportar botao-com-icone" target="_blank"><svg class="icone-botao"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M12 3v12" />
+                <polyline points="7 10 12 15 17 10" />
+                <path d="M4 19h16" />
+              </svg><span>Exportar JSON</span></a>
           </div>
-          <div class="cartao-grafico">
-            <h4>Solution Leakage Rate por grupo</h4>
-            <div id="grafico-leakage-grupo" class="grafico-svg"></div>
-          </div>
-          <div class="cartao-grafico">
-            <h4>Nível máximo de escalada (0-7)</h4>
-            <div id="grafico-nivel-maximo" class="grafico-svg"></div>
-          </div>
-          <div class="cartao-grafico">
-            <h4>Turnos por sessão</h4>
-            <div id="grafico-turnos" class="grafico-svg"></div>
-          </div>
-          <div class="cartao-grafico cartao-grafico-largo">
-            <h4>Sessões por fornecedor/modelo, por escopo do apoio</h4>
-            <div id="grafico-fornecedor-escopo" class="grafico-svg"></div>
-            <div class="legenda-grafico" id="legenda-fornecedor-escopo"></div>
-          </div>
-        </div>
-
-        <h3>Relatório</h3>
-        <div class="acoes-exportacao">
-          <a id="botao-exportar-csv" class="botao-secundario botao-com-icone" target="_blank"><svg class="icone-botao"
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-              stroke-linejoin="round">
-              <path d="M12 3v12" />
-              <polyline points="7 10 12 15 17 10" />
-              <path d="M4 19h16" />
-            </svg><span>Exportar CSV</span></a>
-          <a id="botao-exportar-json" class="botao-secundario botao-com-icone" target="_blank"><svg class="icone-botao"
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-              stroke-linejoin="round">
-              <path d="M12 3v12" />
-              <polyline points="7 10 12 15 17 10" />
-              <path d="M4 19h16" />
-            </svg><span>Exportar JSON</span></a>
-        </div>
-        <table class="tabela-admin">
-          <thead>
-            <tr>
-              <th>Estudante</th>
-              <th>Grupo</th>
-              <th class="ordenavel" data-ordenar="num_turnos">Turnos</th>
-              <th class="ordenavel" data-ordenar="solution_leakage_rate">Leakage</th>
-              <th class="ordenavel" data-ordenar="hint_escalation_maxima">Nível máx.</th>
-              <th>Modelo (apoio)</th>
-              <th>Escopo apoio</th>
-              <th>Escopo guardião</th>
-              <th class="ordenavel" data-ordenar="num_recusas_seguras">Recusas seguras</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="corpo-tabela-atividade"></tbody>
-        </table>
-        <p id="mensagem-sem-atividade" class="ajuda-campo escondido">Nenhuma sessão corresponde aos filtros atuais.</p>
-        <div class="paginacao-admin">
-          <button type="button" id="atividade-pagina-anterior" class="botao-secundario botao-com-icone"><svg
-              class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
-            </svg><span>Anterior</span></button>
-          <span id="atividade-texto-pagina" class="ajuda-campo"></span>
-          <button type="button" id="atividade-pagina-seguinte"
-            class="botao-secundario botao-com-icone"><span>Seguinte</span><svg class="icone-botao" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg></button>
-        </div>
-        <p class="mensagem-erro" id="mensagem-erro-atividade"></p>
-
-        <div id="painel-eliminar-execucoes" class="seccao-definicoes-llm escondido">
-          <div class="cabecalho-seccao-llm"><span>Eliminar histórico de código executado</span></div>
-          <p class="ajuda-campo">Só o histórico de execução/debug de código -- nunca as sessões do Alguem
-            acima, eliminação física e definitiva, sem confirmação a meio.</p>
-          <div class="formulario formulario-inline">
-            <label>Apagar tudo com mais de
-              <input type="number" id="campo-dias-eliminar-execucoes" min="0" value="90" style="width:5rem">
-              dias
-            </label>
-            <button type="button" id="botao-apagar-execucoes-por-periodo" class="botao-secundario botao-com-icone"><svg
+          <table class="tabela-admin">
+            <thead>
+              <tr>
+                <th>Estudante</th>
+                <th>Grupo</th>
+                <th class="ordenavel" data-ordenar="num_turnos">Turnos</th>
+                <th class="ordenavel" data-ordenar="solution_leakage_rate">Leakage</th>
+                <th class="ordenavel" data-ordenar="hint_escalation_maxima">Nível máx.</th>
+                <th>Modelo (apoio)</th>
+                <th>Escopo apoio</th>
+                <th>Escopo guardião</th>
+                <th class="ordenavel" data-ordenar="num_recusas_seguras">Recusas seguras</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="corpo-tabela-atividade"></tbody>
+          </table>
+          <p id="mensagem-sem-atividade" class="ajuda-campo escondido">Nenhuma sessão corresponde aos filtros atuais.</p>
+          <div class="paginacao-admin">
+            <button type="button" id="atividade-pagina-anterior" class="botao-secundario botao-com-icone"><svg
                 class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="4 7 20 7" />
-                <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
-                <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
-              </svg><span>Apagar por período</span></button>
-            <button type="button" id="botao-apagar-todas-execucoes" class="botao-perigo botao-com-icone"><svg
-                class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="4 7 20 7" />
-                <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
-                <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
-              </svg><span>Apagar tudo</span></button>
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg><span>Anterior</span></button>
+            <span id="atividade-texto-pagina" class="ajuda-campo"></span>
+            <button type="button" id="atividade-pagina-seguinte"
+              class="botao-secundario botao-com-icone"><span>Seguinte</span><svg class="icone-botao" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg></button>
           </div>
-          <p class="mensagem-erro" id="mensagem-erro-eliminar-execucoes"></p>
+          <p class="mensagem-erro" id="mensagem-erro-atividade"></p>
+
+          <div id="painel-eliminar-execucoes" class="seccao-definicoes-llm escondido">
+            <div class="cabecalho-seccao-llm"><span>Eliminar histórico de código executado</span></div>
+            <p class="ajuda-campo">Só o histórico de execução/debug de código -- nunca as sessões do Alguem
+              acima, eliminação física e definitiva, sem confirmação a meio.</p>
+            <div class="formulario formulario-inline">
+              <label>Apagar tudo com mais de
+                <span class="campo-com-unidade">
+                  <input type="number" id="campo-dias-eliminar-execucoes" min="0" value="90" style="width:5rem">
+                  dias
+                </span>
+              </label>
+              <button type="button" id="botao-apagar-execucoes-por-periodo" class="botao-secundario botao-com-icone"><svg
+                  class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="4 7 20 7" />
+                  <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+                  <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+                </svg><span>Apagar por período</span></button>
+              <button type="button" id="botao-apagar-todas-execucoes" class="botao-perigo botao-com-icone"><svg
+                  class="icone-botao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="4 7 20 7" />
+                  <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+                  <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+                </svg><span>Apagar tudo</span></button>
+            </div>
+            <p class="mensagem-erro" id="mensagem-erro-eliminar-execucoes"></p>
+          </div>
         </div>
       </section>
 
@@ -577,7 +586,7 @@
         <h3>Backup da base de dados</h3>
         <p class="subtitulo">Descarrega uma cópia completa da base de dados (contas e credenciais cifradas) para guardar
           como backup ou analisar offline.</p>
-        <a href="/api/admin/bd" download class="botao-primario botao-com-icone"><svg class="icone-botao"
+        <a href="/api/admin/bd" download class="botao-exportar botao-com-icone"><svg class="icone-botao"
             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
             stroke-linejoin="round">
             <path d="M12 3v12" />

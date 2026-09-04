@@ -19,6 +19,11 @@
   --grafico-serie-1: #3987e5;
   --grafico-serie-2: #d95926;
   font-size: 16px;
+  /* Sem isto, os controlos nativos do browser (setas do input number,
+     checkbox, ícone do date picker) vêm sempre no tema claro do SO,
+     destacando-se contra o fundo escuro -- ver o input de dias no
+     painel de eliminação de execuções. */
+  color-scheme: dark;
 }
 
 /* FEAT-02: tema claro -- as páginas da aplicação (editor/admin/ajuda)
@@ -37,6 +42,7 @@
   --sucesso: #3f7a4f;
   --grafico-serie-1: #2a78d6;
   --grafico-serie-2: #eb6834;
+  color-scheme: light;
 }
 
 * {
@@ -176,6 +182,16 @@ h2 {
   font-size: 0.88rem;
   font-weight: 500;
   color: var(--texto-esmaecido);
+}
+
+/* Input + unidade (ex: "90 dias") na mesma linha, mesmo quando a
+   legenda antes do label força quebra -- sem isto "dias" cai para
+   a linha seguinte, separado do número. */
+.campo-com-unidade {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
 }
 
 .formulario input,
@@ -524,11 +540,6 @@ button {
   word-break: break-all;
 }
 
-.tabela-relatorios th:nth-child(3),
-.tabela-relatorios td:nth-child(3) {
-  width: 1%;
-}
-
 .tabela-relatorios td {
   vertical-align: top;
   padding-top: 0.75rem;
@@ -576,11 +587,26 @@ button {
   font-size: 0.82rem;
 }
 
+/* Exportar/descarregar (CSV, JSON, backup da BD) é a sua própria categoria,
+   distinta do resto das ações neutras -- reaproveita a cor de série de
+   gráfico já validada em vez de inventar uma cor nova. */
+.botao-exportar {
+  background: var(--grafico-serie-1);
+  color: #fff;
+  border: none;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
 /* No admin, "secundário" cobre ações neutras/utilitárias (filtrar, paginar,
-   exportar, ver detalhes) -- ao contrário do resto do site, aqui tem sempre
-   fundo sólido: nenhum botão do admin fica "sem fundo". Ações que mudam
-   estado para uma condição positiva (Ativar, Tornar admin) usam
-   .botao-sucesso; as destrutivas continuam a usar .botao-perigo. */
+   cancelar, repor por omissão, ver detalhes) -- ao contrário do resto do
+   site, aqui tem sempre fundo sólido: nenhum botão do admin fica "sem
+   fundo". Ações que mudam estado para uma condição positiva (Ativar,
+   Tornar admin) usam .botao-sucesso; as destrutivas usam .botao-perigo;
+   exportar/descarregar usa .botao-exportar -- todas com cor própria para
+   não se confundirem com o cinzento neutro do secundário. */
 .pagina-admin .botao-secundario {
   background: var(--tinta-clara);
   border: 1px solid var(--tinta-borda);
@@ -591,13 +617,13 @@ button {
 }
 
 /* Todos os botões de texto do admin com a mesma altura/tipografia,
-   mesmo misturando variantes (primário/secundário/perigo/sucesso) na
+   mesmo misturando variantes (primário/secundário/perigo/sucesso/exportar) na
    mesma linha -- ex: linha de ações de um grupo, ou os filtros do
    registo de atividade misturados com selects/inputs (ver
    .filtros-admin mais abaixo). Uma segunda régua, mais compacta, cobre
    os botões dentro de células de tabela e da lista de configurações de
    LLM, onde o texto normal ficaria demasiado grande. */
-.pagina-admin :is(.botao-primario, .botao-secundario, .botao-perigo, .botao-sucesso) {
+.pagina-admin :is(.botao-primario, .botao-secundario, .botao-perigo, .botao-sucesso, .botao-exportar) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -608,7 +634,7 @@ button {
   white-space: nowrap;
 }
 
-.pagina-admin :is(.tabela-admin, .linha-configuracao-llm) :is(.botao-primario, .botao-secundario, .botao-perigo, .botao-sucesso) {
+.pagina-admin :is(.tabela-admin, .linha-configuracao-llm) :is(.botao-primario, .botao-secundario, .botao-perigo, .botao-sucesso, .botao-exportar) {
   height: 2rem;
   padding: 0 0.6rem;
   font-size: 0.8rem;
@@ -670,6 +696,7 @@ button {
   font-size: 0.9rem;
   padding: 0.6rem 0.7rem;
   text-align: left;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .item-lateral-admin .icone-botao {
@@ -679,13 +706,14 @@ button {
 }
 
 .item-lateral-admin:hover {
-  background: var(--tinta-clara);
+  background: var(--tinta-borda);
   color: var(--texto-claro);
 }
 
 .item-lateral-admin.ativa {
-  background: var(--tinta-clara);
+  background: var(--tinta-borda);
   color: var(--texto-claro);
+  font-weight: 600;
   border-left-color: var(--ambar);
 }
 
@@ -716,6 +744,32 @@ button {
 
 .conteudo-aba-admin.escondido {
   display: none;
+}
+
+/* Subabas horizontais dentro de uma aba do admin (ex: Investigação ->
+   Dashboard/Relatório, para não amontoar tudo numa página só) --
+   mesmo padrão visual das abas de .aba-ajuda. */
+.abas-secundarias-admin {
+  display: flex;
+  gap: 1.2rem;
+  border-bottom: 1px solid var(--tinta-borda);
+  margin-bottom: 1.2rem;
+}
+
+.aba-secundaria-admin {
+  background: transparent;
+  border: none;
+  color: var(--texto-esmaecido);
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding: 0.6rem 0.2rem;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+}
+
+.aba-secundaria-admin.ativa {
+  color: var(--texto-claro);
+  border-bottom-color: var(--ambar);
 }
 
 @media (max-width: 900px) {
@@ -1982,6 +2036,15 @@ button {
   height: 1.7rem;
   border-radius: 6px;
   flex-shrink: 0;
+}
+
+/* Ícone de apagar (ex: linha de configuração de LLM) sinaliza perigo só
+   no hover, mantendo o mesmo aspeto neutro dos outros ícones da linha
+   em repouso -- consistente com .fechar-ficheiro mais abaixo. */
+.botao-icone-perigo:hover {
+  background: rgba(217, 105, 90, 0.15);
+  color: var(--erro);
+  border-color: var(--erro);
 }
 
 .botao-icone-pequeno .icone-botao {
