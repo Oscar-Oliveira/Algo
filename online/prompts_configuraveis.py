@@ -15,12 +15,41 @@ from alguem.nucleo.guardiao import PROMPT_CLASSIFICACAO
 from alguem.nucleo.system_prompt import IDENTIDADE
 from bd import sessao_bd
 
-# 'apoio_pedagogico' (terceiro prompt do plano) só existe a partir da
-# Fase 6 -- não há texto por omissão para ele ainda, por isso fica de
-# fora daqui até essa fase precisar dele.
+# 'apoio_pedagogico' (Fase 6, ver docs/interno/PlanoAlguemLLMInvestigacao.md,
+# secção 11): ao contrário de 'tutor'/'guardiao', nunca fala com o
+# estudante -- analisa o histórico dele (conversas com o Tutor e/ou
+# código executado, já resumido se longo) e sugere apoio pedagógico só
+# para o professor ler. O texto recebido não é o do estudante, é um
+# resumo/transcrição preparado por online/apoio_pedagogico.py.
+_APOIO_PEDAGOGICO_OMISSAO = """\
+És um assistente de apoio pedagógico para professores de programação, \
+a analisar o histórico de UM estudante que usa o Alguem (tutor de \
+programação em ALGO) e/ou executa código na plataforma.
+
+Vais receber um resumo ou transcrição das conversas desse estudante \
+com o Tutor e/ou das suas execuções de código, num certo período. \
+A tua resposta é para o PROFESSOR ler, nunca para o estudante -- podes \
+falar abertamente sobre dificuldades, padrões de erro e progresso, sem \
+te preocupares em poupar o estudante (isso é trabalho do Tutor, não \
+teu).
+
+Produz uma análise pedagógica breve e concreta, focada em ajudar o \
+professor a agir:
+- Que dificuldades ou conceitos mal compreendidos se repetem?
+- O estudante depende muito de pistas, ou tenta resolver sozinho antes \
+de pedir ajuda?
+- Há sinais de progresso (ou de estagnação) ao longo do período?
+- Que ação concreta o professor poderia tomar (ex: rever um tópico \
+específico com o estudante, sugerir um exercício, falar com ele)?
+
+Não inventes factos que não estejam no histórico recebido. Se o \
+histórico for demasiado curto ou vazio para uma análise útil, diz isso \
+diretamente em vez de especular."""
+
 PROMPTS_OMISSAO = {
     "tutor": IDENTIDADE,
     "guardiao": PROMPT_CLASSIFICACAO,
+    "apoio_pedagogico": _APOIO_PEDAGOGICO_OMISSAO,
 }
 
 

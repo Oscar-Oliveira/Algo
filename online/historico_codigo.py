@@ -29,15 +29,29 @@ def registar_execucao(estudante_id: int, tipo: str, nome_ficheiro_principal: str
         )
 
 
-def listar_por_estudante(estudante_id: int, dsn: str | None = None) -> list[dict]:
+def listar_por_estudante(estudante_id: int, dsn: str | None = None, *,
+                          data_inicio: str | None = None, data_fim: str | None = None) -> list[dict]:
     """Ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção 10/Fase
     5 -- matéria-prima da vista cronológica por estudante (junta-se às
-    sessões do Alguem em online/investigacao.py:vista_estudante)."""
+    sessões do Alguem em online/investigacao.py:vista_estudante).
+    'data_inicio'/'data_fim' (Fase 6, secção 6/11): filtro de período
+    opcional sobre 'criado_em', mesma convenção ISO-8601 usada em
+    investigacao.filtrar_sessoes -- usado pelo Apoio Pedagógico para
+    limitar o histórico enviado ao LLM a um período escolhido pelo
+    admin, sem afetar quem chama sem estes argumentos (vista completa)."""
+    condicoes = ["estudante_id = %s"]
+    parametros: list = [estudante_id]
+    if data_inicio:
+        condicoes.append("criado_em >= %s")
+        parametros.append(data_inicio)
+    if data_fim:
+        condicoes.append("criado_em <= %s")
+        parametros.append(data_fim)
     with sessao_bd(dsn) as bd:
         linhas = bd.execute(
             "SELECT id, tipo, nome_ficheiro_principal, ficheiros, resultado, criado_em "
-            "FROM execucao_codigo WHERE estudante_id = %s ORDER BY criado_em DESC",
-            (estudante_id,),
+            f"FROM execucao_codigo WHERE {' AND '.join(condicoes)} ORDER BY criado_em DESC",
+            parametros,
         ).fetchall()
     resultado = []
     for linha in linhas:

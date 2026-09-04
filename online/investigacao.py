@@ -73,6 +73,46 @@ def _pode_ver(grupos_do_estudante: set[int], permitidos: set[int] | None) -> boo
     return bool(grupos_do_estudante & permitidos)
 
 
+def listar_estudantes_no_ambito_admin(admin_id: int, admin_global: bool, dsn: str | None = None) -> list[dict]:
+    """Todas as CONTAS (não sessões) que este admin pode ver, ordenadas
+    por email -- ao contrário de listar_sessoes_no_ambito, inclui
+    estudantes sem nenhuma sessão do Alguem ainda (só com execuções de
+    código, ou nem isso), para um seletor de estudante conseguir
+    apontar a qualquer um dentro do âmbito. Usada tanto pela pesquisa
+    direta por email da vista por estudante (secção 10) como pelo
+    seletor do Apoio Pedagógico (secção 11/Fase 6)."""
+    mapa_contas = _mapa_email_para_conta(dsn)
+    permitidos = _grupos_permitidos(admin_id, admin_global, dsn)
+    resultado = [
+        {"id": conta["id"], "email": email}
+        for email, conta in mapa_contas.items()
+        if _pode_ver(conta["grupos"], permitidos)
+    ]
+    resultado.sort(key=lambda c: c["email"])
+    return resultado
+
+
+def verificar_acesso_estudante(admin_id: int, admin_global: bool, estudante_id: int,
+                                dsn: str | None = None) -> str:
+    """Confirma que este admin pode ver este estudante (secção 15) e
+    devolve o email dele -- levanta ErroAcessoNegado caso contrário
+    (nunca uma lista vazia silenciosa). Partilhado entre vista_estudante
+    (abaixo) e online/apoio_pedagogico.py (Fase 6), que precisa da
+    mesma verificação antes de gerar qualquer análise."""
+    with sessao_bd(dsn) as bd:
+        linha = bd.execute("SELECT email FROM estudante WHERE id = %s", (estudante_id,)).fetchone()
+    if linha is None:
+        raise ErroAcessoNegado("Estudante não encontrado.")
+    email = linha["email"]
+
+    if not admin_global:
+        permitidos = _grupos_permitidos(admin_id, admin_global, dsn)
+        conta = _mapa_email_para_conta(dsn).get(email)
+        if not _pode_ver(conta["grupos"] if conta else set(), permitidos):
+            raise ErroAcessoNegado("Este estudante não está num dos grupos que geres.")
+    return email
+
+
 def listar_sessoes_no_ambito(admin_id: int, admin_global: bool, pasta_logs: str | None = None,
                               dsn: str | None = None) -> list[dict]:
     """Todas as sessões que este admin tem permissão para ver (secção
@@ -230,17 +270,7 @@ def vista_estudante(admin_id: int, admin_global: bool, estudante_id: int,
     + execuções de código, por ordem cronológica. Levanta
     ErroAcessoNegado se o estudante estiver fora do âmbito de um admin
     de grupo (secção 15) -- nunca uma lista vazia silenciosa."""
-    with sessao_bd(dsn) as bd:
-        linha = bd.execute("SELECT email FROM estudante WHERE id = %s", (estudante_id,)).fetchone()
-    if linha is None:
-        raise ErroAcessoNegado("Estudante não encontrado.")
-    email = linha["email"]
-
-    if not admin_global:
-        permitidos = _grupos_permitidos(admin_id, admin_global, dsn)
-        conta = _mapa_email_para_conta(dsn).get(email)
-        if not _pode_ver(conta["grupos"] if conta else set(), permitidos):
-            raise ErroAcessoNegado("Este estudante não está num dos grupos que geres.")
+    email = verificar_acesso_estudante(admin_id, admin_global, estudante_id, dsn)
 
     pasta_logs = pasta_logs or registador.PASTA_LOGS_POR_OMISSAO
     eventos_por_sessao = metricas.carregar_eventos_por_sessao(pasta_logs)

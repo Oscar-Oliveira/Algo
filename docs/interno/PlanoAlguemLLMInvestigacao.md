@@ -718,16 +718,121 @@ só assume o que as anteriores já entregaram).
 
 ### Fase 6 — Apoio Pedagógico (terceiro papel de LLM)
 
-- Papel `apoio_pedagogico` (sempre global, secções 1/2), nova aba no
-  admin, geração sob pedido por estudante.
-- Junta o histórico do estudante (Fases 4/5) num prompt (com resumo
-  prévio para históricos longos), envia ao LLM configurado, mostra a
-  resposta só ao admin/professor.
+Desenho fechado com o utilizador (2026-09-04), afinando a secção 11
+original em três pontos que só ficaram claros ao desenhar o ecrã: o
+LLM deste papel precisa do mesmo seletor que apoio/guardião já têm, o
+admin escolhe explicitamente QUAL estudante e QUE tipos de log entram
+na análise (não é sempre "tudo"), e o resumo de histórico longo passa
+por uma revisão humana antes de seguir para o LLM.
+
+- **Papel `apoio_pedagogico` em `configuracao_llm.PAPEIS_GLOBAIS`**
+  (passa a ter 3 elementos, não 2) -- reaproveita tal e qual toda a
+  máquina já construída na Fase 2 para apoio/guardião: CRUD de
+  configurações, `definir_selecao_global`/`obter_selecao_global`,
+  a rota genérica `/api/admin/llm/selecao` e a listagem `/api/admin/llm`
+  (já devolve `selecao_global` com uma entrada por papel em
+  `PAPEIS_GLOBAIS`, sem precisar de mudança nenhuma em `main.py` para
+  isto). **Não** entra em `PAPEIS_PESSOAIS` -- nunca há alternativa
+  pessoal nem permissão para o estudante, como já decidido. Na aba
+  "LLM" do admin, o seletor "LLM ativo para Apoio Pedagógico" fica ao
+  lado dos de Apoio/Guardião (mesma secção "Atribuição de papéis"),
+  sem checkbox de permissão a acompanhar (só os dois papéis pessoais
+  têm um).
+- **Prompt `apoio_pedagogico` em `prompts_configuraveis.PROMPTS_OMISSAO`**
+  -- texto por omissão explica ao LLM que está a analisar histórico de
+  UM estudante (conversas com o Tutor e/ou código executado) para dar
+  uma sugestão de apoio pedagógico a um professor, nunca para o
+  estudante ver. Editável só por admin global, como tutor/guardião
+  (mesma rota genérica `/api/admin/prompts/*`, sem mudança em
+  `main.py`), mas o editor deste prompt vive dentro da nova aba
+  "Apoio Pedagógico" (não na aba "Alguem", que é só Tutor/Guardião),
+  visível só quando `EH_ADMIN_GLOBAL` -- um admin de grupo continua a
+  poder gerar análises (ver acesso abaixo), só não edita o prompt nem
+  o LLM.
+- **Novo módulo `online/apoio_pedagogico.py`**, no mesmo espírito de
+  `online/investigacao.py` (ponte entre logs `.jsonl`/BD e o admin,
+  `alguem/` continua sem saber nada disto):
+  - Reaproveita o controlo de acesso por grupo da Investigação (secção
+    15) -- extrai-se de `investigacao.py` uma função pública
+    `verificar_acesso_estudante(admin_id, admin_global, estudante_id)`
+    (o que hoje está só dentro de `vista_estudante`) para os dois
+    módulos usarem a mesma lógica, e uma nova
+    `investigacao.listar_estudantes_no_ambito_admin(admin_id,
+    admin_global) -> list[{"id", "email"}]` (lista de CONTAS, não de
+    sessões -- ao contrário de `listar_sessoes_no_ambito`, inclui
+    estudantes sem nenhuma sessão do Alguem ainda, para o seletor
+    conseguir apontar também a quem só tem execuções de código) --
+    nova rota `/api/admin/investigacao/estudantes` expõe isto,
+    reaproveitada tanto pelo seletor da Investigação (resolve também a
+    "pesquisa direta por email" que a secção 10 previa e ainda não
+    tinha ficado exposta) como pelo novo seletor do Apoio Pedagógico.
+  - `montar_blocos_historico(estudante_id, *, tipos, data_inicio,
+    data_fim, pasta_logs=None) -> list[str]`: um bloco de texto por
+    sessão do Alguem (se `"alguem" in tipos`) e/ou por execução de
+    código (se `"codigo" in tipos`), já formatado para leitura humana
+    -- a sessão inclui a transcrição real (pergunta do estudante +
+    resposta final entregue, por turno, a partir dos eventos
+    `tentativa_guardiao`/`resposta_final` em bruto, não só as métricas
+    agregadas que `investigacao.py` usa) porque um LLM de apoio
+    pedagógico precisa do conteúdo, não só de números. `tipos` é
+    `{"alguem"}`, `{"codigo"}` ou `{"alguem", "codigo"}` (pelo menos um
+    -- validado). `historico_codigo.listar_por_estudante` ganha
+    `data_inicio`/`data_fim` opcionais (mesma convenção ISO-8601 já
+    usada em `investigacao.filtrar_sessoes`), para o filtro de período
+    também cobrir código, não só sessões.
+  - **Resumo, mecanismo automático por tamanho** (não uma escolha do
+    admin -- essa é uma decisão técnica que não lhe compete): se o
+    texto de todos os blocos juntos couber num limite de carateres
+    configurável, uma única chamada ao LLM de apoio pedagógico pede um
+    resumo do histórico completo; se não couber, os blocos são
+    agrupados em fatias que cabem no limite, cada fatia é resumida à
+    parte (uma chamada por fatia), e se os resumos juntos ainda
+    excederem o limite, o mesmo processo repete-se sobre os resumos
+    (map-reduce simples, com um limite de rondas por segurança --
+    histórico de um estudante não deve precisar de mais que 2-3). Um
+    bloco nunca é cortado a meio.
+  - **Revisão humana obrigatória antes da análise final** -- por isso
+    o fluxo fica em DOIS pedidos distintos, nunca um só:
+    1. `preparar_resumo(...) -> str` -- só gera e devolve o resumo (ou
+       o histórico bruto tal qual, se já coubesse sem precisar de
+       resumir), para o admin ler, e se quiser, editar.
+    2. `gerar_analise(estudante_id, resumo_texto, admin_id) -> str` --
+       o admin confirma (com o texto tal como ficou, editado ou não);
+       só agora se envia esse texto, mais o prompt `apoio_pedagogico`,
+       ao LLM configurado, e a resposta é devolvida. Não fica gravada
+       como sessão nova (decisão validada, ponto 6) -- só o pedido
+       fica auditado (ver abaixo).
+  - Ambas as chamadas (resumo e análise final) usam o MESMO fornecedor
+    -- o configurado para `apoio_pedagogico` -- não há um "LLM
+    diferente para resumir"; simplifica o desenho e evita um quarto
+    papel.
+- **Auditoria**: gerar uma análise (não só ver o histórico bruto) fica
+  registado em `log_atividade` (tipo `apoio_pedagogico_gerado`, ator =
+  admin, alvo = estudante), mesmo espírito do ponto 8 já aplicado à
+  vista por estudante -- é pelo menos tão sensível.
+- **Acesso**: as rotas de geração (estudantes/resumo/análise) usam
+  `admin_atual` (não `admin_global_atual`), tal como as de Investigação
+  -- um admin de grupo só consegue escolher estudantes dentro dos seus
+  grupos (`verificar_acesso_estudante` levanta `ErroAcessoNegado` ->
+  403 fora disso). As rotas de configuração (seleção do LLM, prompt)
+  continuam `admin_global_atual`, como todo o resto da secção 15.
+- **UI**: o botão "Apoio Pedagógico" já existe na barra lateral
+  (`admin.html`), hoje desativado (`disabled`, classe `brevemente`) --
+  esta fase ativa-o. Dentro da aba: seletor de estudante (reaproveita
+  `/api/admin/investigacao/estudantes`), período (dois campos de
+  data, iguais aos da Investigação), dois checkboxes "Execuções de
+  código" / "Sessões do Alguem" (pelo menos um marcado, ambos por
+  omissão), botão "Gerar resumo" -> mostra o resumo numa caixa de
+  texto editável com "Confirmar e analisar" / "Cancelar" -> ao
+  confirmar, mostra a análise devolvida num painel de leitura. Editor
+  do prompt (só admin global) fica no fundo da mesma aba.
 - Depende de todas as fases anteriores (é o que junta LLM, permissões,
   registo e a vista por estudante num único fluxo).
-- **Demonstrável no fim**: o admin pede uma análise de um estudante
-  concreto e recebe uma sugestão de apoio pedagógico, sem o estudante
-  alguma vez ver esse texto.
+- **Demonstrável no fim**: o admin escolhe um estudante, um período e
+  os tipos de log, revê (e pode editar) o resumo gerado, confirma, e
+  recebe uma sugestão de apoio pedagógico -- sem o estudante alguma
+  vez ver esse texto. Um admin de grupo só consegue fazer isto para
+  estudantes dos seus grupos.
 
 ## Perguntas em aberto para a fase de implementação
 

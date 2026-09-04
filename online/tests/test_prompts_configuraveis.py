@@ -11,6 +11,7 @@ import prompts_configuraveis as pc
 def test_obter_prompt_sem_personalizacao_devolve_omissao():
     assert pc.obter_prompt("tutor") == pc.PROMPTS_OMISSAO["tutor"]
     assert pc.obter_prompt("guardiao") == pc.PROMPTS_OMISSAO["guardiao"]
+    assert pc.obter_prompt("apoio_pedagogico") == pc.PROMPTS_OMISSAO["apoio_pedagogico"]
 
 
 def test_obter_prompt_personalizado_sem_linha_devolve_none():
@@ -35,7 +36,17 @@ def test_definir_prompt_rejeita_texto_vazio():
 def test_definir_prompt_rejeita_chave_desconhecida():
     admin_id = autenticacao.registar("admin@escola.pt", "password123")
     with pytest.raises(pc.ErroPromptConfiguravel):
-        pc.definir_prompt("apoio_pedagogico", "texto", admin_id)
+        pc.definir_prompt("papel_que_nao_existe", "texto", admin_id)
+
+
+def test_definir_prompt_apoio_pedagogico_e_ler_de_volta():
+    """'apoio_pedagogico' (Fase 6) é o terceiro prompt -- mesma máquina
+    genérica dos outros dois, só o texto por omissão muda."""
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    pc.definir_prompt("apoio_pedagogico", "Texto novo de apoio pedagógico.", admin_id)
+    assert pc.obter_prompt("apoio_pedagogico") == "Texto novo de apoio pedagógico."
+    pc.repor_omissao("apoio_pedagogico")
+    assert pc.obter_prompt("apoio_pedagogico") == pc.PROMPTS_OMISSAO["apoio_pedagogico"]
 
 
 def test_repor_omissao_remove_personalizacao():

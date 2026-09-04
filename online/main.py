@@ -26,6 +26,7 @@ from contextlib import asynccontextmanager
 import bd
 import autenticacao
 import atividade
+import apoio_pedagogico
 import definicoes
 import grupos
 import limitador_registo
@@ -634,6 +635,17 @@ async def _sessoes_no_ambito_filtradas(
     return sessoes, no_ambito
 
 
+@app.get("/api/admin/investigacao/estudantes")
+async def rota_investigacao_estudantes(id_estudante: int = Depends(admin_atual)):
+    """Lista de contas (não sessões) dentro do âmbito deste admin --
+    ver investigacao.listar_estudantes_no_ambito_admin. Serve tanto a
+    pesquisa direta por email da vista por estudante (secção 10) como o
+    seletor de estudante do Apoio Pedagógico (secção 11/Fase 6)."""
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    return {"estudantes": await run_in_threadpool(
+        investigacao.listar_estudantes_no_ambito_admin, id_estudante, admin_global)}
+
+
 @app.get("/api/admin/investigacao/filtros")
 async def rota_investigacao_filtros(id_estudante: int = Depends(admin_atual)):
     admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
@@ -702,6 +714,65 @@ async def rota_investigacao_estudante(estudante_id: int, id_estudante: int = Dep
     await run_in_threadpool(
         atividade.registar_evento, "investigacao_estudante_visto", id_estudante, estudante_id)
     return vista
+
+
+# ---------- administração: Apoio Pedagógico (terceiro papel de LLM) ----------
+#
+# Ver docs/interno/PlanoAlguemLLMInvestigacao.md, secção 11, Fase 6.
+# Mesmo controlo de acesso que a Investigação (admin_atual, não
+# admin_global_atual -- um admin de grupo só consegue gerar isto para
+# estudantes dos seus grupos, verificado dentro de apoio_pedagogico.py).
+# Fluxo em DOIS pedidos (resumo -> revisão do admin -> análise), nunca
+# um só -- ver o módulo para o porquê.
+
+def _corpo_tipos_apoio_pedagogico(dados: dict) -> set[str]:
+    tipos = dados.get("tipos", [])
+    if not isinstance(tipos, list):
+        raise HTTPException(status_code=400, detail="'tipos' tem de ser uma lista.")
+    return set(tipos)
+
+
+@app.post("/api/admin/apoio-pedagogico/resumo")
+async def rota_apoio_pedagogico_resumo(request: Request, id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    estudante_alvo = dados.get("estudante_id")
+    if not isinstance(estudante_alvo, int):
+        raise HTTPException(status_code=400, detail="'estudante_id' em falta ou inválido.")
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    try:
+        resumo = await run_in_threadpool(
+            apoio_pedagogico.preparar_resumo, id_estudante, admin_global, estudante_alvo,
+            tipos=_corpo_tipos_apoio_pedagogico(dados),
+            data_inicio=dados.get("data_inicio"), data_fim=dados.get("data_fim"),
+            pasta_logs=_pasta_logs_alguem())
+    except investigacao.ErroAcessoNegado as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except apoio_pedagogico.ErroApoioPedagogico as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"resumo": resumo}
+
+
+@app.post("/api/admin/apoio-pedagogico/analise")
+async def rota_apoio_pedagogico_analise(request: Request, id_estudante: int = Depends(admin_atual)):
+    dados = await corpo_json(request)
+    estudante_alvo = dados.get("estudante_id")
+    if not isinstance(estudante_alvo, int):
+        raise HTTPException(status_code=400, detail="'estudante_id' em falta ou inválido.")
+    admin_global = await run_in_threadpool(autenticacao.eh_admin_global, id_estudante)
+    try:
+        analise = await run_in_threadpool(
+            apoio_pedagogico.gerar_analise, id_estudante, admin_global, estudante_alvo,
+            dados.get("resumo", ""))
+    except investigacao.ErroAcessoNegado as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except apoio_pedagogico.ErroApoioPedagogico as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    # Decisão validada, ponto 8/secção 11: gerar uma análise é pelo
+    # menos tão sensível como abrir a vista por estudante -- fica
+    # auditado da mesma forma.
+    await run_in_threadpool(
+        atividade.registar_evento, "apoio_pedagogico_gerado", id_estudante, estudante_alvo)
+    return {"analise": analise}
 
 
 # ---------- administração: relatórios de problemas enviados por estudantes ----------

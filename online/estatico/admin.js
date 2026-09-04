@@ -86,6 +86,7 @@ function carregarConteudoDaAba(nomeAba) {
   if (nomeAba === "registoatividade") carregarLog();
   if (nomeAba === "alguem") carregarDefinicoesAlguem();
   if (nomeAba === "llm") carregarConfiguracoesLlmAdmin();
+  if (nomeAba === "apoiopedagogico") carregarApoioPedagogico();
 }
 
 abas.forEach((aba) => {
@@ -1433,6 +1434,7 @@ const adminListaConfiguracoesLlm = document.getElementById("admin-lista-configur
 const adminVazioConfiguracoesLlm = document.getElementById("admin-vazio-configuracoes-llm");
 const adminSelectPapelApoio = document.getElementById("admin-select-papel-apoio");
 const adminSelectPapelGuardiao = document.getElementById("admin-select-papel-guardiao");
+const adminSelectPapelApoioPedagogico = document.getElementById("admin-select-papel-apoio-pedagogico");
 const adminPermissaoApoio = document.getElementById("admin-permissao-apoio");
 const notaApoioGlobalManda = document.getElementById("nota-apoio-global-manda");
 const modalConfiguracaoLlm = document.getElementById("modal-configuracao-llm");
@@ -1442,7 +1444,7 @@ const adminCampoFornecedor = document.getElementById("admin-campo-fornecedor");
 const adminRotuloApiKey = document.getElementById("admin-rotulo-api-key");
 const adminRotuloHost = document.getElementById("admin-rotulo-host");
 
-const ROTULOS_PAPEL_LLM_ADMIN = { apoio: "apoio", guardiao: "guardião" };
+const ROTULOS_PAPEL_LLM_ADMIN = { apoio: "apoio", guardiao: "guardião", apoio_pedagogico: "apoio pedagógico" };
 
 function atualizarCamposFornecedorAdmin() {
   const ollama = adminCampoFornecedor.value === "ollama";
@@ -1522,6 +1524,7 @@ function renderizarConfiguracoesLlmAdmin(dados) {
 
   preencherSelectPapelAdmin(adminSelectPapelApoio, "apoio", configuracoes, selecao_global);
   preencherSelectPapelAdmin(adminSelectPapelGuardiao, "guardiao", configuracoes, selecao_global);
+  preencherSelectPapelAdmin(adminSelectPapelApoioPedagogico, "apoio_pedagogico", configuracoes, selecao_global);
   adminPermissaoApoio.checked = !!permissoes.apoio;
   atualizarAvisoAlguemSemLlm();
   atualizarNotaApoioGlobalManda();
@@ -1544,7 +1547,9 @@ function preencherSelectPapelAdmin(select, papel, configuracoes, selecaoGlobal) 
   // a conversa simplesmente continua sem guardião.
   opcaoNenhuma.textContent = papel === "guardiao"
     ? "Nenhum -- conversa continua sem guardião"
-    : "Nenhum -- deixar ao critério do estudante";
+    : papel === "apoio_pedagogico"
+      ? "Nenhuma -- aba \"Apoio Pedagógico\" fica indisponível"
+      : "Nenhum -- deixar ao critério do estudante";
   select.appendChild(opcaoNenhuma);
   configuracoes.forEach((configuracao) => {
     const opcao = document.createElement("option");
@@ -1582,6 +1587,8 @@ adminSelectPapelApoio.addEventListener("change", () => {
   atualizarNotaApoioGlobalManda();
 });
 adminSelectPapelGuardiao.addEventListener("change", () => definirSelecaoPapelAdmin("guardiao", adminSelectPapelGuardiao));
+adminSelectPapelApoioPedagogico.addEventListener(
+  "change", () => definirSelecaoPapelAdmin("apoio_pedagogico", adminSelectPapelApoioPedagogico));
 
 async function definirPermissaoLlmAdmin(papel, checkbox) {
   mensagemErroDefinicoesLlm.textContent = "";
@@ -1724,6 +1731,12 @@ const CAMPOS_PROMPT = {
     omissao: document.getElementById("prompt-omissao-guardiao"),
     botaoGuardar: document.getElementById("botao-guardar-prompt-guardiao"),
     botaoRepor: document.getElementById("botao-repor-prompt-guardiao"),
+  },
+  apoio_pedagogico: {
+    texto: document.getElementById("prompt-texto-apoio_pedagogico"),
+    omissao: document.getElementById("prompt-omissao-apoio_pedagogico"),
+    botaoGuardar: document.getElementById("botao-guardar-prompt-apoio_pedagogico"),
+    botaoRepor: document.getElementById("botao-repor-prompt-apoio_pedagogico"),
   },
 };
 
@@ -1968,6 +1981,134 @@ document.getElementById("botao-apagar-todas-execucoes").addEventListener("click"
   } catch (erro) {
     console.error(erro);
     mensagemErroEliminarExecucoes.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  }
+});
+
+// ---------- Apoio Pedagógico (secção 11/Fase 6) ----------
+// Fluxo em DOIS passos, nunca um só: "Gerar resumo" só monta/resume o
+// histórico (revisível/editável); só "Confirmar e analisar" fala com o
+// LLM de análise, com o texto que ficou na caixa nesse momento.
+
+const selectEstudanteApoioPedagogico = document.getElementById("apoiopedagogico-select-estudante");
+const dataInicioApoioPedagogico = document.getElementById("apoiopedagogico-data-inicio");
+const dataFimApoioPedagogico = document.getElementById("apoiopedagogico-data-fim");
+const checkboxTipoAlguemApoioPedagogico = document.getElementById("apoiopedagogico-tipo-alguem");
+const checkboxTipoCodigoApoioPedagogico = document.getElementById("apoiopedagogico-tipo-codigo");
+const botaoGerarResumoApoioPedagogico = document.getElementById("botao-gerar-resumo-apoiopedagogico");
+const mensagemErroApoioPedagogico = document.getElementById("mensagem-erro-apoiopedagogico");
+const blocoResumoApoioPedagogico = document.getElementById("bloco-resumo-apoiopedagogico");
+const textoResumoApoioPedagogico = document.getElementById("apoiopedagogico-texto-resumo");
+const botaoCancelarResumoApoioPedagogico = document.getElementById("botao-cancelar-resumo-apoiopedagogico");
+const botaoConfirmarAnaliseApoioPedagogico = document.getElementById("botao-confirmar-analise-apoiopedagogico");
+const blocoAnaliseApoioPedagogico = document.getElementById("bloco-analise-apoiopedagogico");
+const textoAnaliseApoioPedagogico = document.getElementById("apoiopedagogico-texto-analise");
+const blocoPromptApoioPedagogico = document.getElementById("bloco-prompt-apoiopedagogico");
+
+// Editar o prompt/LLM deste papel fica só para admin global (secção
+// 15) -- gerar uma análise, não: um admin de grupo continua a poder
+// usar esta aba para os estudantes dos seus grupos, só não edita o
+// prompt nem escolhe o LLM (isso fica na aba "LLM"/aqui escondido).
+async function carregarApoioPedagogico() {
+  blocoPromptApoioPedagogico.classList.toggle("escondido", !EH_ADMIN_GLOBAL);
+  if (EH_ADMIN_GLOBAL) carregarPrompts();
+  await popularEstudantesApoioPedagogico();
+}
+
+async function popularEstudantesApoioPedagogico() {
+  const valorAtual = selectEstudanteApoioPedagogico.value;
+  try {
+    const resposta = await fetch("/api/admin/investigacao/estudantes");
+    if (!resposta.ok) return;
+    const { estudantes } = await resposta.json();
+    selectEstudanteApoioPedagogico.innerHTML = '<option value="">Escolhe um estudante...</option>';
+    estudantes.forEach((estudante) => {
+      const opcao = document.createElement("option");
+      opcao.value = estudante.id;
+      opcao.textContent = estudante.email;
+      selectEstudanteApoioPedagogico.appendChild(opcao);
+    });
+    selectEstudanteApoioPedagogico.value = valorAtual;
+  } catch (erro) {
+    console.error(erro);
+  }
+}
+
+function esconderResultadosApoioPedagogico() {
+  blocoResumoApoioPedagogico.classList.add("escondido");
+  blocoAnaliseApoioPedagogico.classList.add("escondido");
+  textoResumoApoioPedagogico.value = "";
+  textoAnaliseApoioPedagogico.textContent = "";
+}
+
+selectEstudanteApoioPedagogico.addEventListener("change", esconderResultadosApoioPedagogico);
+
+botaoGerarResumoApoioPedagogico.addEventListener("click", async () => {
+  mensagemErroApoioPedagogico.textContent = "";
+  esconderResultadosApoioPedagogico();
+  const estudanteId = selectEstudanteApoioPedagogico.value;
+  if (!estudanteId) {
+    mensagemErroApoioPedagogico.textContent = "Escolhe um estudante primeiro.";
+    return;
+  }
+  const tipos = [];
+  if (checkboxTipoAlguemApoioPedagogico.checked) tipos.push("alguem");
+  if (checkboxTipoCodigoApoioPedagogico.checked) tipos.push("codigo");
+  if (!tipos.length) {
+    mensagemErroApoioPedagogico.textContent = "Escolhe pelo menos um tipo de histórico.";
+    return;
+  }
+  botaoGerarResumoApoioPedagogico.disabled = true;
+  try {
+    const resposta = await fetch("/api/admin/apoio-pedagogico/resumo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        estudante_id: Number(estudanteId),
+        tipos,
+        data_inicio: dataInicioApoioPedagogico.value || null,
+        data_fim: dataFimApoioPedagogico.value || null,
+      }),
+    });
+    const corpo = await resposta.json();
+    if (!resposta.ok) {
+      mensagemErroApoioPedagogico.textContent = corpo.detail || "Não foi possível gerar o resumo.";
+      return;
+    }
+    textoResumoApoioPedagogico.value = corpo.resumo;
+    blocoResumoApoioPedagogico.classList.remove("escondido");
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroApoioPedagogico.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  } finally {
+    botaoGerarResumoApoioPedagogico.disabled = false;
+  }
+});
+
+botaoCancelarResumoApoioPedagogico.addEventListener("click", esconderResultadosApoioPedagogico);
+
+botaoConfirmarAnaliseApoioPedagogico.addEventListener("click", async () => {
+  mensagemErroApoioPedagogico.textContent = "";
+  const estudanteId = selectEstudanteApoioPedagogico.value;
+  const resumo = textoResumoApoioPedagogico.value;
+  botaoConfirmarAnaliseApoioPedagogico.disabled = true;
+  try {
+    const resposta = await fetch("/api/admin/apoio-pedagogico/analise", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estudante_id: Number(estudanteId), resumo }),
+    });
+    const corpo = await resposta.json();
+    if (!resposta.ok) {
+      mensagemErroApoioPedagogico.textContent = corpo.detail || "Não foi possível gerar a análise.";
+      return;
+    }
+    textoAnaliseApoioPedagogico.textContent = corpo.analise;
+    blocoAnaliseApoioPedagogico.classList.remove("escondido");
+  } catch (erro) {
+    console.error(erro);
+    mensagemErroApoioPedagogico.textContent = "Não foi possível contactar o servidor: " + (erro && erro.message ? erro.message : erro);
+  } finally {
+    botaoConfirmarAnaliseApoioPedagogico.disabled = false;
   }
 });
 

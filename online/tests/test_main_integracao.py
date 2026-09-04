@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 import bd
 import main
+import apoio_pedagogico
 import autenticacao
 import configuracao_llm
 import historico_codigo
@@ -2264,4 +2265,157 @@ def test_login_lento_nao_bloqueia_pedido_concorrente_nao_relacionado(cliente, mo
     # a página inicial não devia esperar pelo bcrypt lento (1s) do login
     # concorrente -- generoso para não ficar frágil em CI lento
     assert duracao < 0.5
+
+
+# ---------- administração: Apoio Pedagógico (Fase 6) ----------
+
+class _FornecedorApoioPedagogicoFalso:
+    def __init__(self):
+        self.chamadas = []
+
+    def responder(self, mensagens):
+        self.chamadas.append(mensagens)
+        return "Sugestão de apoio pedagógico."
+
+
+def _configurar_llm_apoio_pedagogico_admin(cliente):
+    r = cliente.post("/api/admin/llm/configuracoes", json={
+        "etiqueta": "Apoio pedagógico", "fornecedor": "openai", "modelo": "gpt-4o-mini", "api_key": "sk-x"})
+    config_id = r.json()["id"]
+    r = cliente.post("/api/admin/llm/selecao", json={"papel": "apoio_pedagogico", "configuracao_id": config_id})
+    assert r.status_code == 200
+    return config_id
+
+
+def _tornar_outro_admin_de_grupo(cliente, monkeypatch, grupo_id):
+    """A partir de uma sessão já autenticada como o admin global
+    'professor@escola.pt': faz logout, regista 'outro@escola.pt',
+    volta a entrar como professor, torna 'outro' admin de grupo (não
+    global) do grupo dado, e deixa a sessão autenticada como
+    professor -- espelha exatamente
+    test_admin_de_grupo_recebe_403_nas_rotas_restritas_a_admin_global."""
+    cliente.post("/api/sair")
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={"email": "outro@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    id_outro = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "outro@escola.pt")
+    cliente.post(f"/api/admin/tornar_admin/{id_outro}")
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/admin_global", json={"admin_global": False})
+    cliente.post(f"/api/admin/utilizadores/{id_outro}/grupos_geridos", json={"grupo_ids": [grupo_id]})
+    return id_outro
+
+
+def test_investigacao_estudantes_lista_contas_no_ambito(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    cliente.post("/api/sair")
+    cliente.post("/api/registar", json={"email": "aluno@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    r = cliente.get("/api/admin/investigacao/estudantes")
+    assert r.status_code == 200
+    emails = [e["email"] for e in r.json()["estudantes"]]
+    assert "aluno@escola.pt" in emails
+
+
+def test_apoio_pedagogico_resumo_exige_pelo_menos_um_tipo(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    _configurar_llm_apoio_pedagogico_admin(cliente)
+    id_est = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "professor@escola.pt")
+    r = cliente.post("/api/admin/apoio-pedagogico/resumo", json={"estudante_id": id_est, "tipos": []})
+    assert r.status_code == 400
+
+
+def test_apoio_pedagogico_resumo_sem_llm_configurado_devolve_400(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    id_est = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "professor@escola.pt")
+    # precisa de ALGUM histórico -- sem nenhum, preparar_resumo devolve
+    # a mensagem "sem histórico" ANTES de sequer precisar do LLM.
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+    r = cliente.post("/api/admin/apoio-pedagogico/resumo", json={
+        "estudante_id": id_est, "tipos": ["alguem", "codigo"]})
+    assert r.status_code == 400
+
+
+def test_apoio_pedagogico_fluxo_completo_resumo_e_analise(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    _configurar_llm_apoio_pedagogico_admin(cliente)
+    id_est = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "professor@escola.pt")
+    historico_codigo.registar_execucao(id_est, "executa", "p.algo", [], "Sucesso")
+
+    fornecedor = _FornecedorApoioPedagogicoFalso()
+    monkeypatch.setattr(apoio_pedagogico, "criar_fornecedor", lambda *a, **k: fornecedor)
+
+    r = cliente.post("/api/admin/apoio-pedagogico/resumo", json={
+        "estudante_id": id_est, "tipos": ["codigo"]})
+    assert r.status_code == 200
+    resumo = r.json()["resumo"]
+    assert "p.algo" in resumo  # um único bloco pequeno -- devolvido tal qual, sem chamar o LLM
+
+    r = cliente.post("/api/admin/apoio-pedagogico/analise", json={
+        "estudante_id": id_est, "resumo": resumo})
+    assert r.status_code == 200
+    assert r.json()["analise"] == "Sugestão de apoio pedagógico."
+
+    # ver secção 11, decisão validada ponto 8: fica auditado, tal como a
+    # vista por estudante.
+    log = cliente.get("/api/admin/log").json()
+    tipos = {e["tipo"] for e in log["eventos"]}
+    assert "apoio_pedagogico_gerado" in tipos
+
+
+def test_apoio_pedagogico_analise_rejeita_resumo_vazio(cliente, monkeypatch):
+    _entrar_como_admin(cliente, monkeypatch)
+    _configurar_llm_apoio_pedagogico_admin(cliente)
+    id_est = next(
+        u["id"] for u in cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+        if u["email"] == "professor@escola.pt")
+    r = cliente.post("/api/admin/apoio-pedagogico/analise", json={"estudante_id": id_est, "resumo": "   "})
+    assert r.status_code == 400
+
+
+def test_admin_de_grupo_acede_apoio_pedagogico_dos_seus_grupos_mas_nao_fora(cliente, monkeypatch):
+    """Mesmo controlo de acesso da Investigação (secção 15) -- um admin
+    de grupo só gera apoio pedagógico para estudantes dos seus grupos,
+    403 fora disso."""
+    _entrar_como_admin(cliente, monkeypatch, "professor@escola.pt")
+    grupo = cliente.post("/api/admin/grupos", json={"nome": "Turma A"}).json()
+    cliente.post("/api/sair")
+
+    monkeypatch.delenv("ONLINE_EMAIL_ADMIN", raising=False)
+    cliente.post("/api/registar", json={
+        "email": "dentro@escola.pt", "password": "password123", "codigo_grupo": grupo["codigo"]})
+    cliente.post("/api/sair")
+    cliente.post("/api/registar", json={"email": "fora@escola.pt", "password": "password123"})
+    cliente.post("/api/sair")
+
+    monkeypatch.setenv("ONLINE_EMAIL_ADMIN", "professor@escola.pt")
+    cliente.post("/api/entrar", json={"email": "professor@escola.pt", "password": "password123"})
+    _configurar_llm_apoio_pedagogico_admin(cliente)
+    utilizadores = cliente.get("/api/admin/utilizadores").json()["utilizadores"]
+    id_dentro = next(u["id"] for u in utilizadores if u["email"] == "dentro@escola.pt")
+    id_fora = next(u["id"] for u in utilizadores if u["email"] == "fora@escola.pt")
+    _tornar_outro_admin_de_grupo(cliente, monkeypatch, grupo["id"])
+    cliente.post("/api/sair")
+
+    cliente.post("/api/entrar", json={"email": "outro@escola.pt", "password": "password123"})
+    r_dentro = cliente.post("/api/admin/apoio-pedagogico/resumo", json={
+        "estudante_id": id_dentro, "tipos": ["alguem", "codigo"]})
+    assert r_dentro.status_code == 200
+
+    r_fora = cliente.post("/api/admin/apoio-pedagogico/resumo", json={
+        "estudante_id": id_fora, "tipos": ["alguem", "codigo"]})
+    assert r_fora.status_code == 403
 

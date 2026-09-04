@@ -29,7 +29,10 @@ FORNECEDORES_VALIDOS = frozenset(FORNECEDORES)
 # nunca vê nem escolhe o guardião como um conceito à parte. Deixar o
 # estudante escolher o seu próprio guardião defeitava o propósito dele
 # (é uma verificação de segurança independente do estudante).
-PAPEIS_GLOBAIS = frozenset({"apoio", "guardiao"})
+# 'apoio_pedagogico' (Fase 6): terceiro papel, também só global -- quem
+# o usa é o admin/professor, nunca o estudante, por isso nem sequer faz
+# sentido ter uma alternativa pessoal ou uma permissão para uma.
+PAPEIS_GLOBAIS = frozenset({"apoio", "guardiao", "apoio_pedagogico"})
 PAPEIS_PESSOAIS = frozenset({"apoio"})
 
 
@@ -39,7 +42,8 @@ class ErroConfiguracaoLLM(Exception):
 
 def _validar_papel_global(papel: str) -> None:
     if papel not in PAPEIS_GLOBAIS:
-        raise ErroConfiguracaoLLM(f"Papel '{papel}' desconhecido. Válidos: apoio, guardiao.")
+        disponiveis = ", ".join(sorted(PAPEIS_GLOBAIS))
+        raise ErroConfiguracaoLLM(f"Papel '{papel}' desconhecido. Válidos: {disponiveis}.")
 
 
 def _validar_papel_pessoal(papel: str) -> None:
@@ -282,3 +286,12 @@ def resolver_configuracao_ativa(estudante_id: int, papel: str, dsn: str | None =
     if pessoal_id is None:
         return None
     return obter_configuracao(pessoal_id, dsn)
+
+
+def resolver_apoio_pedagogico(dsn: str | None = None) -> ConfiguracaoLLM | None:
+    """'apoio_pedagogico' (Fase 6) só tem seleção global, nunca pessoal
+    -- ao contrário de resolver_configuracao_ativa, não precisa de
+    'estudante_id' nenhum (é sempre a mesma configuração, seja qual for
+    o estudante a ser analisado)."""
+    config_id = obter_selecao_global("apoio_pedagogico", dsn)
+    return obter_configuracao(config_id, dsn) if config_id is not None else None

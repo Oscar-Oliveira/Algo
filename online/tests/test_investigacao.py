@@ -225,3 +225,43 @@ def test_vista_estudante_dentro_do_ambito_de_admin_de_grupo_funciona(tmp_path):
 
     vista = inv.vista_estudante(admin_id, admin_global=False, estudante_id=id_est, pasta_logs=str(tmp_path))
     assert vista["email"] == "a@b.com"
+
+
+# ---------- listar_estudantes_no_ambito_admin / verificar_acesso_estudante (Fase 6) ----------
+
+def test_listar_estudantes_no_ambito_admin_inclui_conta_sem_sessao_nenhuma():
+    """Ao contrário de listar_sessoes_no_ambito, esta lista é sobre
+    CONTAS -- um estudante que nunca falou com o Alguem (só executou
+    código, ou nem isso) tem de aparecer na mesma, para o seletor do
+    Apoio Pedagógico (secção 11) conseguir apontar para ele."""
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    autenticacao.registar("a@b.com", "password123")
+    estudantes = inv.listar_estudantes_no_ambito_admin(admin_id, admin_global=True)
+    assert [e["email"] for e in estudantes] == ["a@b.com"]
+
+
+def test_listar_estudantes_no_ambito_admin_filtra_por_grupo_para_admin_de_grupo():
+    admin_id = autenticacao.registar("prof@escola.pt", "password123")
+    id_a = autenticacao.registar("a@b.com", "password123")
+    autenticacao.registar("b@c.com", "password123")
+    turma_a = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.reatribuir_grupo(id_a, turma_a["id"])
+    grupos.definir_grupos_geridos(admin_id, [turma_a["id"]])
+
+    estudantes = inv.listar_estudantes_no_ambito_admin(admin_id, admin_global=False)
+    assert [e["email"] for e in estudantes] == ["a@b.com"]
+
+
+def test_verificar_acesso_estudante_devolve_email_quando_permitido():
+    admin_id = autenticacao.registar("admin@escola.pt", "password123")
+    id_est = autenticacao.registar("a@b.com", "password123")
+    assert inv.verificar_acesso_estudante(admin_id, admin_global=True, estudante_id=id_est) == "a@b.com"
+
+
+def test_verificar_acesso_estudante_levanta_erro_fora_do_ambito():
+    admin_id = autenticacao.registar("prof@escola.pt", "password123")
+    id_est = autenticacao.registar("a@b.com", "password123")
+    turma_a = grupos.criar_grupo("Turma A", criado_por=admin_id)
+    grupos.definir_grupos_geridos(admin_id, [turma_a["id"]])
+    with pytest.raises(inv.ErroAcessoNegado):
+        inv.verificar_acesso_estudante(admin_id, admin_global=False, estudante_id=id_est)
