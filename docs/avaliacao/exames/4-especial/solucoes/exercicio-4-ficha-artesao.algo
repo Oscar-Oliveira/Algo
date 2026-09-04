@@ -1,0 +1,20 @@
+algoritmo "FichaArtesao"
+
+estrutura Artesao
+    nome:cadeia
+    vendasDia:decimal
+
+funcao comissao(vendas:decimal):decimal
+    retornar vendas * 0.10
+
+inicio
+    n:cadeia
+    escrever("Nome: ")
+    ler(n)
+
+    v:decimal
+    escrever("Vendas do dia: ")
+    ler(v)
+
+    artesao:Artesao = {nome: n, vendasDia: v}
+    escrever("Comissão de ", artesao.nome, ": ", comissao(artesao.vendasDia))

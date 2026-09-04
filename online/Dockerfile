@@ -32,6 +32,9 @@ COPY --chown=algo:algo online /app/online
 # linha a pasta fica ausente na imagem e a aba "Exemplos" da ajuda
 # fica vazia.
 COPY --chown=algo:algo docs/exemplos /app/docs/exemplos
+# mesma lógica -- lida pela rota /api/admin/manual (PASTA_MANUAL_ADMIN),
+# aba "Manual" do painel de admin.
+COPY --chown=algo:algo docs/manuais/manual-admin /app/docs/manuais/manual-admin
 
 RUN pip install --no-cache-dir -r /app/online/requerimentos.txt
 

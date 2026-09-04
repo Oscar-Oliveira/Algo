@@ -1,0 +1,20 @@
+algoritmo "CorridaEstafetas"
+
+inicio
+    tempos:decimal[4]
+    i:inteiro
+    para i de 0 ate 3 fazer
+        escrever("Tempo do corredor ", i + 1, " (segundos): ")
+        ler(tempos[i])
+
+    total:decimal = 0.0
+    para i de 0 ate 3 fazer
+        total = total + tempos[i]
+
+    maisRapido:decimal = tempos[0]
+    para i de 0 ate 3 fazer
+        se tempos[i] < maisRapido entao
+            maisRapido = tempos[i]
+
+    escrever("Tempo total da equipa: ", total)
+    escrever("Tempo do corredor mais rápido: ", maisRapido)

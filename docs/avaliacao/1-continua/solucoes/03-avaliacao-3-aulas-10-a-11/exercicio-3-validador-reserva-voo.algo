@@ -1,0 +1,13 @@
+algoritmo "ValidadorReservaVoo"
+
+constante CAPACIDADE_AVIAO:inteiro = 180
+
+inicio
+    lugares:inteiro
+    escrever("Número de lugares a reservar: ")
+    ler(lugares)
+
+    afirmar lugares > 0, "o número de lugares tem de ser positivo"
+    afirmar lugares <= CAPACIDADE_AVIAO, "o avião não tem capacidade suficiente"
+
+    escrever("Reserva confirmada para ", lugares, " lugar(es).")

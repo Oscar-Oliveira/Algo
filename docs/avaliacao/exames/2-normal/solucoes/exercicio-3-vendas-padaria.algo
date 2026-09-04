@@ -1,0 +1,20 @@
+algoritmo "VendasPadaria"
+
+inicio
+    vendas:decimal[6]
+    i:inteiro
+    para i de 0 ate 5 fazer
+        escrever("Vendas do dia ", i, ": ")
+        ler(vendas[i])
+
+    total:decimal = 0.0
+    para i de 0 ate 5 fazer
+        total = total + vendas[i]
+
+    melhorDia:inteiro = 0
+    para i de 0 ate 5 fazer
+        se vendas[i] > vendas[melhorDia] entao
+            melhorDia = i
+
+    escrever("Total vendido na semana: ", total)
+    escrever("Melhor dia (índice): ", melhorDia)

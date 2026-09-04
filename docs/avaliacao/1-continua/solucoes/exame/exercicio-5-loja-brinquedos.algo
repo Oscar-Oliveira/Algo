@@ -1,0 +1,34 @@
+algoritmo "LojaBrinquedos"
+
+importar Cadeia
+
+estrutura Brinquedo
+    nome:cadeia
+    preco:decimal
+    emStock:booleano
+
+funcao totalEmStock(brinquedos:Brinquedo[], tamanho:inteiro):inteiro
+    total:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se brinquedos[i].emStock entao
+            total = total + 1
+    retornar total
+
+inicio
+    brinquedos:Brinquedo[4]
+    i:inteiro
+    para i de 0 ate 3 fazer
+        brinquedos[i] = {}
+        escrever("Nome: ")
+        ler(brinquedos[i].nome)
+        escrever("Preço: ")
+        ler(brinquedos[i].preco)
+        afirmar brinquedos[i].preco > 0.0, "o preço tem de ser positivo"
+        escrever("Em stock (verdadeiro/falso): ")
+        ler(brinquedos[i].emStock)
+
+    para i de 0 ate 3 fazer
+        escrever(cadeia.maiusculas(brinquedos[i].nome))
+
+    escrever("Brinquedos em stock: ", totalEmStock(brinquedos, 4))

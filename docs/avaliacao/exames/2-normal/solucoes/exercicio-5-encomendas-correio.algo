@@ -1,0 +1,34 @@
+algoritmo "EncomendasCorreio"
+
+importar Cadeia
+
+estrutura Encomenda
+    destino:cadeia
+    peso:decimal
+    entregue:booleano
+
+funcao totalPorEntregar(encomendas:Encomenda[], tamanho:inteiro):inteiro
+    total:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se nao encomendas[i].entregue entao
+            total = total + 1
+    retornar total
+
+inicio
+    encomendas:Encomenda[4]
+    i:inteiro
+    para i de 0 ate 3 fazer
+        encomendas[i] = {}
+        escrever("Destino: ")
+        ler(encomendas[i].destino)
+        escrever("Peso: ")
+        ler(encomendas[i].peso)
+        afirmar encomendas[i].peso > 0.0, "o peso tem de ser positivo"
+        escrever("Já entregue (verdadeiro/falso): ")
+        ler(encomendas[i].entregue)
+
+    para i de 0 ate 3 fazer
+        escrever(cadeia.maiusculas(encomendas[i].destino))
+
+    escrever("Encomendas por entregar: ", totalPorEntregar(encomendas, 4))

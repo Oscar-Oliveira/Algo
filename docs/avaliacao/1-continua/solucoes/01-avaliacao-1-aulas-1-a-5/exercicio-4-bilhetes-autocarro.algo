@@ -1,0 +1,22 @@
+algoritmo "BilhetesAutocarro"
+
+inicio
+    quantidadeVendida:inteiro
+    escrever("Bilhetes vendidos hoje: ")
+    ler(quantidadeVendida)
+
+    precoBilhete:decimal
+    escrever("Preço do bilhete: ")
+    ler(precoBilhete)
+
+    totalArrecadado:decimal = 0.0
+    bilhetesGratis:inteiro = 0
+    numero:inteiro
+    para numero de 1 ate quantidadeVendida fazer
+        se numero mod 10 == 0 entao
+            bilhetesGratis = bilhetesGratis + 1
+        senao
+            totalArrecadado = totalArrecadado + precoBilhete
+
+    escrever("Total arrecadado: ", totalArrecadado)
+    escrever("Bilhetes grátis: ", bilhetesGratis)

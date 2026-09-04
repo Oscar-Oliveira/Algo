@@ -1,0 +1,10 @@
+algoritmo "AplicarImposto"
+
+procedimento aplicarImposto(ref preco:decimal, taxa:decimal)
+    preco = preco * (1.0 + taxa)
+
+inicio
+    precoProduto:decimal = 100.0
+    escrever("Antes: ", precoProduto)
+    aplicarImposto(precoProduto, 0.23)
+    escrever("Depois: ", precoProduto)

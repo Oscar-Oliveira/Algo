@@ -1,0 +1,17 @@
+algoritmo "CarregamentoBateria"
+
+inicio
+    percentagemAtual:inteiro
+    escrever("Percentagem já carregada (0-100): ")
+    ler(percentagemAtual)
+
+    velocidade:inteiro
+    escrever("Velocidade de carregamento (%/minuto): ")
+    ler(velocidade)
+
+    minutos:inteiro = 0
+    enquanto percentagemAtual < 100 fazer
+        percentagemAtual = percentagemAtual + velocidade
+        minutos = minutos + 1
+
+    escrever("Minutos até 100%: ", minutos)

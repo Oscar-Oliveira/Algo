@@ -1,0 +1,20 @@
+algoritmo "FichaMoradorCondominio"
+
+estrutura Morador
+    nome:cadeia
+    quotaMensal:decimal
+
+funcao calcularDividaAnual(quota:decimal):decimal
+    retornar quota * 12.0
+
+inicio
+    n:cadeia
+    escrever("Nome: ")
+    ler(n)
+
+    q:decimal
+    escrever("Quota mensal: ")
+    ler(q)
+
+    morador:Morador = {nome: n, quotaMensal: q}
+    escrever("Dívida anual de ", morador.nome, ": ", calcularDividaAnual(morador.quotaMensal))

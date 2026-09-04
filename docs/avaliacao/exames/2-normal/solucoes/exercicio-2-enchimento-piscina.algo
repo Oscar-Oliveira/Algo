@@ -1,0 +1,19 @@
+algoritmo "EnchimentoPiscina"
+
+inicio
+    capacidade:inteiro
+    escrever("Capacidade da piscina (litros): ")
+    ler(capacidade)
+
+    caudal:inteiro
+    escrever("Caudal da mangueira (litros/minuto): ")
+    ler(caudal)
+
+    litrosAcumulados:inteiro = 0
+    minutos:inteiro = 0
+    enquanto litrosAcumulados < capacidade fazer
+        litrosAcumulados = litrosAcumulados + caudal
+        minutos = minutos + 1
+
+    escrever("Minutos até encher: ", minutos)
+    escrever("Litros a mais no último minuto: ", litrosAcumulados - capacidade)

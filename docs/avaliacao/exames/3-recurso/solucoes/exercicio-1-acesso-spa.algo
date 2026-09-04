@@ -1,0 +1,19 @@
+algoritmo "AcessoSpa"
+
+constante IDADE_MINIMA:inteiro = 16
+
+inicio
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    acompanhado:booleano
+    escrever("Vem acompanhado de um adulto (verdadeiro/falso): ")
+    ler(acompanhado)
+
+    se idade >= IDADE_MINIMA entao
+        escrever("Pode entrar")
+    senao se acompanhado entao
+        escrever("Pode entrar, acompanhado por um adulto")
+    senao
+        escrever("Não pode entrar")

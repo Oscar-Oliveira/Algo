@@ -1,0 +1,28 @@
+algoritmo "ReservaHotel"
+
+constante TAXA_TURISTICA:decimal = 2.0
+
+inicio
+    nome:cadeia
+    escrever("Nome do hóspede: ")
+    ler(nome)
+
+    noites:inteiro
+    escrever("Número de noites: ")
+    ler(noites)
+
+    diaria:decimal
+    escrever("Preço da diária: ")
+    ler(diaria)
+
+    pequenoAlmoco:booleano
+    escrever("Pequeno-almoço incluído (verdadeiro/falso): ")
+    ler(pequenoAlmoco)
+
+    quarto:caracter
+    escrever("Letra do quarto: ")
+    ler(quarto)
+
+    total:decimal = diaria * noites + TAXA_TURISTICA * noites
+    escrever("Reserva de ", nome, " -- Quarto ", quarto, " -- ", noites, " noite(s)")
+    escrever("Total a pagar: ", total)

@@ -1,0 +1,21 @@
+algoritmo "LeiturasFrigorifico"
+
+inicio
+    leituras:decimal[6]
+    i:inteiro
+    para i de 0 ate 5 fazer
+        escrever("Leitura ", i, ": ")
+        ler(leituras[i])
+
+    soma:decimal = 0.0
+    para i de 0 ate 5 fazer
+        soma = soma + leituras[i]
+    media:decimal = soma / 6
+
+    maisAlta:decimal = leituras[0]
+    para i de 0 ate 5 fazer
+        se leituras[i] > maisAlta entao
+            maisAlta = leituras[i]
+
+    escrever("Temperatura média: ", media)
+    escrever("Leitura mais alta: ", maisAlta)

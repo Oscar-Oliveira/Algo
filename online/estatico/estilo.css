@@ -1296,6 +1296,54 @@ button {
   font-size: 0.85rem;
 }
 
+/* Elementos extra usados pelo manual do admin (docs/manuais/manual-admin/,
+   ver renderizarMarkdownManual em admin.js) -- os enunciados de exemplos
+   nunca usam listas/tabelas/ligações, por isso estas regras não existiam
+   até aqui. */
+.conteudo-exemplo ul,
+.conteudo-exemplo ol {
+  line-height: 1.6;
+  color: var(--texto-claro);
+  padding-left: 1.4rem;
+  margin: 0.6rem 0;
+}
+
+.conteudo-exemplo li {
+  margin: 0.3rem 0;
+}
+
+.conteudo-exemplo strong {
+  color: var(--texto-claro);
+}
+
+.conteudo-exemplo em {
+  color: var(--texto-esmaecido);
+}
+
+.conteudo-exemplo a {
+  color: var(--ambar-forte);
+}
+
+.tabela-manual {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8rem 0 1.2rem;
+  font-size: 0.9rem;
+}
+
+.tabela-manual th,
+.tabela-manual td {
+  border: 1px solid var(--tinta-borda);
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.tabela-manual th {
+  background: var(--tinta-clara);
+  color: var(--texto-claro);
+}
+
 .intro-exemplo {
   padding-bottom: 0.8rem;
   border-bottom: 1px solid var(--tinta-borda);

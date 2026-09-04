@@ -70,6 +70,12 @@ PASTA_PAGINAS_PRIVADAS = os.path.join(os.path.dirname(os.path.abspath(__file__))
 # lexer a cada pedido), para nunca divergir do conteúdo real da pasta.
 PASTA_EXEMPLOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "exemplos")
 
+# Mesma lógica de PASTA_EXEMPLOS acima -- docs/manuais/manual-admin/ vive
+# fora de online/, lida do disco a cada pedido pela rota /api/admin/manual,
+# para o painel nunca divergir do conteúdo real dos capítulos.
+PASTA_MANUAL_ADMIN = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "docs", "manuais", "manual-admin")
+
 _logger = logging.getLogger("online")
 
 
@@ -956,6 +962,56 @@ async def rota_admin_definir_nivel_maximo_ajuda(request: Request, id_estudante: 
         atividade.registar_evento, "definicao_alterada", id_estudante, None, None,
         {"chave": "nivel_maximo_ajuda", "valor": nivel})
     return {"ok": True}
+
+
+# ---------- administração: manual do painel (docs/manuais/manual-admin/) ----------
+#
+# Acessível a admin_atual (não admin_global_atual) -- é só documentação,
+# útil também a um admin de grupo, que só vê as abas às quais tem acesso
+# de qualquer forma (ver 01-Acessos-e-Conceitos.md).
+
+def _listar_capitulos_manual_admin() -> list[dict]:
+    """Um capítulo por ficheiro .md em PASTA_MANUAL_ADMIN, ordenados pelo
+    nome do ficheiro (que já começam por '00-', '01-', ... -- é assim que
+    a ordem de leitura fica definida, sem precisar de outro índice). O
+    título de cada um é a primeira linha '# ...' desse ficheiro; sem
+    isso, usa-se o próprio nome do ficheiro."""
+    capitulos = []
+    if not os.path.isdir(PASTA_MANUAL_ADMIN):
+        return capitulos
+    for nome_ficheiro in sorted(os.listdir(PASTA_MANUAL_ADMIN)):
+        if not nome_ficheiro.endswith(".md"):
+            continue
+        titulo = nome_ficheiro
+        with open(os.path.join(PASTA_MANUAL_ADMIN, nome_ficheiro), "r", encoding="utf-8") as f:
+            for linha in f:
+                if linha.startswith("# "):
+                    titulo = linha[2:].strip()
+                    break
+        capitulos.append({"ficheiro": nome_ficheiro, "titulo": titulo})
+    return capitulos
+
+
+def _ler_capitulo_manual_admin(ficheiro: str) -> str:
+    """'ficheiro' só é aceite se corresponder exatamente a um dos
+    capítulos devolvidos por _listar_capitulos_manual_admin -- nunca lido
+    diretamente a partir do valor vindo do pedido, para não haver risco
+    de path traversal."""
+    capitulos = _listar_capitulos_manual_admin()
+    if not any(c["ficheiro"] == ficheiro for c in capitulos):
+        raise HTTPException(status_code=404, detail="Capítulo do manual não encontrado.")
+    with open(os.path.join(PASTA_MANUAL_ADMIN, ficheiro), "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.get("/api/admin/manual")
+async def rota_admin_manual_listar(id_estudante: int = Depends(admin_atual)):
+    return {"capitulos": await run_in_threadpool(_listar_capitulos_manual_admin)}
+
+
+@app.get("/api/admin/manual/{ficheiro}")
+async def rota_admin_manual_capitulo(ficheiro: str, id_estudante: int = Depends(admin_atual)):
+    return {"texto": await run_in_threadpool(_ler_capitulo_manual_admin, ficheiro)}
 
 
 # ---------- administração: referência da sintaxe ALGO enviada ao Tutor ----------

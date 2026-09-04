@@ -1,0 +1,20 @@
+algoritmo "CalculadoraPortagem"
+
+constante PRECO_LIGEIRO:decimal = 1.5
+constante PRECO_PESADO:decimal = 4.5
+constante PRECO_MOTOCICLO:decimal = 0.9
+
+inicio
+    tipoVeiculo:inteiro
+    escrever("Tipo de veículo (1-Ligeiro, 2-Pesado, 3-Motociclo): ")
+    ler(tipoVeiculo)
+
+    escolher tipoVeiculo
+        caso 1
+            escrever("Portagem: ", PRECO_LIGEIRO)
+        caso 2
+            escrever("Portagem: ", PRECO_PESADO)
+        caso 3
+            escrever("Portagem: ", PRECO_MOTOCICLO)
+        contrario
+            escrever("Tipo inválido")

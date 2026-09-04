@@ -7,4 +7,10 @@ docker compose up -d --build
 
 ---
 
-manual de admin
+execioio de avaliação
+
+exames AC 5 execios
+
+exame EN, ER EE 5 + 2 (10% cada equivaliente à avaliade de exercios )
+
+

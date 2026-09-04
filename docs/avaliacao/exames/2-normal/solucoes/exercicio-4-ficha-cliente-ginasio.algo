@@ -1,0 +1,20 @@
+algoritmo "FichaClienteGinasio"
+
+estrutura Cliente
+    nome:cadeia
+    mensalidade:decimal
+
+funcao calcularAnuidade(mensalidade:decimal):decimal
+    retornar mensalidade * 10.0
+
+inicio
+    n:cadeia
+    escrever("Nome: ")
+    ler(n)
+
+    m:decimal
+    escrever("Mensalidade: ")
+    ler(m)
+
+    cliente:Cliente = {nome: n, mensalidade: m}
+    escrever("Anuidade de ", cliente.nome, ": ", calcularAnuidade(cliente.mensalidade))

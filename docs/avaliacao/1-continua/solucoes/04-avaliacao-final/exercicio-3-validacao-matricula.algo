@@ -1,0 +1,12 @@
+algoritmo "ValidacaoMatricula"
+
+importar Cadeia
+
+inicio
+    matricula:cadeia
+    escrever("Matrícula: ")
+    ler(matricula)
+
+    afirmar cadeia.comprimento(matricula) == 6, "a matrícula tem de ter 6 carateres"
+
+    escrever(cadeia.maiusculas(matricula))

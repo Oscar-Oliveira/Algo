@@ -1,0 +1,31 @@
+algoritmo "PlataformaStreaming"
+
+importar Cadeia
+
+estrutura Utilizador
+    nome:cadeia
+    ativo:booleano
+
+funcao contarAtivos(utilizadores:Utilizador[], tamanho:inteiro):inteiro
+    total:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se utilizadores[i].ativo entao
+            total = total + 1
+    retornar total
+
+inicio
+    utilizadores:Utilizador[4]
+    i:inteiro
+    para i de 0 ate 3 fazer
+        utilizadores[i] = {}
+        escrever("Nome do utilizador: ")
+        ler(utilizadores[i].nome)
+        afirmar cadeia.comprimento(utilizadores[i].nome) > 0, "o nome não pode ser vazio"
+        escrever("Subscrição ativa (verdadeiro/falso): ")
+        ler(utilizadores[i].ativo)
+
+    para i de 0 ate 3 fazer
+        escrever(cadeia.maiusculas(utilizadores[i].nome))
+
+    escrever("Utilizadores ativos: ", contarAtivos(utilizadores, 4))

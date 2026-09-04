@@ -21,6 +21,13 @@
           <path d="M12 20h9" />
           <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
         </svg></a>
+      <button type="button" id="botao-manual-topo" class="botao-icone" title="Manual"><svg class="icone-botao"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.1 9a2.9 2.9 0 0 1 5.7.9c0 1.9-2.4 2.1-2.7 3.6" />
+          <line x1="12" y1="17.2" x2="12" y2="17.3" />
+        </svg></button>
     </div>
   </header>
 
@@ -722,6 +729,18 @@
             <polyline points="7 10 12 15 17 10" />
             <path d="M4 19h16" />
           </svg><span>Descarregar base de dados</span></a>
+      </section>
+
+      <section id="aba-conteudo-manual" class="conteudo-aba-admin escondido">
+        <p class="subtitulo">Manual de referência deste painel, capítulo a capítulo -- retirado de
+          <code>docs/manuais/manual-admin/</code> do projeto.</p>
+        <div class="corpo-exemplos">
+          <nav class="indice-exemplos" id="indice-manual" aria-label="Capítulos do manual">
+            <p class="carregando-exemplos">A carregar...</p>
+          </nav>
+          <div class="conteudo-exemplo" id="conteudo-manual"></div>
+        </div>
+        <p class="mensagem-erro" id="mensagem-erro-manual"></p>
       </section>
     </main>
   </div>

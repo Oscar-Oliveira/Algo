@@ -1,0 +1,22 @@
+algoritmo "FichaFuncionario"
+
+estrutura Funcionario
+    nome:cadeia
+    salario:decimal
+    departamento:cadeia
+
+inicio
+    n:cadeia
+    escrever("Nome: ")
+    ler(n)
+
+    s:decimal
+    escrever("Salário: ")
+    ler(s)
+
+    d:cadeia
+    escrever("Departamento: ")
+    ler(d)
+
+    funcionario:Funcionario = {nome: n, salario: s, departamento: d}
+    escrever(funcionario.nome, " -- ", funcionario.departamento, " -- ", funcionario.salario)

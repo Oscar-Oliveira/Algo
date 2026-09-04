@@ -1,0 +1,15 @@
+algoritmo "ConversorUnidades"
+
+incluir "exercicio-2-biblioteca_unidades.algo" como unid
+
+inicio
+    metros:decimal
+    escrever("Valor em metros: ")
+    ler(metros)
+
+    kg:decimal
+    escrever("Valor em quilogramas: ")
+    ler(kg)
+
+    escrever("Em pés: ", unid.metrosParaPes(metros))
+    escrever("Em libras: ", unid.kgParaLibras(kg))

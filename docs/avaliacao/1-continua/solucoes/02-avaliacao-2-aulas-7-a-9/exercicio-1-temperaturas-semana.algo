@@ -1,0 +1,21 @@
+algoritmo "TemperaturasSemana"
+
+inicio
+    temperaturas:decimal[7]
+    i:inteiro
+    para i de 0 ate 6 fazer
+        escrever("Temperatura do dia ", i, ": ")
+        ler(temperaturas[i])
+
+    soma:decimal = 0.0
+    para i de 0 ate 6 fazer
+        soma = soma + temperaturas[i]
+    media:decimal = soma / 7
+
+    diaMaisQuente:inteiro = 0
+    para i de 0 ate 6 fazer
+        se temperaturas[i] > temperaturas[diaMaisQuente] entao
+            diaMaisQuente = i
+
+    escrever("Temperatura média: ", media)
+    escrever("Dia mais quente (índice): ", diaMaisQuente)

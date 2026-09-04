@@ -1,0 +1,66 @@
+algoritmo "SistemaDespachoTaxis"
+
+constante MAX_MOTORISTAS:inteiro = 10
+
+estrutura Motorista
+    nome:cadeia
+    viagensFeitas:inteiro
+
+funcao calcularTarifa(distancia:decimal, horaPonta:booleano):decimal
+    tarifa:decimal = 3.5 + 0.8 * distancia
+    se horaPonta entao
+        tarifa = tarifa * 1.2
+    retornar tarifa
+
+funcao indiceMenosOcupado(motoristas:Motorista[], tamanho:inteiro):inteiro
+    melhorIndice:inteiro = 0
+    i:inteiro
+    para i de 1 ate tamanho - 1 fazer
+        se motoristas[i].viagensFeitas < motoristas[melhorIndice].viagensFeitas entao
+            melhorIndice = i
+    retornar melhorIndice
+
+inicio
+    motoristas:Motorista[MAX_MOTORISTAS]
+    numMotoristas:inteiro = 0
+
+    opcao:inteiro
+    fazer
+        escrever("")
+        escrever("1) Adicionar motorista")
+        escrever("2) Listar motoristas")
+        escrever("3) Despachar corrida")
+        escrever("4) Sair")
+        escrever("Escolhe: ")
+        ler(opcao)
+
+        escolher opcao
+            caso 1
+                afirmar numMotoristas < MAX_MOTORISTAS, "frota cheia"
+                motoristas[numMotoristas] = {}
+                escrever("Nome do motorista: ")
+                ler(motoristas[numMotoristas].nome)
+                motoristas[numMotoristas].viagensFeitas = 0
+                numMotoristas = numMotoristas + 1
+            caso 2
+                i:inteiro
+                para i de 0 ate numMotoristas - 1 fazer
+                    escrever(motoristas[i].nome, " -- viagens: ", motoristas[i].viagensFeitas)
+            caso 3
+                afirmar numMotoristas > 0, "não há motoristas na frota"
+                distanciaViagem:decimal
+                escrever("Distância (km): ")
+                ler(distanciaViagem)
+                ehHoraPonta:booleano
+                escrever("É hora de ponta (verdadeiro/falso): ")
+                ler(ehHoraPonta)
+
+                indiceEscolhido:inteiro = indiceMenosOcupado(motoristas, numMotoristas)
+                motoristas[indiceEscolhido].viagensFeitas = motoristas[indiceEscolhido].viagensFeitas + 1
+                tarifa:decimal = calcularTarifa(distanciaViagem, ehHoraPonta)
+                escrever("Corrida atribuída a ", motoristas[indiceEscolhido].nome, " -- tarifa: ", tarifa)
+            caso 4
+                escrever("Total de motoristas na frota: ", numMotoristas)
+            contrario
+                escrever("Opção inválida")
+    enquanto opcao <> 4

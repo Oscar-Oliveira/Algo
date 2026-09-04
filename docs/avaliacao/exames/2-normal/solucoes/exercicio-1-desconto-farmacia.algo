@@ -1,0 +1,15 @@
+algoritmo "DescontoFarmacia"
+
+inicio
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    temCartao:booleano
+    escrever("Tem cartão de fidelidade (verdadeiro/falso): ")
+    ler(temCartao)
+
+    se idade >= 65 ou temCartao entao
+        escrever("Tem direito a desconto")
+    senao
+        escrever("Sem direito a desconto")

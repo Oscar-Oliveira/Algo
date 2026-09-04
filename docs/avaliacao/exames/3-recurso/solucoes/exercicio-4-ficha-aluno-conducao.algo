@@ -1,0 +1,20 @@
+algoritmo "FichaAlunoConducao"
+
+estrutura Aluno
+    nome:cadeia
+    horasTreino:decimal
+
+funcao estaPronto(horas:decimal):booleano
+    retornar horas >= 20.0
+
+inicio
+    n:cadeia
+    escrever("Nome: ")
+    ler(n)
+
+    h:decimal
+    escrever("Horas de treino: ")
+    ler(h)
+
+    aluno:Aluno = {nome: n, horasTreino: h}
+    escrever(aluno.nome, " está pronto para o exame: ", estaPronto(aluno.horasTreino))

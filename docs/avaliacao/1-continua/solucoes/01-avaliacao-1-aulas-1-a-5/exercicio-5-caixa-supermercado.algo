@@ -1,0 +1,26 @@
+algoritmo "CaixaSupermercado"
+
+inicio
+    totalFaturado:decimal = 0.0
+    clientesAtendidos:inteiro = 0
+    valorCompra:decimal
+
+    fazer
+        escrever("Valor da compra (0 ou menos para fechar a caixa): ")
+        ler(valorCompra)
+
+        se valorCompra > 0 entao
+            temCartao:booleano
+            escrever("Tem cartão de desconto (verdadeiro/falso): ")
+            ler(temCartao)
+
+            valorFinal:decimal = valorCompra
+            se temCartao entao
+                valorFinal = valorCompra * 0.9
+
+            totalFaturado = totalFaturado + valorFinal
+            clientesAtendidos = clientesAtendidos + 1
+    enquanto valorCompra > 0
+
+    escrever("Total faturado: ", totalFaturado)
+    escrever("Clientes atendidos: ", clientesAtendidos)

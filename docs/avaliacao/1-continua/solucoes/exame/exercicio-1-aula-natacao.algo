@@ -1,0 +1,19 @@
+algoritmo "AulaNatacao"
+
+constante IDADE_MINIMA:inteiro = 6
+
+inicio
+    idade:inteiro
+    escrever("Idade da criança: ")
+    ler(idade)
+
+    sabeNadar:booleano
+    escrever("Já sabe nadar sozinha (verdadeiro/falso): ")
+    ler(sabeNadar)
+
+    se idade >= IDADE_MINIMA e nao sabeNadar entao
+        escrever("Pode inscrever-se na aula")
+    senao se idade < IDADE_MINIMA entao
+        escrever("Ainda não tem idade suficiente")
+    senao
+        escrever("Já sabe nadar sozinha, não precisa da aula de iniciação")

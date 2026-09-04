@@ -1,0 +1,15 @@
+algoritmo "FilaOficinaBicicletas"
+
+constante TEMPO_REPARACAO:decimal = 15.0
+
+inicio
+    numBicicletas:inteiro
+    escrever("Bicicletas na fila: ")
+    ler(numBicicletas)
+
+    tempoTotalEspera:decimal = 0.0
+    i:inteiro
+    para i de 1 ate numBicicletas fazer
+        tempoTotalEspera = tempoTotalEspera + i * TEMPO_REPARACAO
+
+    escrever("Tempo total de espera da fila: ", tempoTotalEspera)

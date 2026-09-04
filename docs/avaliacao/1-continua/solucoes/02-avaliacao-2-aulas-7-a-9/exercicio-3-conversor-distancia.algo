@@ -1,0 +1,11 @@
+algoritmo "ConversorDistancia"
+
+funcao kmParaMilhas(km:decimal):decimal
+    retornar km * 0.621371
+
+inicio
+    distancia:decimal
+    escrever("Distância em quilómetros: ")
+    ler(distancia)
+
+    escrever("Em milhas: ", kmParaMilhas(distancia))

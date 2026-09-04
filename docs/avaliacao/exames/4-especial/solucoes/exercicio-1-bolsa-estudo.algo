@@ -1,0 +1,13 @@
+algoritmo "BolsaEstudo"
+
+inicio
+    media:decimal
+    escrever("Média do aluno: ")
+    ler(media)
+
+    carencia:booleano
+    escrever("Está em situação de carência económica (verdadeiro/falso): ")
+    ler(carencia)
+
+    temDireito:booleano = media >= 14.0 e carencia
+    escrever("Tem direito a bolsa: ", temDireito)

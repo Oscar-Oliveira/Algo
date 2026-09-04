@@ -1,0 +1,13 @@
+algoritmo "ValidadorCodigoPostal"
+
+importar Cadeia
+
+inicio
+    codigoPostal:cadeia
+    escrever("Código postal (formato NNNN-NNN): ")
+    ler(codigoPostal)
+
+    afirmar cadeia.comprimento(codigoPostal) == 7, "o código postal tem de ter 7 carateres"
+    afirmar cadeia.caracter(codigoPostal, 4) == '-', "o 5º caráter tem de ser um hífen"
+
+    escrever("Código postal válido")

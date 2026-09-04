@@ -1,0 +1,34 @@
+algoritmo "ClinicaVeterinaria"
+
+importar Cadeia
+
+estrutura Animal
+    nome:cadeia
+    especie:cadeia
+    vacinado:booleano
+
+funcao contarVacinados(animais:Animal[], tamanho:inteiro):inteiro
+    total:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se animais[i].vacinado entao
+            total = total + 1
+    retornar total
+
+inicio
+    animais:Animal[4]
+    i:inteiro
+    para i de 0 ate 3 fazer
+        animais[i] = {}
+        escrever("Nome do animal: ")
+        ler(animais[i].nome)
+        afirmar cadeia.comprimento(animais[i].nome) > 0, "o nome não pode ser vazio"
+        escrever("Espécie: ")
+        ler(animais[i].especie)
+        escrever("Vacinado (verdadeiro/falso): ")
+        ler(animais[i].vacinado)
+
+    para i de 0 ate 3 fazer
+        escrever(animais[i].nome, " -- ", cadeia.maiusculas(animais[i].especie))
+
+    escrever("Animais vacinados: ", contarVacinados(animais, 4))

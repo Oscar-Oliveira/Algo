@@ -1,0 +1,13 @@
+algoritmo "ElegibilidadeMaratona"
+
+inicio
+    idade:inteiro
+    escrever("Idade: ")
+    ler(idade)
+
+    temAtestado:booleano
+    escrever("Tem atestado médico válido (verdadeiro/falso): ")
+    ler(temAtestado)
+
+    podeParticipar:booleano = idade >= 16 e temAtestado
+    escrever("Pode participar: ", podeParticipar)

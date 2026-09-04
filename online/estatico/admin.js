@@ -87,16 +87,22 @@ function carregarConteudoDaAba(nomeAba) {
   if (nomeAba === "alguem") carregarDefinicoesAlguem();
   if (nomeAba === "llm") carregarConfiguracoesLlmAdmin();
   if (nomeAba === "apoiopedagogico") carregarApoioPedagogico();
+  if (nomeAba === "manual") carregarManual();
+}
+
+// Extraído à parte (em vez de só dentro do listener de cada aba) porque
+// o atalho "Manual" no topo (ver botao-manual-topo mais abaixo) também
+// precisa de ativar uma aba -- a do Manual, que deixou de ter um botão
+// próprio na barra lateral.
+function ativarAba(nomeAba) {
+  abas.forEach((a) => a.classList.toggle("ativa", a.dataset.aba === nomeAba));
+  document.querySelectorAll(".conteudo-aba-admin").forEach((secao) => secao.classList.add("escondido"));
+  document.getElementById(`aba-conteudo-${nomeAba}`).classList.remove("escondido");
+  carregarConteudoDaAba(nomeAba);
 }
 
 abas.forEach((aba) => {
-  aba.addEventListener("click", () => {
-    abas.forEach((a) => a.classList.remove("ativa"));
-    aba.classList.add("ativa");
-    document.querySelectorAll(".conteudo-aba-admin").forEach((secao) => secao.classList.add("escondido"));
-    document.getElementById(`aba-conteudo-${aba.dataset.aba}`).classList.remove("escondido");
-    carregarConteudoDaAba(aba.dataset.aba);
-  });
+  aba.addEventListener("click", () => ativarAba(aba.dataset.aba));
 });
 
 // Subabas horizontais dentro de uma aba (ex: Investigação -> Dashboard/
@@ -111,6 +117,11 @@ document.querySelectorAll(".aba-secundaria-admin").forEach((subaba) => {
     document.getElementById(`subaba-conteudo-${subaba.dataset.subaba}`).classList.remove("escondido");
   });
 });
+
+// Atalho no topo (mesmo ícone do botão de ajuda do editor -- ver
+// editor.html/app.js) para a aba "Manual" -- esta aba não tem botão
+// próprio na barra lateral, só este atalho.
+document.getElementById("botao-manual-topo").addEventListener("click", () => ativarAba("manual"));
 
 // Abas só para admin global (ver online/main.py admin_global_atual) --
 // esconder aqui é só cosmético, a proteção real é do lado do servidor
@@ -2360,6 +2371,168 @@ botaoConfirmarAnaliseApoioGrupo.addEventListener("click", async () => {
   } finally {
     botaoConfirmarAnaliseApoioGrupo.disabled = false;
   }
+});
+
+// ---------- manual do painel ----------
+//
+// Renderizador de markdown propositadamente mínimo (cabeçalhos até nível
+// 3, negrito, código em linha, listas, tabelas, parágrafos e ligações)
+// -- cobre exatamente o que os capítulos de docs/manuais/manual-admin/
+// usam, sem trazer uma biblioteca externa só para isto (mesma filosofia
+// de formatarLinhaMarkdown/paragrafosHtml em ajuda.js, só um pouco mais
+// completo porque este manual usa listas/tabelas/ligações, ao contrário
+// dos enunciados de exemplos).
+
+function escaparHtmlManual(texto) {
+  const div = document.createElement("div");
+  div.textContent = texto;
+  return div.innerHTML;
+}
+
+function formatarInlineManual(texto) {
+  let html = escaparHtmlManual(texto);
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (correspondencia, rotulo, alvo) => {
+    if (/^\d{2}-[\w-]+\.md$/.test(alvo)) {
+      return `<a href="#" class="link-capitulo-manual" data-ficheiro="${alvo}">${rotulo}</a>`;
+    }
+    const externo = /^https?:\/\//.test(alvo) ? ' target="_blank" rel="noopener"' : "";
+    return `<a href="${alvo}"${externo}>${rotulo}</a>`;
+  });
+  return html;
+}
+
+function renderizarTabelaManual(linhas) {
+  const celulasDe = (linha) => linha.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+  const cabecalho = celulasDe(linhas[0]);
+  let html = "<table class=\"tabela-manual\"><thead><tr>";
+  html += cabecalho.map((c) => `<th>${formatarInlineManual(c)}</th>`).join("");
+  html += "</tr></thead><tbody>";
+  linhas.slice(2).forEach((linha) => {
+    html += "<tr>" + celulasDe(linha).map((c) => `<td>${formatarInlineManual(c)}</td>`).join("") + "</tr>";
+  });
+  return html + "</tbody></table>";
+}
+
+const MARCADOR_LISTA_NAO_ORDENADA = /^-\s/;
+const MARCADOR_LISTA_ORDENADA = /^\d+\.\s/;
+
+function renderizarListaManual(linhas) {
+  // Um item pode continuar em linhas seguintes sem marcador à frente (o
+  // markdown escrito nos capítulos usa isto para não ultrapassar 80
+  // colunas por linha dentro de um único item de lista).
+  const ordenada = MARCADOR_LISTA_ORDENADA.test(linhas[0]);
+  const marcador = ordenada ? MARCADOR_LISTA_ORDENADA : MARCADOR_LISTA_NAO_ORDENADA;
+  const itens = [];
+  linhas.forEach((linha) => {
+    if (marcador.test(linha)) {
+      itens.push(linha.replace(marcador, ""));
+    } else if (itens.length > 0) {
+      itens[itens.length - 1] += " " + linha.trim();
+    }
+  });
+  const etiqueta = ordenada ? "ol" : "ul";
+  return `<${etiqueta}>` + itens.map((item) => `<li>${formatarInlineManual(item)}</li>`).join("") + `</${etiqueta}>`;
+}
+
+function renderizarBlocoManual(bloco) {
+  const linhas = bloco.split("\n");
+  const cabecalho = linhas[0].match(/^(#{1,3})\s+(.*)/);
+  if (cabecalho) {
+    const nivel = cabecalho[1].length;
+    return `<h${nivel}>${formatarInlineManual(cabecalho[2])}</h${nivel}>`;
+  }
+  if (linhas.length >= 2 && linhas[0].includes("|") && /^[\s|:-]+$/.test(linhas[1])) {
+    return renderizarTabelaManual(linhas);
+  }
+  if (MARCADOR_LISTA_NAO_ORDENADA.test(linhas[0]) || MARCADOR_LISTA_ORDENADA.test(linhas[0])) {
+    return renderizarListaManual(linhas);
+  }
+  return `<p>${formatarInlineManual(linhas.join(" "))}</p>`;
+}
+
+function renderizarMarkdownManual(texto) {
+  return texto
+    .split(/\n\s*\n/)
+    .map((bloco) => bloco.trim())
+    .filter((bloco) => bloco !== "")
+    .map(renderizarBlocoManual)
+    .join("\n");
+}
+
+const indiceManual = document.getElementById("indice-manual");
+const conteudoManual = document.getElementById("conteudo-manual");
+const mensagemErroManual = document.getElementById("mensagem-erro-manual");
+let capitulosManual = null;
+const botoesCapituloManual = {};
+
+async function carregarManual() {
+  mensagemErroManual.textContent = "";
+  if (capitulosManual !== null) {
+    return;
+  }
+  try {
+    const resposta = await fetch("/api/admin/manual");
+    if (!resposta.ok) {
+      throw new Error(`HTTP ${resposta.status}`);
+    }
+    capitulosManual = (await resposta.json()).capitulos;
+  } catch (erro) {
+    mensagemErroManual.textContent = "Não foi possível carregar o manual: " + (erro && erro.message ? erro.message : erro);
+    return;
+  }
+  renderizarIndiceManual();
+}
+
+function renderizarIndiceManual() {
+  indiceManual.innerHTML = "";
+  if (capitulosManual.length === 0) {
+    indiceManual.innerHTML = '<p class="aviso-exemplo">Manual indisponível.</p>';
+    return;
+  }
+  capitulosManual.forEach((capitulo, indice) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "item-tema-exemplo";
+    item.textContent = capitulo.titulo;
+    item.addEventListener("click", () => abrirCapituloManual(capitulo.ficheiro));
+    botoesCapituloManual[capitulo.ficheiro] = item;
+    indiceManual.appendChild(item);
+    if (indice === 0) {
+      abrirCapituloManual(capitulo.ficheiro);
+    }
+  });
+}
+
+async function abrirCapituloManual(ficheiro) {
+  Object.values(botoesCapituloManual).forEach((el) => el.classList.remove("ativo"));
+  botoesCapituloManual[ficheiro]?.classList.add("ativo");
+  mensagemErroManual.textContent = "";
+  conteudoManual.innerHTML = '<p class="carregando-exemplos">A carregar...</p>';
+  try {
+    const resposta = await fetch(`/api/admin/manual/${encodeURIComponent(ficheiro)}`);
+    if (!resposta.ok) {
+      throw new Error(`HTTP ${resposta.status}`);
+    }
+    const { texto } = await resposta.json();
+    conteudoManual.innerHTML = renderizarMarkdownManual(texto);
+  } catch (erro) {
+    conteudoManual.innerHTML = "";
+    mensagemErroManual.textContent = "Não foi possível carregar este capítulo: " + (erro && erro.message ? erro.message : erro);
+  }
+}
+
+// Ligações entre capítulos (ex: "ver capítulo 4") navegam dentro do
+// próprio manual em vez de tentar abrir um ficheiro .md solto.
+conteudoManual.addEventListener("click", (evento) => {
+  const ligacao = evento.target.closest(".link-capitulo-manual");
+  if (!ligacao) {
+    return;
+  }
+  evento.preventDefault();
+  abrirCapituloManual(ligacao.dataset.ficheiro);
 });
 
 carregarConteudoDaAba("grupos");

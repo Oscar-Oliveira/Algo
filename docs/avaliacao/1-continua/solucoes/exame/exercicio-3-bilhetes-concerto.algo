@@ -1,0 +1,20 @@
+algoritmo "BilhetesConcerto"
+
+inicio
+    bilhetes:decimal[5]
+    i:inteiro
+    para i de 0 ate 4 fazer
+        escrever("Preço do bilhete ", i + 1, ": ")
+        ler(bilhetes[i])
+
+    receitaTotal:decimal = 0.0
+    para i de 0 ate 4 fazer
+        receitaTotal = receitaTotal + bilhetes[i]
+
+    maisCaro:decimal = bilhetes[0]
+    para i de 0 ate 4 fazer
+        se bilhetes[i] > maisCaro entao
+            maisCaro = bilhetes[i]
+
+    escrever("Receita total: ", receitaTotal)
+    escrever("Bilhete mais caro: ", maisCaro)

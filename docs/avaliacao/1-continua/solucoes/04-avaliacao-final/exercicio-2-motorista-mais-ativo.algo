@@ -1,0 +1,25 @@
+algoritmo "MotoristaMaisAtivo"
+
+estrutura Motorista
+    nome:cadeia
+    viagensFeitas:inteiro
+
+funcao motoristaMaisAtivo(motoristas:Motorista[], tamanho:inteiro):cadeia
+    melhorIndice:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se motoristas[i].viagensFeitas > motoristas[melhorIndice].viagensFeitas entao
+            melhorIndice = i
+    retornar motoristas[melhorIndice].nome
+
+inicio
+    motoristas:Motorista[3]
+    i:inteiro
+    para i de 0 ate 2 fazer
+        motoristas[i] = {}
+        escrever("Nome do motorista: ")
+        ler(motoristas[i].nome)
+        escrever("Viagens feitas: ")
+        ler(motoristas[i].viagensFeitas)
+
+    escrever("Motorista mais ativo: ", motoristaMaisAtivo(motoristas, 3))

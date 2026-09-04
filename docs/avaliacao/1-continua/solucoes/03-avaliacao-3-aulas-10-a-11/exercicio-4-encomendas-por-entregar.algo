@@ -1,0 +1,28 @@
+algoritmo "EncomendasPorEntregar"
+
+estrutura Encomenda
+    cliente:cadeia
+    valor:decimal
+    entregue:booleano
+
+funcao totalEntregues(encomendas:Encomenda[], tamanho:inteiro):inteiro
+    total:inteiro = 0
+    i:inteiro
+    para i de 0 ate tamanho - 1 fazer
+        se encomendas[i].entregue entao
+            total = total + 1
+    retornar total
+
+inicio
+    encomendas:Encomenda[3]
+    i:inteiro
+    para i de 0 ate 2 fazer
+        encomendas[i] = {}
+        escrever("Cliente: ")
+        ler(encomendas[i].cliente)
+        escrever("Valor: ")
+        ler(encomendas[i].valor)
+        escrever("Já entregue (verdadeiro/falso): ")
+        ler(encomendas[i].entregue)
+
+    escrever("Encomendas entregues: ", totalEntregues(encomendas, 3))

@@ -1,0 +1,14 @@
+algoritmo "GeradorIniciais"
+
+importar Cadeia
+
+inicio
+    nomeCompleto:cadeia
+    escrever("Nome completo (nome e apelido separados por um espaço): ")
+    ler(nomeCompleto)
+
+    partes:cadeia[2] = cadeia.dividir(nomeCompleto, " ")
+    inicial1:cadeia = cadeia.maiusculas(cadeia.subcadeia(partes[0], 0, 1))
+    inicial2:cadeia = cadeia.maiusculas(cadeia.subcadeia(partes[1], 0, 1))
+
+    escrever(inicial1, ". ", inicial2, ".")

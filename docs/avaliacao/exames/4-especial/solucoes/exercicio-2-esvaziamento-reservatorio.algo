@@ -1,0 +1,17 @@
+algoritmo "EsvaziamentoReservatorio"
+
+inicio
+    volume:inteiro
+    escrever("Volume inicial (litros): ")
+    ler(volume)
+
+    caudal:inteiro
+    escrever("Caudal de saída (litros/minuto): ")
+    ler(caudal)
+
+    minutos:inteiro = 0
+    enquanto volume > 0 fazer
+        volume = volume - caudal
+        minutos = minutos + 1
+
+    escrever("Minutos até esvaziar: ", minutos)

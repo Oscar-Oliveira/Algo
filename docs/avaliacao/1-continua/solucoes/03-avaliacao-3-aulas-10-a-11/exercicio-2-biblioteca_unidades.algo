@@ -1,0 +1,5 @@
+funcao metrosParaPes(metros:decimal):decimal
+    retornar metros * 3.28084
+
+funcao kgParaLibras(kg:decimal):decimal
+    retornar kg * 2.20462
